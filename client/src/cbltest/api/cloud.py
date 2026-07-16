@@ -23,9 +23,7 @@ class CouchbaseCloud:
         if server:
             self.__couchbase_server: CouchbaseServer = server
         elif not sync_gateway.using_rosmar:
-            raise CblTestError(
-                "Couchbase Server must be provided if Sync Gateway is not using Rosmar"
-            )
+            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
         self.__tracer = get_tracer(__name__, VERSION)
 
     @property
@@ -44,9 +42,7 @@ class CouchbaseCloud:
         if self.sync_gateway.using_rosmar:
             return
         for scope in db_payload.scopes():
-            self.__couchbase_server.create_collections(
-                db_payload.bucket, scope, db_payload.collections(scope)
-            )
+            self.__couchbase_server.create_collections(db_payload.bucket, scope, db_payload.collections(scope))
 
     def _check_all_indexes_removed(self, bucket: str) -> None:
         count = self.__couchbase_server.indexes_count(bucket)
@@ -85,9 +81,7 @@ class CouchbaseCloud:
             config_filepath = dataset_path / f"{dataset_name}-sg-config.json"
             data_filepath = dataset_path / f"{dataset_name}-sg.json"
             if not config_filepath.exists():
-                raise FileNotFoundError(
-                    f"Configuration file {dataset_name}-sg-config.json not found!"
-                )
+                raise FileNotFoundError(f"Configuration file {dataset_name}-sg-config.json not found!")
 
             if not data_filepath.exists():
                 raise FileNotFoundError(f"Data file {dataset_name}-sg.json not found!")
@@ -95,16 +89,12 @@ class CouchbaseCloud:
             with open(config_filepath, encoding="utf-8") as fin:
                 dataset_config = cast(dict, load(fin))
                 if not isinstance(dataset_config, dict):
-                    raise ValueError(
-                        f"Badly formatted {dataset_name}-sg-config.json (not an object)"
-                    )
+                    raise ValueError(f"Badly formatted {dataset_name}-sg-config.json (not an object)")
 
             users = _get_typed_required(dataset_config, "users", dict)
             if sg_config_options is not None:
                 nested_config = _get_typed_required(dataset_config, "config", dict)
-                valid_options = _get_typed_required(
-                    dataset_config, "config_options", dict
-                )
+                valid_options = _get_typed_required(dataset_config, "config_options", dict)
 
                 for option in sg_config_options:
                     if option not in valid_options:
@@ -163,9 +153,7 @@ class CouchbaseCloud:
         """Drop the bucket from the backing cluster."""
         if self.sync_gateway.using_rosmar:
             try:
-                await self.sync_gateway._send_request(
-                    "delete", f"/_rosmar/{bucket_name}"
-                )
+                await self.sync_gateway._send_request("delete", f"/_rosmar/{bucket_name}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code != 404:
                     raise

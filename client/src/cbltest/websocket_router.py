@@ -72,9 +72,7 @@ class WebSocketRouter:
 
         for fut in self.__pending.values():
             if not fut.done():
-                fut.set_exception(
-                    RuntimeError("WebSocket router stopped before response received")
-                )
+                fut.set_exception(RuntimeError("WebSocket router stopped before response received"))
 
         self.__pending.clear()
 
@@ -88,9 +86,7 @@ class WebSocketRouter:
         return url in self.__connections
 
     async def _websocket_handler(self, request: web.Request) -> web.WebSocketResponse:
-        ws = web.WebSocketResponse(
-            protocols=request.headers.getall("Sec-WebSocket-Protocol", [])
-        )
+        ws = web.WebSocketResponse(protocols=request.headers.getall("Sec-WebSocket-Protocol", []))
         await ws.prepare(request)
 
         async for msg in ws:
@@ -111,14 +107,10 @@ class WebSocketRouter:
                             self.__connections[self.__server_urls[url_index]] = ws
                             self.__conn_sem.release()
                         except (ValueError, IndexError):
-                            cbl_error(
-                                f"Unknown or invalid device ID received: {device}"
-                            )
+                            cbl_error(f"Unknown or invalid device ID received: {device}")
                             await ws.close(message=b"Unknown or invalid device ID")
             elif msg.type == web.WSMsgType.ERROR:
-                cbl_error(
-                    f"WebSocket connection closed with exception {ws.exception()}"
-                )
+                cbl_error(f"WebSocket connection closed with exception {ws.exception()}")
 
         return ws
 
@@ -144,9 +136,7 @@ class WebSocketRouter:
                 if ip.startswith("169.254"):
                     continue
 
-                if not WebSocketRouter._reachable(
-                    ip, remote_url.split("/")[2].split(":")[0], 5173
-                ):
+                if not WebSocketRouter._reachable(ip, remote_url.split("/")[2].split(":")[0], 5173):
                     continue
 
                 return ip
@@ -154,9 +144,7 @@ class WebSocketRouter:
         raise RuntimeError("No valid network interface found!")
 
     @staticmethod
-    def _reachable(
-        local_ip: str, remote_host: str, remote_port: int, timeout: float = 0.5
-    ) -> bool:
+    def _reachable(local_ip: str, remote_host: str, remote_port: int, timeout: float = 0.5) -> bool:
         """Bind to local_ip and attempt a TCP connect; returns True if succeeds or gets a
         connection refused (host reachable), False on timeout / network unreachable."""
         try:

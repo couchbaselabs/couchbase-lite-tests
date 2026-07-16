@@ -28,11 +28,7 @@ class _HttpLogWriter:
 
     def __get_path(self, suffix: str) -> Path:
         (self.__record_path / self.__folder_name).mkdir(parents=True, exist_ok=True)
-        return (
-            self.__record_path
-            / self.__folder_name
-            / f"{self.__fname_prefix}_{suffix}.txt"
-        )
+        return self.__record_path / self.__folder_name / f"{self.__fname_prefix}_{suffix}.txt"
 
     def write_begin(self, header: str, payload: str) -> None:
         (self.__record_path / self.__folder_name).mkdir(parents=True, exist_ok=True)

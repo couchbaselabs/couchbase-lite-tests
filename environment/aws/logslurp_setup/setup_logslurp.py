@@ -29,9 +29,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -80,9 +78,7 @@ def main(topology: TopologyConfig) -> None:
     global current_ssh
     current_ssh = topology.logslurp
     sftp = ssh.open_sftp()
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
     sftp.close()
     ssh.close()

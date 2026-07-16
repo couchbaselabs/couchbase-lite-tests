@@ -36,9 +36,7 @@ def _get_string_list(d: dict, key: str) -> list[str] | None:
 
     for x in ret_val:
         if not isinstance(x, str):
-            raise ValueError(
-                f"Expecting an array of strings for {key} but found {x} inside!"
-            )
+            raise ValueError(f"Expecting an array of strings for {key} but found {x} inside!")
 
     return cast(list[str], ret_val)
 
@@ -81,9 +79,7 @@ def _get_str_or_default(d: dict, key: str, default: str) -> str:
 
     ret_val = d[key]
     if not isinstance(ret_val, str):
-        raise ValueError(
-            f"Expecting a string for key {key} but found {ret_val} instead"
-        )
+        raise ValueError(f"Expecting a string for key {key} but found {ret_val} instead")
 
     return cast(str, ret_val)
 
@@ -95,9 +91,7 @@ def _get_bool_or_default(d: dict, key: str, default: bool) -> bool:
 
     ret_val = d[key]
     if not isinstance(ret_val, bool):
-        raise ValueError(
-            f"Expecting a string for key {key} but found {ret_val} instead"
-        )
+        raise ValueError(f"Expecting a string for key {key} but found {ret_val} instead")
 
     return cast(bool, ret_val)
 
@@ -115,9 +109,7 @@ def _get_typed(d: dict, key: str, expected_type: type[T]) -> T | None:
         return ret_val
 
     if not isinstance(ret_val, origin):
-        raise ValueError(
-            f"Expecting {str(type)} for key {key} but found {ret_val} instead"
-        )
+        raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
 
     return cast(T, ret_val)
 
@@ -137,9 +129,7 @@ def _get_typed_required(d: dict, key: str, expected_type: type[T]) -> T:
 
     ret_val = d[key]
     if not isinstance(ret_val, origin):
-        raise ValueError(
-            f"Expecting {str(type)} for key {key} but found {ret_val} instead"
-        )
+        raise ValueError(f"Expecting {str(type)} for key {key} but found {ret_val} instead")
 
     return cast(T, ret_val)
 
@@ -149,9 +139,7 @@ def json_equivalent(left: Any, right: Any, current_path: str = "") -> bool:
         if not isinstance(right, dict):
             left_obj = dumps_with_ellipsis(left)
             right_obj = dumps_with_ellipsis(right)
-            cbl_info(
-                f"Lefthand '{left_obj}' was a dict and righthand '{right_obj}' was not"
-            )
+            cbl_info(f"Lefthand '{left_obj}' was a dict and righthand '{right_obj}' was not")
             return False
 
         left_dict = cast(dict, left)
@@ -160,9 +148,7 @@ def json_equivalent(left: Any, right: Any, current_path: str = "") -> bool:
             if key not in right_dict:
                 left_obj = dumps_with_ellipsis(left)
                 right_obj = dumps_with_ellipsis(right)
-                cbl_info(
-                    f"Lefthand '{left_obj}' contained key '{key}' and righthand '{right_obj}' did not"
-                )
+                cbl_info(f"Lefthand '{left_obj}' contained key '{key}' and righthand '{right_obj}' did not")
                 return False
 
             next_path = f"{current_path}.{key}"
@@ -178,9 +164,7 @@ def json_equivalent(left: Any, right: Any, current_path: str = "") -> bool:
         if not isinstance(right, list):
             left_obj = dumps_with_ellipsis(left)
             right_obj = dumps_with_ellipsis(right)
-            cbl_info(
-                f"Lefthand '{left_obj}' was a list and righthand '{right_obj}' was not"
-            )
+            cbl_info(f"Lefthand '{left_obj}' was a list and righthand '{right_obj}' was not")
             return False
 
         left_list = cast(list, left)

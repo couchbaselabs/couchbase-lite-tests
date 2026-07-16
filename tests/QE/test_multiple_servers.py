@@ -13,9 +13,7 @@ def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool
     """Check if a CBS node is in cluster and if it needs recovery."""
     for node in cluster_nodes:
         hostname = node.get("hostname", "").split(":")[0]
-        alt_hostname = (
-            node.get("alternateAddresses", {}).get("external", {}).get("hostname", "")
-        )
+        alt_hostname = node.get("alternateAddresses", {}).get("external", {}).get("hostname", "")
         if cbs_hostname in [hostname, alt_hostname]:
             return True, node.get("clusterMembership") == "inactiveFailed"
     return False, False
@@ -28,9 +26,7 @@ def _recover_or_add_node(cbs_one, cbs_two):
     resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
     resp.raise_for_status()
     cluster_data = resp.json()
-    node_in_cluster, _ = _check_node_in_cluster(
-        cbs_two.hostname, cluster_data.get("nodes", [])
-    )
+    node_in_cluster, _ = _check_node_in_cluster(cbs_two.hostname, cluster_data.get("nodes", []))
     if node_in_cluster:
         cbs_one.recover(cbs_two)
     else:
@@ -92,9 +88,7 @@ async def _setup_database_and_user(
 @pytest.mark.min_couchbase_servers(2)
 class TestMultipleServers(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_rebalance_sanity(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_rebalance_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs_one = cblpytest.couchbase_servers[0]
         cbs_two = cblpytest.couchbase_servers[1]
@@ -127,27 +121,18 @@ class TestMultipleServers(CBLTestClass):
         await sg_user.update_documents(sg_db, docs_to_add)
         await asyncio.sleep(2)
 
-        self.mark_test_step(
-            "Verify all docs were created and store original revisions and version vectors"
-        )
+        self.mark_test_step("Verify all docs were created and store original revisions and version vectors")
         all_docs = await sg_user.get_all_documents(sg_db)
-        assert len(all_docs.rows) == num_docs, (
-            f"Expected {num_docs} docs, got {len(all_docs.rows)}"
-        )
+        assert len(all_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(all_docs.rows)}"
         original_revs = {row.id: row.revision for row in all_docs.rows}
         original_vvs = {}
 
         supports_version_vectors = await sg.supports_version_vectors()
         if supports_version_vectors:
             changes_initial = await sg_user.get_changes(sg_db, version_type="cv")
-            original_vvs = {
-                entry.id: entry.changes[0] if entry.changes else None
-                for entry in changes_initial.results
-            }
+            original_vvs = {entry.id: entry.changes[0] if entry.changes else None for entry in changes_initial.results}
 
-        self.mark_test_step(
-            f"Start concurrent updates ({num_updates} updates per doc) and rebalance CBS cluster"
-        )
+        self.mark_test_step(f"Start concurrent updates ({num_updates} updates per doc) and rebalance CBS cluster")
 
         async def update_docs_continuously() -> None:
             """Continuously update all documents num_updates times"""
@@ -162,9 +147,7 @@ class TestMultipleServers(CBLTestClass):
                         updates = [
                             DocumentUpdateEntry(
                                 id=f"test_doc_{i}",
-                                revid=rev_map.get(
-                                    f"test_doc_{i}"
-                                ),  # Use current revision
+                                revid=rev_map.get(f"test_doc_{i}"),  # Use current revision
                                 body={
                                     "type": "test_doc",
                                     "index": i,
@@ -178,9 +161,7 @@ class TestMultipleServers(CBLTestClass):
                         break  # Success, exit retry loop
                     except Exception as e:
                         if attempt < max_retries - 1:
-                            print(
-                                f"Update attempt {attempt + 1} failed: {e}, retrying..."
-                            )
+                            print(f"Update attempt {attempt + 1} failed: {e}, retrying...")
                             await asyncio.sleep(1)
                         else:
                             print(f"Update failed after {max_retries} attempts: {e}")
@@ -208,9 +189,7 @@ class TestMultipleServers(CBLTestClass):
         self.mark_test_step("Wait for all updates to complete")
         await update_task
 
-        self.mark_test_step(
-            "Verify all docs are present and revisions/version vectors changed"
-        )
+        self.mark_test_step("Verify all docs are present and revisions/version vectors changed")
         all_docs_final = await sg_user.get_all_documents(sg_db)
         assert len(all_docs_final.rows) == num_docs, (
             f"Expected {num_docs} docs after rebalance, got {len(all_docs_final.rows)}"
@@ -218,18 +197,14 @@ class TestMultipleServers(CBLTestClass):
 
         for row in all_docs_final.rows:
             original_rev = original_revs.get(row.id)
-            assert original_rev is not None, (
-                f"Document {row.id} not found in original revisions"
-            )
+            assert original_rev is not None, f"Document {row.id} not found in original revisions"
             assert row.revision != original_rev, (
                 f"Document {row.id} revision should have changed after {num_updates} "
                 f"updates. Original: {original_rev}, Current: {row.revision}"
             )
             if supports_version_vectors:
                 original_vv = original_vvs.get(row.id)
-                assert original_vv is not None, (
-                    f"Document {row.id} not found in original version vectors"
-                )
+                assert original_vv is not None, f"Document {row.id} not found in original version vectors"
                 assert row.cv != original_vv, (
                     f"Document {row.id} version vector should have changed after "
                     f"{num_updates} updates. Original: {original_vv}, Current: {row.cv}"
@@ -238,9 +213,7 @@ class TestMultipleServers(CBLTestClass):
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_server_goes_down_sanity(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_server_goes_down_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs_one = cblpytest.couchbase_servers[0]
         cbs_two = cblpytest.couchbase_servers[1]
@@ -270,9 +243,7 @@ class TestMultipleServers(CBLTestClass):
         ]
         await sg_user.update_documents(sg_db, docs_to_add)
         initial_docs = await sg_user.get_all_documents(sg_db)
-        assert len(initial_docs.rows) == num_docs, (
-            f"Expected {num_docs} docs, got {len(initial_docs.rows)}"
-        )
+        assert len(initial_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(initial_docs.rows)}"
 
         self.mark_test_step("Failover CBS node 2 to simulate server failure")
         cbs_one.failover(cbs_two)
@@ -321,9 +292,7 @@ class TestMultipleServers(CBLTestClass):
 @pytest.mark.min_couchbase_servers(1)
 class TestISGRCollectionMapping(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_isgr_explicit_collection_mapping(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_isgr_explicit_collection_mapping(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg_cluster = SyncGatewayCluster(cblpytest.sync_gateways)
         cbs = cblpytest.couchbase_servers[0]
         sg1, sg2, sg3 = sg_cluster.sync_gateways[:2]
@@ -346,9 +315,7 @@ class TestISGRCollectionMapping(CBLTestClass):
             cbs.create_bucket(bucket)
             cbs.create_collections(bucket, "_default", collections)
 
-        self.mark_test_step(
-            "Configure all SGs with their respective buckets and collections"
-        )
+        self.mark_test_step("Configure all SGs with their respective buckets and collections")
         for sg, sg_db, bucket, collections in [
             (sg1, sg_db1, bucket1, b1_collections),
             (sg2, sg_db2, bucket2, b2_collections),
@@ -358,9 +325,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 "bucket": bucket,
                 "num_index_replicas": 0,
                 "scopes": {
-                    "_default": {
-                        "collections": {"_default": {}, **{c: {} for c in collections}}
-                    },
+                    "_default": {"collections": {"_default": {}, **{c: {} for c in collections}}},
                 },
                 "unsupported": {"sgr_tls_skip_verify": True},
             }
@@ -430,24 +395,16 @@ class TestISGRCollectionMapping(CBLTestClass):
         await sg3.start_isgr(sg_db3, isgr_2_payload)
 
         self.mark_test_step("Wait for ISGR replications to complete")
-        await sg1.wait_for_isgr_status(
-            sg_db1, isgr_1_payload.replication_id, "stopped", timeout=60
-        )
-        await sg3.wait_for_isgr_status(
-            sg_db3, isgr_2_payload.replication_id, "stopped", timeout=60
-        )
+        await sg1.wait_for_isgr_status(sg_db1, isgr_1_payload.replication_id, "stopped", timeout=60)
+        await sg3.wait_for_isgr_status(sg_db3, isgr_2_payload.replication_id, "stopped", timeout=60)
 
         self.mark_test_step("""
             Verify docs replicated to SG2 (collection4 and collection5):
                 * collection4 should have docs from collection1
                 * collection5 should have docs from collection2
         """)
-        sg2_collection4_docs = await sg2.wait_for_all_documents(
-            sg_db2, num_docs, "_default", b2_collections[0]
-        )
-        sg2_collection5_docs = await sg2.wait_for_all_documents(
-            sg_db2, num_docs, "_default", b2_collections[1]
-        )
+        sg2_collection4_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[0])
+        sg2_collection5_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[1])
         sg2_collection4_ids = {row.id for row in sg2_collection4_docs.rows}
         sg2_collection5_ids = {row.id for row in sg2_collection5_docs.rows}
         for i in range(num_docs):
@@ -464,15 +421,9 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * collection7 should have docs from collection2
                 * collection8 should have docs from collection3
         """)
-        sg3_collection6_docs = await sg3.wait_for_all_documents(
-            sg_db3, num_docs, "_default", b3_collections[0]
-        )
-        sg3_collection7_docs = await sg3.wait_for_all_documents(
-            sg_db3, num_docs, "_default", b3_collections[1]
-        )
-        sg3_collection8_docs = await sg3.wait_for_all_documents(
-            sg_db3, num_docs, "_default", b3_collections[2]
-        )
+        sg3_collection6_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[0])
+        sg3_collection7_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[1])
+        sg3_collection8_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[2])
         sg3_collection6_ids = {row.id for row in sg3_collection6_docs.rows}
         sg3_collection7_ids = {row.id for row in sg3_collection7_docs.rows}
         sg3_collection8_ids = {row.id for row in sg3_collection8_docs.rows}

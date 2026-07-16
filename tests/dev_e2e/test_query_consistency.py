@@ -34,9 +34,7 @@ class TestQueryConsistency(CBLTestClass):
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         replicator = Replicator(
             dbs[0],
             cloud.sync_gateway.replication_url("travel"),
@@ -57,9 +55,7 @@ class TestQueryConsistency(CBLTestClass):
         )
         await replicator.start()
 
-        status = await replicator.wait_for(
-            ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300)
-        )
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -73,20 +69,14 @@ class TestQueryConsistency(CBLTestClass):
         sort: Callable[[dict], str] | None = None,
         comparison: Callable[[Any, Any], bool] = json_equivalent,
     ):
-        assert TestQueryConsistency.__database is not None, (
-            "Weird...setup not finished?"
-        )
+        assert TestQueryConsistency.__database is not None, "Weird...setup not finished?"
 
         query_for_logging = query.format(f"travel.{collection}")
         self.mark_test_step(f"Run '{query_for_logging}' on test server")
-        local_results = await TestQueryConsistency.__database.run_query(
-            query_for_logging
-        )
+        local_results = await TestQueryConsistency.__database.run_query(query_for_logging)
 
         self.mark_test_step(f"Run '{query_for_logging}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(
-            query, "travel", "travel", collection
-        )
+        remote_results = cblpytest.couchbase_servers[0].run_query(query, "travel", "travel", collection)
 
         self.mark_test_step("Check that the results are equivalent")
         if sort is not None:
@@ -95,12 +85,8 @@ class TestQueryConsistency(CBLTestClass):
 
         assert comparison(local_results, remote_results)
 
-    async def _test_join(
-        self, cblpytest: CBLPyTest, query: str, server_query: str | None = None
-    ):
-        assert TestQueryConsistency.__database is not None, (
-            "Weird...setup not finished?"
-        )
+    async def _test_join(self, cblpytest: CBLPyTest, query: str, server_query: str | None = None):
+        assert TestQueryConsistency.__database is not None, "Weird...setup not finished?"
 
         if server_query is None:
             server_query = query.replace("travel", "travel.travel")
@@ -113,9 +99,7 @@ class TestQueryConsistency(CBLTestClass):
         # If running this test standalone, you may need to CREATE PRIMARY INDEX
         # on both the airlines and routes collections.
         self.mark_test_step(f"Run '{server_query}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(
-            server_query, "travel", "travel", "airlines"
-        )
+        remote_results = cblpytest.couchbase_servers[0].run_query(server_query, "travel", "travel", "airlines")
 
         assert json_equivalent(local_results, remote_results)
 
@@ -154,9 +138,7 @@ class TestQueryConsistency(CBLTestClass):
         ],
     )
     async def test_select_star(self, cblpytest: CBLPyTest, doc_id: str):
-        await self._test_query(
-            cblpytest, f'SELECT * FROM {{}} WHERE meta().id = "{doc_id}"', "airlines"
-        )
+        await self._test_query(cblpytest, f'SELECT * FROM {{}} WHERE meta().id = "{doc_id}"', "airlines")
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("limit, offset", [(5, 5), (-5, -5)])

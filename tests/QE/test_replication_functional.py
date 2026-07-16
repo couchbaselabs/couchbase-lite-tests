@@ -24,11 +24,7 @@ class TestReplicationFunctional(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset.")
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
 
         self.mark_test_step("Create test user 'testuser' with no initial roles.")
         await cloud.sync_gateway.add_user(
@@ -45,14 +41,10 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create role1 with access to group1 channel.")
-        await cloud.sync_gateway.add_role(
-            "posts", "role1", {"_default": {"posts": {"admin_channels": ["group1"]}}}
-        )
+        await cloud.sync_gateway.add_role("posts", "role1", {"_default": {"posts": {"admin_channels": ["group1"]}}})
 
         self.mark_test_step("Create role2 with access to group2 channel.")
-        await cloud.sync_gateway.add_role(
-            "posts", "role2", {"_default": {"posts": {"admin_channels": ["group2"]}}}
-        )
+        await cloud.sync_gateway.add_role("posts", "role2", {"_default": {"posts": {"admin_channels": ["group2"]}}})
 
         self.mark_test_step("Assign only role1 to testuser initially.")
         await cloud.sync_gateway.add_user(
@@ -164,9 +156,7 @@ class TestReplicationFunctional(CBLTestClass):
             "initial_group1_doc2",
         }
         for doc_id in expected_group1_docs:
-            assert doc_id in replicated_doc_ids, (
-                f"Expected group1 document {doc_id} not found in CBL"
-            )
+            assert doc_id in replicated_doc_ids, f"Expected group1 document {doc_id} not found in CBL"
         unexpected_group2_docs = {
             "post_4",
             "post_5",
@@ -174,9 +164,7 @@ class TestReplicationFunctional(CBLTestClass):
             "initial_group2_doc2",
         }
         for doc_id in unexpected_group2_docs:
-            assert doc_id not in replicated_doc_ids, (
-                f"Unexpected group2 document {doc_id} found in CBL"
-            )
+            assert doc_id not in replicated_doc_ids, f"Unexpected group2 document {doc_id} found in CBL"
         assert len(replicated_doc_ids) == 5, (
             f"Expected exactly 5 documents (group1 only), got {len(replicated_doc_ids)}: {replicated_doc_ids}"
         )
@@ -293,9 +281,7 @@ class TestReplicationFunctional(CBLTestClass):
             f"Expected exactly 13 documents (all channels), got {len(final_replicated_doc_ids)}: {final_replicated_doc_ids}"
         )
 
-        self.mark_test_step(
-            "Verify specific documents from group2 that were previously inaccessible."
-        )
+        self.mark_test_step("Verify specific documents from group2 that were previously inaccessible.")
         for doc_id in [
             "post_4",
             "post_5",
@@ -303,12 +289,8 @@ class TestReplicationFunctional(CBLTestClass):
             "initial_group2_doc2",
         ]:
             doc = await db.get_document(DocumentEntry("_default.posts", doc_id))
-            assert doc is not None, (
-                f"Document {doc_id} should be accessible after adding role2"
-            )
-            assert "group2" in doc.body.get("channels", []), (
-                f"Document {doc_id} should have group2 channel"
-            )
+            assert doc is not None, f"Document {doc_id} should be accessible after adding role2"
+            assert "group2" in doc.body.get("channels", []), f"Document {doc_id} should have group2 channel"
         for doc_id in [
             "new_group1_doc1",
             "new_group1_doc2",
@@ -321,9 +303,7 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_CBL_SG_replication_with_rev_messages(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_CBL_SG_replication_with_rev_messages(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `short_expiry` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "short_expiry")
@@ -372,23 +352,17 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify doc_1 exists in SGW.")
-        sgw_doc = await cloud.sync_gateway.get_document(
-            "short_expiry", "doc_1", "_default", "_default"
-        )
+        sgw_doc = await cloud.sync_gateway.get_document("short_expiry", "doc_1", "_default", "_default")
         assert sgw_doc is not None, "doc_1 should exist in SGW after push replication"
         assert sgw_doc.body["type"] == "test_doc", "doc_1 should have correct content"
 
         self.mark_test_step("Purge doc_1 from SGW.")
-        await cloud.sync_gateway.purge_document(
-            "doc_1", "short_expiry", "_default", "_default"
-        )
+        await cloud.sync_gateway.purge_document("doc_1", "short_expiry", "_default", "_default")
 
         self.mark_test_step("Verify doc_1 is purged from SGW")
         all_docs = await cloud.sync_gateway.get_all_documents("short_expiry")
         sgw_doc_ids = {row.id for row in all_docs.rows}
-        assert "doc_1" not in sgw_doc_ids, (
-            f"doc_1 should be purged from SGW, but found in: {sgw_doc_ids}"
-        )
+        assert "doc_1" not in sgw_doc_ids, f"doc_1 should be purged from SGW, but found in: {sgw_doc_ids}"
 
         self.mark_test_step("""
             Create 2 new documents in CBL to flush doc_1's revision from SGW's rev_cache:
@@ -436,21 +410,15 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step("Verify documents exist in SGW.")
         all_docs_after = await cloud.sync_gateway.get_all_documents("short_expiry")
         sgw_doc_ids_after = {row.id for row in all_docs_after.rows}
-        assert "doc_2" in sgw_doc_ids_after, (
-            f"doc_2 should exist in SGW, found: {sgw_doc_ids_after}"
-        )
-        assert "doc_3" in sgw_doc_ids_after, (
-            f"doc_3 should exist in SGW, found: {sgw_doc_ids_after}"
-        )
+        assert "doc_2" in sgw_doc_ids_after, f"doc_2 should exist in SGW, found: {sgw_doc_ids_after}"
+        assert "doc_3" in sgw_doc_ids_after, f"doc_3 should exist in SGW, found: {sgw_doc_ids_after}"
 
         self.mark_test_step("Reset the database.")
         db_recreated = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
 
         self.mark_test_step("Verify the recreated database is empty.")
         lite_all_docs = await db_recreated.get_all_documents("_default._default")
-        assert len(lite_all_docs["_default._default"]) == 0, (
-            "Recreated database should be empty"
-        )
+        assert len(lite_all_docs["_default._default"]) == 0, "Recreated database should be empty"
 
         self.mark_test_step("""
             Start pull replication from SGW to recreated database:
@@ -490,48 +458,32 @@ class TestReplicationFunctional(CBLTestClass):
         replicated_doc_ids = {doc.id for doc in lite_all_docs["_default._default"]}
         expected_docs = {"doc1", "doc_2", "doc_3"}
         for doc_id in expected_docs:
-            assert doc_id in replicated_doc_ids, (
-                f"Expected document {doc_id} not found in CBL"
-            )
-        assert "doc_1" not in replicated_doc_ids, (
-            "Purged document doc_1 should not be replicated"
-        )
+            assert doc_id in replicated_doc_ids, f"Expected document {doc_id} not found in CBL"
+        assert "doc_1" not in replicated_doc_ids, "Purged document doc_1 should not be replicated"
         assert len(replicated_doc_ids) == 3, (
             f"Expected exactly 3 documents, got {len(replicated_doc_ids)}: {replicated_doc_ids}"
         )
 
         self.mark_test_step("Verify specific document contents")
-        dataset_doc = await db_recreated.get_document(
-            DocumentEntry("_default._default", "doc1")
-        )
+        dataset_doc = await db_recreated.get_document(DocumentEntry("_default._default", "doc1"))
         assert dataset_doc is not None, "Dataset document should be accessible"
-        doc2 = await db_recreated.get_document(
-            DocumentEntry("_default._default", "doc_2")
-        )
+        doc2 = await db_recreated.get_document(DocumentEntry("_default._default", "doc_2"))
         assert doc2 is not None, "doc_2 should be accessible"
         assert doc2.body["type"] == "flush_doc", "doc_2 should have correct content"
-        doc3 = await db_recreated.get_document(
-            DocumentEntry("_default._default", "doc_3")
-        )
+        doc3 = await db_recreated.get_document(DocumentEntry("_default._default", "doc_3"))
         assert doc3 is not None, "doc_3 should be accessible"
         assert doc3.body["type"] == "flush_doc", "doc_3 should have correct content"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_behavior_with_channelRole_modification(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_replication_behavior_with_channelRole_modification(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset.")
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
 
         self.mark_test_step("Create test user 'testuser' with no initial access.")
         await cloud.sync_gateway.add_user(
@@ -542,9 +494,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create role 'testrole' with access to group1 channel.")
-        await cloud.sync_gateway.add_role(
-            "posts", "testrole", {"_default": {"posts": {"admin_channels": ["group1"]}}}
-        )
+        await cloud.sync_gateway.add_role("posts", "testrole", {"_default": {"posts": {"admin_channels": ["group1"]}}})
 
         self.mark_test_step("Assign testrole to testuser.")
         await cloud.sync_gateway.add_user(
@@ -623,26 +573,18 @@ class TestReplicationFunctional(CBLTestClass):
             "initial_doc2",
         }
         for doc_id in expected_initial_docs:
-            assert doc_id in initial_replicated_doc_ids, (
-                f"Expected initial document {doc_id} not found in CBL"
-            )
+            assert doc_id in initial_replicated_doc_ids, f"Expected initial document {doc_id} not found in CBL"
         unexpected_docs = {"post_4", "post_5"}
         for doc_id in unexpected_docs:
-            assert doc_id not in initial_replicated_doc_ids, (
-                f"Unexpected document {doc_id} found in CBL"
-            )
+            assert doc_id not in initial_replicated_doc_ids, f"Unexpected document {doc_id} found in CBL"
         assert len(initial_replicated_doc_ids) == 5, (
             f"Expected exactly 5 documents initially, got {len(initial_replicated_doc_ids)}: {initial_replicated_doc_ids}"
         )
 
         self.mark_test_step("Change testrole's channel access from group1 to group2.")
-        await cloud.sync_gateway.add_role(
-            "posts", "testrole", {"_default": {"posts": {"admin_channels": ["group2"]}}}
-        )
+        await cloud.sync_gateway.add_role("posts", "testrole", {"_default": {"posts": {"admin_channels": ["group2"]}}})
 
-        self.mark_test_step(
-            "Add new documents to SGW in group1 channel (should NOT be accessible)."
-        )
+        self.mark_test_step("Add new documents to SGW in group1 channel (should NOT be accessible).")
         await cloud.sync_gateway.update_documents(
             "posts",
             [
@@ -670,9 +612,7 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        self.mark_test_step(
-            "Add new documents to SGW in group2 channel (should be accessible)."
-        )
+        self.mark_test_step("Add new documents to SGW in group2 channel (should be accessible).")
         await cloud.sync_gateway.update_documents(
             "posts",
             [
@@ -705,9 +645,7 @@ class TestReplicationFunctional(CBLTestClass):
             * Should NOT have: initial_doc1, initial_doc2 (group1 no longer accessible), new_group1_doc1, new_group1_doc2 (group1 no longer accessible).
         """)
         lite_all_docs_final = await db.get_all_documents("_default.posts")
-        final_replicated_doc_ids = {
-            doc.id for doc in lite_all_docs_final["_default.posts"]
-        }
+        final_replicated_doc_ids = {doc.id for doc in lite_all_docs_final["_default.posts"]}
         expected_final_docs = {
             "post_1",
             "post_2",
@@ -718,9 +656,7 @@ class TestReplicationFunctional(CBLTestClass):
         }
 
         for doc_id in expected_final_docs:
-            assert doc_id in final_replicated_doc_ids, (
-                f"Expected final document {doc_id} not found in CBL"
-            )
+            assert doc_id in final_replicated_doc_ids, f"Expected final document {doc_id} not found in CBL"
         group1_docs = {
             "initial_doc1",
             "initial_doc2",
@@ -736,13 +672,9 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify specific document contents.")
-        new_group2_doc = await db.get_document(
-            DocumentEntry("_default.posts", "new_group2_doc1")
-        )
+        new_group2_doc = await db.get_document(DocumentEntry("_default.posts", "new_group2_doc1"))
         assert new_group2_doc is not None, "new_group2_doc1 should be accessible"
-        assert new_group2_doc.body["title"] == "New Group2 Doc 1", (
-            "new_group2_doc1 should have correct content"
-        )
+        assert new_group2_doc.body["title"] == "New Group2 Doc 1", "new_group2_doc1 should have correct content"
         post4_doc = await db.get_document(DocumentEntry("_default.posts", "post_4"))
         assert post4_doc is not None, "post_4 should be accessible after role change"
         post5_doc = await db.get_document(DocumentEntry("_default.posts", "post_5"))
@@ -751,9 +683,7 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_conflict_withConflicts_withChannels(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_default_conflict_withConflicts_withChannels(self, cblpytest: CBLPyTest, dataset_path: Path):
         await self.skip_if_sgw_not(cblpytest.sync_gateways[0], "<=4.0.0")
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.simple_cloud()
@@ -805,15 +735,9 @@ class TestReplicationFunctional(CBLTestClass):
             collection="posts",
         )
 
-        self.mark_test_step(
-            "Create conflicts by having both users update the same documents."
-        )
-        doc1 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc1", "_default", "posts"
-        )
-        doc2 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc2", "_default", "posts"
-        )
+        self.mark_test_step("Create conflicts by having both users update the same documents.")
+        doc1 = await cloud.sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")
+        doc2 = await cloud.sync_gateway.get_document("posts", "shared_doc2", "_default", "posts")
         assert doc1 is not None, "Document shared_doc1 not found in SGW"
         assert doc2 is not None, "Document shared_doc2 not found in SGW"
         assert doc1.revid is not None, "Document shared_doc1 has no revision ID"
@@ -882,11 +806,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Create a CBL database.")
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
 
         self.mark_test_step("Start push-pull replication for both users.")
         replicator1 = Replicator(
@@ -923,12 +843,8 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         # Verify that conflicts exist in the database
-        doc1_result = await db.get_document(
-            DocumentEntry("_default.posts", "shared_doc1")
-        )
-        doc2_result = await db.get_document(
-            DocumentEntry("_default.posts", "shared_doc2")
-        )
+        doc1_result = await db.get_document(DocumentEntry("_default.posts", "shared_doc1"))
+        doc2_result = await db.get_document(DocumentEntry("_default.posts", "shared_doc2"))
         assert doc1_result is not None, "Document shared_doc1 not found"
         assert doc2_result is not None, "Document shared_doc2 not found"
         assert "," in doc1_result.revs, "No conflicts found in shared_doc1"
@@ -971,25 +887,17 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify documents in Sync Gateway have the latest updates.")
-        sgw_doc1 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc1", "_default", "posts"
-        )
-        sgw_doc2 = await cloud.sync_gateway.get_document(
-            "posts", "shared_doc2", "_default", "posts"
-        )
+        sgw_doc1 = await cloud.sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")
+        sgw_doc2 = await cloud.sync_gateway.get_document("posts", "shared_doc2", "_default", "posts")
         assert sgw_doc1 is not None, "Document shared_doc1 not found in SGW"
         assert sgw_doc2 is not None, "Document shared_doc2 not found in SGW"
         assert sgw_doc1.body["title"] == "Shared Document 1 - Updated by CBL User1", (
             f"Document 1 in SG does not have user1's CBL update. Found: {sgw_doc1.body['title']}"
         )
-        assert sgw_doc1.body["version"] == 3, (
-            "Document 1 version should be 3 after conflict resolution"
-        )
+        assert sgw_doc1.body["version"] == 3, "Document 1 version should be 3 after conflict resolution"
         assert sgw_doc2.body["title"] == "Shared Document 2 - Updated by CBL User2", (
             f"Document 2 in SG does not have user2's CBL update. Found: {sgw_doc2.body['title']}"
         )
-        assert sgw_doc2.body["version"] == 3, (
-            "Document 2 version should be 3 after conflict resolution"
-        )
+        assert sgw_doc2.body["version"] == 3, "Document 2 version should be 3 after conflict resolution"
 
         await cblpytest.test_servers[0].cleanup()

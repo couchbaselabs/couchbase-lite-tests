@@ -17,9 +17,7 @@ from cbltest.utils import assert_not_null
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_empty_database_active_only(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
@@ -62,9 +60,7 @@ class TestReplicationBehavior(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only the 50 non deleted documents were replicated"
-        )
+        self.mark_test_step("Check that only the 50 non deleted documents were replicated")
         assert len(replicator.document_updates) == 50
         for entry in replicator.document_updates:
             name_number = int(entry.document_id[-3:])

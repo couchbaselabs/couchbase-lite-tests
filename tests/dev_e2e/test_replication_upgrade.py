@@ -20,9 +20,7 @@ from shared.upgrade_test_helpers import (
 @pytest.mark.min_couchbase_servers(1)
 class TestReplicationUpgrade(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_1(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_1(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that hasn’t been
         replicated — a mutation made on CBL before the 4.x upgrade has not yet been pushed.
@@ -59,13 +57,9 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Revision ID mismatch: Local:  {post.local.revid}, Remote: {post.remote.revid}"
             )
 
-            assert post.local.cv is None, (
-                f"Expected local doc to have no HLV, but got: {post.local.cv}"
-            )
+            assert post.local.cv is None, f"Expected local doc to have no HLV, but got: {post.local.cv}"
 
-            assert post.remote.cv and post.remote.cv.endswith(
-                "@Revision+Tree+Encoding"
-            ), (
+            assert post.remote.cv and post.remote.cv.endswith("@Revision+Tree+Encoding"), (
                 f"Expected remote doc's HLV to end with '@Revision+Tree+Encoding', but got: {post.remote.cv}"
             )
 
@@ -79,9 +73,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_2(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_2(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication where SGW has a pre-upgrade mutation that hasn’t been
         replicated — a mutation made on SGW before the 4.x upgrade has not yet been pulled.
@@ -118,13 +110,9 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Revision ID mismatch: Local:  {post.local.revid}, Remote: {post.remote.revid}"
             )
 
-            assert post.local.cv is None, (
-                f"Expected local doc to have no HLV, but got: {post.local.cv}"
-            )
+            assert post.local.cv is None, f"Expected local doc to have no HLV, but got: {post.local.cv}"
 
-            assert post.remote.cv is None, (
-                f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
-            )
+            assert post.remote.cv is None, f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
 
         await do_upgrade_replication_test(
             self,
@@ -136,9 +124,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_3(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_3(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that SGW
         already knows — a mutation made on CBL before the 4.x upgrade has not
@@ -176,13 +162,9 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Revision ID mismatch: Local:  {post.local.revid}, Remote: {post.remote.revid}"
             )
 
-            assert post.local.cv is None, (
-                f"Expected local doc to have no HLV, but got: {post.local.cv}"
-            )
+            assert post.local.cv is None, f"Expected local doc to have no HLV, but got: {post.local.cv}"
 
-            assert post.remote.cv is None, (
-                f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
-            )
+            assert post.remote.cv is None, f"Expected remote doc to have no HLV, but got: {post.remote.cv}"
 
         await do_upgrade_replication_test(
             self,
@@ -194,9 +176,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_4(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_4(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication where CBL has a pre-upgrade mutation that is already in
         SGW’s history and SGW includes post-upgrade mutations — a mutation made on CBL
@@ -231,9 +211,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revid, but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
 
             assert post.remote.revid, "Expected remote doc to have revid, but got none"
 
@@ -251,9 +229,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_5(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_5(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         CBL pull of a post-upgrade mutation that shares a common ancestor with the
         CBL version — SGW has a new mutation with the CBL revTreeID as its ancestor,
@@ -287,9 +263,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revid, but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
 
             assert post.remote.revid, "Expected remote doc to have revid, but got none"
 
@@ -307,9 +281,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_nonconflict_case_6(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_nonconflict_case_6(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         CBL push of a post-upgrade mutation that shares a common ancestor with the
         SGW version — CBL has a post-upgrade mutation with the same revTreeID ancestor
@@ -340,13 +312,9 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revid, but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
 
-            assert post.remote.revid is not None, (
-                "Expected remote doc to have revid, but got none"
-            )
+            assert post.remote.revid is not None, "Expected remote doc to have revid, but got none"
 
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
@@ -362,9 +330,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_1(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_1(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Push replication with a conflict between pre-upgrade CBL and SGW mutations —
         both sides have conflicting legacy revisions created before the 4.x upgrade.
@@ -409,14 +375,10 @@ class TestReplicationUpgrade(CBLTestClass):
 
             # Validate Post-condition:
             assert post.remote.revid == pre.remote.revid, (
-                f"Expected remote doc's revid to be unchanged. "
-                f"Before: {pre.remote.revid}, After: {post.remote.revid}"
+                f"Expected remote doc's revid to be unchanged. Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
 
-            assert post.remote.cv is None, (
-                f"Expected remote doc's HLV to be unchanged (none), "
-                f"but got {post.remote.cv}"
-            )
+            assert post.remote.cv is None, f"Expected remote doc's HLV to be unchanged (none), but got {post.remote.cv}"
 
         await do_upgrade_replication_test(
             self,
@@ -430,9 +392,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_2(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_2(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
         resolved by the default conflict resolver where SGW wins — both SGW and CBL
@@ -475,9 +435,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"RevID mismatch: Local:  {post.local.revid}, Remote: {post.remote.revid}"
             )
 
-            assert post.local.cv is None, (
-                f"Expected local doc to have no HLV, but got: {post.local.cv}"
-            )
+            assert post.local.cv is None, f"Expected local doc to have no HLV, but got: {post.local.cv}"
 
         await do_upgrade_replication_test(
             self,
@@ -512,9 +470,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_3(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_3(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between a pre-upgrade CBL mutation and a post-upgrade
         SGW mutation, resolved by the default conflict resolver where SGW wins — SGW and CBL
@@ -549,9 +505,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate Post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revID , but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revID , but got: {post.local.revid}"
 
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
@@ -591,9 +545,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_4(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_4(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
         resolved by the default conflict resolver where CBL wins — SGW and CBL have
@@ -629,13 +581,9 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate Post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revID, but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revID, but got: {post.local.revid}"
 
-            assert pre.local.cv is None and post.local.cv, (
-                f"Expected local doc to have HLV, but got: {post.local.cv}"
-            )
+            assert pre.local.cv is None and post.local.cv, f"Expected local doc to have HLV, but got: {post.local.cv}"
 
         await do_upgrade_replication_test(
             self,
@@ -672,9 +620,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_5(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_5(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between a pre-upgrade CBL mutation and
         a post-upgrade SGW mutation, resolved by the default conflict resolver
@@ -710,9 +656,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             # Validate Post-condition:
-            assert post.local.revid is None, (
-                f"Expected local doc to have no revID, but got: {post.local.revid}"
-            )
+            assert post.local.revid is None, f"Expected local doc to have no revID, but got: {post.local.revid}"
 
             assert post.local.cv and post.local.cv != post.remote.cv, (
                 f"Expected local doc's HLV to be different from remote doc's HLV after the merge, "
@@ -760,9 +704,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_6(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_6(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between a post-upgrade CBL mutation and
         a pre-upgrade SGW mutation, resolved with local wins — SGW and CBL have
@@ -839,9 +781,7 @@ class TestReplicationUpgrade(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_conflict_case_7(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_conflict_case_7(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Bidirectional replication conflict between a post-upgrade CBL mutation and
         a pre-upgrade SGW mutation, resolved with remote wins — SGW and CBL have
@@ -884,8 +824,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.local.cv.endswith("@Revision+Tree+Encoding"), (
-                f"Expected local doc's HLV to be a rev-tree encoded, "
-                f"but got before={post.local.cv}"
+                f"Expected local doc's HLV to be a rev-tree encoded, but got before={post.local.cv}"
             )
 
         await do_upgrade_replication_test(
@@ -908,10 +847,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
 
-            assert post.remote.cv is None, (
-                f"Expected remote doc HLV to be unchanged (None), "
-                f"but got {post.remote.cv}"
-            )
+            assert post.remote.cv is None, f"Expected remote doc HLV to be unchanged (None), but got {post.remote.cv}"
 
         await do_upgrade_replication_test(
             self,

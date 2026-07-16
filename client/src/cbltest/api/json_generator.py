@@ -59,9 +59,7 @@ class JSONGenerator:
                         "data": {
                             "temperature": random.uniform(-20, 40),
                             "humidity": random.randint(0, 100),
-                            "status": random.choice(
-                                ["active", "inactive", "maintenance"]
-                            ),
+                            "status": random.choice(["active", "inactive", "maintenance"]),
                         }
                     },
                     {
@@ -80,9 +78,7 @@ class JSONGenerator:
         random.seed(self.seed + offset)
         if self.format == "json":
             doc["data"]["temperature"] += random.uniform(-5, 5)
-            doc["data"]["humidity"] = (
-                doc["data"]["humidity"] + random.randint(-10, 10)
-            ) % 100
+            doc["data"]["humidity"] = (doc["data"]["humidity"] + random.randint(-10, 10)) % 100
             doc["data"]["status"] = random.choice(["active", "inactive", "maintenance"])
             doc["metadata"]["version"] = doc["metadata"]["version"] + 1
             doc["metadata"]["modified_at"] = int(time.time())
@@ -110,11 +106,7 @@ class JSONGenerator:
         def process_batch(batch):
             result = {}
             for item in batch:
-                output = (
-                    process_fn(items_doc[item], item)
-                    if items_doc is not None
-                    else process_fn(item)
-                )
+                output = process_fn(items_doc[item], item) if items_doc is not None else process_fn(item)
                 result.update(output)
             return result
 
@@ -137,9 +129,7 @@ class JSONGenerator:
         documents = self.batch_process(self.generate_document, doc_ids)
         return documents
 
-    def update_all_documents(
-        self, documents: dict[str, Any]
-    ) -> dict[str, dict[str, Any]]:
+    def update_all_documents(self, documents: dict[str, Any]) -> dict[str, dict[str, Any]]:
         """Update all documents with consistent modifications"""
 
         doc_ids = list(documents.keys())

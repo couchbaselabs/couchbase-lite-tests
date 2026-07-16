@@ -26,19 +26,13 @@ async def update_cbl(cbl_db, doc_id, data):
 @pytest.mark.min_sync_gateways(1)
 class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_cbl_updates_concurrently_with_push_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_sg_cbl_updates_concurrently_with_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
         self.mark_test_step("Reset local database and load `posts` dataset")
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
 
         self.mark_test_step("""
             Start a replicator:
@@ -94,9 +88,7 @@ class TestNoConflicts(CBLTestClass):
                 ],
                 collection="posts",
             ),
-            update_cbl(
-                db, "post_1000", [{"channels": ["group1"], "title": "CBL Update"}]
-            ),
+            update_cbl(db, "post_1000", [{"channels": ["group1"], "title": "CBL Update"}]),
         )
 
         self.mark_test_step("""
@@ -136,16 +128,10 @@ class TestNoConflicts(CBLTestClass):
         self.mark_test_step("Verify updated doc body in SGW and CBL.")
         cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1000"))
         assert cbl_doc is not None, "Document not found"
-        assert cbl_doc.id == "post_1000", (
-            f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
-        )
-        sg_doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        assert cbl_doc.id == "post_1000", f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
+        sg_doc = await cloud.sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert sg_doc is not None, "Document not found"
-        assert sg_doc.id == "post_1000", (
-            f"Incorrect document ID (expected post_1000; got {sg_doc.id})"
-        )
+        assert sg_doc.id == "post_1000", f"Incorrect document ID (expected post_1000; got {sg_doc.id})"
         assert sg_doc.body.get("title") == cbl_doc.body.get("title"), (
             f"Mismatch in document title, SG: {sg_doc.body.get('title')}, CBL: {cbl_doc.body.get('title')}"
         )
@@ -154,9 +140,7 @@ class TestNoConflicts(CBLTestClass):
             Update docs through CBL:
                 * `"title"`: `"CBL Update 2"`
         """)
-        await update_cbl(
-            db, "post_1000", [{"channels": ["group1"], "title": "CBL Update 2"}]
-        )
+        await update_cbl(db, "post_1000", [{"channels": ["group1"], "title": "CBL Update 2"}])
 
         self.mark_test_step("Wait until the replicators are idle.")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
@@ -169,9 +153,7 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Verify docs got replicated to SGW with CBL updates.")
-        sg_doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        sg_doc = await cloud.sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert sg_doc is not None, "Document not found"
         assert sg_doc.body.get("title") == "CBL Update 2", (
             f"Wrong title in SG doc (expected 'CBL Update 2'; got {sg_doc.body.get('title')}"
@@ -180,31 +162,15 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_cbls_updates_concurrently_with_push(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_multiple_cbls_updates_concurrently_with_push(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step(
-            "Reset local database and load `posts` dataset on all 3 CBLs"
-        )
-        db1 = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
-        db2 = (
-            await cblpytest.test_servers[1].create_and_reset_db(
-                ["db2"], dataset="posts"
-            )
-        )[0]
-        db3 = (
-            await cblpytest.test_servers[2].create_and_reset_db(
-                ["db3"], dataset="posts"
-            )
-        )[0]
+        self.mark_test_step("Reset local database and load `posts` dataset on all 3 CBLs")
+        db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
+        db2 = (await cblpytest.test_servers[1].create_and_reset_db(["db2"], dataset="posts"))[0]
+        db3 = (await cblpytest.test_servers[2].create_and_reset_db(["db3"], dataset="posts"))[0]
 
         self.mark_test_step("""
             Create docs in CBL DB1, DB2, DB3:
@@ -276,15 +242,9 @@ class TestNoConflicts(CBLTestClass):
                 * In DB3: `"CBL3 Update 1"`
         """)
         await asyncio.gather(
-            update_cbl(
-                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]
-            ),
-            update_cbl(
-                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]
-            ),
-            update_cbl(
-                db3, "post_1000", [{"channels": ["group2"], "title": "CBL3 Update 1"}]
-            ),
+            update_cbl(db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]),
+            update_cbl(db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]),
+            update_cbl(db3, "post_1000", [{"channels": ["group2"], "title": "CBL3 Update 1"}]),
         )
 
         self.mark_test_step("Wait until the replicators are idle")
@@ -321,12 +281,8 @@ class TestNoConflicts(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Verify replication was successful and document content in SGW."
-        )
-        sg_doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        self.mark_test_step("Verify replication was successful and document content in SGW.")
+        sg_doc = await cloud.sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert sg_doc is not None, "Document should exist in SGW"
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
@@ -347,31 +303,15 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[2].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_cbls_updates_concurrently_with_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_multiple_cbls_updates_concurrently_with_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step(
-            "Reset local database and load `posts` dataset on all 3 CBLs"
-        )
-        db1 = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="posts"
-            )
-        )[0]
-        db2 = (
-            await cblpytest.test_servers[1].create_and_reset_db(
-                ["db2"], dataset="posts"
-            )
-        )[0]
-        db3 = (
-            await cblpytest.test_servers[2].create_and_reset_db(
-                ["db3"], dataset="posts"
-            )
-        )[0]
+        self.mark_test_step("Reset local database and load `posts` dataset on all 3 CBLs")
+        db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
+        db2 = (await cblpytest.test_servers[1].create_and_reset_db(["db2"], dataset="posts"))[0]
+        db3 = (await cblpytest.test_servers[2].create_and_reset_db(["db3"], dataset="posts"))[0]
 
         self.mark_test_step("Create a new doc in SG: `post_1000`.")
         await cloud.sync_gateway.update_documents(
@@ -459,15 +399,9 @@ class TestNoConflicts(CBLTestClass):
                 ],
                 collection="posts",
             ),
-            update_cbl(
-                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]
-            ),
-            update_cbl(
-                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]
-            ),
-            update_cbl(
-                db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 1"}]
-            ),
+            update_cbl(db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 1"}]),
+            update_cbl(db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 1"}]),
+            update_cbl(db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 1"}]),
         )
 
         self.mark_test_step("Wait until the replicators are idle")
@@ -491,9 +425,7 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        sg_doc = await cloud.sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert sg_doc is not None, "Document should exist in SGW"
         assert (
             cbl1_doc.body.get("title")
@@ -513,15 +445,9 @@ class TestNoConflicts(CBLTestClass):
                 * In DB3: `"title": "CBL3 Update 2"`
         """)
         await asyncio.gather(
-            update_cbl(
-                db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 2"}]
-            ),
-            update_cbl(
-                db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 2"}]
-            ),
-            update_cbl(
-                db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 2"}]
-            ),
+            update_cbl(db1, "post_1000", [{"channels": ["group1"], "title": "CBL1 Update 2"}]),
+            update_cbl(db2, "post_1000", [{"channels": ["group1"], "title": "CBL2 Update 2"}]),
+            update_cbl(db3, "post_1000", [{"channels": ["group1"], "title": "CBL3 Update 2"}]),
         )
 
         self.mark_test_step("Wait until the replicators are idle")
@@ -545,9 +471,7 @@ class TestNoConflicts(CBLTestClass):
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
-        sg_doc = await cloud.sync_gateway.get_document(
-            "posts", "post_1000", collection="posts"
-        )
+        sg_doc = await cloud.sync_gateway.get_document("posts", "post_1000", collection="posts")
         assert sg_doc is not None, "Document should exist in SGW"
         assert (
             cbl1_doc.body.get("title")

@@ -84,13 +84,9 @@ class JavascriptBridge(PlatformBridge):
             if proc.name() == proc_name:
                 try:
                     # For some reason terminating bun leaves this child behind
-                    node_process = next(
-                        p for p in proc.children(True) if p.name() == node_name
-                    )
+                    node_process = next(p for p in proc.children(True) if p.name() == node_name)
                     node_process.terminate()
-                    click.secho(
-                        f"Stopped node child PID {node_process.pid}", fg="green"
-                    )
+                    click.secho(f"Stopped node child PID {node_process.pid}", fg="green")
                 except StopIteration:
                     click.secho("No child node process found...", fg="yellow")
                     pass
@@ -151,11 +147,7 @@ class JavascriptTestServer(TestServer):
     def build(self) -> None:
         header(f"Installing CBL JS and dependencies for version {self.version}")
         click.echo("Installing CBL")
-        working_dir = (
-            DOWNLOADED_TEST_SERVER_DIR / "js" / self.version
-            if self._downloaded
-            else JS_TEST_SERVER_DIR
-        )
+        working_dir = DOWNLOADED_TEST_SERVER_DIR / "js" / self.version if self._downloaded else JS_TEST_SERVER_DIR
 
         subprocess.run(
             [
@@ -187,11 +179,7 @@ class JavascriptTestServer(TestServer):
         path.unlink()
 
     def create_bridge(self, **kwargs):
-        working_dir = (
-            DOWNLOADED_TEST_SERVER_DIR / "js" / self.version
-            if self._downloaded
-            else JS_TEST_SERVER_DIR
-        )
+        working_dir = DOWNLOADED_TEST_SERVER_DIR / "js" / self.version if self._downloaded else JS_TEST_SERVER_DIR
 
         if self._downloaded:
             # Downloaded server needs to be setup like the built one

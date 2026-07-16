@@ -98,14 +98,8 @@ def download_cbbackupmgr(version: str):
     arch = _get_arch(os)
     ext = _get_ext(os)
 
-    dest_dir = (
-        SCRIPT_DIR.parent.parent / "tests" / ".tools" / ToolName.BackupManager.value
-    )
-    dest_name = (
-        f"{ToolName.BackupManager.value}.exe"
-        if os == _WINDOWS
-        else ToolName.BackupManager.value
-    )
+    dest_dir = SCRIPT_DIR.parent.parent / "tests" / ".tools" / ToolName.BackupManager.value
+    dest_name = f"{ToolName.BackupManager.value}.exe" if os == _WINDOWS else ToolName.BackupManager.value
     dest_version_name = ".version"
     version_location = dest_dir / dest_version_name
     if version_location.exists():
@@ -132,9 +126,7 @@ def download_cbbackupmgr(version: str):
     target_in_archive = "cbbackupmgr.exe" if os == _WINDOWS else "cbbackupmgr"
     matches = list(TMP_LOCATION.rglob(target_in_archive))
     if not matches:
-        raise RuntimeError(
-            f"Could not find {target_in_archive} in extracted archive {tmp_file}"
-        )
+        raise RuntimeError(f"Could not find {target_in_archive} in extracted archive {tmp_file}")
 
     # Choose the first match
     src_path = next(match for match in matches if match.is_file())

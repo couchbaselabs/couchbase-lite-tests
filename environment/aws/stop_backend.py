@@ -53,9 +53,7 @@ class BackendStopSteps(Flag):
     default=None,
     help="Specific SGW instance index to destroy (0-based, only with --destroy-sgw)",
 )
-@click.option(
-    "--destroy-cbs", is_flag=True, help="Destroy only Couchbase Server instances"
-)
+@click.option("--destroy-cbs", is_flag=True, help="Destroy only Couchbase Server instances")
 @click.option("--destroy-es", is_flag=True, help="Destroy only Edge Server instances")
 @click.option("--destroy-lb", is_flag=True, help="Destroy only Load Balancer instances")
 @click.option("--destroy-ls", is_flag=True, help="Destroy only Logslurp instances")
@@ -110,9 +108,7 @@ def cli_entry(
     main(topology, steps, sgw_index)
 
 
-def main(
-    topology: str | None, steps: BackendStopSteps, sgw_index: int | None = None
-) -> None:
+def main(topology: str | None, steps: BackendStopSteps, sgw_index: int | None = None) -> None:
     """
     Main function to tear down the AWS environment and stop the test servers.
 
@@ -134,33 +130,13 @@ def main(
         if sgw_index is not None:
             targets.append(f"-target=aws_instance.sync_gateway[{sgw_index}]")
         else:
-            targets.extend(
-                [
-                    f"-target=aws_instance.sync_gateway[{i}]"
-                    for i in range(topology_obj.total_sgw_count)
-                ]
-            )
+            targets.extend([f"-target=aws_instance.sync_gateway[{i}]" for i in range(topology_obj.total_sgw_count)])
     if steps & BackendStopSteps.DESTROY_CBS:
-        targets.extend(
-            [
-                f"-target=aws_instance.couchbaseserver[{i}]"
-                for i in range(topology_obj.total_cbs_count)
-            ]
-        )
+        targets.extend([f"-target=aws_instance.couchbaseserver[{i}]" for i in range(topology_obj.total_cbs_count)])
     if steps & BackendStopSteps.DESTROY_ES:
-        targets.extend(
-            [
-                f"-target=aws_instance.edge_server[{i}]"
-                for i in range(topology_obj.total_es_count)
-            ]
-        )
+        targets.extend([f"-target=aws_instance.edge_server[{i}]" for i in range(topology_obj.total_es_count)])
     if steps & BackendStopSteps.DESTROY_LB:
-        targets.extend(
-            [
-                f"-target=aws_instance.load_balancer[{i}]"
-                for i in range(topology_obj.total_lb_count)
-            ]
-        )
+        targets.extend([f"-target=aws_instance.load_balancer[{i}]" for i in range(topology_obj.total_lb_count)])
     if steps & BackendStopSteps.DESTROY_LS:
         if topology_obj.wants_logslurp:
             targets.append('-target=aws_instance.log_slurp["log_slurp"]')
@@ -177,9 +153,7 @@ def main(
     result = None
     if terraform_command:
         header("Starting terraform destroy")
-        result = subprocess.run(
-            terraform_command, cwd=SCRIPT_DIR, capture_output=False, text=True
-        )
+        result = subprocess.run(terraform_command, cwd=SCRIPT_DIR, capture_output=False, text=True)
         if result.returncode != 0:
             click.secho(
                 f"WARNING: Command '{' '.join(terraform_command)}' failed with exit status {result.returncode}: {result.stderr}",

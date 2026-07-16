@@ -82,9 +82,7 @@ class SyncGatewayInfo:
         self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
         self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, 4985)
         self.__rbac_user: str = _get_str_or_default(data, self.__rbac_user_key, "admin")
-        self.__rbac_password: str = _get_str_or_default(
-            data, self.__rbac_password_key, "password"
-        )
+        self.__rbac_password: str = _get_str_or_default(data, self.__rbac_password_key, "password")
         self.__uses_tls: bool = _get_bool_or_default(data, self.__tls_key, False)
 
 
@@ -112,12 +110,8 @@ class CouchbaseServerInfo:
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__admin_user: str = _get_str_or_default(
-            data, self.__admin_user_key, "Administrator"
-        )
-        self.__admin_password: str = _get_str_or_default(
-            data, self.__admin_password_key, "password"
-        )
+        self.__admin_user: str = _get_str_or_default(data, self.__admin_user_key, "Administrator")
+        self.__admin_password: str = _get_str_or_default(data, self.__admin_password_key, "password")
 
 
 class EdgeServerInfo:
@@ -147,20 +141,14 @@ class EdgeServerInfo:
 
     def _get_repo_root(self):
         repo_root = next(
-            p
-            for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-            if p.name == "couchbase-lite-tests"
+            p for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents) if p.name == "couchbase-lite-tests"
         )
         return repo_root
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__admin_user = _get_str_or_default(
-            data, self.__admin_user_key, "admin_user"
-        )
-        self.__admin_password = _get_str_or_default(
-            data, self.__admin_password_key, "password"
-        )
+        self.__admin_user = _get_str_or_default(data, self.__admin_user_key, "admin_user")
+        self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
         self.__config_path = _get_str_or_default(
             data,
             self.__config_path_key,
@@ -241,13 +229,9 @@ class ParsedConfig:
         return self.__logslurp_url
 
     def __init__(self, json: dict):
-        self.__test_servers = _get_typed_nonnull(
-            json, self.__test_server_key, list[dict], []
-        )
+        self.__test_servers = _get_typed_nonnull(json, self.__test_server_key, list[dict], [])
         self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, list[dict], [])
-        self.__couchbase_servers = _get_typed_nonnull(
-            json, self.__cbs_key, list[dict], []
-        )
+        self.__couchbase_servers = _get_typed_nonnull(json, self.__cbs_key, list[dict], [])
         self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
         self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         if self.__api_version_key in json:
@@ -262,9 +246,7 @@ class ParsedConfig:
             or "username" not in self.__greenboard
             or "password" not in self.__greenboard
         ):
-            raise ValueError(
-                "Malformed greenboard entry, must have hostname username and password"
-            )
+            raise ValueError("Malformed greenboard entry, must have hostname username and password")
 
         self.__logslurp_url = _get_typed(json, self.__logslurp_key, str)
 

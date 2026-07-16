@@ -51,9 +51,7 @@ class PostResetResponse(TestServerResponse):
 
 
 @register_response(getattr(v1_request_module, "PostGetAllDocumentsRequest"), [1, 2])
-class PostGetAllDocumentsResponse(
-    TestServerResponse, PostGetAllDocumentsResponseMethods
-):
+class PostGetAllDocumentsResponse(TestServerResponse, PostGetAllDocumentsResponseMethods):
     """
     A POST /getAllDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -89,9 +87,7 @@ class PostGetAllDocumentsResponse(
         """Gets all the collections that are specified in the response"""
         return list(self.__payload.keys())
 
-    def documents_for_collection(
-        self, collection: str
-    ) -> list[PostGetAllDocumentsEntry]:
+    def documents_for_collection(self, collection: str) -> list[PostGetAllDocumentsEntry]:
         """
         Gets the documents contained in the specified collection
 
@@ -127,9 +123,7 @@ class PostUpdateDatabaseResponse(TestServerResponse):
 
 
 @register_response(getattr(v1_request_module, "PostSnapshotDocumentsRequest"), [1, 2])
-class PostSnapshotDocumentsResponse(
-    TestServerResponse, PostSnapshotDocumentsResponseMethods
-):
+class PostSnapshotDocumentsResponse(TestServerResponse, PostSnapshotDocumentsResponseMethods):
     """
     A POST /snapshotDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -155,9 +149,7 @@ class PostSnapshotDocumentsResponse(
 
 @register_response(getattr(v1_request_module, "PostVerifyDocumentsRequest"), [1, 2])
 @register_response(getattr(v2_request_module, "PostVerifyDocumentsRequest"), [1, 2])
-class PostVerifyDocumentsResponse(
-    TestServerResponse, PostVerifyDocumentsResponseMethods
-):
+class PostVerifyDocumentsResponse(TestServerResponse, PostVerifyDocumentsResponseMethods):
     """
     A POST /verifyDocuments response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -222,9 +214,7 @@ class PostVerifyDocumentsResponse(
 
 
 @register_response(getattr(v1_request_module, "PostStartReplicatorRequest"), [1, 2])
-class PostStartReplicatorResponse(
-    TestServerResponse, PostStartReplicatorResponseMethods
-):
+class PostStartReplicatorResponse(TestServerResponse, PostStartReplicatorResponseMethods):
     """
     A POST /startReplicator response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -249,9 +239,7 @@ class PostStartReplicatorResponse(
 
 
 @register_response(getattr(v1_request_module, "PostGetReplicatorStatusRequest"), [1, 2])
-class PostGetReplicatorStatusResponse(
-    TestServerResponse, PostGetReplicatorStatusResponseMethods
-):
+class PostGetReplicatorStatusResponse(TestServerResponse, PostGetReplicatorStatusResponseMethods):
     """
     A POST /getReplicatorStatus response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -445,12 +433,8 @@ class PostStopListenerResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "stopListener")
 
 
-@register_response(
-    getattr(v1_request_module, "PostStartMultipeerReplicatorRequest"), [1, 2]
-)
-class PostStartMultipeerReplicatorResponse(
-    TestServerResponse, PostStartMultipeerReplicatorResponseMethods
-):
+@register_response(getattr(v1_request_module, "PostStartMultipeerReplicatorRequest"), [1, 2])
+class PostStartMultipeerReplicatorResponse(TestServerResponse, PostStartMultipeerReplicatorResponseMethods):
     """
     A POST /startMultipeerReplicator response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
@@ -473,9 +457,7 @@ class PostStartMultipeerReplicatorResponse(
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
-@register_response(
-    getattr(v1_request_module, "PostStopMultipeerReplicatorRequest"), [1, 2]
-)
+@register_response(getattr(v1_request_module, "PostStopMultipeerReplicatorRequest"), [1, 2])
 class PostStopMultipeerReplicatorResponse(TestServerResponse):
     """
     A POST /stopMultipeerReplicator response as specified in version 1 of the
@@ -486,12 +468,8 @@ class PostStopMultipeerReplicatorResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "stopMultipeerReplicator")
 
 
-@register_response(
-    getattr(v1_request_module, "PostGetMultipeerReplicatorStatusRequest"), [1, 2]
-)
-class PostGetMultipeerReplicatorStatusResponse(
-    TestServerResponse, PostGetMultipeerReplicatorStatusResponseMethods
-):
+@register_response(getattr(v1_request_module, "PostGetMultipeerReplicatorStatusRequest"), [1, 2])
+class PostGetMultipeerReplicatorStatusResponse(TestServerResponse, PostGetMultipeerReplicatorStatusResponseMethods):
     """
     A POST /getMultipeerReplicatorStatus response as specified in version 1 of the
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)

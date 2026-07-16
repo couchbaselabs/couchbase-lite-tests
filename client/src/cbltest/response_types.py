@@ -26,9 +26,7 @@ class PostGetAllDocumentsEntry:
         return self.__rev
 
     def __init__(self, body: dict):
-        assert isinstance(body, dict), (
-            "Invalid PostGetAllDocumentsEntry received (not an object)"
-        )
+        assert isinstance(body, dict), "Invalid PostGetAllDocumentsEntry received (not an object)"
         self.__id = _assert_string_entry(body, self.__id_key)
         self.__rev = _assert_string_entry(body, self.__rev_key)
 
@@ -41,9 +39,7 @@ class PostGetAllDocumentsResponseMethods(ABC):
         pass
 
     @abstractmethod
-    def documents_for_collection(
-        self, collection: str
-    ) -> list[PostGetAllDocumentsEntry]:
+    def documents_for_collection(self, collection: str) -> list[PostGetAllDocumentsEntry]:
         """
         Gets the documents contained in the specified collection
 
@@ -142,17 +138,11 @@ class ReplicatorStatusBody:
         if self.__activity_key not in body:
             return
 
-        self.__activity = ReplicatorActivityLevel[
-            cast(str, body.get(self.__activity_key)).upper()
-        ]
+        self.__activity = ReplicatorActivityLevel[cast(str, body.get(self.__activity_key)).upper()]
         self.__progress = ReplicatorProgress(cast(dict, body.get(self.__progress_key)))
-        self.__replicator_error = ErrorResponseBody.create(
-            body.get(self.__replicator_error_key)
-        )
+        self.__replicator_error = ErrorResponseBody.create(body.get(self.__replicator_error_key))
         docs = _get_typed(body, self.__documents_key, list)
-        self.__documents = (
-            [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
-        )
+        self.__documents = [ReplicatorDocumentEntry(d) for d in docs] if docs is not None else []
 
 
 class PostGetReplicatorStatusResponseMethods(ABC):
@@ -245,9 +235,7 @@ class MultipeerReplicatorStatusEntry:
         return self.__transport
 
     def __init__(self, body: dict):
-        assert isinstance(body, dict), (
-            "Invalid MultipeerReplicatorStatusEntry received (not an object)"
-        )
+        assert isinstance(body, dict), "Invalid MultipeerReplicatorStatusEntry received (not an object)"
 
         self.__peer_id = _assert_string_entry(body, self.__peer_id_key)
         self.__status = ReplicatorStatusBody(body.get(self.__status_key, {}))

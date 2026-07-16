@@ -19,9 +19,7 @@ class RapidChangesMode(Enum):
 class TestMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_medium_mesh_sanity(self, cblpytest: CBLPyTest):
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on all devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
@@ -34,9 +32,7 @@ class TestMultipeer(CBLTestClass):
         """)
         async with db1.batch_updater() as b:
             for i in range(1, 11):
-                b.upsert_document(
-                    "_default._default", f"doc{i}", [{"random": randint(1, 100000)}]
-                )
+                b.upsert_document("_default._default", f"doc{i}", [{"random": randint(1, 100000)}])
 
         self.mark_test_step("""
             Start a multipeer replicator on all devices
@@ -46,10 +42,7 @@ class TestMultipeer(CBLTestClass):
             * collections: default collection                    
         """)
         multipeer_replicators = [
-            MultipeerReplicator(
-                "couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]
-            )
-            for db in all_dbs
+            MultipeerReplicator("couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]) for db in all_dbs
         ]
         mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
         await asyncio.gather(*mpstart_tasks)
@@ -64,14 +57,12 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step(
             "Check that all databases on devices other than 1 have identical content to the database on device 1"
         )
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
 
@@ -80,9 +71,7 @@ class TestMultipeer(CBLTestClass):
         self,
         cblpytest: CBLPyTest,
     ):
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on all devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
@@ -111,10 +100,7 @@ class TestMultipeer(CBLTestClass):
             * collections: default collection                    
         """)
         multipeer_replicators = [
-            MultipeerReplicator(
-                "couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]
-            )
-            for db in all_dbs
+            MultipeerReplicator("couchtest", db, [ReplicatorCollectionEntry(["_default._default"])]) for db in all_dbs
         ]
         mpstart_tasks = [multipeer.start() for multipeer in multipeer_replicators]
         await asyncio.gather(*mpstart_tasks)
@@ -127,13 +113,11 @@ class TestMultipeer(CBLTestClass):
             )
 
         self.mark_test_step("Check that all device databases have the same content")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])

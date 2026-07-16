@@ -54,9 +54,7 @@ class TestServerRequest:
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
         if payload is not None and payload_type is not None:
-            assert isinstance(payload, payload_type), (
-                f"Incorrect payload type for request (expecting '{payload_type}')"
-            )
+            assert isinstance(payload, payload_type), f"Incorrect payload type for request (expecting '{payload_type}')"
 
         self.__version = available_api_version(version)
         self.__uuid = uuid
@@ -66,9 +64,7 @@ class TestServerRequest:
         self.__test_name = CBLPyTestGlobal.running_test_name
 
     def __str__(self) -> str:
-        test_name = (
-            self.__test_name if self.__test_name is not None else "test name not set!"
-        )
+        test_name = self.__test_name if self.__test_name is not None else "test name not set!"
         return f"({test_name}) -> {self.__uuid} v{self.__version} {self.__method.upper()} /{self.__http_name}"
 
 
@@ -109,9 +105,7 @@ class PostResetRequestMethods(ABC):
         pass
 
     @abstractmethod
-    def add_empty(
-        self, result_db_names: list[str], collections: list[str] | None = None
-    ):
+    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None):
         pass
 
 
@@ -148,9 +142,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         removed_properties: list[str] | None = None,
         new_blobs: dict[str, str] | None = None,
     ) -> None:
-        self.type: DatabaseUpdateEntry = cast(
-            DatabaseUpdateEntry, _assert_not_null(type, "type")
-        )
+        self.type: DatabaseUpdateEntry = cast(DatabaseUpdateEntry, _assert_not_null(type, "type"))
         """The type of update to be performed"""
 
         self.collection: str = cast(str, _assert_not_null(collection, "collection"))
@@ -194,11 +186,7 @@ class DatabaseUpdateEntry(JSONSerializable):
         if self.new_blobs is not None:
             return len(self.new_blobs) > 0
 
-        return (
-            len(self.removed_properties) > 0
-            if self.removed_properties is not None
-            else False
-        )
+        return len(self.removed_properties) > 0 if self.removed_properties is not None else False
 
     def to_json(self) -> Any:
         if not self.is_valid():

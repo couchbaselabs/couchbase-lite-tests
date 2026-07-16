@@ -105,9 +105,7 @@ def compare_doc_results(
 
         for id in source:
             if id not in dest:
-                return DocsCompareResult(
-                    False, f"Doc '{id}' present in {source_name} but not {dest_name}"
-                )
+                return DocsCompareResult(False, f"Doc '{id}' present in {source_name} but not {dest_name}")
 
             if not _compare_revisions(local_dict[id], remote_dict[id]):
                 return DocsCompareResult(
@@ -118,17 +116,13 @@ def compare_doc_results(
         return DocsCompareResult(True)
 
 
-def compare_doc_results_p2p(
-    local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]
-) -> DocsCompareResult:
+def compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]) -> DocsCompareResult:
     local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
     remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
 
     for id in local_dict:
         if id not in remote_dict:
-            return DocsCompareResult(
-                False, f"Doc '{id}' present in {local_dict} but not {remote_dict}"
-            )
+            return DocsCompareResult(False, f"Doc '{id}' present in {local_dict} but not {remote_dict}")
 
         if not _compare_revisions(local_dict[id], [remote_dict[id], None]):
             return DocsCompareResult(
@@ -149,16 +143,12 @@ def compare_doc_ids(
     missing_on_remote = local_ids - remote_ids
     if missing_on_remote:
         missing_id = next(iter(missing_on_remote))
-        return DocsCompareResult(
-            False, f"Doc '{missing_id}' present locally but missing on remote"
-        )
+        return DocsCompareResult(False, f"Doc '{missing_id}' present locally but missing on remote")
 
     missing_on_local = remote_ids - local_ids
     if missing_on_local:
         missing_id = next(iter(missing_on_local))
-        return DocsCompareResult(
-            False, f"Doc '{missing_id}' present on remote but missing locally"
-        )
+        return DocsCompareResult(False, f"Doc '{missing_id}' present on remote but missing locally")
 
     return DocsCompareResult(True)
 
@@ -181,9 +171,7 @@ async def compare_local_and_remote(
 
         for collection in collections:
             split = collection.split(".")
-            assert len(split) == 2, (
-                f"Invalid collection name in compare_local_and_remote: {collection}"
-            )
+            assert len(split) == 2, f"Invalid collection name in compare_local_and_remote: {collection}"
             sg_all_docs = await remote.get_all_documents(bucket, split[0], split[1])
 
             lite_docs = lite_all_docs[collection]

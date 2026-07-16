@@ -92,9 +92,7 @@ class Replicator:
         self.reset: bool = reset
         """Whether or not to restart the replicator from the beginning"""
 
-        self.collections: list[ReplicatorCollectionEntry] = (
-            collections if collections is not None else []
-        )
+        self.collections: list[ReplicatorCollectionEntry] = collections if collections is not None else []
         """The collections to use in this replication"""
 
         self.enable_document_listener: bool = enable_document_listener
@@ -159,9 +157,7 @@ class Replicator:
             resp = await self.__request_factory.send_request(self.__index, req)
             cast_resp = cast(PostGetReplicatorStatusResponseMethods, resp)
             self.__document_updates.extend(cast_resp.documents)
-            return ReplicatorStatus(
-                cast_resp.progress, cast_resp.activity, cast_resp.replicator_error
-            )
+            return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
 
     async def wait_for(
         self,
@@ -177,12 +173,8 @@ class Replicator:
         :param timeout: The time limit to wait for the state change (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for"):
-            assert interval.total_seconds() > 0.0, (
-                "Zero interval makes no sense, try again"
-            )
-            assert timeout.total_seconds() >= 1.0, (
-                "Timeout too short, must be at least 1 second"
-            )
+            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+            assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
 
             status_matches = False
             start = time()
@@ -211,15 +203,9 @@ class Replicator:
         :param interval: The interval at which to ping for the replicator state (default is half a second)
         """
         with self.__tracer.start_as_current_span("wait_for_doc_events"):
-            assert interval.total_seconds() > 0.0, (
-                "Zero interval makes no sense, try again"
-            )
-            assert not self.continuous, (
-                "wait_for_doc_events not applicable for a continuous replicator"
-            )
-            assert self.enable_document_listener, (
-                "Can't wait for documents unless the listener is enabled"
-            )
+            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+            assert not self.continuous, "wait_for_doc_events not applicable for a continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
 
             events = events.copy()
             processed = 0
@@ -227,9 +213,7 @@ class Replicator:
             while True:
                 status = await self.get_status()
                 repl_err = status.error
-                assert repl_err is None, (
-                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
-                )
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -279,25 +263,17 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for_all_doc_events"):
-            assert self.continuous, (
-                "wait_for_all_doc_events not applicable for a non-continuous replicator"
-            )
-            assert self.enable_document_listener, (
-                "Can't wait for documents unless the listener is enabled"
-            )
+            assert self.continuous, "wait_for_all_doc_events not applicable for a non-continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
 
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
-                status = await self.wait_for(
-                    ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
-                )
+                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
                 repl_err = status.error
-                assert repl_err is None, (
-                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
-                )
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -344,25 +320,17 @@ class Replicator:
         :param idle_timeout: The timeout to use when waiting for the next idle state (default 10s)
         """
         with self.__tracer.start_as_current_span("wait_for_any_doc_events"):
-            assert self.continuous, (
-                "wait_for_any_doc_events not applicable for a non-continuous replicator"
-            )
-            assert self.enable_document_listener, (
-                "Can't wait for documents unless the listener is enabled"
-            )
+            assert self.continuous, "wait_for_any_doc_events not applicable for a non-continuous replicator"
+            assert self.enable_document_listener, "Can't wait for documents unless the listener is enabled"
 
             events = events.copy()
             processed = 0
 
             iteration = 0
             while iteration < max_retries:
-                status = await self.wait_for(
-                    ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout
-                )
+                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
                 repl_err = status.error
-                assert repl_err is None, (
-                    f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
-                )
+                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we looked at, previously, to save time
                 for event in islice(self.document_updates, processed, None):

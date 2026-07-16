@@ -74,9 +74,7 @@ class PostResetRequestBody(JSONSerializable, PostResetRequestMethods):
             name = urlparse(url).path.split("/")[-1].replace(".cblite2.zip", "")
             self.__databases[db_name] = {"dataset": name}
 
-    def add_empty(
-        self, result_db_names: list[str], collections: list[str] | None = None
-    ):
+    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None):
         """
         Add an empty database entry to the :class`PostResetRequestBody`
 
@@ -163,9 +161,7 @@ class PostUpdateDatabaseRequestBody(JSONSerializable):
             for e in cast(list[DatabaseUpdateEntry], self.updates):
                 raw_entry = e.to_json()
                 if raw_entry is None:
-                    cbl_warning(
-                        "Skipping invalid DatabaseUpdateEntry in body serialization!"
-                    )
+                    cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
                     continue
 
                 # Hack in the names instead of URL for blobs
@@ -393,9 +389,7 @@ class PostStartReplicatorRequestBody(JSONSerializable):
         self.reset: bool = reset
         """Whether or not to start the replication over from the beginning"""
 
-        self.collections: list[ReplicatorCollectionEntry] = (
-            collections if collections is not None else []
-        )
+        self.collections: list[ReplicatorCollectionEntry] = collections if collections is not None else []
         """The per-collection configuration to use inside the replication"""
 
         self.enableDocumentListener: bool = enableDocumentListener
@@ -526,9 +520,7 @@ class PostNewSessionRequestBody(JSONSerializable):
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
 
-    def __init__(
-        self, *, id: str, dataset_version: str, url: str | None, tag: str | None
-    ):
+    def __init__(self, *, id: str, dataset_version: str, url: str | None, tag: str | None):
         super().__init__()
         self.__url = url
         self.__dataset_version = dataset_version
@@ -1044,9 +1036,7 @@ class PostNewSessionRequest(TestServerRequest):
     """
 
     def __init__(self, version: int, uuid: UUID, payload: PostNewSessionRequestBody):
-        super().__init__(
-            version, uuid, "newSession", PostNewSessionRequestBody, payload=payload
-        )
+        super().__init__(version, uuid, "newSession", PostNewSessionRequestBody, payload=payload)
 
 
 @register_request(TestServerRequestType.RUN_QUERY, [1, 2])
@@ -1057,9 +1047,7 @@ class PostRunQueryRequest(TestServerRequest):
     """
 
     def __init__(self, version: int, uuid: UUID, payload: PostRunQueryRequestBody):
-        super().__init__(
-            version, uuid, "runQuery", PostRunQueryRequestBody, payload=payload
-        )
+        super().__init__(version, uuid, "runQuery", PostRunQueryRequestBody, payload=payload)
 
 
 @register_request(TestServerRequestType.GET_DOCUMENT, [1, 2])
@@ -1070,9 +1058,7 @@ class PostGetDocumentRequest(TestServerRequest):
     """
 
     def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
-        super().__init__(
-            version, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload
-        )
+        super().__init__(version, uuid, "getDocument", PostGetDocumentRequestBody, payload=payload)
 
 
 @register_request(TestServerRequestType.LOG, [1, 2])
@@ -1111,9 +1097,7 @@ class PostStopListenerRequest(TestServerRequest):
     """
 
     def __init__(self, version: int, uuid: UUID, payload: PostStopListenerRequestBody):
-        super().__init__(
-            version, uuid, "stopListener", PostStopListenerRequestBody, payload=payload
-        )
+        super().__init__(version, uuid, "stopListener", PostStopListenerRequestBody, payload=payload)
 
 
 @register_request(TestServerRequestType.START_MULTIPEER_REPLICATOR, [1, 2])
@@ -1123,9 +1107,7 @@ class PostStartMultipeerReplicatorRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(
-        self, version: int, uuid: UUID, payload: PostStartMultipeerReplicatorRequestBody
-    ):
+    def __init__(self, version: int, uuid: UUID, payload: PostStartMultipeerReplicatorRequestBody):
         super().__init__(
             version,
             uuid,
@@ -1142,9 +1124,7 @@ class PostStopMultipeerReplicatorRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(
-        self, version: int, uuid: UUID, payload: PostStopMultipeerReplicatorRequestBody
-    ):
+    def __init__(self, version: int, uuid: UUID, payload: PostStopMultipeerReplicatorRequestBody):
         super().__init__(
             version,
             uuid,

@@ -55,9 +55,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
     """
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_rolling_upgrade_sgw_cluster(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_rolling_upgrade_sgw_cluster(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg_nodes = cblpytest.sync_gateways[:3]
         cbs = cblpytest.couchbase_servers[0]
         upgrade_phase = os.environ.get("SGW_UPGRADE_PHASE", "initial")
@@ -90,9 +88,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
 
         self.mark_test_step("Ensure user exists on all SGW nodes")
         for sg in sg_nodes:
-            collection_access = sg.create_collection_access_dict(
-                {"_default._default": ["*"]}
-            )
+            collection_access = sg.create_collection_access_dict({"_default._default": ["*"]})
             try:
                 await sg.add_user(sg_db, "user1", "pass", collection_access)
             except Exception as e:
@@ -133,14 +129,11 @@ class TestSgwRollingUpgrade(CBLTestClass):
         self.mark_test_step("Wait for replicator to sync new docs")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
-            f"Error waiting for replicator: "
-            f"({status.error.domain} / {status.error.code}) {status.error.message}"
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
         self.mark_test_step("Save current revisions before update")
-        docs_before = await sg_nodes[0].get_all_documents(
-            sg_db, scope, collection, True
-        )
+        docs_before = await sg_nodes[0].get_all_documents(sg_db, scope, collection, True)
         revs_before = {row.id: row.revid for row in docs_before.rows}
         print(f"Total docs before update: {len(revs_before)}")
 
@@ -164,8 +157,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         self.mark_test_step("Wait for replicator to sync updates")
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         assert status.error is None, (
-            f"Error waiting for replicator: "
-            f"({status.error.domain} / {status.error.code}) {status.error.message}"
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
         self.mark_test_step("Verify revisions have progressed on SGW via changes feed")
@@ -182,8 +174,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
             before_num = int(before_rev.split("-")[0])
             after_num = int(after_rev.split("-")[0])
             assert after_num > before_num, (
-                f"Doc {doc_id}: Revision didn't progress. "
-                f"Before={before_rev}, After={after_rev}"
+                f"Doc {doc_id}: Revision didn't progress. Before={before_rev}, After={after_rev}"
             )
             print(f"  {doc_id}: {before_num} -> {after_num}")
 
@@ -207,9 +198,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
             cbs_doc = cbs.get_document(bucket, row.id)
             assert cbs_doc is not None, f"Doc {row.id} not found on CBS"
             assert "version" in cbs_doc, f"Doc {row.id} missing 'version' on CBS"
-            assert cbs_doc["type"] == "rolling_upgrade_doc", (
-                f"Doc {row.id} wrong type on CBS: {cbs_doc['type']}"
-            )
+            assert cbs_doc["type"] == "rolling_upgrade_doc", f"Doc {row.id} wrong type on CBS: {cbs_doc['type']}"
 
             cbl_doc = await db.get_document(DocumentEntry("_default._default", row.id))
             assert cbl_doc is not None, f"Doc {row.id} not found on CBL"

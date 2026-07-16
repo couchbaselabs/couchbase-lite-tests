@@ -65,13 +65,7 @@ def main(
     cbs_version: str | None,
     config_file: str,
 ) -> None:
-    topology_out = (
-        SCRIPT_DIR.parents[3]
-        / "environment"
-        / "aws"
-        / "topology_setup"
-        / "topology.json"
-    )
+    topology_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
 
     config_in = SCRIPT_DIR / config_file
     config_out = SCRIPT_DIR.parents[3] / "tests" / "QE" / "config.json"

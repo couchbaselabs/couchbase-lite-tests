@@ -11,9 +11,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(1)
 class TestCrud(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_basic_information_retrieval(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_basic_information_retrieval(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_basic_information_retrieval")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
@@ -23,9 +21,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step(f"VERSION:{version.raw}")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_database_config(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_database_config(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_database_config")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
@@ -40,9 +36,7 @@ class TestCrud(CBLTestClass):
         assert db_info is not None
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_single_doc_crud(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_single_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_single_doc_crud")
         db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -76,9 +70,7 @@ class TestCrud(CBLTestClass):
         try:
             await edge_server.get_document(db_name, doc_id=id2)
         except Exception as e:
-            self.mark_test_step(
-                f"Deleted doc successfully threw exception on retrieval: {e}"
-            )
+            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -98,15 +90,11 @@ class TestCrud(CBLTestClass):
             id=id1, revid=rev1, key="test_key", db_name=db_name, value=sample_value
         )
         self.mark_test_step(f" Insert sub-doc response: {resp}")
-        updated_doc = await edge_server.get_sub_document(
-            id1, "test_key", db_name=db_name
-        )
+        updated_doc = await edge_server.get_sub_document(id1, "test_key", db_name=db_name)
         self.mark_test_step(f" Get updated Document : {updated_doc}")
         assert updated_doc.get("test_key") == sample_value
         self.mark_test_step("Delete the subdocument")
-        resp = await edge_server.delete_sub_document(
-            id1, resp["rev"], "test_key", db_name
-        )
+        resp = await edge_server.delete_sub_document(id1, resp["rev"], "test_key", db_name)
         self.mark_test_step(f" deleted sub document response: {resp}")
         try:
             await edge_server.get_sub_document(id1, "test_key", db_name=db_name)
@@ -115,9 +103,7 @@ class TestCrud(CBLTestClass):
             self.mark_test_step("Fetch deleted sub document failed as expected")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_single_doc_crud_ttl(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_single_doc_crud_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_single_doc_crud_tll")
         db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -137,18 +123,14 @@ class TestCrud(CBLTestClass):
             self.mark_test_step(f"Fetch doc {doc} failed as expected {e}")
         assert failed, "Doc fetch successful despite expiry"
 
-        self.mark_test_step(
-            "create single doc with id of a TTL=50 and update the TTL=20"
-        )
+        self.mark_test_step("create single doc with id of a TTL=50 and update the TTL=20")
         id2 = "test50"
         resp2 = await edge_server.put_document_with_id(doc, id2, db_name, ttl=50)
         rev2 = resp2.get("rev")
 
         self.mark_test_step(f"update doc of rev={rev2} to TTL 20")
         new_doc = {"test2": "This is updated test doc"}
-        update = await edge_server.put_document_with_id(
-            new_doc, id2, db_name, rev=rev2, ttl=20
-        )
+        update = await edge_server.put_document_with_id(new_doc, id2, db_name, rev=rev2, ttl=20)
         rev3 = update.get("rev")
         self.mark_test_step(f"fetch updated doc of rev {rev3} with TTL=20")
         doc3 = await edge_server.get_document(db_name, doc_id=id2)
@@ -174,6 +156,4 @@ class TestCrud(CBLTestClass):
         try:
             await edge_server.get_document(db_name, doc_id=id2)
         except Exception as e:
-            self.mark_test_step(
-                f"Deleted doc successfully threw exception on retrieval: {e}"
-            )
+            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")

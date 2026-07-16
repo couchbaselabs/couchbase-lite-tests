@@ -210,9 +210,7 @@ class CTestServer_iOS(CTestServer):
             build,
         )
         downloader.download(download_file)
-        shutil.rmtree(
-            IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True
-        )
+        shutil.rmtree(IOS_FRAMEWORKS_DIR / "CouchbaseLite.xcframework", ignore_errors=True)
         unzip_directory(download_file, IOS_FRAMEWORKS_DIR)
 
         shutil.rmtree(IOS_VENDOR_DIR / "cmake", ignore_errors=True)
@@ -251,9 +249,7 @@ class CTestServer_iOS(CTestServer):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         ) as xcodebuild_proc:
-            with subprocess.Popen(
-                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
-            ) as xcpretty_proc:
+            with subprocess.Popen(["xcpretty"], stdin=xcodebuild_proc.stdout, env=env) as xcpretty_proc:
                 # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
                 cast(BytesIO, xcodebuild_proc.stdout).close()
 
@@ -270,9 +266,7 @@ class CTestServer_iOS(CTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
-        )
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -300,9 +294,7 @@ class CTestServer_iOS(CTestServer):
             str: The path to the compressed package.
         """
         header(f"Compressing C test server for {self.platform}")
-        publish_dir = (
-            IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
-        )
+        publish_dir = IOS_BUILD_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer.app"
         zip_path = publish_dir.parents[5] / "testserver_ios.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
@@ -344,16 +336,7 @@ class CTestServer_Android(CTestServer):
         return f"{self.product}-enterprise-{version}-android.zip"
 
     def _download_cbl(self):
-        android_lib_dir = (
-            C_TEST_SERVER_DIR
-            / "platforms"
-            / "android"
-            / "app"
-            / "src"
-            / "main"
-            / "cpp"
-            / "lib"
-        )
+        android_lib_dir = C_TEST_SERVER_DIR / "platforms" / "android" / "app" / "src" / "main" / "cpp" / "lib"
         header(f"Downloading CBL library {self.version}")
         build = 0
         version_parts = self.version.split("-")
@@ -417,11 +400,7 @@ class CTestServer_Android(CTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            TEST_SERVER_DIR
-            / "downloaded"
-            / self.platform
-            / self.version
-            / "testserver_android.apk"
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "testserver_android.apk"
             if self._downloaded
             else C_TEST_SERVER_DIR
             / "platforms"
@@ -471,9 +450,7 @@ class CTestServer_Android(CTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho(
-            "No uncompressing needed for Android test server package", fg="yellow"
-        )
+        click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
 @TestServer.register("c_windows")
@@ -574,9 +551,7 @@ class CTestServer_macOS(CTestServer_Desktop):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
-        )
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """

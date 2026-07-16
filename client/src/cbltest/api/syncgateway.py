@@ -96,9 +96,7 @@ class PutDatabasePayload(JSONSerializable):
 
     def __init__(self, dataset_or_config: dict):
         _assert_not_null(dataset_or_config, "dataset_or_config")
-        assert isinstance(dataset_or_config, dict), (
-            "Invalid dataset_or_config passed to PutDatabasePayload"
-        )
+        assert isinstance(dataset_or_config, dict), "Invalid dataset_or_config passed to PutDatabasePayload"
         self.__config: dict = dataset_or_config
         if "config" in dataset_or_config:
             self.__config = _get_typed_required(dataset_or_config, "config", dict)
@@ -132,9 +130,7 @@ class PutDatabasePayload(JSONSerializable):
 
         return map.collections
 
-    def _add_collection(
-        self, payload: dict, scope_name: str, collection_name: str
-    ) -> None:
+    def _add_collection(self, payload: dict, scope_name: str, collection_name: str) -> None:
         """
         Adds a collection to the configuration of the database (must exist on Couchbase Server).
         The scope name and collection name both default to "_default".
@@ -192,9 +188,7 @@ class ISGRPayload(JSONSerializable):
         :param collections_remote: List of remote collections to map to (parallel array with collections_local)
         """
         if direction not in ["push", "pull", "pushAndPull"]:
-            raise ValueError(
-                f"Invalid direction: {direction}. Must be 'push', 'pull', or 'pushAndPull'"
-            )
+            raise ValueError(f"Invalid direction: {direction}. Must be 'push', 'pull', or 'pushAndPull'")
         self.__replication_id = replication_id
         self.__remote = f"{remote_url}/{remote_db}"
         self.__direction = direction
@@ -215,10 +209,7 @@ class ISGRPayload(JSONSerializable):
             body["remote_username"] = self.__remote_username
         if self.__remote_password is not None:
             body["remote_password"] = self.__remote_password
-        if (
-            self.__collections_local is not None
-            or self.__collections_remote is not None
-        ):
+        if self.__collections_local is not None or self.__collections_remote is not None:
             body["collections_enabled"] = True
         if self.__collections_local is not None:
             body["collections_local"] = self.__collections_local
@@ -521,14 +512,10 @@ class SyncGatewayVersion(CouchbaseVersion):
             try:
                 build = int(m.group())
             except ValueError as e:
-                cbl_warning(
-                    f"Could not parse build number {m.group()} from SGW version string: '{input}': {e}"
-                )
+                cbl_warning(f"Could not parse build number {m.group()} from SGW version string: '{input}': {e}")
                 build = 0
         else:
-            cbl_warning(
-                f"Could not parse build number from SGW version string: '{input}'"
-            )
+            cbl_warning(f"Could not parse build number from SGW version string: '{input}'")
             build = 0
         return version, build
 
@@ -651,9 +638,7 @@ class _SyncGatewayBase:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
 
-    def _create_session(
-        self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None
-    ) -> ClientSession:
+    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None) -> ClientSession:
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
@@ -677,20 +662,12 @@ class _SyncGatewayBase:
         if session is None:
             session = self.__session
 
-        with self._tracer.start_as_current_span(
-            "send_request", attributes={"http.method": method, "http.path": path}
-        ):
-            headers = (
-                {"Content-Type": "application/json"} if payload is not None else None
-            )
+        with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
+            headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
-            writer.write_begin(
-                f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data
-            )
-            resp = await session.request(
-                method, path, data=data, headers=headers, params=params
-            )
+            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data)
+            resp = await session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -702,18 +679,14 @@ class _SyncGatewayBase:
                 data,
             )
             if not resp.ok:
-                raise CblSyncGatewayBadResponseError(
-                    resp.status, f"{method} {path} returned {resp.status}: {data}"
-                )
+                raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}: {data}")
 
             return ret_val
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
         version = await self.get_version()
-        return packaging.version.parse(version.version) >= packaging.version.parse(
-            "4.0"
-        )
+        return packaging.version.parse(version.version) >= packaging.version.parse("4.0")
 
     async def get_version(self) -> SyncGatewayVersion:
         """Return version of Sync Gateway"""
@@ -746,16 +719,13 @@ class _SyncGatewayBase:
             packaging.version.parse(sg_version.version)
         except packaging.version.InvalidVersion as exc:
             raise CblTestError(
-                "Failed to parse Sync Gateway version from /_status response: {resp}\n"
-                f"version={model.version}"
+                f"Failed to parse Sync Gateway version from /_status response: {{resp}}\nversion={model.version}"
             ) from exc
         return sg_version
 
     def tls_cert(self) -> str | None:
         if not self.secure:
-            cbl_trace(
-                "Sync Gateway instance not using TLS, returning empty tls_cert..."
-            )
+            cbl_trace("Sync Gateway instance not using TLS, returning empty tls_cert...")
             return None
 
         return ssl.get_server_certificate((self.hostname, self.port))
@@ -806,9 +776,7 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _put_database(
-        self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
-    ) -> None:
+    async def _put_database(self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0) -> None:
         with self._tracer.start_as_current_span(
             "put_database", attributes={"cbl.database.name": db_name}
         ) as current_span:
@@ -816,9 +784,7 @@ class _SyncGatewayBase:
                 await self._send_request("put", f"/{db_name}/", payload)
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 500 and retry_count < 3:
-                    cbl_warning(
-                        f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})..."
-                    )
+                    cbl_warning(f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})...")
                     current_span.add_event("SGW returned 500, retry")
                     await self._put_database(db_name, payload, retry_count + 1)
                 else:
@@ -840,9 +806,7 @@ class _SyncGatewayBase:
         :param db_name: The name of the Database
         :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
-        with self._tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
-        ):
+        with self._tracer.start_as_current_span("get_database_status", attributes={"cbl.database.name": db_name}):
             try:
                 resp = await self._send_request("get", f"/{db_name}/")
                 assert isinstance(resp, dict)
@@ -860,9 +824,7 @@ class _SyncGatewayBase:
                 await self._send_request("delete", f"/{db_name}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 500 and retry_count < 3:
-                    cbl_warning(
-                        f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})..."
-                    )
+                    cbl_warning(f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})...")
                     current_span.add_event("SGW returned 500, retry")
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
@@ -912,9 +874,7 @@ class _SyncGatewayBase:
         typed_response = cast(list, response)
         for r in typed_response:
             info = cast(dict, r)
-            assert isinstance(info, dict), (
-                "Invalid item inside bulk docs response list (not an object)"
-            )
+            assert isinstance(info, dict), "Invalid item inside bulk docs response list (not an object)"
             if "error" in info:
                 raise CblSyncGatewayBadResponseError(
                     info["status"],
@@ -945,11 +905,7 @@ class _SyncGatewayBase:
                     assert isinstance(json, dict), f"Invalid entry in {path}!"
                     scope = cast(str, json["scope"])
                     collection = cast(str, json["collection"])
-                    if (
-                        last_scope != scope
-                        or last_coll != collection
-                        or len(collected) > 500
-                    ):
+                    if last_scope != scope or last_coll != collection or len(collected) > 500:
                         if last_scope and last_coll and collected:
                             resp = await self._send_request(
                                 "post",
@@ -1000,9 +956,7 @@ class _SyncGatewayBase:
             if include_docs:
                 params["include_docs"] = "true"
 
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_all_docs", params=params
-            )
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_all_docs", params=params)
 
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
@@ -1032,8 +986,7 @@ class _SyncGatewayBase:
         """
         all_docs = await self.get_all_documents(db_name, scope, collection)
         assert len(all_docs.rows) >= min_count, (
-            f"Expected at least {min_count} docs in "
-            f"{db_name}.{scope}.{collection}, got {len(all_docs.rows)}"
+            f"Expected at least {min_count} docs in {db_name}.{scope}.{collection}, got {len(all_docs.rows)}"
         )
         return all_docs
 
@@ -1061,9 +1014,7 @@ class _SyncGatewayBase:
             },
         ):
             query_params = f"version_type={version_type}"
-            resp = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}"
-            )
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}")
 
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
@@ -1083,15 +1034,11 @@ class _SyncGatewayBase:
         )
 
         if not isinstance(all_docs_response, dict):
-            raise ValueError(
-                "Inappropriate response from sync gateway _all_docs (not JSON dict)"
-            )
+            raise ValueError("Inappropriate response from sync gateway _all_docs (not JSON dict)")
 
         rows = cast(dict, all_docs_response)["rows"]
         if not isinstance(rows, list):
-            raise ValueError(
-                "Inappropriate response from sync gateway _all_docs (rows not a list)"
-            )
+            raise ValueError("Inappropriate response from sync gateway _all_docs (rows not a list)")
 
         for r in cast(list, rows):
             next_id = r["id"]
@@ -1100,9 +1047,7 @@ class _SyncGatewayBase:
                 f"Unable to find {next_id} in updates!",
             )
             new_rev_id = r["value"]["rev"]
-            cbl_info(
-                f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}"
-            )
+            cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
             found.swap_rev(new_rev_id)
 
     async def update_documents(
@@ -1168,9 +1113,7 @@ class _SyncGatewayBase:
             merged_updates = []
             for update in updates:
                 try:
-                    current_doc = await self.get_document(
-                        db_name, update.id, scope, collection
-                    )
+                    current_doc = await self.get_document(db_name, update.id, scope, collection)
                     if current_doc is not None:
                         current_body = dict(current_doc.body)
                         current_body.update(update.to_json())
@@ -1181,9 +1124,7 @@ class _SyncGatewayBase:
                         current_body = update.to_json()
                 except Exception:
                     current_body = update.to_json()
-                merged_updates.append(
-                    DocumentUpdateEntry(update.id, update.rev, current_body)
-                )
+                merged_updates.append(DocumentUpdateEntry(update.id, update.rev, current_body))
 
             await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
             body = {"docs": list(u.to_json() for u in merged_updates)}
@@ -1193,12 +1134,8 @@ class _SyncGatewayBase:
                 JSONDictionary(body),
             )
 
-    async def _replaced_revid(
-        self, doc_id: str, revid: str, db_name: str, scope: str, collection: str
-    ) -> str:
-        response = await self._send_request(
-            "get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true"
-        )
+    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> str:
+        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
         assert isinstance(response, dict)
         response_dict = cast(dict, response)
         assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
@@ -1231,9 +1168,7 @@ class _SyncGatewayBase:
             },
         ):
             if "@" in revid:
-                new_rev_id = await self._replaced_revid(
-                    doc_id, revid, db_name, scope, collection
-                )
+                new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
             else:
                 new_rev_id = revid
 
@@ -1269,9 +1204,7 @@ class _SyncGatewayBase:
         ):
             body = {doc_id: ["*"]}
 
-            await self._send_request(
-                "post", f"/{db_name}.{scope}.{collection}/_purge", JSONDictionary(body)
-            )
+            await self._send_request("post", f"/{db_name}.{scope}.{collection}/_purge", JSONDictionary(body))
 
     async def get_document(
         self,
@@ -1297,13 +1230,9 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
-            response = await self._send_request(
-                "get", f"/{db_name}.{scope}.{collection}/{doc_id}"
-            )
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from sync gateway get /doc (not JSON)"
-                )
+                raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
@@ -1357,9 +1286,7 @@ class _SyncGatewayBase:
                     500, f"Failed to create document {doc_id}: unexpected response type"
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(
-                    500, f"Failed to create document {doc_id}"
-                )
+                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
@@ -1422,9 +1349,7 @@ class _SyncGatewayBase:
                     f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(
-                    500, f"Failed to update document {doc_id} with rev {rev}"
-                )
+                raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
@@ -1457,9 +1382,7 @@ class _SyncGatewayBase:
             Dictionary containing the database configuration
         """
         _assert_not_null(db_name, "db_name")
-        with self._tracer.start_as_current_span(
-            "get_database_config", attributes={"cbl.database.name": db_name}
-        ):
+        with self._tracer.start_as_current_span("get_database_config", attributes={"cbl.database.name": db_name}):
             return await self._send_request("GET", f"/{db_name}/_config")
 
     async def get_document_revision_public(
@@ -1500,9 +1423,7 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        async with self._create_session(
-            self.secure, self.scheme, self.hostname, 4984, auth
-        ) as session:
+        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
@@ -1525,16 +1446,12 @@ class _SyncGatewayBase:
         """
         try:
             async with ClientSession() as session:
-                async with session.get(
-                    url, timeout=ClientTimeout(total=timeout), headers=headers
-                ) as response:
+                async with session.get(url, timeout=ClientTimeout(total=timeout), headers=headers) as response:
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
                     elif response.status != 200:
                         error_text = await response.text()
-                        raise Exception(
-                            f"{operation} failed: HTTP {response.status} - {error_text}"
-                        )
+                        raise Exception(f"{operation} failed: HTTP {response.status} - {error_text}")
 
                     # Return content as bytes
                     content = await response.read()
@@ -1566,9 +1483,7 @@ class _SyncGatewayBase:
                 "cbl.caddy.url": caddy_url,
             },
         ):
-            _, content = await self._caddy_http_request(
-                caddy_url, f"Fetch {log_filename}", timeout=30
-            )
+            _, content = await self._caddy_http_request(caddy_url, f"Fetch {log_filename}", timeout=30)
             log_content = content.decode("utf-8")
             cbl_info(f"Successfully fetched {log_filename} ({len(log_content)} bytes)")
             return log_content
@@ -1596,18 +1511,14 @@ class _SyncGatewayBase:
                 "cbl.caddy.url": caddy_url,
             },
         ):
-            _, content = await self._caddy_http_request(
-                caddy_url, f"Download {remote_filename}", timeout=600
-            )
+            _, content = await self._caddy_http_request(caddy_url, f"Download {remote_filename}", timeout=600)
 
             # Ensure local directory exists and write file
             local_file_path = Path(local_path)
             local_file_path.parent.mkdir(parents=True, exist_ok=True)
             local_file_path.write_bytes(content)
 
-            cbl_info(
-                f"Successfully downloaded {remote_filename} to {local_path} ({len(content)} bytes)"
-            )
+            cbl_info(f"Successfully downloaded {remote_filename} to {local_path} ({len(content)} bytes)")
 
     async def list_files_via_caddy(
         self,
@@ -1638,8 +1549,7 @@ class _SyncGatewayBase:
                 )
             except FileNotFoundError:
                 raise Exception(
-                    "Directory browsing endpoint not found. "
-                    "Ensure Caddy is configured with 'file_server browse'"
+                    "Directory browsing endpoint not found. Ensure Caddy is configured with 'file_server browse'"
                 )
 
             # Parse JSON response from Caddy
@@ -1652,9 +1562,7 @@ class _SyncGatewayBase:
             files = [
                 entry["name"]
                 for entry in dir_listing
-                if isinstance(entry, dict)
-                and "name" in entry
-                and not entry.get("is_dir", False)
+                if isinstance(entry, dict) and "name" in entry and not entry.get("is_dir", False)
             ]
 
             # Filter by pattern if provided
@@ -1663,8 +1571,7 @@ class _SyncGatewayBase:
                 files = [f for f in files if regex.search(f)]
 
             cbl_info(
-                f"Found {len(files)} files via Caddy browse (JSON)"
-                + (f" (filtered by '{pattern}')" if pattern else "")
+                f"Found {len(files)} files via Caddy browse (JSON)" + (f" (filtered by '{pattern}')" if pattern else "")
             )
             return files
 
@@ -1715,9 +1622,7 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return cast(dict, resp)
 
-    async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 2
-    ) -> None:
+    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 60, wait_time: int = 2) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
         Polls 60 times, waiting 2 seconds between each poll.
@@ -1796,26 +1701,18 @@ class SyncGateway(_SyncGatewayBase):
         ret_val = {}
         for c in input:
             if not isinstance(c, str):
-                raise ValueError(
-                    "Non-string key found in input dictionary to create_collection_access_dict"
-                )
+                raise ValueError("Non-string key found in input dictionary to create_collection_access_dict")
 
             channels = input[c]
             if not isinstance(channels, list):
-                raise ValueError(
-                    f"Non-list found for value of collection {c} in create_collection_access_dict"
-                )
+                raise ValueError(f"Non-list found for value of collection {c} in create_collection_access_dict")
 
             if "." not in c:
-                raise ValueError(
-                    f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified"
-                )
+                raise ValueError(f"Input collection '{c}' in create_collection_access_dict needs to be fully qualified")
 
             spec = c.split(".")
             if len(spec) != 2:
-                raise ValueError(
-                    f"Input collection '{c}' has too many dots in create_collection_access_dict"
-                )
+                raise ValueError(f"Input collection '{c}' has too many dots in create_collection_access_dict")
 
             if spec[0] not in ret_val:
                 scope_dict: dict[str, dict] = {}
@@ -1846,9 +1743,7 @@ class SyncGateway(_SyncGatewayBase):
             :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
         """
-        with self._tracer.start_as_current_span(
-            "add_user", attributes={"cbl.user.name": name}
-        ):
+        with self._tracer.start_as_current_span("add_user", attributes={"cbl.user.name": name}):
             body: dict[str, Any] = {
                 "name": name,
             }
@@ -1862,9 +1757,7 @@ class SyncGateway(_SyncGatewayBase):
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
 
-            await self._send_request(
-                "put", f"/{db_name}/_user/{name}", JSONDictionary(body)
-            )
+            await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
     async def delete_user(self, db_name: str, name: str) -> None:
         """
@@ -1873,9 +1766,7 @@ class SyncGateway(_SyncGatewayBase):
         :param db_name: The name of the Database
         :param name: The username to delete
         """
-        with self._tracer.start_as_current_span(
-            "delete_user", attributes={"cbl.user.name": name}
-        ):
+        with self._tracer.start_as_current_span("delete_user", attributes={"cbl.user.name": name}):
             try:
                 await self._send_request("delete", f"/{db_name}/_user/{name}")
             except CblSyncGatewayBadResponseError as e:
@@ -1906,14 +1797,10 @@ class SyncGateway(_SyncGatewayBase):
             .
             .
         """
-        with self._tracer.start_as_current_span(
-            "add_role", attributes={"cbl.role.name": role}
-        ):
+        with self._tracer.start_as_current_span("add_role", attributes={"cbl.role.name": role}):
             body = {"collection_access": collection_access}
 
-            await self._send_request(
-                "put", f"/{db_name}/_role/{role}", JSONDictionary(body)
-            )
+            await self._send_request("put", f"/{db_name}/_role/{role}", JSONDictionary(body))
 
     async def upload_certificate(self, cert_content: bytes, cert_name: str) -> str:
         """
@@ -1940,15 +1827,11 @@ class SyncGateway(_SyncGatewayBase):
                 ) as resp:
                     if resp.status != 200:
                         resp_body = await resp.text()
-                        raise Exception(
-                            f"Failed to upload certificate: {resp.status} - {resp_body}"
-                        )
+                        raise Exception(f"Failed to upload certificate: {resp.status} - {resp_body}")
 
                     # Return the path where certificate was stored
                     cert_path = f"/home/ec2-user/cert/{cert_name}"
-                    print(
-                        f"Certificate '{cert_name}' uploaded successfully to {cert_path}"
-                    )
+                    print(f"Certificate '{cert_name}' uploaded successfully to {cert_path}")
                     return cert_path
 
     async def _wait_for_rest_api(self) -> None:
@@ -1998,9 +1881,7 @@ class SyncGateway(_SyncGatewayBase):
                 ) as resp:
                     if resp.status != 200:
                         body = await resp.text()
-                        raise Exception(
-                            f"Failed to restart SGW: {resp.status} - {body}"
-                        )
+                        raise Exception(f"Failed to restart SGW: {resp.status} - {body}")
         await self._wait_for_rest_api()
 
     async def stop(self) -> None:
@@ -2033,9 +1914,7 @@ class SyncGateway(_SyncGatewayBase):
         # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
-            async with self._create_session(
-                self.secure, self.scheme, self.hostname, 4984, None
-            ) as session:
+            async with self._create_session(self.secure, self.scheme, self.hostname, 4984, None) as session:
                 async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
                     if resp.status == 200:
                         cbl_info("SGW is already running, skipping start")
@@ -2070,9 +1949,7 @@ class SyncGateway(_SyncGatewayBase):
     async def wait_for_no_databases(self, bucket_name: str):
         dbs = await self.get_all_databases_verbose()
         for db in dbs.values():
-            assert db.bucket != bucket_name, (
-                f"Database {db=} is still backed by bucket {bucket_name}"
-            )
+            assert db.bucket != bucket_name, f"Database {db=} is still backed by bucket {bucket_name}"
 
     async def _wait_for_db_online(
         self,
@@ -2091,14 +1968,9 @@ class SyncGateway(_SyncGatewayBase):
 
         async def _wait_for_db_online_poll() -> None:
             dbs = await self.get_all_databases_verbose()
-            assert db_name in dbs, (
-                f"Database {db_name} is not online "
-                "(database not present in /_all_dbs?verbose=true)"
-            )
+            assert db_name in dbs, f"Database {db_name} is not online (database not present in /_all_dbs?verbose=true)"
             entry = dbs[db_name]
-            assert entry.state == DatabaseState.ONLINE, (
-                f"Database {db_name} is not online: {entry}"
-            )
+            assert entry.state == DatabaseState.ONLINE, f"Database {db_name} is not online: {entry}"
 
         await retry_assert(
             _wait_for_db_online_poll,
@@ -2154,9 +2026,7 @@ class SyncGateway(_SyncGatewayBase):
             .get("shared_bucket_import", {})
             .get("import_count", 0)
         )
-        assert import_count >= min_count, (
-            f"Expected import_count >= {min_count} for {db_name}, got {import_count}"
-        )
+        assert import_count >= min_count, f"Expected import_count >= {min_count} for {db_name}, got {import_count}"
         return import_count
 
     async def create_user_client(
@@ -2211,9 +2081,7 @@ class SyncGateway(_SyncGatewayBase):
                 "cbl.replication.direction": payload.direction,
             },
         ):
-            await self._send_request(
-                "put", f"/{db_name}/_replication/{payload.replication_id}", payload
-            )
+            await self._send_request("put", f"/{db_name}/_replication/{payload.replication_id}", payload)
             return payload.replication_id
 
     async def get_isgr_status(self, db_name: str, replication_id: str) -> dict:
@@ -2231,15 +2099,11 @@ class SyncGateway(_SyncGatewayBase):
                 "cbl.replication.id": replication_id,
             },
         ):
-            resp = await self._send_request(
-                "get", f"/{db_name}/_replicationStatus/{replication_id}"
-            )
+            resp = await self._send_request("get", f"/{db_name}/_replicationStatus/{replication_id}")
             assert isinstance(resp, dict)
             return cast(dict, resp)
 
-    async def stop_isgr(
-        self, db_name: str, replication_id: str, continuous: bool = False
-    ) -> None:
+    async def stop_isgr(self, db_name: str, replication_id: str, continuous: bool = False) -> None:
         """
         Stops and removes an Inter-Sync Gateway Replication.
 
@@ -2255,9 +2119,7 @@ class SyncGateway(_SyncGatewayBase):
             },
         ):
             try:
-                await self._send_request(
-                    "delete", f"/{db_name}/_replication/{replication_id}"
-                )
+                await self._send_request("delete", f"/{db_name}/_replication/{replication_id}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 404 and continuous:
                     cbl_error(f"ISGR {replication_id} is continuous but does not exist")
@@ -2302,9 +2164,7 @@ class SyncGateway(_SyncGatewayBase):
                     )
                 await asyncio.sleep(poll_interval)
 
-            raise TimeoutError(
-                f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds"
-            )
+            raise TimeoutError(f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds")
 
 
 class SyncGatewayUserClient(_SyncGatewayBase):

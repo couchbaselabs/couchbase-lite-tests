@@ -78,11 +78,7 @@ class MultipeerReplicator:
         self.__peerGroupID = peerGroupID
         self.__database = database
         self.__authenticator = authenticator
-        self.__identity = (
-            identity
-            if identity is not None
-            else create_leaf_certificate(f"Test Server {self.__index}")
-        )
+        self.__identity = identity if identity is not None else create_leaf_certificate(f"Test Server {self.__index}")
         assert transports.value != 0, "At least one transport type must be specified"
         assert len(collections) > 0, "At least one collection is required"
         self.__transports = transports
@@ -106,9 +102,7 @@ class MultipeerReplicator:
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
-                cbl_error(
-                    "Failed to start multipeer replicator (see trace log for details)"
-                )
+                cbl_error("Failed to start multipeer replicator (see trace log for details)")
                 cbl_trace(resp.error.message)
                 return None
 
@@ -130,9 +124,7 @@ class MultipeerReplicator:
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:
-                cbl_error(
-                    "Failed to stop multipeer replicator (see trace log for details)"
-                )
+                cbl_error("Failed to stop multipeer replicator (see trace log for details)")
                 cbl_trace(resp.error.message)
                 return
 
@@ -167,12 +159,8 @@ class MultipeerReplicator:
         :param timeout: The time limit to wait for the state change (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for"):
-            assert interval.total_seconds() > 0.0, (
-                "Zero interval makes no sense, try again"
-            )
-            assert timeout.total_seconds() >= 1.0, (
-                "Timeout too short, must be at least 1 second"
-            )
+            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+            assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
 
             all_idle = False
             start = time()
@@ -184,8 +172,7 @@ class MultipeerReplicator:
 
                 next_status = await self.get_status()
                 all_idle = len(next_status.replicators) > 0 and all(
-                    r.status.activity == ReplicatorActivityLevel.IDLE
-                    for r in next_status.replicators
+                    r.status.activity == ReplicatorActivityLevel.IDLE for r in next_status.replicators
                 )
                 if not all_idle:
                     await asyncio.sleep(interval.total_seconds())

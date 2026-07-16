@@ -126,9 +126,7 @@ class PlatformBridge(ABC):
             )
             return fallback
 
-        raise RuntimeError(
-            f"Failed to retrieve IP address for {location} and no fallback provided."
-        )
+        raise RuntimeError(f"Failed to retrieve IP address for {location} and no fallback provided.")
 
     @abstractmethod
     def _get_ip(self, location: str) -> str | None:

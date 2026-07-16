@@ -52,9 +52,7 @@ class TestServer:
         """
         if self.__info is None:
             with self.__tracer.start_as_current_span("get_info"):
-                request = self.__request_factory.create_request(
-                    TestServerRequestType.ROOT
-                )
+                request = self.__request_factory.create_request(TestServerRequestType.ROOT)
                 resp = await self.__request_factory.send_request(self.__index, request)
                 ret_val = cast(GetRootResponse, resp)
                 self.__info = ret_val
@@ -77,9 +75,7 @@ class TestServer:
         :param collections: The name of the collections to add after creating the database.  Cannot
                             be combined with dataset.
         """
-        assert collections is None or dataset is None, (
-            "dataset and collections cannot both be specified"
-        )
+        assert collections is None or dataset is None, "dataset and collections cannot both be specified"
 
         with self.__tracer.start_as_current_span("create_and_reset_db"):
             request = self.__request_factory.create_request(
@@ -88,12 +84,7 @@ class TestServer:
             )
             payload = cast(PostResetRequestMethods, request.payload)
             if dataset is not None:
-                dataset_url = (
-                    self.__dataset_base_url
-                    + self.__dataset_version
-                    + "/"
-                    + f"{dataset}.cblite2.zip"
-                )
+                dataset_url = self.__dataset_base_url + self.__dataset_version + "/" + f"{dataset}.cblite2.zip"
                 payload.add_dataset(dataset_url, db_names)
             else:
                 payload.add_empty(db_names, collections)

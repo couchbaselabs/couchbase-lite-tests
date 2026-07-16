@@ -26,17 +26,13 @@ from cbltest.utils import assert_not_null
 @pytest.mark.min_sync_gateways(1)
 class TestBasicReplication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replicate_non_existing_sg_collections(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `travel` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -79,9 +75,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -96,11 +90,7 @@ class TestBasicReplication(CBLTestClass):
             db,
             cloud.sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PUSH,
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["travel.airlines", "travel.airports", "travel.hotels"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
@@ -130,9 +120,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -147,11 +135,7 @@ class TestBasicReplication(CBLTestClass):
             db,
             cloud.sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PULL,
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["travel.routes", "travel.landmarks", "travel.hotels"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             pinned_server_cert=cloud.sync_gateway.tls_cert(),
         )
@@ -181,9 +165,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -215,9 +197,7 @@ class TestBasicReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(
-            ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300)
-        )
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -240,17 +220,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_continuous_push(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_continuous_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -265,11 +241,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(
             db,
             cloud.sync_gateway.replication_url("travel"),
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["travel.airlines", "travel.airports", "travel.hotels"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])],
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             enable_document_listener=True,
@@ -313,12 +285,8 @@ class TestBasicReplication(CBLTestClass):
                 "test_airport_2",
                 [{"name": "Airport 2", "channels": ["United Kingdom"]}],
             )
-            b.upsert_document(
-                "travel.airlines", "airline_1", removed_properties=["country"]
-            )
-            b.upsert_document(
-                "travel.airlines", "airline_2", removed_properties=["country"]
-            )
+            b.upsert_document("travel.airlines", "airline_1", removed_properties=["country"])
+            b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
             b.delete_document("travel.hotels", "hotel_1")
             b.delete_document("travel.hotels", "hotel_2")
 
@@ -382,9 +350,7 @@ class TestBasicReplication(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -399,11 +365,7 @@ class TestBasicReplication(CBLTestClass):
         replicator = Replicator(
             db,
             cloud.sync_gateway.replication_url("travel"),
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["travel.routes", "travel.landmarks", "travel.hotels"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_document_listener=True,
@@ -461,15 +423,11 @@ class TestBasicReplication(CBLTestClass):
                 },
             ),
         ]
-        await cloud.sync_gateway.update_documents(
-            "travel", routes_updates, "travel", "routes"
-        )
+        await cloud.sync_gateway.update_documents("travel", routes_updates, "travel", "routes")
 
         # Update 2 landmarks in `travel.landmarks`
         landmarks_updates: list[DocumentUpdateEntry] = []
-        landmarks_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "landmarks"
-        )
+        landmarks_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "landmarks")
         for doc in landmarks_all_docs.rows:
             if doc.id == "landmark_100":
                 landmarks_updates.append(
@@ -501,20 +459,14 @@ class TestBasicReplication(CBLTestClass):
                         },
                     )
                 )
-        await cloud.sync_gateway.update_documents(
-            "travel", landmarks_updates, "travel", "landmarks"
-        )
+        await cloud.sync_gateway.update_documents("travel", landmarks_updates, "travel", "landmarks")
 
         # Remove 2 hotels in `travel.hotels`
-        hotels_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "hotels"
-        )
+        hotels_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_400" or doc.id == "hotel_500":
                 revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
-                await cloud.sync_gateway.delete_document(
-                    doc.id, revid, "travel", "travel", "hotels"
-                )
+                await cloud.sync_gateway.delete_document(doc.id, revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events(
@@ -570,17 +522,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_continuous_push_and_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_continuous_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -615,9 +563,7 @@ class TestBasicReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
-        status = await replicator.wait_for(
-            ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=300)
-        )
+        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=300))
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -659,12 +605,8 @@ class TestBasicReplication(CBLTestClass):
                 "test_airport_2",
                 [{"name": "AirPort2", "channels": ["United Kingdom"]}],
             )
-            b.upsert_document(
-                "travel.airlines", "airline_1", removed_properties=["country"]
-            )
-            b.upsert_document(
-                "travel.airlines", "airline_2", removed_properties=["country"]
-            )
+            b.upsert_document("travel.airlines", "airline_1", removed_properties=["country"])
+            b.upsert_document("travel.airlines", "airline_2", removed_properties=["country"])
             b.upsert_document("travel.hotels", "hotel_361", [{"non_smoking": True}])
             b.upsert_document("travel.hotels", "hotel_362", [{"non_smoking": True}])
             b.delete_document("travel.hotels", "hotel_1")
@@ -705,15 +647,11 @@ class TestBasicReplication(CBLTestClass):
                 },
             ),
         ]
-        await cloud.sync_gateway.update_documents(
-            "travel", routes_updates, "travel", "routes"
-        )
+        await cloud.sync_gateway.update_documents("travel", routes_updates, "travel", "routes")
 
         # Update 2 SG landmarks in `travel.landmarks`
         landmarks_updates: list[DocumentUpdateEntry] = []
-        landmarks_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "landmarks"
-        )
+        landmarks_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "landmarks")
         for doc in landmarks_all_docs.rows:
             if doc.id == "landmark_100":
                 landmarks_updates.append(
@@ -745,15 +683,11 @@ class TestBasicReplication(CBLTestClass):
                         },
                     )
                 )
-        await cloud.sync_gateway.update_documents(
-            "travel", landmarks_updates, "travel", "landmarks"
-        )
+        await cloud.sync_gateway.update_documents("travel", landmarks_updates, "travel", "landmarks")
 
         # Update 2 CBL hotels in `travel.landmarks`
         hotels_updates: list[DocumentUpdateEntry] = []
-        hotels_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "hotels"
-        )
+        hotels_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_51":
                 hotels_updates.append(
@@ -797,25 +731,14 @@ class TestBasicReplication(CBLTestClass):
                         },
                     )
                 )
-        await cloud.sync_gateway.update_documents(
-            "travel", hotels_updates, "travel", "hotels"
-        )
+        await cloud.sync_gateway.update_documents("travel", hotels_updates, "travel", "hotels")
 
         # Remove 2 SG and 2 CBL hotels in `travel.hotels`
-        hotels_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "hotels"
-        )
+        hotels_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
-            if (
-                doc.id == "hotel_61"
-                or doc.id == "hotel_62"
-                or doc.id == "hotel_400"
-                or doc.id == "hotel_500"
-            ):
+            if doc.id == "hotel_61" or doc.id == "hotel_62" or doc.id == "hotel_400" or doc.id == "hotel_500":
                 revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
-                await cloud.sync_gateway.delete_document(
-                    doc.id, revid, "travel", "travel", "hotels"
-                )
+                await cloud.sync_gateway.delete_document(doc.id, revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events(
@@ -962,17 +885,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_collection_push(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_default_collection_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -1010,17 +929,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_collection_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_default_collection_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -1058,17 +973,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_collection_push_and_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_default_collection_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -1106,17 +1017,13 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_reset_checkpoint_push(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -1154,9 +1061,7 @@ class TestBasicReplication(CBLTestClass):
 
         self.mark_test_step("Purge an airline doc from `travel.airlines` on SG.")
         sg_purged_doc_id = "airline_10"
-        await cloud.sync_gateway.purge_document(
-            sg_purged_doc_id, "travel", "travel", "airlines"
-        )
+        await cloud.sync_gateway.purge_document(sg_purged_doc_id, "travel", "travel", "airlines")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
@@ -1168,13 +1073,9 @@ class TestBasicReplication(CBLTestClass):
         )
 
         self.mark_test_step("Check that the purged airline doc doesn't exist on SG.")
-        sg_all_docs = await cloud.sync_gateway.get_all_documents(
-            "travel", "travel", "airlines"
-        )
+        sg_all_docs = await cloud.sync_gateway.get_all_documents("travel", "travel", "airlines")
         for doc in sg_all_docs.rows:
-            assert doc.id != sg_purged_doc_id, (
-                f"Unexpected purged document found in SG: {doc.id}"
-            )
+            assert doc.id != sg_purged_doc_id, f"Unexpected purged document found in SG: {doc.id}"
 
         self.mark_test_step(
             "Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`."
@@ -1202,28 +1103,20 @@ class TestBasicReplication(CBLTestClass):
             f"Should be no docs pushed, but {len(replicator.document_updates)} docs were pushed"
         )
 
-        self.mark_test_step(
-            "Check that the purged airline doc was not pushed back to SG"
-        )
+        self.mark_test_step("Check that the purged airline doc was not pushed back to SG")
         for doc in sg_all_docs.rows:
-            assert doc.id != sg_purged_doc_id, (
-                f"Unexpected purged document found in SG: {doc.id}"
-            )
+            assert doc.id != sg_purged_doc_id, f"Unexpected purged document found in SG: {doc.id}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_reset_checkpoint_pull(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -1259,9 +1152,7 @@ class TestBasicReplication(CBLTestClass):
             ["travel.airports"],
         )
 
-        self.mark_test_step(
-            "Purge an airport doc from `travel.airports` in the local database."
-        )
+        self.mark_test_step("Purge an airport doc from `travel.airports` in the local database.")
         lite_purged_doc_id = "airport_20"
         async with db.batch_updater() as b:
             b.purge_document("travel.airports", lite_purged_doc_id)
@@ -1275,14 +1166,10 @@ class TestBasicReplication(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that the purged airport doc doesn't exist in CBL database."
-        )
+        self.mark_test_step("Check that the purged airport doc doesn't exist in CBL database.")
         lite_all_docs = await db.get_all_documents("travel.airports")
         for doc in lite_all_docs["travel.airports"]:
-            assert doc.id != lite_purged_doc_id, (
-                f"Unexpected purged document found in local database: {doc.id}"
-            )
+            assert doc.id != lite_purged_doc_id, f"Unexpected purged document found in local database: {doc.id}"
 
         self.mark_test_step(
             "Start the replicator with the same config as the step 3 BUT with `reset checkpoint set to true`."
@@ -1313,17 +1200,13 @@ class TestBasicReplication(CBLTestClass):
             f"Unexpected doc '{replicator.document_updates[0].document_id}' was pulled"
         )
 
-        self.mark_test_step(
-            "Check that the purged airport doc is pulled back in CBL database."
-        )
+        self.mark_test_step("Check that the purged airport doc is pulled back in CBL database.")
         lite_all_docs = await db.get_all_documents("travel.airports")
         found_doc = False
         for doc in lite_all_docs["travel.airports"]:
             if doc.id == lite_purged_doc_id:
                 found_doc = True
                 break
-        assert found_doc, (
-            f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
-        )
+        assert found_doc, f"{lite_purged_doc_id} was not pulled back to local database after reset checkpoint"
 
         await cblpytest.test_servers[0].cleanup()

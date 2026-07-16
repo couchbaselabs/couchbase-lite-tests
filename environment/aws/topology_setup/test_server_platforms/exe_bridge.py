@@ -23,9 +23,7 @@ from environment.aws.common.output import header
 from .platform_bridge import PlatformBridge
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -114,9 +112,7 @@ class ExeBridge(PlatformBridge):
         args.extend(self.__extra_args)
         log_file = Path(self.__exe_path).parent / self.__log_filename
         log_fd = open(log_file, "w")
-        process = subprocess.Popen(
-            args, start_new_session=True, stdout=log_fd, stderr=log_fd
-        )
+        process = subprocess.Popen(args, start_new_session=True, stdout=log_fd, stderr=log_fd)
         click.echo(f"Started {self.__exe_name} with PID {process.pid}")
 
     def stop(self, location: str) -> None:

@@ -19,9 +19,7 @@ class TestStartReplicator:
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_invalid_database(self, cblpytest: CBLPyTest) -> None:
-        repl = Replicator(
-            Database(cblpytest.request_factory, 0, "fake"), "ws://localhost:4984/db"
-        )
+        repl = Replicator(Database(cblpytest.request_factory, 0, "fake"), "ws://localhost:4984/db")
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             await repl.start()
 
@@ -46,9 +44,7 @@ class TestStartReplicator:
             ("delete", None),
         ],
     )
-    async def test_known_conflict_resolvers(
-        self, cblpytest: CBLPyTest, name: str, parameters: dict | None
-    ):
+    async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: dict | None):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 

@@ -20,9 +20,7 @@ class CBLTestClass(ABC):
 
     def teardown_method(self, method) -> None:
         if self.__step == 1 and not self.__skipped:
-            cbl_warning(
-                f"No test steps marked in {method.__name__}, did you forget to use self.mark_test_step()?"
-            )
+            cbl_warning(f"No test steps marked in {method.__name__}, did you forget to use self.mark_test_step()?")
 
     def mark_test_step(self, description: str) -> None:
         """
@@ -57,9 +55,7 @@ class CBLTestClass(ABC):
         if not condition:
             self.skip(reason)
 
-    async def skip_if_not_platform(
-        self, server: TestServer, allow_platforms: ServerVariant
-    ):
+    async def skip_if_not_platform(self, server: TestServer, allow_platforms: ServerVariant):
         """
         Skips the test if the current platform does not match the specified platform.
 

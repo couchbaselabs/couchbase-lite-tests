@@ -69,9 +69,7 @@ class TestDbGone(CBLTestClass):
         return (endpoints_tested, errors_403)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_db_gone_on_bucket_deletion(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_db_gone_on_bucket_deletion(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -104,12 +102,8 @@ class TestDbGone(CBLTestClass):
         await sg.update_documents(sg_db, sg_docs)
 
         self.mark_test_step("Verify database is available - REST endpoints work")
-        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_available=True
-        )
-        assert errors_403 == 0, (
-            f"DB is available but {errors_403}/{endpoints_tested} endpoints returned 403"
-        )
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, sg_db, expected_available=True)
+        assert errors_403 == 0, f"DB is available but {errors_403}/{endpoints_tested} endpoints returned 403"
 
         self.mark_test_step("Delete bucket to sever connection")
         cbs.drop_bucket(bucket_name)
@@ -119,18 +113,14 @@ class TestDbGone(CBLTestClass):
             await asyncio.sleep(10)
 
         self.mark_test_step("Verify database is gone - REST endpoints return 403")
-        endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-            sg, sg_db, expected_available=False
-        )
+        endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, sg_db, expected_available=False)
         assert endpoints_tested > 0, "No endpoints were tested"
         assert errors_403 == endpoints_tested, (
             f"DB is gone but only {errors_403}/{endpoints_tested} endpoints returned 403"
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_dbs_bucket_deletion(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_multiple_dbs_bucket_deletion(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -153,9 +143,7 @@ class TestDbGone(CBLTestClass):
             }
             db_payload = PutDatabasePayload(db_config)
             await sg.put_database(db_name, db_payload)
-            db_configs[i][4] = await sg.create_user_client(
-                db_name, username, "pass", [channel]
-            )
+            db_configs[i][4] = await sg.create_user_client(db_name, username, "pass", [channel])
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
             sg_docs: list[DocumentUpdateEntry] = []
@@ -173,13 +161,9 @@ class TestDbGone(CBLTestClass):
         for [db_name, _, _, _, _] in db_configs:
             status = await sg.get_database_status(db_name)
             assert status is not None, f"{db_name} database doesn't exist"
-            assert status.state == "Online", (
-                f"{db_name} should be online, but state is: {status.state}"
-            )
+            assert status.state == "Online", f"{db_name} should be online, but state is: {status.state}"
 
-        self.mark_test_step(
-            "Delete buckets for db1 and db3 and wait for those databases to be gone"
-        )
+        self.mark_test_step("Delete buckets for db1 and db3 and wait for those databases to be gone")
         cbs.drop_bucket("data-bucket-1")
         cbs.drop_bucket("data-bucket-3")
         await cbs.wait_for_bucket_deleted("data-bucket-1")
@@ -192,18 +176,12 @@ class TestDbGone(CBLTestClass):
 
         self.mark_test_step("Verify db2 and db4 remain available")
         for db_name in ["db2", "db4"]:
-            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_available=True
-            )
-            assert errors_403 == 0, (
-                f"{db_name} should be available but got {errors_403} 403 errors"
-            )
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, db_name, expected_available=True)
+            assert errors_403 == 0, f"{db_name} should be available but got {errors_403} 403 errors"
 
         self.mark_test_step("Verify db1 and db3 are gone (return 403)")
         for db_name in ["db1", "db3"]:
-            endpoints_tested, errors_403 = await self.scan_rest_endpoints(
-                sg, db_name, expected_available=False
-            )
+            endpoints_tested, errors_403 = await self.scan_rest_endpoints(sg, db_name, expected_available=False)
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )

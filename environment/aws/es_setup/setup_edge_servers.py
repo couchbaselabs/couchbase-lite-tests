@@ -81,14 +81,14 @@ class EsDownloadInfo:
         self.__version = version
         self.__build_no = 0
         self.__local_filename = f"couchbase-edge-server-{self.__version}.x86_64.rpm"
-        self.__url = f"https://packages.couchbase.com/releases/couchbase-edge-server/{self.__version}/{self.__local_filename}"
+        self.__url = (
+            f"https://packages.couchbase.com/releases/couchbase-edge-server/{self.__version}/{self.__local_filename}"
+        )
 
     def _init_internal(self, version: str, build_no: int):
         self.__version = version
         self.__build_no = build_no
-        self.__local_filename = (
-            f"couchbase-edge-server-{self.__version}-{self.__build_no}.x86_64.rpm"
-        )
+        self.__local_filename = f"couchbase-edge-server-{self.__version}-{self.__build_no}.x86_64.rpm"
         self.__url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{self.__version}/{self.__build_no}/{self.__local_filename}"
 
     def __init__(self, version: str):
@@ -172,9 +172,7 @@ def download_es_package(download_info: EsDownloadInfo) -> None:
         )
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -209,9 +207,7 @@ def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
     click.echo()
 
 
-def setup_server(
-    hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo
-) -> None:
+def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo) -> None:
     """
     Set up an Edge Server on an EC2 instance.
 
@@ -223,9 +219,7 @@ def setup_server(
     if es_info.is_release:
         click.echo(f"Setting up server {hostname} with ES {es_info.version}")
     else:
-        click.echo(
-            f"Setting up server {hostname} with ES {es_info.version}-{es_info.build_no}"
-        )
+        click.echo(f"Setting up server {hostname} with ES {es_info.version}-{es_info.build_no}")
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -234,9 +228,7 @@ def setup_server(
     global current_ssh
     current_ssh = hostname
     sftp = ssh.open_sftp()
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
     for file in (SCRIPT_DIR / "shell2http").iterdir():
@@ -305,17 +297,13 @@ def setup_server(
         "Installing Edge Server",
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
-    remote_exec_bg(
-        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server"
-    )
+    remote_exec_bg(ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server")
     remote_exec(
         ssh,
         'echo \'{"name":"admin_user","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',
         "Adding user ",
     )
-    remote_exec(
-        ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server"
-    )
+    remote_exec(ssh, "bash /home/ec2-user/shell2http/kill-edgeserver.sh", "Stopping Edge Server")
     remote_exec(
         ssh,
         "sudo mv /tmp/config.json /opt/couchbase-edge-server/etc/config.json",

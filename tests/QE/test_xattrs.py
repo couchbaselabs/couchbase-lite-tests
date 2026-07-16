@@ -14,9 +14,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 @pytest.mark.min_couchbase_servers(1)
 class TestXattrs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_offline_processing_of_external_updates(
-        self, cblpytest: CBLPyTest
-    ) -> None:
+    async def test_offline_processing_of_external_updates(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 100
@@ -40,9 +38,7 @@ class TestXattrs(CBLTestClass):
         db_payload = PutDatabasePayload(db_config)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step(
-            f"Create user {username} with access to SG and SDK channels"
-        )
+        self.mark_test_step(f"Create user {username} with access to SG and SDK channels")
         sg_user = await sg.create_user_client(sg_db, username, password, ["SG", "SDK"])
 
         self.mark_test_step(f"Bulk create {num_docs} docs via Sync Gateway")
@@ -74,16 +70,10 @@ class TestXattrs(CBLTestClass):
                 collection="_default",
             )
 
-        self.mark_test_step(
-            "Verify all SG docs were created successfully and store revisions, versions"
-        )
+        self.mark_test_step("Verify all SG docs were created successfully and store revisions, versions")
         sg_all_docs = await sg_user.get_all_documents(sg_db)
-        sg_created_count = len(
-            [doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")]
-        )
-        assert sg_created_count == num_docs, (
-            f"Expected {num_docs} SG docs, but found {sg_created_count}"
-        )
+        sg_created_count = len([doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")])
+        assert sg_created_count == num_docs, f"Expected {num_docs} SG docs, but found {sg_created_count}"
         supports_version_vectors = await sg.supports_version_vectors()
         original_revisions = {row.id: row.revision for row in sg_all_docs.rows}
         if supports_version_vectors:
@@ -130,31 +120,17 @@ class TestXattrs(CBLTestClass):
             elif doc.id.startswith("sg_"):
                 sgw_docs_now += 1
                 if doc.body.get("updated_by_sdk") is not True:
-                    content_errors.append(
-                        f"SG doc {doc_id} missing 'updated_by_sdk' flag"
-                    )
+                    content_errors.append(f"SG doc {doc_id} missing 'updated_by_sdk' flag")
                 if doc.revid == original_revisions.get(doc.id):
                     content_errors.append(f"SG doc {doc_id} has incorrect revision")
-                if (
-                    supports_version_vectors
-                    and doc.cv is not None
-                    and doc.cv == original_vv.get(doc.id)
-                ):
-                    content_errors.append(
-                        f"SG doc {doc_id} has incorrect version vector"
-                    )
+                if supports_version_vectors and doc.cv is not None and doc.cv == original_vv.get(doc.id):
+                    content_errors.append(f"SG doc {doc_id} has incorrect version vector")
             elif doc.id.startswith("sdk_"):
                 sdk_docs_now += 1
                 if doc.body.get("created_by") != "sdk":
-                    content_errors.append(
-                        f"SDK doc {doc_id} has incorrect 'created_by' value"
-                    )
-        assert sgw_docs_now == num_docs, (
-            f"Expected {num_docs} SG docs, got {sgw_docs_now}"
-        )
-        assert sdk_docs_now == num_docs, (
-            f"Expected {num_docs} SDK docs, got {sdk_docs_now}"
-        )
+                    content_errors.append(f"SDK doc {doc_id} has incorrect 'created_by' value")
+        assert sgw_docs_now == num_docs, f"Expected {num_docs} SG docs, got {sgw_docs_now}"
+        assert sdk_docs_now == num_docs, f"Expected {num_docs} SDK docs, got {sdk_docs_now}"
         assert len(content_errors) == 0, (
             f"{len(content_errors)} documents didn't have correct content: {content_errors}"
         )
@@ -235,9 +211,7 @@ class TestXattrs(CBLTestClass):
         assert len(sg_all_docs.rows) == num_docs * 2, (
             f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
         )
-        all_doc_revisions: dict[str, str] = {
-            row.id: row.revision for row in sg_all_docs.rows
-        }
+        all_doc_revisions: dict[str, str] = {row.id: row.revision for row in sg_all_docs.rows}
 
         supports_version_vectors = await sg.supports_version_vectors()
         all_doc_version_vectors: dict[str, str | None] = {}
@@ -251,9 +225,7 @@ class TestXattrs(CBLTestClass):
             sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
             if sdk_doc is not None:
                 sdk_visible_count += 1
-        assert sdk_visible_count == num_docs * 2, (
-            f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
-        )
+        assert sdk_visible_count == num_docs * 2, f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
 
         self.mark_test_step("Delete half of the docs randomly via Sync Gateway")
         random.shuffle(all_doc_ids)
@@ -263,16 +235,10 @@ class TestXattrs(CBLTestClass):
         for doc_id in docs_to_delete:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
             if sg_doc is not None and sg_doc.revid is not None:
-                await sg.delete_document(
-                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
-                )
+                await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
-        self.mark_test_step(
-            "Verify deleted docs visible in changes feed with new revision"
-        )
-        rev_changes = await sg.get_changes(
-            sg_db, "_default", "_default", version_type="rev"
-        )
+        self.mark_test_step("Verify deleted docs visible in changes feed with new revision")
+        rev_changes = await sg.get_changes(sg_db, "_default", "_default", version_type="rev")
         deleted_revisions, remaining_revisions = 0, 0
         for entry in rev_changes.results:
             if entry.id in docs_to_delete and entry.deleted:
@@ -295,17 +261,11 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Verify non-deleted docs still accessible")
         for doc_id in remaining_docs:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            assert sg_doc is not None, (
-                f"Non-deleted doc {doc_id} should still be accessible"
-            )
+            assert sg_doc is not None, f"Non-deleted doc {doc_id} should still be accessible"
 
         if supports_version_vectors:
-            self.mark_test_step(
-                "Verify new version vectors for deleted docs (optional)"
-            )
-            cv_changes = await sg.get_changes(
-                sg_db, "_default", "_default", version_type="cv"
-            )
+            self.mark_test_step("Verify new version vectors for deleted docs (optional)")
+            cv_changes = await sg.get_changes(sg_db, "_default", "_default", version_type="cv")
             for entry in cv_changes.results:
                 if entry.id in docs_to_delete and entry.deleted and entry.changes:
                     assert entry.changes[0] != all_doc_version_vectors.get(entry.id), (
@@ -319,17 +279,11 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Verify SG can't see any docs after purge")
         sg_docs_after_purge = await sg_user.get_all_documents(sg_db)
-        assert len(sg_docs_after_purge.rows) == 0, (
-            f"Expected 0 docs after purge, got {len(sg_docs_after_purge.rows)}"
-        )
+        assert len(sg_docs_after_purge.rows) == 0, f"Expected 0 docs after purge, got {len(sg_docs_after_purge.rows)}"
 
         self.mark_test_step("Verify XATTRS are gone using changes feed")
-        changes_after_purge = await sg.get_changes(
-            sg_db, "_default", "_default", version_type="rev"
-        )
-        purged_doc_count = sum(
-            1 for entry in changes_after_purge.results if entry.id in all_doc_ids
-        )
+        changes_after_purge = await sg.get_changes(sg_db, "_default", "_default", version_type="rev")
+        purged_doc_count = sum(1 for entry in changes_after_purge.results if entry.id in all_doc_ids)
         assert purged_doc_count == 0, (
             f"Expected 0 docs in changes feed after purge, found {purged_doc_count} (verifies _sync XATTR is removed)"
         )
@@ -370,9 +324,7 @@ class TestXattrs(CBLTestClass):
         db_payload = PutDatabasePayload(db_config)
         await sg.put_database(sg_db, db_payload)
 
-        self.mark_test_step(
-            f"Create user '{username}' with access to SDK and SG channels"
-        )
+        self.mark_test_step(f"Create user '{username}' with access to SDK and SG channels")
         sg_user = await sg.create_user_client(sg_db, username, password, ["sdk", "sg"])
 
         self.mark_test_step(f"Bulk create {num_docs} docs via SDK")
@@ -405,13 +357,9 @@ class TestXattrs(CBLTestClass):
             sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
             if sdk_doc is not None:
                 sdk_visible_count += 1
-        assert sdk_visible_count == num_docs * 2, (
-            f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
-        )
+        assert sdk_visible_count == num_docs * 2, f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
 
-        self.mark_test_step(
-            f"Verify user '{username}' sees all docs via _changes (public API)"
-        )
+        self.mark_test_step(f"Verify user '{username}' sees all docs via _changes (public API)")
         user_changes = await sg_user.get_changes(sg_db)
         unique_docs = {e.id for e in user_changes.results if e.id in all_doc_ids}
         assert len(unique_docs) == num_docs * 2, (
@@ -424,9 +372,7 @@ class TestXattrs(CBLTestClass):
                 sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
                 if sdk_doc is not None:
                     sdk_doc["content"]["updates"] += 1
-                    cbs.upsert_document(
-                        bucket_name, doc_id, sdk_doc, "_default", "_default"
-                    )
+                    cbs.upsert_document(bucket_name, doc_id, sdk_doc, "_default", "_default")
 
         self.mark_test_step("Verify SDK docs don't contain _sync metadata")
         for doc_id in sdk_doc_ids[:5]:
@@ -442,9 +388,7 @@ class TestXattrs(CBLTestClass):
                 if sg_doc is not None:
                     updated_body = sg_doc.body.copy()
                     updated_body["content"]["updates"] += 1
-                    sg_docs_to_update.append(
-                        DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body)
-                    )
+                    sg_docs_to_update.append(DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body))
             await sg.update_documents(sg_db, sg_docs_to_update, "_default", "_default")
 
         self.mark_test_step("Verify SDK sees all doc updates")
@@ -455,9 +399,7 @@ class TestXattrs(CBLTestClass):
                     f"SDK doc {doc_id} should have {num_updates + 1} updates, got {sdk_doc['content']['updates']}"
                 )
 
-        self.mark_test_step(
-            f"Verify '{username}' sees all doc updates via _all_docs (public API)"
-        )
+        self.mark_test_step(f"Verify '{username}' sees all doc updates via _all_docs (public API)")
         all_docs_updated = await sg_user.get_all_documents(sg_db)
         for row in all_docs_updated.rows:
             sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
@@ -480,9 +422,7 @@ class TestXattrs(CBLTestClass):
         for doc_id in sg_doc_ids:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
             if sg_doc is not None and sg_doc.revid is not None:
-                await sg.delete_document(
-                    doc_id, sg_doc.revid, sg_db, "_default", "_default"
-                )
+                await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
         self.mark_test_step("Verify SDK sees all docs as deleted")
         sdk_deleted_count = 0
@@ -494,9 +434,7 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs to be deleted via SDK, got {sdk_deleted_count}"
         )
 
-        self.mark_test_step(
-            f"Verify '{username}' sees all docs as deleted via _changes (public API)"
-        )
+        self.mark_test_step(f"Verify '{username}' sees all docs as deleted via _changes (public API)")
         changes_deleted = await sg_user.get_changes(sg_db)
         sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
         assert sg_deleted_count == num_docs * 2, (
@@ -531,9 +469,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(f"Create user '{username}' with access to shared channel")
         sg_user = await sg.create_user_client(sg_db, username, password, ["shared"])
 
-        self.mark_test_step(
-            f"Bulk create {num_docs} docs via SDK with tracking properties"
-        )
+        self.mark_test_step(f"Bulk create {num_docs} docs via SDK with tracking properties")
         sdk_doc_ids: list[str] = []
         for i in range(num_docs):
             doc_id = f"doc_set_one_{i}"
@@ -546,9 +482,7 @@ class TestXattrs(CBLTestClass):
             }
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
-        self.mark_test_step(
-            f"Bulk create {num_docs} docs via SG with tracking properties"
-        )
+        self.mark_test_step(f"Bulk create {num_docs} docs via SG with tracking properties")
         sg_docs: list[DocumentUpdateEntry] = []
         sg_doc_ids: list[str] = []
         for i in range(num_docs):
@@ -575,21 +509,13 @@ class TestXattrs(CBLTestClass):
             sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
             if sdk_doc is not None:
                 sdk_visible_count += 1
-        assert sdk_visible_count == num_docs * 2, (
-            f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
-        )
+        assert sdk_visible_count == num_docs * 2, f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
 
-        self.mark_test_step(
-            f"Verify '{username}' sees all docs via _all_docs (public API)"
-        )
+        self.mark_test_step(f"Verify '{username}' sees all docs via _all_docs (public API)")
         sg_all_docs = await sg_user.get_all_documents(sg_db)
-        assert len(sg_all_docs.rows) == num_docs * 2, (
-            f"Expected {num_docs * 2} docs, got {len(sg_all_docs.rows)}"
-        )
+        assert len(sg_all_docs.rows) == num_docs * 2, f"Expected {num_docs * 2} docs, got {len(sg_all_docs.rows)}"
 
-        self.mark_test_step(
-            f"Perform concurrent updates ({num_updates} per doc) from SDK and SG"
-        )
+        self.mark_test_step(f"Perform concurrent updates ({num_updates} per doc) from SDK and SG")
 
         async def update_from_sg() -> None:
             """Update documents from Sync Gateway side with conflict handling"""
@@ -598,10 +524,7 @@ class TestXattrs(CBLTestClass):
                 doc_id = random.choice(docs_remaining)
                 try:
                     sg_doc = await sg.get_document(sg_db, doc_id)
-                    if (
-                        sg_doc is None
-                        or sg_doc.body.get("sg_updates", 0) >= num_updates
-                    ):
+                    if sg_doc is None or sg_doc.body.get("sg_updates", 0) >= num_updates:
                         docs_remaining.remove(doc_id)
                         continue
 
@@ -709,16 +632,10 @@ class TestXattrs(CBLTestClass):
                 await asyncio.sleep(0.01)
             return deleted_count
 
-        sg_deleted, sdk_deleted = await asyncio.gather(
-            delete_from_sg(), delete_from_sdk()
-        )
+        sg_deleted, sdk_deleted = await asyncio.gather(delete_from_sg(), delete_from_sdk())
 
-        assert sg_deleted > 0, (
-            f"SG should have deleted at least some documents, got {sg_deleted}"
-        )
-        assert sdk_deleted > 0, (
-            f"SDK should have deleted at least some documents, got {sdk_deleted}"
-        )
+        assert sg_deleted > 0, f"SG should have deleted at least some documents, got {sg_deleted}"
+        assert sdk_deleted > 0, f"SDK should have deleted at least some documents, got {sdk_deleted}"
 
         self.mark_test_step("Verify all docs deleted from SDK side")
         sdk_deleted_count = 0
@@ -730,14 +647,10 @@ class TestXattrs(CBLTestClass):
             f"Expected {num_docs * 2} docs deleted via SDK, got {sdk_deleted_count}"
         )
 
-        self.mark_test_step(
-            f"Verify '{username}' sees all docs as deleted via _changes (public API)"
-        )
+        self.mark_test_step(f"Verify '{username}' sees all docs as deleted via _changes (public API)")
         changes_deleted = await sg_user.get_changes(sg_db)
         sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
-        assert sg_deleted_count == num_docs * 2, (
-            f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
-        )
+        assert sg_deleted_count == num_docs * 2, f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
 
         await sg_user.close()
 
@@ -758,9 +671,7 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Create bucket and default collection")
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step(
-            "Configure Sync Gateway with custom sync function using xattrs"
-        )
+        self.mark_test_step("Configure Sync Gateway with custom sync function using xattrs")
         sync_function = f"""
         function(doc, oldDoc, meta) {{
             if (doc._deleted) {{
@@ -778,9 +689,7 @@ class TestXattrs(CBLTestClass):
             "import_docs": True,
             "user_xattr_key": user_custom_channel_xattr,  # Database-level config
             "index": {"num_replicas": 0},
-            "scopes": {
-                "_default": {"collections": {"_default": {"sync": sync_function}}}
-            },
+            "scopes": {"_default": {"collections": {"_default": {"sync": sync_function}}}},
         }
         db_payload = PutDatabasePayload(db_config)
         await sg.put_database(sg_db, db_payload)
@@ -788,16 +697,10 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step(
             f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"
         )
-        sg_user1 = await sg.create_user_client(
-            sg_db, username1, password, [sg_channel1]
-        )
-        sg_user2 = await sg.create_user_client(
-            sg_db, username2, password, [sg_channel2]
-        )
+        sg_user1 = await sg.create_user_client(sg_db, username1, password, [sg_channel1])
+        sg_user2 = await sg.create_user_client(sg_db, username2, password, [sg_channel2])
 
-        self.mark_test_step(
-            f"Create {num_docs} docs via SDK with xattr '{user_custom_channel_xattr}={sg_channel1}'"
-        )
+        self.mark_test_step(f"Create {num_docs} docs via SDK with xattr '{user_custom_channel_xattr}={sg_channel1}'")
         sdk_doc_ids: list[str] = []
         for i in range(num_docs):
             doc_id = f"sdk_{i}"
@@ -822,9 +725,7 @@ class TestXattrs(CBLTestClass):
             f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
         )
 
-        self.mark_test_step(
-            f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'"
-        )
+        self.mark_test_step(f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'")
         await asyncio.sleep(10)
         user1_changes = await sg_user1.get_changes(sg_db)
         unique_user1_docs = {e.id for e in user1_changes.results if e.id in sdk_doc_ids}
@@ -833,9 +734,7 @@ class TestXattrs(CBLTestClass):
             f"User '{username1}' should see {num_docs} docs in channel '{sg_channel1}', got {user1_doc_count}"
         )
 
-        self.mark_test_step(
-            f"Concurrently update xattrs to '{sg_channel2}' while querying docs"
-        )
+        self.mark_test_step(f"Concurrently update xattrs to '{sg_channel2}' while querying docs")
 
         async def update_xattrs_and_docs() -> None:
             """Update xattrs to change channel assignment, then trigger import"""
@@ -859,13 +758,9 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step("Delete _sync xattrs to force complete re-processing")
         for doc_id in sdk_doc_ids:
-            cbs.delete_document_xattr(
-                bucket_name, doc_id, "_sync", "_default", "_default"
-            )
+            cbs.delete_document_xattr(bucket_name, doc_id, "_sync", "_default", "_default")
 
-        self.mark_test_step(
-            "Restart Sync Gateway to force re-import with updated xattrs"
-        )
+        self.mark_test_step("Restart Sync Gateway to force re-import with updated xattrs")
         await sg.delete_database(sg_db)
         await sg.put_database(sg_db, db_payload)
 
@@ -884,9 +779,7 @@ class TestXattrs(CBLTestClass):
 
         self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
         user1_changes_after = await sg_user1.get_changes(sg_db)
-        unique_user1_after = {
-            e.id for e in user1_changes_after.results if e.id in sdk_doc_ids
-        }
+        unique_user1_after = {e.id for e in user1_changes_after.results if e.id in sdk_doc_ids}
         user1_count_after = len(unique_user1_after)
         assert user1_count_after == 0, (
             f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', "

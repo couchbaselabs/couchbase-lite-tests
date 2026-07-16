@@ -39,9 +39,7 @@ class LogSlurpHandler(Handler):
         super().close()
         self.__ws.close()
         s = requests.Session()
-        resp = s.post(
-            f"http://{self.__url}/finishLog", headers={"CBL-Log-ID": self.__id}
-        )
+        resp = s.post(f"http://{self.__url}/finishLog", headers={"CBL-Log-ID": self.__id})
         if resp.status_code != 200:
             return
 
@@ -79,9 +77,7 @@ def cbl_log_init(log_id: str, logslurp_url: str | None) -> None:
     _cbl_log.addHandler(console)
 
     if logslurp_url is not None:
-        resp = requests.post(
-            f"http://{logslurp_url}/startNewLog", json={"log_id": log_id}
-        )
+        resp = requests.post(f"http://{logslurp_url}/startNewLog", json={"log_id": log_id})
         if resp.status_code != 200:
             cbl_warning("Failed to start new logslurp log")
         else:

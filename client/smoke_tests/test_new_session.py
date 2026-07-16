@@ -30,6 +30,4 @@ class TestLogSlurp:
     @pytest.mark.asyncio(loop_scope="session")
     async def test_duplicate_new_session(self, cblpytest: CBLPyTest) -> None:
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
-            await cblpytest.test_servers[0].new_session(
-                str(cblpytest.request_factory.uuid), None, None
-            )
+            await cblpytest.test_servers[0].new_session(str(cblpytest.request_factory.uuid), None, None)

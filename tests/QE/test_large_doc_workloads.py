@@ -66,9 +66,7 @@ class TestLargeDocWorkloads(CBLTestClass):
         dbs = await ts.create_and_reset_db(["db1"], collections=["_default._default"])
         db = dbs[0]
 
-        self.mark_test_step(
-            "Create a document with a 50 MB blob attachment (xl2.jpg) in CBL."
-        )
+        self.mark_test_step("Create a document with a 50 MB blob attachment (xl2.jpg) in CBL.")
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default._default",
@@ -77,23 +75,13 @@ class TestLargeDocWorkloads(CBLTestClass):
             )
 
         self.mark_test_step("Verify the document and blob exist locally in CBL.")
-        local_doc = await db.get_document(
-            DocumentEntry("_default._default", "oversized_blob_doc")
-        )
-        assert local_doc is not None, (
-            "Document with 50 MB blob not found in local CBL database"
-        )
-        assert "attachment" in local_doc.body, (
-            "Blob 'attachment' field not present in local document body"
-        )
+        local_doc = await db.get_document(DocumentEntry("_default._default", "oversized_blob_doc"))
+        assert local_doc is not None, "Document with 50 MB blob not found in local CBL database"
+        assert "attachment" in local_doc.body, "Blob 'attachment' field not present in local document body"
         blob_meta = local_doc.body["attachment"]
-        assert isinstance(blob_meta, dict), (
-            "Blob attachment should be a dict (blob reference metadata)"
-        )
+        assert isinstance(blob_meta, dict), "Blob attachment should be a dict (blob reference metadata)"
 
-        self.mark_test_step(
-            "Also create a small control document to verify partial replication works."
-        )
+        self.mark_test_step("Also create a small control document to verify partial replication works.")
         async with db.batch_updater() as b:
             b.upsert_document(
                 "_default._default",
@@ -101,14 +89,10 @@ class TestLargeDocWorkloads(CBLTestClass):
                 new_properties=[{"type": "control", "channels": channels}],
             )
 
-        local_control = await db.get_document(
-            DocumentEntry("_default._default", "small_control_doc")
-        )
+        local_control = await db.get_document(DocumentEntry("_default._default", "small_control_doc"))
         assert local_control is not None, "Control doc should exist locally"
 
-        self.mark_test_step(
-            "Push replicate to SGW — expect SGW to reject the 50 MB blob."
-        )
+        self.mark_test_step("Push replicate to SGW — expect SGW to reject the 50 MB blob.")
         push_replicator = Replicator(
             db,
             sg.replication_url(sg_db),
@@ -137,77 +121,44 @@ class TestLargeDocWorkloads(CBLTestClass):
         assert "oversized_blob_doc" not in sgw_doc_ids, (
             "SGW must reject document with 50 MB blob attachment (>20 MB limit)"
         )
-        assert len(sgw_all_docs.rows) >= 1, (
-            "SGW _all_docs should have at least the control document"
-        )
+        assert len(sgw_all_docs.rows) >= 1, "SGW _all_docs should have at least the control document"
 
         self.mark_test_step("Verify the oversized doc is not retrievable from SGW.")
         try:
-            sgw_rejected = await sg.get_document(
-                sg_db, "oversized_blob_doc", "_default", "_default"
-            )
+            sgw_rejected = await sg.get_document(sg_db, "oversized_blob_doc", "_default", "_default")
             assert sgw_rejected is None, "Oversized blob doc must NOT exist on SGW"
         except CblSyncGatewayBadResponseError as e:
-            assert e.code == 404, (
-                f"Expected 404 for rejected blob doc on SGW, got HTTP {e.code}"
-            )
+            assert e.code == 404, f"Expected 404 for rejected blob doc on SGW, got HTTP {e.code}"
 
-        self.mark_test_step(
-            "Verify the small control document WAS successfully replicated."
-        )
+        self.mark_test_step("Verify the small control document WAS successfully replicated.")
         assert "small_control_doc" in sgw_doc_ids, (
-            "Small control doc should be replicated successfully "
-            "even when another doc was rejected"
+            "Small control doc should be replicated successfully even when another doc was rejected"
         )
-        sgw_control = await sg.get_document(
-            sg_db, "small_control_doc", "_default", "_default"
-        )
+        sgw_control = await sg.get_document(sg_db, "small_control_doc", "_default", "_default")
         assert sgw_control is not None, "Control doc must be retrievable from SGW"
-        assert sgw_control.body.get("type") == "control", (
-            "Control doc body content mismatch on SGW"
-        )
+        assert sgw_control.body.get("type") == "control", "Control doc body content mismatch on SGW"
 
-        self.mark_test_step(
-            "Verify local CBL database integrity — blob doc still intact."
-        )
-        local_doc_after = await db.get_document(
-            DocumentEntry("_default._default", "oversized_blob_doc")
-        )
-        assert local_doc_after is not None, (
-            "Local blob doc must remain intact after failed push replication"
-        )
+        self.mark_test_step("Verify local CBL database integrity — blob doc still intact.")
+        local_doc_after = await db.get_document(DocumentEntry("_default._default", "oversized_blob_doc"))
+        assert local_doc_after is not None, "Local blob doc must remain intact after failed push replication"
         assert "attachment" in local_doc_after.body, (
             "Blob attachment must still be present in local doc after failed push"
         )
 
         self.mark_test_step("Verify local control doc also still intact.")
-        local_control_after = await db.get_document(
-            DocumentEntry("_default._default", "small_control_doc")
-        )
-        assert local_control_after is not None, (
-            "Local control doc must remain intact after replication"
-        )
+        local_control_after = await db.get_document(DocumentEntry("_default._default", "small_control_doc"))
+        assert local_control_after is not None, "Local control doc must remain intact after replication"
 
         self.mark_test_step("Verify local database has exactly 2 documents.")
         local_all_docs = await db.get_all_documents("_default._default")
         local_doc_ids = {d.id for d in local_all_docs["_default._default"]}
-        assert "oversized_blob_doc" in local_doc_ids, (
-            "Oversized blob doc must still exist in local CBL database"
-        )
-        assert "small_control_doc" in local_doc_ids, (
-            "Control doc must still exist in local CBL database"
-        )
-        assert len(local_doc_ids) == 2, (
-            f"Expected exactly 2 local docs, found {len(local_doc_ids)}: {local_doc_ids}"
-        )
+        assert "oversized_blob_doc" in local_doc_ids, "Oversized blob doc must still exist in local CBL database"
+        assert "small_control_doc" in local_doc_ids, "Control doc must still exist in local CBL database"
+        assert len(local_doc_ids) == 2, f"Expected exactly 2 local docs, found {len(local_doc_ids)}: {local_doc_ids}"
 
-        self.mark_test_step(
-            "Verify CBS bucket — control doc present, blob doc NOT present."
-        )
+        self.mark_test_step("Verify CBS bucket — control doc present, blob doc NOT present.")
         cbs_control = cbs.get_document(bucket_name, "small_control_doc")
-        assert cbs_control is not None, (
-            "Control doc must exist in CBS bucket after successful replication"
-        )
+        assert cbs_control is not None, "Control doc must exist in CBS bucket after successful replication"
         cbs_blob = cbs.get_document(bucket_name, "oversized_blob_doc")
         assert cbs_blob is None, "Oversized blob doc must NOT exist in CBS bucket"
 

@@ -18,17 +18,13 @@ from cbltest.api.replicator_types import (
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationEventing(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_replication_for_20mb_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_push_replication_for_20mb_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -104,9 +100,7 @@ class TestReplicationEventing(CBLTestClass):
         assert len(sgw_docs_after.rows) < len(docs_after["_default._default"]), (
             f"Expected no successful document updates but found {len(sgw_docs_after.rows)}"
         )
-        large_doc = next(
-            (doc for doc in sgw_docs_after.rows if doc.id == "large_doc"), None
-        )
+        large_doc = next((doc for doc in sgw_docs_after.rows if doc.id == "large_doc"), None)
         assert large_doc is None, "Large document should not be replicated"
         try:
             with pytest.raises(Exception) as excinfo:

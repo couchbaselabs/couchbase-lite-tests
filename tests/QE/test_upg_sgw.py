@@ -19,9 +19,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
 @pytest.mark.min_couchbase_servers(1)
 class TestSgwUpgrade(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_and_persistence_after_upgrade(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_replication_and_persistence_after_upgrade(self, cblpytest: CBLPyTest, dataset_path: Path):
         """
         This test runs after each SGW upgrade. It performs two key checks:
         1. Ingests a new set of documents to verify that the newly upgraded
@@ -86,9 +84,7 @@ class TestSgwUpgrade(CBLTestClass):
                 raise e
 
         self.mark_test_step("Create user1 for replication")
-        collection_access = sg.create_collection_access_dict(
-            {"_default._default": ["*"]}
-        )
+        collection_access = sg.create_collection_access_dict({"_default._default": ["*"]})
         await sg.add_user(sg_db, "user1", "pass", collection_access)
 
         self.mark_test_step("""
@@ -194,9 +190,7 @@ class TestSgwUpgrade(CBLTestClass):
             cbl_doc = await db.get_document(DocumentEntry("_default._default", row.id))
             print(f"Retrieved doc {row.id} from CBL: {cbl_doc}")
             assert cbl_doc is not None, f"Doc {row.id} not found on CBL"
-            assert "version" in cbl_doc.body, (
-                f"Doc {row.id} missing 'version' field on CBL!"
-            )
+            assert "version" in cbl_doc.body, f"Doc {row.id} missing 'version' field on CBL!"
             assert cbl_doc.body.get("type") == "upgrade_test_doc", (
                 f"Doc {row.id} has wrong type on CBL! Expected 'upgrade_test_doc', got {cbl_doc.body.get('type')}"
             )

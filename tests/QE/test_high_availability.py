@@ -17,9 +17,7 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 @pytest.mark.min_load_balancers(1)
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_high_availability_with_load_balancer(
-        self, cblpytest: CBLPyTest, cleanup_after_test
-    ) -> None:
+    async def test_sgw_high_availability_with_load_balancer(self, cblpytest: CBLPyTest, cleanup_after_test) -> None:
         sgs = cblpytest.sync_gateways
         sg_cluster = SyncGatewayCluster(sgs)
         cbs = cblpytest.couchbase_servers[0]
@@ -46,15 +44,11 @@ class TestHighAvailability(CBLTestClass):
         await sg1.put_database(sg_db, db_payload)
         await sg_cluster.wait_for_db_online(sg_db)
 
-        self.mark_test_step(
-            f"Create user '{username}' with access to channels {channels}"
-        )
+        self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
         await sgs[0].create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
-        lb_user = SyncGatewayUserClient(
-            lb_url, username, password, port=4984, secure=False
-        )
+        lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")
         docs = [
@@ -72,9 +66,7 @@ class TestHighAvailability(CBLTestClass):
         lb_docs = await lb_user.get_all_documents(sg_db)
         lb_doc_ids = {row.id for row in lb_docs.rows}
         missing = set(all_doc_ids) - lb_doc_ids
-        assert len(missing) == 0, (
-            f"LB missing {len(missing)} docs: {list(missing)[:5]}..."
-        )
+        assert len(missing) == 0, f"LB missing {len(missing)} docs: {list(missing)[:5]}..."
 
         self.mark_test_step("Start concurrent SDK writes in background")
 
@@ -86,9 +78,7 @@ class TestHighAvailability(CBLTestClass):
                     "index": i,
                     "content": f"Document {i} written via SDK",
                 }
-                cbs.upsert_document(
-                    bucket_name, doc_id, doc_body, "_default", "_default"
-                )
+                cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         write_task = asyncio.create_task(write_docs_via_sdk())
 
@@ -103,16 +93,12 @@ class TestHighAvailability(CBLTestClass):
             f"LB should still see at least {len(all_doc_ids)} docs with SG2 offline, got {len(lb_doc_ids_after)}"
         )
 
-        self.mark_test_step(
-            "Wait for SDK writes to complete and verify via load balancer"
-        )
+        self.mark_test_step("Wait for SDK writes to complete and verify via load balancer")
         await write_task
 
         lb_docs_final = await lb_user.wait_for_all_documents(sg_db, num_docs + 50)
         final_doc_count = len(lb_docs_final.rows)
-        assert final_doc_count >= num_docs + 50, (
-            f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
-        )
+        assert final_doc_count >= num_docs + 50, f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
 
         self.mark_test_step("Bring SG2 back online")
         await sg2.start(config_name="bootstrap")
@@ -130,9 +116,7 @@ class TestHighAvailability(CBLTestClass):
         ]
         await lb_user.update_documents(sg_db, final_docs)
         final_doc_ids = [d.id for d in final_docs]
-        lb_final_check = await lb_user.wait_for_all_documents(
-            sg_db, num_docs + 50 + len(final_docs)
-        )
+        lb_final_check = await lb_user.wait_for_all_documents(sg_db, num_docs + 50 + len(final_docs))
         lb_final_ids = {row.id for row in lb_final_check.rows}
         for doc_id in final_doc_ids:
             assert doc_id in lb_final_ids, f"Final doc {doc_id} not accessible via LB"

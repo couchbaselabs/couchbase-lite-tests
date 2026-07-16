@@ -15,19 +15,13 @@ def resolved_version(product: str, version: str) -> str:
     if len(version.split(".")) >= 3:
         return version
 
-    r = requests.get(
-        f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}"
-    )
+    r = requests.get(f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}")
     if r.status_code != 200:
-        raise RuntimeError(
-            f"Failed to get latest version for {product} {version}: {r.text}"
-        )
+        raise RuntimeError(f"Failed to get latest version for {product} {version}: {r.text}")
     return cast(str, r.json()["version"])
 
 
-def update_sgw_version(
-    topology_file: Path, sgw_version: str, sgw_index: int | None = None
-) -> None:
+def update_sgw_version(topology_file: Path, sgw_version: str, sgw_index: int | None = None) -> None:
     """Update the SGW version in the topology file.
 
     If sgw_index is provided, only that specific node's version is updated
@@ -44,9 +38,7 @@ def update_sgw_version(
     if sgw_index is not None:
         sgw_list = topology.get("sync_gateways", [])
         if sgw_index < 0 or sgw_index >= len(sgw_list):
-            raise ValueError(
-                f"SGW index {sgw_index} out of range (topology has {len(sgw_list)} nodes)"
-            )
+            raise ValueError(f"SGW index {sgw_index} out of range (topology has {len(sgw_list)} nodes)")
         sgw_list[sgw_index]["version"] = sgw_version_resolved
         print(f"Updated SGW node {sgw_index} version to: {sgw_version_resolved}")
     else:

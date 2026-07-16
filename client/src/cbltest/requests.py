@@ -132,13 +132,9 @@ class RequestFactory:
             version = request_tuple[1]
             request_cls = _request_registry[request_tuple]
             if (request_cls, version) not in _response_registry:
-                raise ValueError(
-                    f"Response type for '{request_cls}' not registered for version {version}!"
-                )
+                raise ValueError(f"Response type for '{request_cls}' not registered for version {version}!")
 
-        cbl_info(
-            f"RequestFactory ({self.__uuid}) initialized for version {self.__version}"
-        )
+        cbl_info(f"RequestFactory ({self.__uuid}) initialized for version {self.__version}")
 
     @property
     def uuid(self) -> UUID:
@@ -148,23 +144,15 @@ class RequestFactory:
     async def start(self) -> None:
         await self.__ws_router.start()
 
-    def _create_request(
-        self, type: TestServerRequestType, **kwargs
-    ) -> TestServerRequest:
+    def _create_request(self, type: TestServerRequestType, **kwargs) -> TestServerRequest:
         if (type, self.__version) not in _request_registry:
-            raise ValueError(
-                f"Request type '{type}' not registered for version {self.__version}"
-            )
+            raise ValueError(f"Request type '{type}' not registered for version {self.__version}")
 
         request_class = _request_registry[(type, self.__version)]
         payload = self._create_body(type, **kwargs)
-        return cast(
-            TestServerRequest, request_class(self.__version, self.__uuid, payload)
-        )
+        return cast(TestServerRequest, request_class(self.__version, self.__uuid, payload))
 
-    def create_request(
-        self, type: TestServerRequestType, **kwargs
-    ) -> TestServerRequest:
+    def create_request(self, type: TestServerRequestType, **kwargs) -> TestServerRequest:
         """
         Creates a request to send.
 
@@ -172,36 +160,26 @@ class RequestFactory:
         :param payload: The payload to send with the request
         """
         return (
-            GetRootRequest(self.__uuid)
-            if type == TestServerRequestType.ROOT
-            else self._create_request(type, **kwargs)
+            GetRootRequest(self.__uuid) if type == TestServerRequestType.ROOT else self._create_request(type, **kwargs)
         )
 
-    def _create_body(
-        self, type: TestServerRequestType, **kwargs
-    ) -> JSONSerializable | None:
+    def _create_body(self, type: TestServerRequestType, **kwargs) -> JSONSerializable | None:
         if type == TestServerRequestType.ROOT:
             return None
 
         if (type, self.__version) not in _body_registry:
-            raise ValueError(
-                f"Request body type '{type}' not registered for version {self.__version}"
-            )
+            raise ValueError(f"Request body type '{type}' not registered for version {self.__version}")
 
         body_class = _body_registry[(type, self.__version)]
         return cast(JSONSerializable, body_class(**kwargs))
 
-    async def send_request(
-        self, index: int, r: TestServerRequest
-    ) -> TestServerResponse:
+    async def send_request(self, index: int, r: TestServerRequest) -> TestServerResponse:
         """Sends a request to the URL at the provided index (as indexes by test_servers in
         the JSON configuration file)"""
         writer = get_next_writer()
         server_info = self.__server_infos[index]
         header = f"{r} @ TS-{index}"
-        writer.write_begin(
-            header, r.payload.serialize() if r.payload is not None else ""
-        )
+        writer.write_begin(header, r.payload.serialize() if r.payload is not None else "")
 
         try:
             transport = RequestTransportFactory.get_transport(

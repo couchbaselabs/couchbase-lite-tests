@@ -67,9 +67,7 @@ class TestPeerToPeer(CBLTestClass):
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -112,47 +110,34 @@ class TestPeerToPeer(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
         self.mark_test_step("Perform concurrent updates to both listener and client")
         for i in range(3):
             await asyncio.gather(
-                *(
-                    self._testserver_crud(
-                        db, num_of_docs, optype="update", documents=documents
-                    )
-                    for db in all_dbs[:2]
-                )
+                *(self._testserver_crud(db, num_of_docs, optype="update", documents=documents) for db in all_dbs[:2])
             )
 
         self.mark_test_step("Wait till replication is complete")
         if continuous:
-            status = await replicator.wait_for(
-                ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=200)
-            )
+            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=200))
         else:
-            status = await replicator.wait_for(
-                ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=200)
-            )
+            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=200))
         assert status.error is None, (
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener.stop()
@@ -172,9 +157,7 @@ class TestPeerToPeer(CBLTestClass):
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -195,9 +178,7 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Setup Replication on Device-1 with listener endpoint-1")
         replicator1 = Replicator(
             all_dbs[0],
-            endpoint=cblpytest.test_servers[1].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[1].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -209,9 +190,7 @@ class TestPeerToPeer(CBLTestClass):
 
         replicator2 = Replicator(
             all_dbs[0],
-            endpoint=cblpytest.test_servers[2].replication_url(
-                "db1", listener2.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[2].replication_url("db1", listener2.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -236,14 +215,12 @@ class TestPeerToPeer(CBLTestClass):
         )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -264,9 +241,7 @@ class TestPeerToPeer(CBLTestClass):
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -283,9 +258,7 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Setup Replication on Device-2 with listener endpoint-1")
         replicator1 = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -296,9 +269,7 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Setup Replication on Device-3 with listener endpoint-1")
         replicator2 = Replicator(
             all_dbs[2],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -323,14 +294,12 @@ class TestPeerToPeer(CBLTestClass):
         )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -350,9 +319,7 @@ class TestPeerToPeer(CBLTestClass):
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -365,14 +332,10 @@ class TestPeerToPeer(CBLTestClass):
         listener1.set_identity()
         await listener1.start()
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
-        self.mark_test_step(
-            "Setup 3 different Replication sessions using same db on Device-2 with listener endpoint-1"
-        )
+        self.mark_test_step("Setup 3 different Replication sessions using same db on Device-2 with listener endpoint-1")
         replicator1 = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -381,9 +344,7 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
         replicator2 = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -392,9 +353,7 @@ class TestPeerToPeer(CBLTestClass):
         await replicator2.start()
         replicator3 = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -426,14 +385,12 @@ class TestPeerToPeer(CBLTestClass):
             f"Error waiting for replicator3: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -453,21 +410,15 @@ class TestPeerToPeer(CBLTestClass):
     ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         self.mark_test_step("Create 3 dbs and sdd 10 docs each to Device-1")
-        client_db_list = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1", "db2", "db3"]
-        )
+        client_db_list = await cblpytest.test_servers[0].create_and_reset_db(["db1", "db2", "db3"])
         await self._testserver_crud(client_db_list[0], num_of_docs)
         await self._testserver_crud(client_db_list[1], num_of_docs)
         await self._testserver_crud(client_db_list[2], num_of_docs)
         self.mark_test_step("Create 3 dbs and start 3 listeners on Device-2")
-        server_db_list = await cblpytest.test_servers[1].create_and_reset_db(
-            ["db1", "db2", "db3"]
-        )
+        server_db_list = await cblpytest.test_servers[1].create_and_reset_db(["db1", "db2", "db3"])
         listener1 = Listener(server_db_list[0], ["_default._default"], 59840)
         listener1.set_identity()
         await listener1.start()
@@ -485,9 +436,7 @@ class TestPeerToPeer(CBLTestClass):
         )
         replicator1 = Replicator(
             client_db_list[0],
-            endpoint=cblpytest.test_servers[1].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[1].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -496,9 +445,7 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
         replicator2 = Replicator(
             client_db_list[1],
-            endpoint=cblpytest.test_servers[1].replication_url(
-                "db2", listener2.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[1].replication_url("db2", listener2.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -507,9 +454,7 @@ class TestPeerToPeer(CBLTestClass):
         await replicator2.start()
         replicator3 = Replicator(
             client_db_list[2],
-            endpoint=cblpytest.test_servers[1].replication_url(
-                "db3", listener3.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[1].replication_url("db3", listener3.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -540,14 +485,12 @@ class TestPeerToPeer(CBLTestClass):
             f"Error waiting for replicator3: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in server_db_list
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in server_db_list]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -564,14 +507,10 @@ class TestPeerToPeer(CBLTestClass):
             (100, True, ReplicatorType.PUSH),
         ],
     )
-    async def test_peer_to_peer_with_server_down(
-        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
-    ):
+    async def test_peer_to_peer_with_server_down(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
-        self.mark_test_step(
-            "Reset local database and load `empty` dataset on two devices"
-        )
+        self.mark_test_step("Reset local database and load `empty` dataset on two devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
         all_dbs = [dbs[0] for dbs in all_devices_dbs]
@@ -588,9 +527,7 @@ class TestPeerToPeer(CBLTestClass):
         cert1 = listener1.identity.pem_bytes().decode("utf-8")
         replicator1 = Replicator(
             all_dbs[1],
-            endpoint=cblpytest.test_servers[0].replication_url(
-                "db1", listener1.port, tls=True
-            ),
+            endpoint=cblpytest.test_servers[0].replication_url("db1", listener1.port, tls=True),
             replicator_type=replicator_type,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             continuous=continuous,
@@ -600,17 +537,13 @@ class TestPeerToPeer(CBLTestClass):
 
         async def stop_restart_task():
             await listener1.stop()
-            listener2 = Listener(
-                all_dbs[0], ["_default._default"], 59840, identity=None
-            )
+            listener2 = Listener(all_dbs[0], ["_default._default"], 59840, identity=None)
             await listener2.start()
             return listener2
 
         restarted_listener, _ = await asyncio.gather(
             stop_restart_task(),
-            self._testserver_crud(
-                all_dbs[1], num_of_docs, optype="update", documents=docs
-            ),
+            self._testserver_crud(all_dbs[1], num_of_docs, optype="update", documents=docs),
         )
         await replicator1.start()
         listener1 = restarted_listener
@@ -624,14 +557,12 @@ class TestPeerToPeer(CBLTestClass):
             f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
         self.mark_test_step("Check that all docs are replicated correctly.")
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Stop listener")
         await listener1.stop()

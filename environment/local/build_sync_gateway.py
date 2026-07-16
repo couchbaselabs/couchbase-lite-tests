@@ -12,9 +12,7 @@ import click
 def main(repo_path, git_tag):
     """Build Sync Gateway"""
     if bool(repo_path) == bool(git_tag):
-        raise click.UsageError(
-            "Exactly one of --repo-path or --git-tag must be provided."
-        )
+        raise click.UsageError("Exactly one of --repo-path or --git-tag must be provided.")
 
     env_local_dir = os.path.dirname(os.path.abspath(__file__))
     output_bin = os.path.join(env_local_dir, "sync_gateway")

@@ -37,9 +37,7 @@ def scan_logs_for_untagged_sensitive_data(
             after_text = log_content[end_pos : min(len(log_content), end_pos + 1000)]
 
             # Check if this occurrence is within <ud>...</ud> tags
-            has_opening_tag = "<ud>" in before_text and before_text.rfind(
-                "<ud>"
-            ) > before_text.rfind("</ud>")
+            has_opening_tag = "<ud>" in before_text and before_text.rfind("<ud>") > before_text.rfind("</ud>")
             has_closing_tag = "</ud>" in after_text
 
             if has_opening_tag and has_closing_tag:
@@ -71,12 +69,8 @@ def scan_logs_for_untagged_sensitive_data(
             if any(marker in extended_context for marker in struct_markers):
                 continue  # Go struct dump - these are debug internals
 
-            context = log_content[
-                max(0, start_pos - 50) : min(len(log_content), end_pos + 50)
-            ]
-            violations.append(
-                f"Untagged '{pattern}' at position {start_pos}: ...{context}..."
-            )
+            context = log_content[max(0, start_pos - 50) : min(len(log_content), end_pos + 50)]
+            violations.append(f"Untagged '{pattern}' at position {start_pos}: ...{context}...")
     return violations
 
 
@@ -86,9 +80,7 @@ def scan_logs_for_untagged_sensitive_data(
 @pytest.mark.min_couchbase_servers(1)
 class TestLogRedaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_log_redaction_partial(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_log_redaction_partial(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -134,9 +126,7 @@ class TestLogRedaction(CBLTestClass):
 
         self.mark_test_step("Verify docs were created (public API)")
         all_docs = await sg_user.get_all_documents(sg_db, "_default", "_default")
-        assert len(all_docs.rows) == num_docs, (
-            f"Expected {num_docs} docs, got {len(all_docs.rows)}"
-        )
+        assert len(all_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(all_docs.rows)}"
 
         self.mark_test_step("Fetch and scan SG logs for redaction violations via Caddy")
         log_types = ["debug", "info", "warn", "error"]
@@ -148,37 +138,27 @@ class TestLogRedaction(CBLTestClass):
         for log_type in log_types:
             try:
                 log_contents = await sg.fetch_log_file(log_type)
-                violations = scan_logs_for_untagged_sensitive_data(
-                    log_contents, sensitive_patterns
-                )
+                violations = scan_logs_for_untagged_sensitive_data(log_contents, sensitive_patterns)
                 if violations:
-                    all_violations.extend(
-                        [f"sg_{log_type}.log: {v}" for v in violations[:3]]
-                    )
+                    all_violations.extend([f"sg_{log_type}.log: {v}" for v in violations[:3]])
                 if "<ud>" in log_contents:
                     has_any_ud_tags = True
             except FileNotFoundError:
                 continue
             except Exception as e:
-                raise Exception(
-                    f"Failed to fetch sg_{log_type}.log via Caddy: {e}"
-                ) from e
+                raise Exception(f"Failed to fetch sg_{log_type}.log via Caddy: {e}") from e
 
         assert len(all_violations) == 0, (
             f"Found {len(all_violations)} log redaction violations across all logs: Showing first 10:\n"
             + "\n".join(all_violations[:10])
         )
 
-        assert has_any_ud_tags, (
-            "No <ud> tags found in any log files - partial redaction not working"
-        )
+        assert has_any_ud_tags, "No <ud> tags found in any log files - partial redaction not working"
 
         await sg_user.close()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgcollect_redacted_files_and_contents(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_sgcollect_redacted_files_and_contents(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
@@ -224,17 +204,11 @@ class TestLogRedaction(CBLTestClass):
 
         self.mark_test_step("Verify docs were created")
         all_docs = await sg_user.get_all_documents(sg_db, "_default", "_default")
-        assert len(all_docs.rows) == num_docs, (
-            f"Expected {num_docs} docs, got {len(all_docs.rows)}"
-        )
+        assert len(all_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(all_docs.rows)}"
 
         self.mark_test_step("Trigger SGCollect with redaction enabled")
-        sgcollect_resp = await sg.start_sgcollect(
-            redact_level="partial", output_dir="/home/ec2-user/log"
-        )
-        assert sgcollect_resp.get("status") in ["running", "started"], (
-            f"SGCollect failed to start: {sgcollect_resp}"
-        )
+        sgcollect_resp = await sg.start_sgcollect(redact_level="partial", output_dir="/home/ec2-user/log")
+        assert sgcollect_resp.get("status") in ["running", "started"], f"SGCollect failed to start: {sgcollect_resp}"
 
         self.mark_test_step("Wait for SGCollect to complete")
         await sg.wait_for_sgcollect_to_complete(max_attempts=60, wait_time=5)
@@ -260,9 +234,7 @@ class TestLogRedaction(CBLTestClass):
             local_zip_path = Path(tmpdir) / redacted_zip_filename
             await sg.download_file_via_caddy(redacted_zip_filename, str(local_zip_path))
 
-            assert local_zip_path.exists(), (
-                f"Downloaded zip not found at {local_zip_path}"
-            )
+            assert local_zip_path.exists(), f"Downloaded zip not found at {local_zip_path}"
 
             self.mark_test_step("Extract and verify redacted logs in zip")
             extract_dir = Path(tmpdir) / "extracted"
@@ -275,22 +247,16 @@ class TestLogRedaction(CBLTestClass):
             log_files = list(extract_dir.rglob("sg_*.log"))
             assert len(log_files) > 0, "No log files found in SGCollect zip"
 
-            self.mark_test_step(
-                f"Scanning {len(log_files)} log files for redaction violations"
-            )
+            self.mark_test_step(f"Scanning {len(log_files)} log files for redaction violations")
             sensitive_patterns = sg_doc_ids + [username]
             all_violations = []
             has_any_ud_tags = False
 
             for log_file in log_files:
                 log_content = log_file.read_text(errors="replace")
-                violations = scan_logs_for_untagged_sensitive_data(
-                    log_content, sensitive_patterns
-                )
+                violations = scan_logs_for_untagged_sensitive_data(log_content, sensitive_patterns)
                 if violations:
-                    all_violations.extend(
-                        [f"{log_file.name}: {v}" for v in violations[:3]]
-                    )
+                    all_violations.extend([f"{log_file.name}: {v}" for v in violations[:3]])
                 if "<ud>" in log_content:
                     has_any_ud_tags = True
 
@@ -299,8 +265,6 @@ class TestLogRedaction(CBLTestClass):
                 + "\n".join(all_violations[:10])
             )
 
-            assert has_any_ud_tags, (
-                "No <ud> tags found in SGCollect log files - partial redaction not working"
-            )
+            assert has_any_ud_tags, "No <ud> tags found in SGCollect log files - partial redaction not working"
 
         await sg_user.close()

@@ -76,9 +76,7 @@ def get_cbl_platform() -> str:
 
 
 def get_latest_released_cbl_c_version() -> str:
-    r = requests.get(
-        "http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c"
-    )
+    r = requests.get("http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c")
     r.raise_for_status()
     return r.json()["version"]
 

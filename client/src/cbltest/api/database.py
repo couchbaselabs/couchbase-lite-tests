@@ -22,7 +22,9 @@ from cbltest.response_types import (
 )
 from cbltest.version import VERSION
 
-BASE_BLOB_URL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/"
+BASE_BLOB_URL = (
+    "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/"
+)
 
 
 class SnapshotUpdater:
@@ -37,9 +39,7 @@ class SnapshotUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to delete
         """
-        self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id)
-        )
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
 
     def purge_document(self, collection: str, id: str):
         """
@@ -48,9 +48,7 @@ class SnapshotUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to purge
         """
-        self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id)
-        )
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
     def upsert_document(
         self,
@@ -136,9 +134,7 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to delete
         """
-        self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id)
-        )
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
 
     def purge_document(self, collection: str, id: str):
         """
@@ -147,9 +143,7 @@ class DatabaseUpdater:
         :param collection: The collection to which the document belongs (scope-qualified)
         :param id: The ID of the document to purge
         """
-        self._updates.append(
-            DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id)
-        )
+        self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.PURGE, collection, id))
 
     def upsert_document(
         self,
@@ -173,7 +167,9 @@ class DatabaseUpdater:
         .. note:: A keypath is a JSON keypath like $.foo[0].bar ($. is optional)
         """
         if new_properties is not None and not isinstance(new_properties, list):
-            self.__error = "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            self.__error = (
+                "Incorrect new_properties format, must be a list of dictionaries each with properties to update"
+            )
             return
 
         if new_blobs is not None:
@@ -320,15 +316,11 @@ class GetDocumentResult:
         Handles both rev-tree and version-vector formats.
         """
         # Replace semicolons with commas, then split
-        parts = [
-            p.strip() for p in self.__revs.replace(";", ",").split(",") if p.strip()
-        ]
+        parts = [p.strip() for p in self.__revs.replace(";", ",").split(",") if p.strip()]
         return parts[0] if parts else ""
 
     def __init__(self, raw: dict[str, Any]) -> None:
-        assert self.__id_key in raw and self.__revs_key in raw, (
-            "Malformed raw dict in GetDocumentResult"
-        )
+        assert self.__id_key in raw and self.__revs_key in raw, "Malformed raw dict in GetDocumentResult"
         self.__id = raw[self.__id_key]
         self.__revs = raw[self.__revs_key]
         raw.pop(self.__id_key)
@@ -368,9 +360,7 @@ class Database:
         """
         return DatabaseUpdater(self.__name, self.__request_factory, self.__index)
 
-    async def get_all_documents(
-        self, *collections: str
-    ) -> dict[str, list[AllDocumentsEntry]]:
+    async def get_all_documents(self, *collections: str) -> dict[str, list[AllDocumentsEntry]]:
         """
         Performs a getAllDocumentIDs request for the given collections
 
@@ -392,9 +382,7 @@ class Database:
             cast_resp = cast(PostGetAllDocumentsResponseMethods, resp)
             ret_val: dict[str, list[AllDocumentsEntry]] = {}
             for c in cast_resp.collection_keys:
-                ret_val[c] = list(
-                    AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c)
-                )
+                ret_val[c] = list(AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c))
 
             return ret_val
 

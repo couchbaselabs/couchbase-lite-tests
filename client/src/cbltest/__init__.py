@@ -80,9 +80,7 @@ class CBLPyTest:
         test_server_only: bool = False,
         dataset_version: str = "4.0",
     ):
-        ret_val = CBLPyTest(
-            config, log_level, extra_props_path, test_server_only, dataset_version
-        )
+        ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version)
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
@@ -122,9 +120,7 @@ class CBLPyTest:
         for ts in self.__config.test_servers:
             ts_info = TestServerInfo(ts)
             dataset_version = ts_info.dataset_version or dataset_version
-            self.__test_servers.append(
-                TestServer(self.__request_factory, index, ts_info.url, dataset_version)
-            )
+            self.__test_servers.append(TestServer(self.__request_factory, index, ts_info.url, dataset_version))
             index += 1
 
         self.__sync_gateways: list[SyncGateway] = []
@@ -148,9 +144,7 @@ class CBLPyTest:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
                 self.__couchbase_servers.append(
-                    CouchbaseServer(
-                        cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
-                    )
+                    CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password)
                 )
 
         self.__edge_servers: list[EdgeServer] = []
@@ -192,14 +186,7 @@ class CBLPyTest:
             await sg.close()
 
     def __str__(self) -> str:
-        ret_val = (
-            "Configuration:"
-            + "\n"
-            + str(self.__config)
-            + "\n\n"
-            + "Log Level: "
-            + str(self.__log_level)
-        )
+        ret_val = "Configuration:" + "\n" + str(self.__config) + "\n\n" + "Log Level: " + str(self.__log_level)
 
         if self.__extra_props is not None:
             ret_val += "\n" + "Extra Properties:" + "\n" + dumps(self.__extra_props)

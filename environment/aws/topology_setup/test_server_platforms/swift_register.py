@@ -86,9 +86,7 @@ class SwiftTestServer(TestServer):
             int(version_parts[1]) if len(version_parts) > 1 else 0,
         )
         downloader.download(download_file)
-        shutil.rmtree(
-            FRAMEWORKS_DIR / "CouchbaseLiteSwift.xcframework", ignore_errors=True
-        )
+        shutil.rmtree(FRAMEWORKS_DIR / "CouchbaseLiteSwift.xcframework", ignore_errors=True)
         unzip_directory(download_file, FRAMEWORKS_DIR)
         download_file.unlink()
         self._mark_downloaded(FRAMEWORKS_DIR)
@@ -125,9 +123,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
-        )
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
     def build(self) -> None:
         self._download_cbl()
@@ -156,9 +152,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         ) as xcodebuild_proc:
-            with subprocess.Popen(
-                ["xcpretty"], stdin=xcodebuild_proc.stdout, env=env
-            ) as xcpretty_proc:
+            with subprocess.Popen(["xcpretty"], stdin=xcodebuild_proc.stdout, env=env) as xcpretty_proc:
                 # Close the stdout of the first process to allow it to receive a SIGPIPE if the second process exits
                 cast(BytesIO, xcodebuild_proc.stdout).close()
 
@@ -192,13 +186,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
             str: The path to the compressed package.
         """
         header("Compressing Swift test server for iOS")
-        publish_dir = (
-            BUILD_DEVICE_DIR
-            / "Build"
-            / "Products"
-            / "Release-iphoneos"
-            / "TestServer-iOS.app"
-        )
+        publish_dir = BUILD_DEVICE_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer-iOS.app"
         zip_path = publish_dir.parents[5] / "testserver_ios.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)

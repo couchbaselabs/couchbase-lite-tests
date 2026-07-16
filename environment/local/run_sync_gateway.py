@@ -63,9 +63,7 @@ def main(start, stop, server):
         config_path = str(SYNC_GATEWAY_CONFIG[server])
         if server == "cbs":
             cbs_version = get_cbs_version()
-            download_tool.download_tool(
-                download_tool.ToolName.BackupManager, cbs_version
-            )
+            download_tool.download_tool(download_tool.ToolName.BackupManager, cbs_version)
 
     bridge = ExeBridge(
         exe_path=exe_path,

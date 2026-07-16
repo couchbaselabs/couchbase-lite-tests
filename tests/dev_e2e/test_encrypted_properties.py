@@ -18,9 +18,7 @@ from cbltest.responses import ServerVariant
 @pytest.mark.min_sync_gateways(1)
 class TestEncryptedProperties(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_encrypted_push(
-        self, dataset_path: Path, cblpytest: CBLPyTest
-    ) -> None:
+    async def test_encrypted_push(self, dataset_path: Path, cblpytest: CBLPyTest) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
         self.mark_test_step("Reset SG and load `names` dataset")
@@ -69,12 +67,10 @@ class TestEncryptedProperties(CBLTestClass):
         self.mark_test_step("Check that the document in SG is not in plaintext")
         pushed_doc = await cloud.sync_gateway.get_document("names", "secret")
         assert pushed_doc is not None, "Document not found in SG"
-        assert "password" not in pushed_doc.body, (
-            "The document was pushed without encryption"
-        )
+        assert "password" not in pushed_doc.body, "The document was pushed without encryption"
         assert "encrypted$password" in pushed_doc.body, (
             "The document was pushed without encryption, but the encrypted field is not present"
         )
-        assert (
-            pushed_doc.body["encrypted$password"]["ciphertext"] != "secret_password"
-        ), "The document was pushed with encryption, but the value is still plaintext"
+        assert pushed_doc.body["encrypted$password"]["ciphertext"] != "secret_password", (
+            "The document was pushed with encryption, but the value is still plaintext"
+        )

@@ -33,18 +33,14 @@ class _FakeConfigResponse:
 
 
 @pytest_asyncio.fixture(loop_scope="function")
-async def sync_gateway(
-    monkeypatch, tmp_path
-) -> AsyncIterator[tuple[SyncGateway, list[dict]]]:
+async def sync_gateway(monkeypatch, tmp_path) -> AsyncIterator[tuple[SyncGateway, list[dict]]]:
     """A SyncGateway backed by a real aiohttp test server, so _send_request and
     everything built on it (get_all_databases_verbose, wait_for_db_online, ...) runs
     against real ClientSession/ClientResponse objects. `specs` controls what the
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online)."""
-    monkeypatch.setattr(
-        _HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log"
-    )
+    monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
         lambda *args, **kwargs: _FakeConfigResponse(),
@@ -68,9 +64,7 @@ async def sync_gateway(
     await server.start_server()
     assert server.port is not None
 
-    sg = SyncGateway(
-        url=server.host, username="user", password="pass", port=server.port
-    )
+    sg = SyncGateway(url=server.host, username="user", password="pass", port=server.port)
 
     yield sg, specs
 

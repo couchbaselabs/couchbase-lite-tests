@@ -36,9 +36,7 @@ class TestSystemMultipeer(CBLTestClass):
     async def test_system(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(
-                ts, ServerVariant.ANDROID | ServerVariant.IOS
-            )
+            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=24)
         CRUD_INTERVAL = timedelta(minutes=5)
@@ -102,9 +100,7 @@ class TestSystemMultipeer(CBLTestClass):
             update_count = random.randint(1, MAX_DOCS_PER_CRUD)
             num_updates = random.randint(1, 3)
 
-            crud_ids = random.sample(
-                doc_ids, (delete_count + update_count)
-            )  # to ensure no overlaps in IDs
+            crud_ids = random.sample(doc_ids, (delete_count + update_count))  # to ensure no overlaps in IDs
             to_delete = crud_ids[:delete_count]
             to_update = crud_ids[delete_count:]
             should_stop_testserver = (
@@ -113,9 +109,7 @@ class TestSystemMultipeer(CBLTestClass):
             new_docs = docgen.generate_all_documents(size=insert_count)
             new_doc_ids = list(new_docs.keys())
             documents.update(new_docs)  # add newly generated docs to the documents dict
-            doc_ids.extend(
-                new_doc_ids
-            )  # add newly generated doc_ids to the doc_ids list
+            doc_ids.extend(new_doc_ids)  # add newly generated doc_ids to the doc_ids list
 
             doc_ids = list(set(doc_ids) - set(to_delete))
             docs_to_update = {k: documents[k] for k in to_update}
@@ -147,9 +141,7 @@ class TestSystemMultipeer(CBLTestClass):
                         end = min(start + 10, len(to_update))
                         async with all_dbs[update_testserver].batch_updater() as b:
                             for doc_id in to_update[start:end]:
-                                b.upsert_document(
-                                    "_default._default", doc_id, updated_docs[doc_id]
-                                )
+                                b.upsert_document("_default._default", doc_id, updated_docs[doc_id])
                         docs_to_update = updated_docs
 
             async def stop_restart_task():
@@ -172,21 +164,15 @@ class TestSystemMultipeer(CBLTestClass):
             self.mark_test_step("Wait for idle status on all devices ")
             for multipeer in multipeer_replicators:
                 try:
-                    status = await multipeer.wait_for_idle(
-                        timeout=timedelta(seconds=1000)
-                    )
+                    status = await multipeer.wait_for_idle(timeout=timedelta(seconds=1000))
                 except Exception:
                     self.mark_test_step("Replication staus fetch timed out")
-                assert all(
-                    r.status.replicator_error is None for r in status.replicators
-                ), "Multipeer replicator should not have any errors"
+                assert all(r.status.replicator_error is None for r in status.replicators), (
+                    "Multipeer replicator should not have any errors"
+                )
 
-            self.mark_test_step(
-                "Verifying that all devices have identical document content"
-            )
-            all_docs_collection = [
-                db.get_all_documents("_default._default") for db in all_dbs
-            ]
+            self.mark_test_step("Verifying that all devices have identical document content")
+            all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
             all_docs_results = await asyncio.gather(*all_docs_collection)
             for all_docs in all_docs_results[1:]:
                 assert compare_doc_results_p2p(
@@ -209,9 +195,7 @@ class TestSystemMultipeer(CBLTestClass):
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(
-                ts, ServerVariant.ANDROID | ServerVariant.IOS
-            )
+            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         NO_OF_DOCS = 100000
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
 
@@ -281,17 +265,13 @@ class TestSystemMultipeer(CBLTestClass):
                 "Multipeer replicator should not have any errors"
             )
 
-        self.mark_test_step(
-            "Verifying that all devices have identical document content"
-        )
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        self.mark_test_step("Verifying that all devices have identical document content")
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
         self.mark_test_step("Stopping all multipeer replicators")
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
 
@@ -306,29 +286,21 @@ class TestSystemMultipeer(CBLTestClass):
             MultipeerTransportType.WIFI,
         ],
     )
-    async def test_multipeer_end_to_end(
-        self, cblpytest: CBLPyTest, dataset_path: Path, transport
-    ):
+    async def test_multipeer_end_to_end(self, cblpytest: CBLPyTest, dataset_path: Path, transport):
         #  CB-server1           CB-server2
         #   SGW1                    SGW2 ----  CBL5
         #    /                       \
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(
-                ts, ServerVariant.ANDROID | ServerVariant.IOS
-            )
+            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         DOC_COUNT = 1000
 
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud_1 = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
-        )
+        cloud_1 = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
         await cloud_1.configure_dataset(dataset_path, "names")
 
-        cloud_2 = CouchbaseCloud(
-            cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
-        )
+        cloud_2 = CouchbaseCloud(cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1])
         await cloud_2.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset DBs on all CBL clients and SGWs")
@@ -434,18 +406,14 @@ class TestSystemMultipeer(CBLTestClass):
             await sgw.upsert_documents(db_name, docs_list)
 
         async def insert_testserver(testserver_db):
-            docgen = JSONGenerator(
-                random.randint(21, 50), size=DOC_COUNT, format="key-value"
-            )
+            docgen = JSONGenerator(random.randint(21, 50), size=DOC_COUNT, format="key-value")
             testserver_docs = docgen.generate_all_documents()
             testserver_keys = list(testserver_docs.keys())
             for start in range(0, DOC_COUNT, 10):
                 end = min(start + 10, DOC_COUNT)
                 async with testserver_db.batch_updater() as b:
                     for key in testserver_keys[start:end]:
-                        b.upsert_document(
-                            "_default._default", key, testserver_docs[key]
-                        )
+                        b.upsert_document("_default._default", key, testserver_docs[key])
 
         async def stop_and_restart_testserver(idx):
             await multipeer_replicators[idx].stop()
@@ -485,17 +453,13 @@ class TestSystemMultipeer(CBLTestClass):
             f"Error waiting for replicator: ({repl3_status.error.domain} / {repl3_status.error.code}) {repl3_status.error.message}"
         )
 
-        self.mark_test_step(
-            "Verifying that all devices have identical document content"
-        )
-        all_docs_collection = [
-            db.get_all_documents("_default._default") for db in all_dbs
-        ]
+        self.mark_test_step("Verifying that all devices have identical document content")
+        all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
         for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(
-                all_docs_results[0]["_default._default"], all_docs["_default._default"]
-            ), "All databases should have the same content"
+            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
+                "All databases should have the same content"
+            )
 
         self.mark_test_step("Check that all docs are replicated correctly in SGW1")
         await compare_local_and_remote(

@@ -47,9 +47,7 @@ class TestServerSetup(CBLTestClass):
         self.mark_test_step("Verify documents were imported via SGW")
         all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
         imported_count = len(all_docs.rows)
-        assert imported_count == num_docs, (
-            f"Expected {num_docs} imported docs, got {imported_count}"
-        )
+        assert imported_count == num_docs, f"Expected {num_docs} imported docs, got {imported_count}"
 
         self.mark_test_step("Verify import_count in expvars")
         import_count = await sg.wait_for_import_count(sg_db, 1)
@@ -68,9 +66,7 @@ class TestServerSetup(CBLTestClass):
 
         self.mark_test_step("Fetch CBS root CA certificate and upload to SGW")
         ca_cert_pem = await cbs.get_root_ca_certificate()
-        await sg.upload_certificate(
-            cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem"
-        )
+        await sg.upload_certificate(cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem")
 
         self.mark_test_step("Restart SGW with x509 cacert config")
         await sg.restart_with_config("bootstrap-x509-cacert-only")

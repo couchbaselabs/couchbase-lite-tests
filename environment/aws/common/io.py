@@ -78,9 +78,7 @@ def download_progress_bar(response: Response, output_path: Path) -> None:
             f.write(data)
 
 
-def sftp_progress_bar(
-    sftp: paramiko.SFTPClient, local_path: Path, remote_path: str
-) -> None:
+def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: str) -> None:
     """
     Upload a file via SFTP with a progress bar.
 
@@ -126,9 +124,7 @@ def zip_directory(input: Path, output: Path, excludes: list[str] | None = None) 
             if fnmatch(rel_posix, pat):
                 return True
             # Allow directory patterns written without trailing /** by user
-            if is_dir and (
-                fnmatch(rel_posix + "/", pat) or fnmatch(rel_posix + "/.", pat)
-            ):
+            if is_dir and (fnmatch(rel_posix + "/", pat) or fnmatch(rel_posix + "/.", pat)):
                 return True
         return False
 

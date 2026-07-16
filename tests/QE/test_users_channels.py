@@ -13,9 +13,7 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 @pytest.mark.min_couchbase_servers(1)
 class TestUsersChannels(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_single_user_multiple_channels(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_single_user_multiple_channels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sgs = cblpytest.sync_gateways
         sg_cluster = SyncGatewayCluster(sgs)
         cbs = cblpytest.couchbase_servers[0]
@@ -32,9 +30,7 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step("Create single shared bucket for all SGW nodes")
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step(
-            f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)"
-        )
+        self.mark_test_step(f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)")
         db_config = {
             "bucket": bucket_name,
             "index": {"num_replicas": 0},
@@ -44,9 +40,7 @@ class TestUsersChannels(CBLTestClass):
         await sgs[0].put_database(sg_db, db_payload)
         await sg_cluster.wait_for_db_online(sg_db)
 
-        self.mark_test_step(
-            f"Create user '{username}' with access to {channels} (stored in shared bucket)"
-        )
+        self.mark_test_step(f"Create user '{username}' with access to {channels} (stored in shared bucket)")
         sg_user = await sgs[0].create_user_client(sg_db, username, password, channels)
 
         self.mark_test_step(
@@ -80,9 +74,7 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step("Wait for documents to propagate across all SGW nodes")
         await asyncio.sleep(10)
 
-        self.mark_test_step(
-            f"Verify user sees all {total_docs} docs via changes feed from first SGW"
-        )
+        self.mark_test_step(f"Verify user sees all {total_docs} docs via changes feed from first SGW")
         changes = await sg_user.get_changes(sg_db)
         user_doc_changes = [entry for entry in changes.results if entry.id in doc_ids]
         assert len(user_doc_changes) == total_docs, (
@@ -92,8 +84,7 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step("Verify no duplicate documents in changes feed")
         unique_ids = {entry.id for entry in user_doc_changes}
         assert len(unique_ids) == total_docs, (
-            f"Duplicate documents found in changes feed. "
-            f"Expected: {total_docs}, Got: {len(unique_ids)}"
+            f"Duplicate documents found in changes feed. Expected: {total_docs}, Got: {len(unique_ids)}"
         )
 
         self.mark_test_step("Verify all expected document IDs are present")
@@ -104,47 +95,31 @@ class TestUsersChannels(CBLTestClass):
         assert len(missing_ids) == 0, f"Missing document IDs: {missing_ids}"
         assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
 
-        self.mark_test_step(
-            "Verify user can retrieve all documents via _all_docs from one SGW node"
-        )
+        self.mark_test_step("Verify user can retrieve all documents via _all_docs from one SGW node")
         all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
         all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
-        assert len(all_docs_ids) == total_docs, (
-            f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
-        )
+        assert len(all_docs_ids) == total_docs, f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
 
         self.mark_test_step("Verify all documents have correct revision format")
         for row in all_docs.rows:
             if row.id in doc_ids:
                 assert len(row.revision) > 0, f"Document {row.id} has no revision"
-                assert "-" in row.revision, (
-                    f"Invalid revision format for {row.id}: {row.revision}"
-                )
+                assert "-" in row.revision, f"Invalid revision format for {row.id}: {row.revision}"
 
         supports_version_vectors = await sgs[0].supports_version_vectors()
         if supports_version_vectors:
-            self.mark_test_step(
-                "Verify all documents have correct version vector format (SGW 4.0+)"
-            )
+            self.mark_test_step("Verify all documents have correct version vector format (SGW 4.0+)")
             for row in all_docs.rows:
                 if row.id in doc_ids:
-                    assert row.cv is not None and len(row.cv) > 0, (
-                        f"Document {row.id} has no version vector"
-                    )
-                    assert "@" in row.cv, (
-                        f"Invalid version vector format for {row.id}: {row.cv}"
-                    )
+                    assert row.cv is not None and len(row.cv) > 0, f"Document {row.id} has no version vector"
+                    assert "@" in row.cv, f"Invalid version vector format for {row.id}: {row.cv}"
 
-        self.mark_test_step(
-            "Verify all documents are accessible from each SGW node independently"
-        )
+        self.mark_test_step("Verify all documents are accessible from each SGW node independently")
         for i, sg in enumerate(sgs):
             test_user = await sg.create_user_client(sg_db, username, password, channels)
             node_all_docs = await test_user.wait_for_all_documents(sg_db, total_docs)
             node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
-            assert len(node_doc_ids) == total_docs, (
-                f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"
-            )
+            assert len(node_doc_ids) == total_docs, f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"
             await test_user.close()
 
         await sg_user.close()

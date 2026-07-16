@@ -11,13 +11,9 @@ from cbltest.responses import ServerVariant
 class TestLogEndpoint(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_log_message(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(
-            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
-        )
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
         if cblpytest.config.logslurp_url is None:
-            pytest.skip(
-                "No LogSlurp server configured (required to check functionality)"
-            )
+            pytest.skip("No LogSlurp server configured (required to check functionality)")
 
         msg = "The client is on fire"
         await cblpytest.test_servers[0].log("The client is on fire")

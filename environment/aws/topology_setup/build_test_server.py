@@ -57,9 +57,7 @@ def upload_exists(server: TestServer) -> bool:
     if response.status_code == 404:
         return False
 
-    raise RuntimeError(
-        f"Unexpected status code {response.status_code} from latestbuilds"
-    )
+    raise RuntimeError(f"Unexpected status code {response.status_code} from latestbuilds")
 
 
 def main() -> None:
@@ -100,9 +98,7 @@ def main() -> None:
         exit(0)
 
     if upload_exists(server):
-        click.secho(
-            "Server already exists on latestbuilds, skipping upload", fg="yellow"
-        )
+        click.secho("Server already exists on latestbuilds, skipping upload", fg="yellow")
         exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
@@ -131,6 +127,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 else:
-    raise RuntimeError(
-        "This script is not intended to be imported as a module. Please run it directly."
-    )
+    raise RuntimeError("This script is not intended to be imported as a module. Please run it directly.")

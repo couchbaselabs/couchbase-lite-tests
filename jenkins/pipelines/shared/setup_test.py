@@ -51,13 +51,9 @@ def resolved_version(product: str, version: str) -> str:
     if len(version.split(".")) >= 3:
         return version
 
-    r = requests.get(
-        f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}"
-    )
+    r = requests.get(f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}")
     if r.status_code != 200:
-        raise RuntimeError(
-            f"Failed to get latest version for {product} {version}: {r.text}"
-        )
+        raise RuntimeError(f"Failed to get latest version for {product} {version}: {r.text}")
 
     return cast(str, r.json()["version"])
 
@@ -82,36 +78,20 @@ def setup_test_multi(
     Sets up a testing environment with the specified CBL version and Sync Gateway version.
     """
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
-    topology_file_out = (
-        SCRIPT_DIR.parents[2]
-        / "environment"
-        / "aws"
-        / "topology_setup"
-        / "topology.json"
-    )
-    assert topology_file_in.exists() and topology_file_in.is_file(), (
-        f"Topology file {topology_file_in} does not exist."
-    )
-    assert config_file_in.exists() and config_file_in.is_file(), (
-        f"Config file {config_file_in} does not exist."
-    )
-    assert os.access(topology_file_in, os.R_OK), (
-        f"Topology file {topology_file_in} is not readable."
-    )
-    assert os.access(config_file_in, os.R_OK), (
-        f"Config file {config_file_in} is not readable."
-    )
-    assert topology_file_out.parent.exists() and os.access(
-        topology_file_out.parent, os.W_OK
-    ), (
+    topology_file_out = SCRIPT_DIR.parents[2] / "environment" / "aws" / "topology_setup" / "topology.json"
+    assert topology_file_in.exists() and topology_file_in.is_file(), f"Topology file {topology_file_in} does not exist."
+    assert config_file_in.exists() and config_file_in.is_file(), f"Config file {config_file_in} does not exist."
+    assert os.access(topology_file_in, os.R_OK), f"Topology file {topology_file_in} is not readable."
+    assert os.access(config_file_in, os.R_OK), f"Config file {config_file_in} is not readable."
+    assert topology_file_out.parent.exists() and os.access(topology_file_out.parent, os.W_OK), (
         f"Output directory {topology_file_out.parent} does not exist or is not writeable."
     )
-    assert config_file_out.parent.exists() and os.access(
-        config_file_out.parent, os.W_OK
-    ), f"Output directory {config_file_out.parent} does not exist or is not writeable."
-    assert topology_file_out.exists() is False or os.access(
-        topology_file_out, os.W_OK
-    ), f"Output file {topology_file_out} already exists and is not writeable."
+    assert config_file_out.parent.exists() and os.access(config_file_out.parent, os.W_OK), (
+        f"Output directory {config_file_out.parent} does not exist or is not writeable."
+    )
+    assert topology_file_out.exists() is False or os.access(topology_file_out, os.W_OK), (
+        f"Output file {topology_file_out} already exists and is not writeable."
+    )
     assert config_file_out.exists() is False or os.access(config_file_out, os.W_OK), (
         f"Output file {config_file_out} already exists and is not writeable."
     )
@@ -121,9 +101,7 @@ def setup_test_multi(
     with open(topology_file_in) as fin:
         topology = cast(dict[str, Any], json.load(fin))
         topology["$schema"] = "topology_schema.json"
-        if "include" in topology and str(topology["include"]).endswith(
-            "default_topology.json"
-        ):
+        if "include" in topology and str(topology["include"]).endswith("default_topology.json"):
             old_include = Path(str(topology["include"]))
             if not old_include.is_absolute():
                 absolute_include = (topology_file_in.parent / old_include).resolve()
@@ -151,9 +129,7 @@ def setup_test_multi(
         topology["tag"] = topology_tag
         for ts in topology["test_servers"]:
             platform = cast(str, ts.get("platform"))
-            ts["cbl_version"] = get_platform_version(
-                cbl_version_map, ts_to_topology(platform)
-            )
+            ts["cbl_version"] = get_platform_version(cbl_version_map, ts_to_topology(platform))
 
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)

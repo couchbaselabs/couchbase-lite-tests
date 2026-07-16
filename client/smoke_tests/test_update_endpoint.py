@@ -45,16 +45,10 @@ class TestUpdateDatabase(CBLTestClass):
 
         # JS can accept negative numbers in paths to count from the end
         if "-1" in attempt:
-            await self.skip_if_not_platform(
-                cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
-            )
+            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         if self.db is None:
-            self.db = (
-                await cblpytest.test_servers[0].create_and_reset_db(
-                    ["db1"], dataset="names"
-                )
-            )[0]
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
 
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             async with self.db.batch_updater() as b:
@@ -98,31 +92,19 @@ class TestUpdateDatabase(CBLTestClass):
     async def test_good_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
         # The JS test server doesn't support escapes
         if "\\" in attempt:
-            await self.skip_if_not_platform(
-                cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
-            )
+            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         self.mark_test_step(f"Testing good update with path: {attempt}")
         if self.db is None:
-            self.db = (
-                await cblpytest.test_servers[0].create_and_reset_db(
-                    ["db1"], dataset="names"
-                )
-            )[0]
+            self.db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
 
         async with self.db.batch_updater() as b:
             b.upsert_document("_default._default", "name_1", [{attempt: 5}])
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_nonexistent_blob(self, cblpytest: CBLPyTest) -> None:
-        db = (
-            await cblpytest.test_servers[0].create_and_reset_db(
-                ["db1"], dataset="names"
-            )
-        )[0]
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
 
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
             async with db.batch_updater() as b:
-                b.upsert_document(
-                    "_default._default", "name_1", new_blobs={"foo": "bar.png"}
-                )
+                b.upsert_document("_default._default", "name_1", new_blobs={"foo": "bar.png"})

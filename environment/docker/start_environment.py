@@ -12,11 +12,7 @@ def start_environment():
     print()
 
     sg_count = 0
-    output = (
-        subprocess.check_output(["docker", "compose", "ps", "--format", "json"])
-        .decode()
-        .splitlines()
-    )
+    output = subprocess.check_output(["docker", "compose", "ps", "--format", "json"]).decode().splitlines()
     # Docker compose v2.21+ changes to return a seprate JSON dict per line for each process instead of
     # a single array of all processes in one line. To support new and old version of docker compose,
     # read JSON object line-by-line and wrap the JSON dict in an array to consolidate the logic detecting
@@ -45,9 +41,7 @@ def start_environment():
             sys.stdout.flush()
             time.sleep(2)
 
-        output = (
-            subprocess.check_output(["docker", "compose", "logs"]).decode().splitlines()
-        )
+        output = subprocess.check_output(["docker", "compose", "logs"]).decode().splitlines()
         for line in output:
             if "Sync Gateway is up" in line:
                 which = line.split()[0]

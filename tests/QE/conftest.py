@@ -31,16 +31,12 @@ async def cleanup_after_test(cblpytest, request):
     finally:
         try:
             if request.node.get_closest_marker("sgw"):
-                print(
-                    "\n================== 🧹 CLEANUP FIXTURE STARTED =================="
-                )
+                print("\n================== 🧹 CLEANUP FIXTURE STARTED ==================")
                 await cleanup_all_test_resources(
                     cblpytest.sync_gateways,
                     cblpytest.couchbase_servers,
                 )
-                print(
-                    f"🧹 CLEANUP FIXTURE: Cleanup completed successfully for {test_name}"
-                )
+                print(f"🧹 CLEANUP FIXTURE: Cleanup completed successfully for {test_name}")
             else:
                 print(f"🧹 CLEANUP FIXTURE: Skipping non-SGW test: {test_name}")
         except Exception as e:
@@ -98,9 +94,7 @@ async def cleanup_all_test_resources(
                 except Exception as e:
                     print(f"🧹 Failed to drop bucket {bucket_name}: {e}")
 
-            print(
-                f"\t\t🧹 Will wait for {len(deleted_buckets)} buckets to be deleted: {deleted_buckets}"
-            )
+            print(f"\t\t🧹 Will wait for {len(deleted_buckets)} buckets to be deleted: {deleted_buckets}")
             for bucket_name in deleted_buckets:
                 try:
                     await cbs.wait_for_bucket_deleted(bucket_name)

@@ -45,9 +45,7 @@ from environment.aws.topology_setup.setup_topology import main as topology_main
 class TopologyParamType(click.ParamType):
     name = "path"
 
-    def convert(
-        self, value: Any, param: click.Parameter | None, ctx: click.Context | None
-    ) -> TopologyConfig:
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> TopologyConfig:
         if isinstance(value, TopologyConfig):
             return value
 
@@ -96,13 +94,9 @@ def terraform_apply(topology: TopologyConfig) -> None:
         click.secho("No AWS resources requested, skipping terraform", fg="yellow")
         return
 
-    result = subprocess.run(
-        ["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR
-    )
+    result = subprocess.run(["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR)
     if result.returncode != 0:
-        raise Exception(
-            f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-        )
+        raise Exception(f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}")
 
     sgw_count = topology.total_sgw_count
     es_count = topology.total_es_count
@@ -123,9 +117,7 @@ def terraform_apply(topology: TopologyConfig) -> None:
     result = subprocess.run(command, capture_output=False, text=True, cwd=SCRIPT_DIR)
 
     if result.returncode != 0:
-        raise Exception(
-            f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}"
-        )
+        raise Exception(f"Command '{' '.join(command)}' failed with exit status {result.returncode}: {result.stderr}")
 
     topology.read_from_terraform(str(SCRIPT_DIR))
 
@@ -135,9 +127,7 @@ def terraform_apply(topology: TopologyConfig) -> None:
     sleep(5)
 
 
-def write_config(
-    in_config_file: str, topology: TopologyConfig, output: IO[str]
-) -> None:
+def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]) -> None:
     """
     Write the TDK configuration based on the provided topology.
 
@@ -184,13 +174,7 @@ def write_config(
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
-                port = (
-                    5555
-                    if ts.platform.startswith("dotnet")
-                    else 5173
-                    if ts.platform == "js"
-                    else 8080
-                )
+                port = 5555 if ts.platform.startswith("dotnet") else 5173 if ts.platform == "js" else 8080
                 ts_definition = {
                     "url": f"http://{ts.ip_address}:{port}",
                 }
@@ -244,9 +228,7 @@ def check_sts_status() -> bool:
         )
         return False
 
-    attempt_login = click.confirm(
-        "Do you want to run single sign on now? (Y/n)", show_default=False
-    )
+    attempt_login = click.confirm("Do you want to run single sign on now? (Y/n)", show_default=False)
     if not attempt_login:
         return False
 
@@ -268,15 +250,7 @@ class BackendSteps(Flag):
     LB_PROVISION = auto()
     LS_PROVISION = auto()
     TS_RUN = auto()
-    ALL = (
-        TERRAFORM_APPLY
-        | CBS_PROVISION
-        | SGW_PROVISION
-        | ES_PROVISION
-        | LB_PROVISION
-        | LS_PROVISION
-        | TS_RUN
-    )
+    ALL = TERRAFORM_APPLY | CBS_PROVISION | SGW_PROVISION | ES_PROVISION | LB_PROVISION | LS_PROVISION | TS_RUN
 
 
 def main(
@@ -302,13 +276,9 @@ def main(
 
         terraform_apply(topology)
     else:
-        result = subprocess.run(
-            ["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR
-        )
+        result = subprocess.run(["terraform", "init"], capture_output=False, text=True, cwd=SCRIPT_DIR)
         if result.returncode != 0:
-            raise Exception(
-                f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}"
-            )
+            raise Exception(f"Command 'terraform init' failed with exit status {result.returncode}: {result.stderr}")
 
         click.echo()
         click.secho("Skipping terraform apply...", fg="yellow")

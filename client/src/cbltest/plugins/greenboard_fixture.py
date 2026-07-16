@@ -57,9 +57,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             # the upgrade run by jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py.
             # Default matches the shell wrapper's path so direct pytest
             # invocations still record correctly.
-            results_file = os.environ.get(
-                "SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json"
-            )
+            results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
             # During rolling phases the SGW node under upgrade may be
             # destroyed/restarting and get_version() will raise. We must
             # still record the iteration (with sgw_version=None) so the

@@ -91,9 +91,7 @@ class AndroidBridge(PlatformBridge):
         self.__needs_permissions = needs_permissions
 
         find_command = "where" if platform.system() == "Windows" else "which"
-        find_adb_result = subprocess.run(
-            [find_command, "adb"], check=False, capture_output=True, text=True
-        )
+        find_adb_result = subprocess.run([find_command, "adb"], check=False, capture_output=True, text=True)
         if find_adb_result.returncode == 0:
             self.__adb_location = Path(find_adb_result.stdout.strip())
             return
@@ -180,8 +178,7 @@ class AndroidBridge(PlatformBridge):
         permissions = [
             permission
             for permission, min_api, max_api in self.__runtime_permissions
-            if (min_api is None or api_level >= min_api)
-            and (max_api is None or api_level <= max_api)
+            if (min_api is None or api_level >= min_api) and (max_api is None or api_level <= max_api)
         ]
         for permission in permissions:
             result = subprocess.run(

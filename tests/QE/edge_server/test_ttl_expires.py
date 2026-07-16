@@ -28,9 +28,7 @@ class TestTTLExpires(CBLTestClass):
             "channels": ["public"],
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        response = await edge_server.put_document_with_id(
-            doc, "ttl_doc", es_db_name, ttl=5
-        )
+        response = await edge_server.put_document_with_id(doc, "ttl_doc", es_db_name, ttl=5)
         assert response is not None, "Failed to create document with TTL of 5 seconds"
 
         self.mark_test_step("Check if the document is present in the database")
@@ -59,12 +57,8 @@ class TestTTLExpires(CBLTestClass):
         }
 
         expires = datetime.now(timezone.utc) + timedelta(seconds=5)
-        response = await edge_server.put_document_with_id(
-            doc, "ttl_doc", es_db_name, expires=int(expires.timestamp())
-        )
-        assert response is not None, (
-            "Failed to create document with Expires of 5 seconds"
-        )
+        response = await edge_server.put_document_with_id(doc, "ttl_doc", es_db_name, expires=int(expires.timestamp()))
+        assert response is not None, "Failed to create document with Expires of 5 seconds"
 
         self.mark_test_step("Check if the document is present in the database")
         response = await edge_server.get_document(es_db_name, "ttl_doc")
@@ -91,9 +85,7 @@ class TestTTLExpires(CBLTestClass):
             "channels": ["public"],
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        response = await edge_server.put_document_with_id(
-            doc, "ttl", es_db_name, ttl=30
-        )
+        response = await edge_server.put_document_with_id(doc, "ttl", es_db_name, ttl=30)
         assert response is not None, "Failed to create document with TTL of 30 seconds"
 
         self.mark_test_step("Check if the document is present in the database")
@@ -110,9 +102,7 @@ class TestTTLExpires(CBLTestClass):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "updated": "yes",
         }
-        response = await edge_server.put_document_with_id(
-            updated_doc, "ttl", es_db_name, rev=rev_id, ttl=5
-        )
+        response = await edge_server.put_document_with_id(updated_doc, "ttl", es_db_name, rev=rev_id, ttl=5)
         assert response is not None, "Failed to update document with TTL of 5 seconds"
 
         self.mark_test_step("Check if the document is expired after 5 seconds")
@@ -123,18 +113,14 @@ class TestTTLExpires(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_ttl_expires(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        self.mark_test_step(
-            "Starting test to verify that with both ttl and expires provided, the lower value is used"
-        )
+        self.mark_test_step("Starting test to verify that with both ttl and expires provided, the lower value is used")
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
-        self.mark_test_step(
-            "Creating a document with TTL of 10 seconds and Expires of 30 seconds"
-        )
+        self.mark_test_step("Creating a document with TTL of 10 seconds and Expires of 30 seconds")
 
         doc = {
             "id": "ttl_expires_doc1",
@@ -156,20 +142,14 @@ class TestTTLExpires(CBLTestClass):
         assert response is not None, "Document is not present in the database"
 
         # Wait 10 seconds - document should expire (TTL=10s is lower than expires=30s, so TTL should take precedence)
-        self.mark_test_step(
-            "Waiting 10 seconds - document should expire based on TTL (lower value)"
-        )
+        self.mark_test_step("Waiting 10 seconds - document should expire based on TTL (lower value)")
         time.sleep(10)
 
-        self.mark_test_step(
-            "Document expired after 10 seconds - TTL took precedence over expires"
-        )
+        self.mark_test_step("Document expired after 10 seconds - TTL took precedence over expires")
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_expires_doc")
 
-        self.mark_test_step(
-            "Creating a document with TTL of 60 seconds and Expires of 10 seconds"
-        )
+        self.mark_test_step("Creating a document with TTL of 60 seconds and Expires of 10 seconds")
 
         doc2 = {
             "id": "ttl_expires_doc2",
@@ -191,46 +171,30 @@ class TestTTLExpires(CBLTestClass):
         assert response2 is not None, "Document is not present in the database"
 
         # Wait 10 seconds - document should expire (expires=10s is lower than TTL=60s, so expires should take precedence)
-        self.mark_test_step(
-            "Waiting 10 seconds - document should expire based on expires (lower value)"
-        )
+        self.mark_test_step("Waiting 10 seconds - document should expire based on expires (lower value)")
         time.sleep(10)
 
-        self.mark_test_step(
-            "Document expired after 10 seconds - expires took precedence over TTL"
-        )
+        self.mark_test_step("Document expired after 10 seconds - expires took precedence over TTL")
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_expires_doc2")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_ttl_non_existent_document(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
-        self.mark_test_step(
-            "Starting test to verify TTL feature for non-existent document"
-        )
+    async def test_ttl_non_existent_document(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Starting test to verify TTL feature for non-existent document")
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
 
-        self.mark_test_step(
-            "Checking if updating TTL of a non-existent document returns 404"
-        )
+        self.mark_test_step("Checking if updating TTL of a non-existent document returns 404")
 
         with pytest.raises(CblEdgeServerBadResponseError):
-            await edge_server.put_document_with_id(
-                {"id": "ttl_doc"}, "ttl_doc", es_db_name, rev="1-1234567890", ttl=5
-            )
+            await edge_server.put_document_with_id({"id": "ttl_doc"}, "ttl_doc", es_db_name, rev="1-1234567890", ttl=5)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_bulk_documents_ttl(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
-        self.mark_test_step(
-            "Starting test to see if bulk documents with TTL are deleted after the TTL expires"
-        )
+    async def test_bulk_documents_ttl(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        self.mark_test_step("Starting test to see if bulk documents with TTL are deleted after the TTL expires")
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
@@ -258,9 +222,7 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 10,
                 "doc_num": doc_num,
             }
-            tasks.append(
-                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10)
-            )
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=10))
             task_ttl_map.append(10)
 
         # 25 docs with 30s TTL
@@ -273,9 +235,7 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 30,
                 "doc_num": doc_num,
             }
-            tasks.append(
-                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30)
-            )
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=30))
             task_ttl_map.append(30)
 
         # 25 docs with 60s TTL
@@ -288,9 +248,7 @@ class TestTTLExpires(CBLTestClass):
                 "ttl": 60,
                 "doc_num": doc_num,
             }
-            tasks.append(
-                edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60)
-            )
+            tasks.append(edge_server.put_document_with_id(doc, doc_id, es_db_name, ttl=60))
             task_ttl_map.append(60)
 
         # Execute all document creations concurrently
@@ -321,9 +279,7 @@ class TestTTLExpires(CBLTestClass):
         initial_response = await edge_server.get_all_documents(es_db_name)
         initial_count = len(initial_response.rows)
         self.mark_test_step(f"Initial document count: {initial_count}")
-        assert initial_count == successful, (
-            f"Expected {successful} documents, but found {initial_count}"
-        )
+        assert initial_count == successful, f"Expected {successful} documents, but found {initial_count}"
 
         # Step 1: After 10s, check that docs with 30s and 60s TTL remain
         self.mark_test_step("Waiting 10 seconds - 10s TTL documents should expire")
@@ -332,41 +288,29 @@ class TestTTLExpires(CBLTestClass):
         response_10s = await edge_server.get_all_documents(es_db_name)
         count_10s = len(response_10s.rows)
         expected_10s = successful_30s + successful_60s
-        self.mark_test_step(
-            f"Document count after 10 seconds: {count_10s} (expected {expected_10s})"
-        )
+        self.mark_test_step(f"Document count after 10 seconds: {count_10s} (expected {expected_10s})")
         assert count_10s == expected_10s, (
             f"After 10s: Expected {expected_10s} documents (30s and 60s TTL), but found {count_10s}"
         )
 
         # Step 2: After 30s total, check that docs with 60s TTL remain
-        self.mark_test_step(
-            "Waiting additional 20 seconds (30s total) - 30s TTL documents should expire"
-        )
+        self.mark_test_step("Waiting additional 20 seconds (30s total) - 30s TTL documents should expire")
         time.sleep(20)
 
         response_30s = await edge_server.get_all_documents(es_db_name)
         count_30s = len(response_30s.rows)
         expected_30s = successful_60s
-        self.mark_test_step(
-            f"Document count after 30 seconds: {count_30s} (expected {expected_30s})"
-        )
+        self.mark_test_step(f"Document count after 30 seconds: {count_30s} (expected {expected_30s})")
         assert count_30s == expected_30s, (
             f"After 30s: Expected {expected_30s} documents (60s TTL), but found {count_30s}"
         )
 
         # Step 3: After 60s total, check that 0 docs remain
-        self.mark_test_step(
-            "Waiting additional 30 seconds (60s total) - 60s TTL documents should expire"
-        )
+        self.mark_test_step("Waiting additional 30 seconds (60s total) - 60s TTL documents should expire")
         time.sleep(30)
 
         response_60s = await edge_server.get_all_documents(es_db_name)
         count_60s = len(response_60s.rows)
         expected_60s = 0
-        self.mark_test_step(
-            f"Document count after 60 seconds: {count_60s} (expected {expected_60s})"
-        )
-        assert count_60s == expected_60s, (
-            f"After 60s: Expected {expected_60s} documents, but found {count_60s}"
-        )
+        self.mark_test_step(f"Document count after 60 seconds: {count_60s} (expected {expected_60s})")
+        assert count_60s == expected_60s, f"After 60s: Expected {expected_60s} documents, but found {count_60s}"

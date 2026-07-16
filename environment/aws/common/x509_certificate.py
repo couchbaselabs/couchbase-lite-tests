@@ -70,9 +70,7 @@ def create_self_signed_certificate(CN: str) -> CertKeyPair:
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
         .add_extension(
-            ExtendedKeyUsage(
-                [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
-            ),
+            ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]),
             critical=False,
         )
         .sign(signing_key, hashes.SHA256())

@@ -33,9 +33,7 @@ class SyncGatewayCluster:
         """
         await asyncio.gather(
             *(
-                sg._wait_for_db_online(
-                    db_name, max_retries=max_retries, retry_delay=retry_delay
-                )
+                sg._wait_for_db_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
                 for sg in self.__sync_gateways
             )
         )
@@ -56,9 +54,7 @@ class SyncGatewayCluster:
         """
         await asyncio.gather(
             *(
-                sg._wait_for_db_gone(
-                    db_name, max_retries=max_retries, retry_delay=retry_delay
-                )
+                sg._wait_for_db_gone(db_name, max_retries=max_retries, retry_delay=retry_delay)
                 for sg in self.__sync_gateways
             )
         )
