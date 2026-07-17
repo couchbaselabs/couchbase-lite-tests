@@ -1,0 +1,42 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "users": "/home/ec2-user/user/users.json",
+    "replications": [
+        {
+            "source": "wss://ec2-32-197-126-140.compute-1.amazonaws.com:4984/travel",
+            "target": "travel",
+            "bidirectional": true,
+            "continuous": true,
+            "collections": [
+                "travel.airlines"
+            ],
+            "auth": {
+                "openid_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyMSIsImlzcyI6InRlc3QtaXNzdWVyIiwiYXVkIjoiZWRnZS1zZXJ2ZXIiLCJpYXQiOjE3ODIyMjM2NzgsImV4cCI6MTc4MjIyNzI3OH0.jfqRMDXXzDnLsxa76JiEkJI3O4ifEcdBmR52MG0XQGl-5AGz-IEVrsJG9Bi1SSJR3d1tW9XJv4JpmUm9wYs0H5Cin49NOdDLud01TVNckkmeQuEChX3qPu0_s9DfC8KeRGoborTxX7TVIXpUBSoeRxIVAkGAc_sKM9xVdo2TntdI-RlON1zhbxNTKWxGAhKfqnHER4HbLgfx5Nr75HcmxQImzFFiEH8rbFdE2rkErtVpI4ncaQ1gCF8oHxY_VubNWWM8gbgnd12ao-g23svQ-gZ2oyplpUMTASs8TzCnK7LOKgeqJZbFHrnl4Kng_gTGBa9aCLzTXmsVbSO6HJoLqA",
+                "reconnect_on_token_change": false
+            },
+            "pinned_cert": "/home/ec2-user/cert/sg_cert.pem"
+        }
+    ],
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info",
+            "Replicator": "verbose",
+            "WebSocket": "verbose",
+            "WS": "verbose"
+        }
+    }
+}

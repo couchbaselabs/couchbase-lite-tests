@@ -3,5 +3,6 @@
     "test-servers":  [{"url": "http://localhost:8080", "dataset_version": "3.2"}],
     "sync-gateways": [{"hostname": "localhost"}],
     "couchbase-servers": [{"hostname": "localhost"}],
+    "edge-servers": [{"hostname": "localhost"}],
     "api-version": 1
 }
