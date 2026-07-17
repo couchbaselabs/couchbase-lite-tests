@@ -3,11 +3,12 @@
 import json
 import os
 import sys
-from pathlib import Path
 from io import TextIOWrapper
+from pathlib import Path
 from typing import Any
 
 import click
+
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 if __name__ == "__main__":
