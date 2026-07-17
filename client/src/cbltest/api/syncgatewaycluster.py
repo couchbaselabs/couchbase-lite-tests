@@ -15,9 +15,11 @@ class SyncGatewayCluster:
         """Gets the Sync Gateway nodes that make up this cluster"""
         return self.__sync_gateways
 
-    def __init__(self, sync_gateways: list[SyncGateway]):
-        self.__sync_gateways = sync_gateways
-        self.__round_robin_index = 0
+def __init__(self, sync_gateways: list[SyncGateway]):
+    if not sync_gateways:
+        raise ValueError("At least one Sync Gateway must be provided")
+    self.__sync_gateways = sync_gateways
+    self.__round_robin_index = 0
 
     @property
     def round_robin_node(self) -> SyncGateway:
