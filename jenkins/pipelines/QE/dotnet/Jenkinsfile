@@ -19,35 +19,12 @@ pipeline {
                 }
             }
         }
-        stage('Prebuild Servers') {
-            steps {
-                script {
-                    def platforms = [
-                        'dotnet_windows', 'dotnet_ios', 'dotnet_android', 'dotnet_macos'
-                    ]
-                    def parallelBuilds = [:]
-                    for(p in platforms) {
-                        def platform = p
-                        parallelBuilds[platform] = {
-                            build job: 'prebuild-test-server',
-                            parameters: [
-                                string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                            ],
-                            wait: true,
-                            propagate: true
-                        }
-                    }
-                    parallel parallelBuilds
-                }
-            }
-        }
         stage('Run Tests') {
             parallel {
                 stage('Windows') {
-                    agent { label 'net-windows' }
+                    agent { label 'mob-e2e-win-02' }
                     options {
-                        lock('net-windows')
+                        lock('mob-e2e-win-02')
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
@@ -67,99 +44,6 @@ pipeline {
                             }
                             archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== Dotnet Windows Test Teardown Complete"
-                        }
-                    }
-                }
-                stage('macOS') {
-                    agent { label 'qe-mac-india' }
-                    options {
-                        lock('qe-mac-india')
-                    }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        DEVELOPER_DIR = "/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        TS_ARTIFACTS_DIR = 'dotnet_macos'
-                    }
-                    steps {
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "=== Run Dotnet macOS Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
-                        }
-                        echo "=== Dotnet macOS Tests Complete"
-                    }
-                    post {
-                        always {
-                            echo "=== Teardown Dotnet macOS Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet macOS Test Teardown Complete"
-                        }
-                    }
-                }
-                stage('iOS') {
-                    agent { label 'qe-mac-india' }
-                    options {
-                        lock('qe-mac-india,00008140-0006458A0C22801C')
-                    }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        DEVELOPER_DIR = "/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        TS_ARTIFACTS_DIR = 'dotnet_ios'
-                    }
-                    steps {
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "=== Run Dotnet iOS Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
-                        }
-                        echo "=== Dotnet iOS Tests Complete"
-                    }
-                    post {
-                        always {
-                            echo "=== Teardown Dotnet iOS Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet iOS Test Teardown Complete"
-                        }
-                    }
-                }
-                stage('Android') {
-                    agent { label 'mac-mini-CBL-Android1' }
-                    options {
-                        lock('mac-mini-CBL-Android1,R5CT20FYA7R')
-                    }
-                    environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe')
-                        ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
-                        JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                        TS_ARTIFACTS_DIR = 'dotnet_android'
-                    }
-                    steps {
-                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "=== Run Dotnet Android Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
-                        }
-                        echo "=== Dotnet Android Tests Complete"
-                    }
-                    post {
-                        always {
-                            echo "=== Teardown Dotnet Android Tests"
-                            timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
-                            }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet Android Test Teardown Complete"
                         }
                     }
                 }
