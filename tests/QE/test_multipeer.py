@@ -14,7 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
-from shared.multipeer_tests_helper import build_group_transports
+from shared.multipeer_tests_helpers import build_group_transports
 
 
 @pytest.mark.cbl

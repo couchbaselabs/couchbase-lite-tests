@@ -19,7 +19,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
 from cbltest.responses import ServerVariant
-from shared.multipeer_tests_helper import build_group_transports
+from shared.multipeer_tests_helpers import build_group_transports
 
 
 @pytest.mark.cbl
