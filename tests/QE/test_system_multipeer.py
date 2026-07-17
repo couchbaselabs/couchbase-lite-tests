@@ -9,7 +9,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -20,6 +19,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
 from cbltest.responses import ServerVariant
+from shared.multipeer_tests_helper import build_group_transports
 
 
 @pytest.mark.cbl
@@ -76,9 +76,7 @@ class TestSystemMultipeer(CBLTestClass):
         for start in range(0, len(doc_ids), 10):
             await insert_each_batch(start)
 
-        transport_arr = MultipeerTransportType.build_group_transports(
-            NUM_DEVICES, transport
-        )
+        transport_arr = build_group_transports(NUM_DEVICES, transport)
         self.mark_test_step("""
                             Start a multipeer replicator on all devices
                             * peerGroupID: “com.couchbase.testing”
@@ -263,9 +261,7 @@ class TestSystemMultipeer(CBLTestClass):
 
         for start in range(0, len(doc_ids), 10):
             await insert_each_batch(start)
-        transport_arr = MultipeerTransportType.build_group_transports(
-            NUM_DEVICES, transport
-        )
+        transport_arr = build_group_transports(NUM_DEVICES, transport)
         self.mark_test_step("""
                             Start a multipeer replicator on all devices
                             * peerGroupID: “com.couchbase.testing”
@@ -346,9 +342,7 @@ class TestSystemMultipeer(CBLTestClass):
         num_devices = len(cblpytest.test_servers)
         assert num_devices >= 5, "Need at least 5 devices for this test"
 
-        transport_arr = MultipeerTransportType.build_group_transports(
-            num_devices, transport
-        )
+        transport_arr = build_group_transports(num_devices, transport)
 
         self.mark_test_step("""
         Start push/pull replication with SGW1

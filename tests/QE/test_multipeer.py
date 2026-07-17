@@ -9,12 +9,12 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from shared.multipeer_tests_helper import build_group_transports
 
 
 @pytest.mark.cbl
@@ -52,9 +52,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Start multipeer replication with merge conflict resolver")
         num_devices = len(all_dbs)
-        transport_arr = MultipeerTransportType.build_group_transports(
-            num_devices, transport
-        )
+        transport_arr = build_group_transports(num_devices, transport)
         multipeer_replicators = [
             MultipeerReplicator(
                 "couchtest",
@@ -93,7 +91,7 @@ class TestMultipeer(CBLTestClass):
             ]
         )
         expected_keys = {f"device{i + 1}" for i in range(len(all_dbs))}
-        for idx,doc in enumnerate(results):
+        for doc in results:
             counter = doc.body["counter"]
             assert set(counter.keys()) == expected_keys, (
                 "All device keys must be present"
@@ -103,32 +101,36 @@ class TestMultipeer(CBLTestClass):
                 and value == int(match.group())
                 for key, value in counter.items()
             ), "Each key's value must be device_id"
-            retry = 5
-            while retry > 0:
-                rev_ids = [doc.revs for doc in results]
-                if len(set(rev_ids)) == 1:
-                    break
-                self.mark_test_step(
-                    f"Rev IDs don't match across devices, waiting 30 seconds (retries left: {retry})"
-                )
-                await asyncio.sleep(30)
-                retry -= 1
-                for mp in multipeer_replicators:
-                    status = await mp.wait_for_idle(timeout=timedelta(seconds=timeout))
-                    assert all(
-                        r.status.replicator_error is None for r in status.replicators
-                    ), "Multipeer replicator should not have any errors"
 
-                results = await asyncio.gather(
-                    *[
-                        db.get_document(DocumentEntry("_default._default", "conflict1"))
-                        for db in all_dbs
-                    ]
-                )
-            assert len(set(doc.revs for doc in results)) == 1, (
-                f"Revision IDs don't match across all devices after 5 retries: "
-                f"{[doc.revs for doc in results]}"
+        retry = 5
+        while retry > 0:
+            rev_ids = [tuple(sorted(doc.revs.split(","))) for doc in results]
+            if len(set(rev_ids)) == 1:
+                break
+            self.mark_test_step(
+                f"Rev IDs don't match across devices, waiting 30 seconds (retries left: {retry})"
             )
+            await asyncio.sleep(30)
+            retry -= 1
+            for mp in multipeer_replicators:
+                status = await mp.wait_for_idle(timeout=timedelta(seconds=timeout))
+                assert all(
+                    r.status.replicator_error is None for r in status.replicators
+                ), "Multipeer replicator should not have any errors"
+
+            results = await asyncio.gather(
+                *[
+                    db.get_document(DocumentEntry("_default._default", "conflict1"))
+                    for db in all_dbs
+                ]
+            )
+
+        rev_ids = [tuple(sorted(doc.revs.split(","))) for doc in results]
+        assert len(set(rev_ids)) == 1, (
+            f"Revision IDs don't match across all devices after 5 retries: "
+            f"{[doc.revs for doc in results]}"
+        )
+
         self.mark_test_step("Stopping multipeer replicator on all devices")
         await asyncio.gather(*[mp.stop() for mp in multipeer_replicators])
 
@@ -157,9 +159,7 @@ class TestMultipeer(CBLTestClass):
                     "_default._default", f"doc{i}", [{"random": randint(1, 100000)}]
                 )
         num_devices = len(all_dbs)
-        transport_arr = MultipeerTransportType.build_group_transports(
-            num_devices, transport
-        )
+        transport_arr = build_group_transports(num_devices, transport)
 
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
@@ -214,9 +214,7 @@ class TestMultipeer(CBLTestClass):
 
         self.mark_test_step("Add 50 documents to the database on all devices")
         num_devices = len(all_dbs)
-        transport_arr = MultipeerTransportType.build_group_transports(
-            num_devices, transport
-        )
+        transport_arr = build_group_transports(num_devices, transport)
 
         for device_idx, db in enumerate(all_dbs, 1):
             doc_num = 1
@@ -340,15 +338,9 @@ class TestMultipeer(CBLTestClass):
         total_docs_group2 = len(group2_dbs) * docs_per_device_group2
         total_docs_group3 = len(group3_dbs) * docs_per_device_group3
 
-        group1_transports = MultipeerTransportType.build_group_transports(
-            len(group1_dbs), transport
-        )
-        group2_transports = MultipeerTransportType.build_group_transports(
-            len(group2_dbs), transport
-        )
-        group3_transports = MultipeerTransportType.build_group_transports(
-            len(group3_dbs), transport
-        )
+        group1_transports = build_group_transports(len(group1_dbs), transport)
+        group2_transports = build_group_transports(len(group2_dbs), transport)
+        group3_transports = build_group_transports(len(group3_dbs), transport)
 
         self.mark_test_step("Start multipeer replicators with different peer groups")
 
@@ -624,12 +616,8 @@ class TestMultipeer(CBLTestClass):
                     doc_num += 1
 
         # total_initial_docs = len(initial_dbs) * 20
-        initial_transport = MultipeerTransportType.build_group_transports(
-            initial_devices, transport
-        )
-        additional_transport = MultipeerTransportType.build_group_transports(
-            additional_devices, transport
-        )
+        initial_transport = build_group_transports(initial_devices, transport)
+        additional_transport = build_group_transports(additional_devices, transport)
 
         self.mark_test_step("Start multipeer replicator on initial devices")
 
@@ -786,9 +774,7 @@ class TestMultipeer(CBLTestClass):
                     f"large_doc{i}",
                     new_blobs={"image": blob},
                 )
-        transport_arr = MultipeerTransportType.build_group_transports(
-            len(all_dbs), transport
-        )
+        transport_arr = build_group_transports(len(all_dbs), transport)
         self.mark_test_step("Start multipeer replicator on all devices")
         multipeer_replicators = [
             MultipeerReplicator(

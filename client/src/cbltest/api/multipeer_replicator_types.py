@@ -33,40 +33,6 @@ class MultipeerTransportType(Flag):
             if m.value != 0 and (m.value & (m.value - 1)) == 0 and (self & m) == m
         ]
 
-    @classmethod
-    def build_group_transports(
-        cls,
-        size: int,
-        transport: str,
-    ) -> list["MultipeerTransportType"]:
-        """
-        Builds a list of transports for a group of given size.
-
-        If transport != "MIXED_MODE", returns a uniform list.
-        If MIXED_MODE, distributes WIFI, BLUETOOTH, and ALL.
-        """
-
-        # Non-mixed mode → uniform assignment
-        if transport != "MIXED_MODE":
-            return [cls.from_string(transport)] * size
-
-        if size == 1:
-            return [cls.ALL]
-
-        if size == 2:
-            return [cls.BLUETOOTH, cls.ALL]
-
-        # General distribution
-        num_wifi = size // 3
-        num_bt = size // 3
-        num_dual = size - num_wifi - num_bt
-
-        transports_array = (
-            [cls.WIFI] * num_wifi + [cls.BLUETOOTH] * num_bt + [cls.ALL] * num_dual
-        )
-
-        return transports_array
-
 
 class MultipeerReplicatorAuthenticator(JSONSerializable):
     """
