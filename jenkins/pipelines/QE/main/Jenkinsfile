@@ -1,6 +1,20 @@
+// Resolved per-platform CBL info, populated by the 'Resolve Versions' stage and read
+// (never written) by the parallel matrix cells — so there is no cross-cell race.
+//   platform -> [version: "4.2.0", build: "9", dataset: "4.0"]
+def resolved = [:]
+
+// All platforms this scheduler knows about; a single-platform run trims this to one.
+def ALL_PLATFORMS = ['c', 'android', 'java', 'ios', 'dotnet']
+
+def progetProductFor(String platform) {
+    return "couchbase-lite-" + ((platform == "dotnet") ? "net" : platform)
+}
+
 pipeline {
+    // The dedup state lives on this node's filesystem (~/.jenkins_build_info),
     agent { label 'qe-mac-india' }
     environment {
+        // Ensure Homebrew's python3 (used by the ProGet version/build lookups) is on PATH.
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
     parameters {
@@ -23,6 +37,68 @@ pipeline {
                 }
             }
         }
+        stage('Resolve Versions') {
+            steps {
+                script {
+                    def platforms = (params.CBL_PLATFORM == 'all') ? ALL_PLATFORMS : [params.CBL_PLATFORM]
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+
+                    for (p in platforms) {
+                        def product = progetProductFor(p)
+                        try {
+                            // Resolve the latest version (auto when CBL_VERSION is blank):
+                            //   .../api/latest_release?product=<product>&prerelease=true
+                            def version = proget.resolveProgetVersion(product, params.CBL_VERSION, "CBL_VERSION")
+
+                            // If a full <version>-<build> was supplied, split it; otherwise look up the latest build:
+                            //   .../api/get_version?product=<product>&version=<version>
+                            def buildNo
+                            if (version.contains('-')) {
+                                def parts = version.split('-', 2)
+                                version = parts[0]
+                                buildNo = parts[1]
+                            } else {
+                                def buildUrl = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
+                                buildNo = sh(
+                                    script: "curl -sf '${buildUrl}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"BuildNumber\",\"\"))'",
+                                    returnStdout: true
+                                ).trim()
+                            }
+                            if (!buildNo) { error "Could not resolve build number for ${product} ${version}" }
+
+                            // Pick dataset version from CBL version: 4.0+ uses the 4.0 dataset, else 3.2:
+                            def majorVersion = version.tokenize('.')[0].toInteger()
+                            def datasetVersion = (majorVersion >= 4) ? "4.0" : "3.2"
+
+                            resolved[p] = [version: version, build: buildNo, dataset: datasetVersion]
+                            echo "${p}: CBL ${version}-${buildNo} (dataset ${datasetVersion})"
+                        } catch (Exception e) {
+                            // Don't let one platform's ProGet hiccup block the others.
+                            echo "WARN: could not resolve ${p} (${product}): ${e.getMessage()}"
+                        }
+                    }
+
+                    if (resolved.isEmpty()) { error "Could not resolve any platform version" }
+
+                    // Build the display name once, honestly. When every platform lands on the
+                    // same build, collapse to one CBL version; otherwise list them per platform.
+                    def sgw = params.SGW_VERSION
+                    if (params.CBL_PLATFORM == 'all') {
+                        def present = ALL_PLATFORMS.findAll { resolved.containsKey(it) }
+                        def distinct = present.collect { "${resolved[it].version}-${resolved[it].build}" }.unique()
+                        if (distinct.size() == 1) {
+                            currentBuild.displayName = "QE all  |  CBL ${distinct[0]}  |  SGW ${sgw}  (#${currentBuild.number})"
+                        } else {
+                            def parts = present.collect { "${it} ${resolved[it].version}-${resolved[it].build}" }
+                            currentBuild.displayName = "QE all  |  ${parts.join(', ')}  |  SGW ${sgw}  (#${currentBuild.number})"
+                        }
+                    } else {
+                        def p = params.CBL_PLATFORM
+                        currentBuild.displayName = "QE ${p}  |  CBL ${resolved[p].version}-${resolved[p].build}  |  SGW ${sgw}  (#${currentBuild.number})"
+                    }
+                }
+            }
+        }
         stage('Trigger QE Tests') {
             matrix {
                 when {
@@ -42,48 +118,17 @@ pipeline {
                         steps {
                             script {
                                 def platform = env.CBL_PLATFORM
+                                def info = resolved[platform]
+                                if (info == null) {
+                                    echo "SKIP: ${platform} (version could not be resolved)"
+                                    return
+                                }
+                                def version = info.version
+                                def buildNo = info.build
+                                def datasetVersion = info.dataset
                                 def sgwVersion = params.SGW_VERSION
                                 def force = params.FORCE_TRIGGER
-                                def progetProduct = "couchbase-lite-" + ((platform == "dotnet") ? "net" : platform)
-
-                                // Resolve the latest version (auto when CBL_VERSION is blank):
-                                //   http://proget.build.couchbase.com:8080/api/latest_release?product=<product>&prerelease=true
-                                def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
-                                def version = proget.resolveProgetVersion(progetProduct, params.CBL_VERSION, "CBL_VERSION")
-
-                                // If a full <version>-<build> was supplied, split it; otherwise look up the latest build:
-                                //   http://proget.build.couchbase.com:8080/api/get_version?product=<product>&version=<version>
-                                def buildNo
-                                if (version.contains('-')) {
-                                    def parts = version.split('-', 2)
-                                    version = parts[0]
-                                    buildNo = parts[1]
-                                } else {
-                                    def buildUrl = "http://proget.build.couchbase.com:8080/api/get_version?product=${progetProduct}&version=${version}"
-                                    buildNo = sh(
-                                        script: "curl -sf '${buildUrl}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"BuildNumber\",\"\"))'",
-                                        returnStdout: true
-                                    ).trim()
-                                }
-                                if (!buildNo) { error "Could not resolve build number for ${progetProduct} ${version}" }
-
                                 def fullVersion = "${version}-${buildNo}"
-
-                                // Pick dataset version from CBL version: 4.0+ uses the 4.0 dataset, else 3.2:
-                                def majorVersion = version.tokenize('.')[0].toInteger()
-                                def datasetVersion = (majorVersion >= 4) ? "4.0" : "3.2"
-
-                                if (params.CBL_PLATFORM == "all") {
-                                    currentBuild.displayName = "${fullVersion}-SGW${sgwVersion} (#${currentBuild.number})"
-                                } else {
-                                    currentBuild.displayName = "${platform}-${fullVersion}-SGW${sgwVersion} (#${currentBuild.number})"
-                                }
-
-                                echo "PLATFORM: ${platform}"
-                                echo "VERSION: ${version}"
-                                echo "BUILD: ${buildNo}"
-                                echo "DATASET_VERSION: ${datasetVersion}"
-                                echo "FORCE: ${force}"
 
                                 // Check whether the QE test has already been triggered for this CBL build:
                                 def triggerTestJob = true
