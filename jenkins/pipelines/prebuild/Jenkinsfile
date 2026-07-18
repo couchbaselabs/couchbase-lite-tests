@@ -64,7 +64,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
+                KEYCHAIN_PASSWORD = getKeychainPassword(params.TS_PLATFORM)
             }
             steps {
                 cleanWs()
@@ -124,4 +124,11 @@ def getNodeForPlatform(platform) {
     } else {
         return 'e2e&&macos-host'
     }
+}
+
+def getKeychainPassword(platform) {
+    if (!platform.contains("windows") && !platform.contains("linux")) {
+        return credentials("${env.NODE_NAME}-keychain-password")
+    }
+    return null
 }
