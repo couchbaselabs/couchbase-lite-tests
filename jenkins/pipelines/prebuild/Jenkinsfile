@@ -64,7 +64,7 @@ pipeline {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mob-e2e-mac-01-keychain-password')
+                KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
             }
             steps {
                 cleanWs()
@@ -96,7 +96,7 @@ pipeline {
                                     Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
                                 }
 
-                                uv run ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                uv run --python 3.13 ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
                             """
                         } else {
                             sh """#!/bin/bash -e
@@ -106,7 +106,7 @@ pipeline {
                                     source jenkins/pipelines/shared/config.sh
                                 fi
                                 
-                                uv run "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
+                                uv run --python 3.13 "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
                             """
                         }
                     }
