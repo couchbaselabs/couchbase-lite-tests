@@ -1,8 +1,6 @@
-// Per-platform CBL info. Written once in 'Resolve Versions', then only read.
-//   platform -> [version: "4.2.0", build: "9", dataset: "4.0"]
+// platform -> [version: "4.2.0", build: "9", dataset: "4.0"]
 def resolved = [:]
 
-// All platforms this scheduler knows about; a single-platform run trims this to one.
 def ALL_PLATFORMS = ['c', 'android', 'java', 'ios', 'dotnet']
 
 def progetProductFor(String platform) {
@@ -10,10 +8,9 @@ def progetProductFor(String platform) {
 }
 
 pipeline {
-    // The dedup state lives on this node's filesystem (~/.jenkins_build_info),
+    // Dedup state lives on this node's filesystem (~/.jenkins_build_info).
     agent { label 'qe-mac-india' }
     environment {
-        // Ensure Homebrew's python3 (used by the ProGet version/build lookups) is on PATH.
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
     parameters {
@@ -45,12 +42,9 @@ pipeline {
                     for (p in platforms) {
                         def product = progetProductFor(p)
                         try {
-                            // Resolve the latest version (auto when CBL_VERSION is blank):
-                            //   .../api/latest_release?product=<product>&prerelease=true
                             def version = proget.resolveProgetVersion(product, params.CBL_VERSION, "CBL_VERSION")
 
-                            // If a full <version>-<build> was supplied, split it; otherwise look up the latest build:
-                            //   .../api/get_version?product=<product>&version=<version>
+                            // Split a supplied <version>-<build>, else look up the latest build.
                             def buildNo
                             if (version.contains('-')) {
                                 def parts = version.split('-', 2)
@@ -65,22 +59,20 @@ pipeline {
                             }
                             if (!buildNo) { error "Could not resolve build number for ${product} ${version}" }
 
-                            // Pick dataset version from CBL version: 4.0+ uses the 4.0 dataset, else 3.2:
                             def majorVersion = version.tokenize('.')[0].toInteger()
                             def datasetVersion = (majorVersion >= 4) ? "4.0" : "3.2"
 
                             resolved[p] = [version: version, build: buildNo, dataset: datasetVersion]
                             echo "${p}: CBL ${version}-${buildNo} (dataset ${datasetVersion})"
                         } catch (Exception e) {
-                            // Don't let one platform's ProGet hiccup block the others.
+                            // One platform's failure must not block the others.
                             echo "WARN: could not resolve ${p} (${product}): ${e.getMessage()}"
                         }
                     }
 
                     if (resolved.isEmpty()) { error "Could not resolve any platform version" }
 
-                    // Build the display name once, honestly. When every platform lands on the
-                    // same build, collapse to one CBL version; otherwise list them per platform.
+                    // Collapse to one CBL version when all platforms match, else list per platform.
                     def sgw = params.SGW_VERSION
                     if (params.CBL_PLATFORM == 'all') {
                         def present = ALL_PLATFORMS.findAll { resolved.containsKey(it) }
@@ -129,7 +121,7 @@ pipeline {
                                 def force = params.FORCE_TRIGGER
                                 def fullVersion = "${version}-${buildNo}"
 
-                                // Check whether the QE test has already been triggered for this CBL build:
+                                // Skip if this CBL build was already triggered.
                                 def triggerTestJob = true
                                 def buildInfo = [:]
                                 def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/${platform}.json"
@@ -146,7 +138,6 @@ pipeline {
                                     }
                                 }
 
-                                // Trigger the QE test job:
                                 if (triggerTestJob) {
                                     def jobName = "qe-${platform}-pipeline"
                                     echo "Triggering '${jobName}' job for ${platform} v${fullVersion}"
@@ -157,7 +148,6 @@ pipeline {
                                         string(name: "TS_DATASET_VERSION", value: datasetVersion)
                                     ], wait: false
 
-                                    // Save CBL build info:
                                     buildInfo[version] = buildNo
                                     try {
                                         writeJSON file: buildInfoFile, json: buildInfo
