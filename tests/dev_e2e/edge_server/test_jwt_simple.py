@@ -26,6 +26,9 @@ JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
 
 @pytest.mark.sgw
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
+@pytest.mark.min_edge_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_jwt_replication_reconnect_false(

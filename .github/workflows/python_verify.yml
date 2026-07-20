@@ -9,6 +9,7 @@ on:
       - 'environment/**/*.py'
       - 'tests/**/*.py'
       - 'jenkins/pipelines/**/*.py'
+      - 'scripts/check_topology_markers.py'
       - '**/pyproject.toml'
       - '**/pytest.ini'
       - '.github/workflows/*py*'
@@ -21,6 +22,7 @@ on:
       - 'environment/**/*.py'
       - 'tests/**/*.py'
       - 'jenkins/pipelines/**/*.py'
+      - 'scripts/check_topology_markers.py'
       - '.github/workflows/*py*'
 
 jobs:
@@ -49,6 +51,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
+  topology-markers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "latest"
+      - name: Check topology markers
+        run: uv run python scripts/check_topology_markers.py $(find tests/dev_e2e tests/QE -name 'test_*.py')
   client-test:
     runs-on: ubuntu-latest
     steps:

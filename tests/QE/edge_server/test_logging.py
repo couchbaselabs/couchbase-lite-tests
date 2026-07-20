@@ -71,6 +71,8 @@ AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
 }
 
 
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestLogging(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")

@@ -14,6 +14,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE = "/home/ec2-user/cert/jwt.txt"
 
 
+@pytest.mark.min_edge_servers(1)
 class TestJWTReplication(CBLTestClass):
     """Test Edge Server replication using JWT file-based authentication."""
 
