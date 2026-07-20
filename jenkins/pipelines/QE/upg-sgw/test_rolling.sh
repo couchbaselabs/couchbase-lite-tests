@@ -98,6 +98,7 @@ function rolling_upgrade_to_version() {
         pushd $QE_TESTS_DIR > /dev/null
         uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
             --upgrade-versions "$UPGRADE_VERSIONS" \
+            --sgcollect-on-test-failure \
             test_rolling_upgrade_sgw.py
         popd > /dev/null
     else
@@ -154,6 +155,7 @@ function rolling_upgrade_to_version() {
             pushd $QE_TESTS_DIR > /dev/null
             uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
                 --upgrade-versions "$UPGRADE_VERSIONS" \
+                --sgcollect-on-test-failure \
                 test_rolling_upgrade_sgw.py
             popd > /dev/null
         done
@@ -169,6 +171,7 @@ function rolling_upgrade_to_version() {
         pushd $QE_TESTS_DIR > /dev/null
         uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
             --upgrade-versions "$UPGRADE_VERSIONS" \
+            --sgcollect-on-test-failure \
             test_rolling_upgrade_sgw.py
         popd > /dev/null
     fi
