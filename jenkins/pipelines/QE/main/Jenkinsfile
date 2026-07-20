@@ -21,6 +21,7 @@ pipeline {
     }
     options {
         timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
     }
     triggers {
         cron('''TZ=Asia/Kolkata
