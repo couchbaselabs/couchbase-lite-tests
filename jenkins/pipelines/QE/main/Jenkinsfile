@@ -1,5 +1,4 @@
-// Resolved per-platform CBL info, populated by the 'Resolve Versions' stage and read
-// (never written) by the parallel matrix cells — so there is no cross-cell race.
+// Per-platform CBL info. Written once in 'Resolve Versions', then only read.
 //   platform -> [version: "4.2.0", build: "9", dataset: "4.0"]
 def resolved = [:]
 
