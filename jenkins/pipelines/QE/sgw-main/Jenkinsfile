@@ -37,7 +37,8 @@ pipeline {
         disableConcurrentBuilds()
     }
     triggers {
-        cron('@daily')
+        cron('''TZ=Asia/Kolkata
+0 4 * * *''')
     }
     stages {
         stage('Resolve and Trigger') {
