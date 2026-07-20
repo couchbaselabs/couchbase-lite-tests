@@ -40,7 +40,7 @@ Test replication behavior with role-based access control.
 
 Test replication behavior with revision messages and document purging.
 
-Parametrized over `channel`: `*` (wildcard) and `A` (an explicit channel name),
+Parametrized over `channel`: `*` (wildcard) and `ChannelA` (an explicit channel name),
 used as the `channels` value on every document created in this test. Both
 variants are otherwise identical — user1 keeps its default dataset-configured
 `*` access in both cases. When `channel` is `*` and Sync Gateway is configured

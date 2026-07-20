@@ -321,7 +321,7 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    @pytest.mark.parametrize("channel", ["*", "A"])
+    @pytest.mark.parametrize("channel", ["*", "ChannelA"])
     async def test_CBL_SG_replication_with_rev_messages(
         self, cblpytest: CBLPyTest, dataset_path: Path, channel: str
     ):

@@ -1426,10 +1426,13 @@ class _SyncGatewayBase:
             return await self._send_request("GET", f"/{db_name}/_config")
 
     async def is_using_views(self, db_name: str) -> bool:
-        """
-        Determines whether the given Sync Gateway database is using views rather than GSI.
+        """Determine whether the given Sync Gateway database is using views rather than GSI.
 
-        :param db_name: The name of the database to check
+        Args:
+            db_name: The name of the database to check.
+
+        Returns:
+            True if the database is configured with enable_shared_bucket_access=false.
         """
         config = await self.get_database_config(db_name)
         return not config.get("enable_shared_bucket_access", True)
