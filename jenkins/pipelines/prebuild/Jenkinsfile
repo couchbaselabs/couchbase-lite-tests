@@ -63,12 +63,9 @@ pipeline {
             agent {
                 label getNodeForPlatform(params.TS_PLATFORM)
             }
-            environment {
-                KEYCHAIN_PASSWORD = getKeychainPassword(params.TS_PLATFORM)
-            }
             steps {
                 cleanWs()
-                
+
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: "*/${env.BUILD_BRANCH}"]],
@@ -84,7 +81,9 @@ pipeline {
 
                     withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
                         if (params.TS_PLATFORM.contains("ios")) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            withCredentials([string(credentialsId: "${env.NODE_NAME}-keychain-password", variable: 'KEYCHAIN_PASSWORD')]) {
+                                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            }
                         }
 
                         if (params.TS_PLATFORM.contains("windows")) {
@@ -124,11 +123,4 @@ def getNodeForPlatform(platform) {
     } else {
         return 'e2e&&macos-host'
     }
-}
-
-def getKeychainPassword(platform) {
-    if (!platform.contains("windows") && !platform.contains("linux")) {
-        return credentials("${env.NODE_NAME}-keychain-password")
-    }
-    return null
 }
