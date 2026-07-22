@@ -29,6 +29,23 @@ else()
     if(NOT DEFINED CBL_VERSION)
         message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
     endif()
+
+    # find_package(CouchbaseLite) only searches the lib/<triplet>/cmake multiarch
+    # subdirectory shipped in the CBL tarball when CMAKE_LIBRARY_ARCHITECTURE is a
+    # real GNU triple, which CMake only auto-detects on Debian-based distros. When
+    # it doesn't, ask the C compiler for its target triple and rebuild it in the
+    # Debian convention the CBL tarball uses (e.g. Arch's gcc reports
+    # x86_64-pc-linux-gnu, but the tarball ships lib/x86_64-linux-gnu).
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_LIBRARY_ARCHITECTURE MATCHES "^[^-]+-[^-]+-[^-]+")
+        execute_process(
+                COMMAND ${CMAKE_C_COMPILER} -dumpmachine
+                OUTPUT_VARIABLE CMAKE_C_COMPILER_TARGET_TRIPLE
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        string(REGEX REPLACE "^([^-]+)-.*" "\\1" CBL_COMPILER_CPU "${CMAKE_C_COMPILER_TARGET_TRIPLE}")
+        set(CMAKE_LIBRARY_ARCHITECTURE "${CBL_COMPILER_CPU}-linux-gnu")
+    endif()
+
     find_package(
             CouchbaseLite
             REQUIRED

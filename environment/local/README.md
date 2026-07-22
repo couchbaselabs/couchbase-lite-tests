@@ -2,45 +2,52 @@
 
 This directory contains scripts to help set up and run a local testing environment.
 
-## Building Sync Gateway
+## Quickstart
 
-Use `build_sync_gateway.py` to compile Sync Gateway from source. This requires `go` to be installed on your system.
+`start_local.py` builds/starts the test server and Sync Gateway in one go:
 
 ```bash
-# Build from an existing local repository
-uv run environment/local/build_sync_gateway.py --repo-path /path/to/sync-gateway
+# Rosmar
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
 
-# Build from a specific git tag/branch (clones to environment/local/sync_gateway_clone)
-uv run environment/local/build_sync_gateway.py --git-tag release/3.3.0
+# Couchbase Server
+uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-gateway --connstr couchbase://127.0.0.1
 ```
 
-## Running Sync Gateway
+The test server and Sync Gateway stages can be skipped independently with
+`--skip-testserver`, `--skip-sync-gateway-build`, and `--skip-sync-gateway-start` —
+useful for iterating without repeating the earlier, slower steps. `--repo-path`/`--git-tag`
+are only required unless `--skip-sync-gateway-build` is set, and `--connstr` is only valid
+with `--server cbs` (defaults to `$SG_TEST_COUCHBASE_SERVER_URL`).
 
-Once built, you can manage the Sync Gateway process using `run_sync_gateway.py`. You must provide either `--start` (with a `--server` type) or `--stop`.
+`start_local.py` also writes the path of the cbltest config to use for the run to
+`environment/local/topology_config`, so it can be passed straight to pytest:
 
 ```bash
-# Start Sync Gateway in the background using Rosmar
-uv run environment/local/run_sync_gateway.py --start --server rosmar
+cd tests/dev_e2e
+uv run pytest --config "$(cat ../../environment/local/topology_config)"
+```
 
-# Start Sync Gateway in the background using CBS
-uv run environment/local/run_sync_gateway.py --start --server cbs
+## Running the individual steps
 
-# Stop the background Sync Gateway process
-uv run environment/local/run_sync_gateway.py --stop
+`build_sync_gateway.py` and `run_sync_gateway.py` have been folded into `start_local.py`.
+Use its `--skip-*` flags to rebuild/restart just one stage, e.g. to rebuild Sync Gateway
+without touching the test server:
+
+```bash
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --skip-testserver
+```
+
+To stop the background Sync Gateway process independently:
+
+```bash
+uv run environment/local/start_local.py --stop-sync-gateway
 ```
 
 - **Logs:** Written to `environment/local/sync_gateway.log`.
-- **Configuration:** 
+- **Configuration:**
   - `--server rosmar`: uses `environment/local/sync_gateway_config/basic_sync_gateway_rosmar.json`
-  - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json`
-
-## Running the Test Server
-
-To start the local test server (CBL-C):
-
-```bash
-uv run environment/local/start_local.py
-```
+  - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json` (with `bootstrap.server` overridden by `--connstr`, if given)
 
 ## Running Tests
 
@@ -50,8 +57,8 @@ After starting the environment, you can run tests against it:
 cd tests/dev_e2e
 
 # If using Couchbase Server (cbs)
-uv run pytest --config ../../environment/local/cbs_config.json
+uv run pytest --config ../../environment/local/topology_configs/cbs_config.json
 
 # If using Rosmar
-uv run pytest --config ../../environment/local/rosmar_config.json
+uv run pytest --config ../../environment/local/topology_configs/rosmar_config.json
 ```
