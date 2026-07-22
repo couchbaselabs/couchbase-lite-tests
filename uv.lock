@@ -479,6 +479,9 @@ requires-dist = [
     { name = "tqdm", specifier = "==4.67.1" },
 ]
 
+[package.metadata.requires-dev]
+dotnet-build = []
+
 [[package]]
 name = "cryptography"
 version = "44.0.0"

@@ -18,6 +18,13 @@ lint.ignore = ["E402"]
 [tool.uv.sources]
 cbltest = { workspace = true }
 
+# Empty on purpose: this branch produces no .NET builds, but main's shared
+# prebuild Jenkinsfile unconditionally passes --group dotnet-build for any
+# dotnet_* platform regardless of which branch it checks out, so the group
+# must exist here for that invocation to resolve.
+[dependency-groups]
+dotnet-build = []
+
 [tool.uv.workspace]
 members = [ "client" ]
 
