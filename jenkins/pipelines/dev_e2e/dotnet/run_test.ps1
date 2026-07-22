@@ -5,11 +5,9 @@ param (
 )
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
-Import-Module $PSScriptRoot/prepare_env.psm1 -Force
 $ErrorActionPreference = "Stop"
 
-Install-DotNet -Version "$env:DOTNET_SDK_VERSION"
-Install-DotNetRuntime -Version "$env:DOTNET_RUNTIME_VERSION"
+uv run dotnetenv install "10.0"
 
 uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {

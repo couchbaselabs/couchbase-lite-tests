@@ -6,6 +6,10 @@ set -euo pipefail
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 source "$SCRIPT_DIR/../../shared/config.sh"
 
+DOTNET_ENV_NAME="10.0"
+XHARNESS_VERSION="10.0.0-prerelease*"
+XHARNESS_SOURCE="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json"
+
 function usage() {
     echo "Usage: $0 <version> <platform> <sgw_version> [dataset-version] [--setup-only]"
     echo "version: CBL version (e.g. 3.2.1-2)"
@@ -17,9 +21,16 @@ function usage() {
 
 function prepare_dotnet() {
     source "$SCRIPT_DIR/prepare_env.sh"
-    install_dotnet "$DOTNET_SDK_VERSION"
+    uv run dotnetenv install "$DOTNET_ENV_NAME"
     if [ "$platform" != "macos" ]; then
-        install_xharness
+        # XHarness is shared, machine-wide infra (swift_ios/c_ios also rely on
+        # it), so install it at the default global tool location, not inside
+        # dotnetenv's isolated environment directory.
+        local dotnet_exe="$HOME/.dotnet${DOTNET_ENV_NAME%%.*}/dotnet"
+        if ! "$dotnet_exe" tool list --global | grep -qi microsoft.dotnet.xharness.cli; then
+            "$dotnet_exe" tool install --global Microsoft.DotNet.XHarness.CLI \
+                --version "$XHARNESS_VERSION" --add-source "$XHARNESS_SOURCE"
+        fi
     fi
 }
 
