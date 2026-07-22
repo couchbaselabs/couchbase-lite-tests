@@ -17,6 +17,17 @@ lint.ignore = ["E402"]
 
 [tool.uv.sources]
 cbltest = { workspace = true }
+dotnetenv = { index = "cbl-py" }
+
+[[tool.uv.index]]
+name = "cbl-py"
+url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
+explicit = true
+
+[dependency-groups]
+dotnet-build = [
+    "dotnetenv",
+]
 
 [tool.uv.workspace]
 members = [ "client" ]
