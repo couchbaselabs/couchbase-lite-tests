@@ -35,6 +35,7 @@ from abc import abstractmethod
 from pathlib import Path
 
 import click
+import dotnetenv
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
@@ -49,7 +50,17 @@ from .platform_bridge import PlatformBridge
 DOTNET_TEST_SERVER_DIR = TEST_SERVER_DIR / "dotnet"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
-DOTNET_PATH = Path.home() / ".dotnet10" / "dotnet"
+DOTNET_ENV_NAME = "10.0"
+
+
+def _dotnet_env() -> tuple[str, dict]:
+    """Ensure the pinned dotnetenv environment (SDK + MAUI workload) is
+    installed, and return (dotnet_exe_path, env) to run it with."""
+    cfg = dotnetenv.load_config(dotnetenv.discover_config())
+    dotnetenv.install(DOTNET_ENV_NAME, cfg)
+    ec = dotnetenv.env_config(cfg, DOTNET_ENV_NAME)
+    env_dir, env = dotnetenv.build_env(DOTNET_ENV_NAME, ec)
+    return str(env_dir / dotnetenv.dotnet_exe_name()), env
 
 
 class DotnetTestServer(TestServer):
@@ -103,6 +114,8 @@ class DotnetTestServer(TestServer):
         """
         Build the .NET test server.
         """
+        dotnet, env = _dotnet_env()
+
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
@@ -112,7 +125,7 @@ class DotnetTestServer(TestServer):
         header(f"Modifying Couchbase Lite version to {cbl_version}")
         subprocess.run(
             [
-                DOTNET_PATH,
+                dotnet,
                 "add",
                 csproj_path,
                 "package",
@@ -122,21 +135,14 @@ class DotnetTestServer(TestServer):
             ],
             check=True,
             capture_output=False,
-        )
-
-        header("Restoring .NET workloads")
-        subprocess.run(
-            [DOTNET_PATH, "workload", "install", "maui"],
-            check=True,
-            capture_output=False,
-            cwd=DOTNET_TEST_SERVER_DIR / "testserver",
+            env=env,
         )
 
         verb = "publish" if self.publish else "build"
         csproj_path = DOTNET_TEST_SERVER_DIR / "testserver" / "testserver.csproj"
         header(f"Building .NET test server for {self.platform}")
         args: list[str] = [
-            str(DOTNET_PATH),
+            dotnet,
             verb,
             str(csproj_path),
             "-f",
@@ -149,7 +155,7 @@ class DotnetTestServer(TestServer):
         if self.extra_args:
             args.append(self.extra_args)
 
-        subprocess.run(args, check=True, capture_output=False)
+        subprocess.run(args, check=True, capture_output=False, env=env)
 
 
 class DotnetTestServerCli(TestServer):
@@ -182,6 +188,8 @@ class DotnetTestServerCli(TestServer):
         """
         Build the .NET CLI test server.
         """
+        dotnet, env = _dotnet_env()
+
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
@@ -191,7 +199,7 @@ class DotnetTestServerCli(TestServer):
         header(f"Modifying Couchbase Lite version to {cbl_version}")
         subprocess.run(
             [
-                DOTNET_PATH,
+                dotnet,
                 "add",
                 csproj_path,
                 "package",
@@ -201,6 +209,7 @@ class DotnetTestServerCli(TestServer):
             ],
             check=True,
             capture_output=False,
+            env=env,
         )
 
         csproj_path = (
@@ -208,7 +217,7 @@ class DotnetTestServerCli(TestServer):
         )
         header(f"Building .NET test server for {self.platform}")
         args: list[str] = [
-            str(DOTNET_PATH),
+            dotnet,
             "publish",
             str(csproj_path),
             "-r",
@@ -219,7 +228,7 @@ class DotnetTestServerCli(TestServer):
             "true",
         ]
 
-        subprocess.run(args, check=True, capture_output=False)
+        subprocess.run(args, check=True, capture_output=False, env=env)
 
 
 @TestServer.register("dotnet_ios")

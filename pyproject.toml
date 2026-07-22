@@ -5,6 +5,7 @@ version = "0.1.0"
 dependencies = [
     "cbltest",
     "click==8.1.8",
+    "dotnetenv",
     "paramiko==3.5.0",
     "psutil==7.0.0",
     "pyyaml==6.0.2",
@@ -21,6 +22,11 @@ exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 
 [tool.uv.sources]
 cbltest = { workspace = true }
+dotnetenv = { index = "cbl-py" }
+
+[[tool.uv.index]]
+name = "cbl-py"
+url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
 
 [dependency-groups]
 lint = [
