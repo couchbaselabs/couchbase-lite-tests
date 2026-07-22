@@ -1,0 +1,132 @@
+pipeline {
+    agent none
+    parameters {
+        string(name: 'CBL_VERSION', defaultValue: '3.3.0')
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    currentBuild.displayName = "Java P2P CBL:${params.CBL_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'jak_desktop'),
+                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
+
+        stage('Start Test Servers') {
+            parallel {
+                stage('Linux Server') {
+                    agent { label 'linux-java' }
+                    steps {
+                        sh "jenkins/pipelines/QE/java/p2p/start_server.sh ${params.CBL_VERSION}"
+                        // Write IP to a file, stash it for the test runner
+                        sh "hostname -I | awk '{print \$1}' > linux_ip.txt"
+                        stash name: 'linux-ip', includes: 'linux_ip.txt'
+                    }
+                }
+                stage('macOS Server') {
+                    agent { label 'macos-java' }
+                    steps {
+                        sh "jenkins/pipelines/QE/java/p2p/start_server.sh ${params.CBL_VERSION}"
+                        sh "ipconfig getifaddr en0 > macos_ip.txt"
+                        stash name: 'macos-ip', includes: 'macos_ip.txt'
+                    }
+                }
+                stage('Windows Server') {
+                    agent { label 'windows-java' }
+                    steps {
+                        powershell "jenkins/pipelines/QE/java/p2p/start_server.ps1 -Version ${params.CBL_VERSION}"
+                        powershell "(Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias 'Ethernet*' | Select-Object -First 1).IPAddress | Out-File windows_ip.txt -NoNewline"
+                        stash name: 'windows-ip', includes: 'windows_ip.txt'
+                    }
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            agent { label 'linux-java' }  // test runner, can be any of the three
+            steps {
+                // Collect all IPs
+                unstash 'linux-ip'
+                unstash 'macos-ip'
+                unstash 'windows-ip'
+
+                // Build config.json dynamically from the three IPs
+                sh """
+                    LINUX_IP=\$(cat linux_ip.txt)
+                    MACOS_IP=\$(cat macos_ip.txt)
+                    WINDOWS_IP=\$(cat windows_ip.txt)
+
+                    cat > config.json <<EOF
+{
+    "test_servers": [
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "${params.CBL_VERSION}",
+            "location": "\${LINUX_IP}",
+            "download": false
+        },
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "${params.CBL_VERSION}",
+            "location": "\${MACOS_IP}",
+            "download": false
+        },
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "${params.CBL_VERSION}",
+            "location": "\${WINDOWS_IP}",
+            "download": false
+        }
+    ]
+}
+EOF
+                """
+
+                timeout(time: 120, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/QE/java/p2p/run_test.sh ${params.CBL_VERSION} ${params.TS_DATASET_VERSION}"
+                }
+            }
+            post {
+                always {
+                    archiveArtifacts artifacts: 'tests/QE/java_p2p/**/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Stop all servers on all machines
+            parallel(
+                'Stop Linux': {
+                    node('linux-java') {
+                        sh 'jenkins/pipelines/QE/java/p2p/teardown.sh'
+                    }
+                },
+                'Stop macOS': {
+                    node('macos-java') {
+                        sh 'jenkins/pipelines/QE/java/p2p/teardown.sh'
+                    }
+                },
+                'Stop Windows': {
+                    node('windows-java') {
+                        powershell 'jenkins/pipelines/QE/java/p2p/teardown.ps1'
+                    }
+                }
+            )
+        }
+    }
+}

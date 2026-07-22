@@ -1,0 +1,23 @@
+{
+    "$schema": "../../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "{{version}}",
+            "location": "localhost",
+            "download": true
+        },
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "{{version}}",
+            "location": "localhost",
+            "download": true
+        },
+        {
+            "platform": "jak_desktop",
+            "cbl_version": "{{version}}",
+            "location": "localhost",
+            "download": true
+        }
+    ]
+}
