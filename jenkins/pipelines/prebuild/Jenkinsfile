@@ -65,7 +65,7 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label getNodeForPlatform(params.TS_PLATFORM)
+                label getNodeForPlatform(params.TS_PLATFORM, params.CBL_VERSION)
             }
             steps {
                 cleanWs()
@@ -121,8 +121,12 @@ pipeline {
     }
 }
 
-def getNodeForPlatform(platform) {
-    if (platform.contains("windows")) {
+def getNodeForPlatform(platform, version) {
+    def macDotnetPlatforms = ['dotnet_ios', 'dotnet_android', 'dotnet_macos']
+    // mob-e2e-mac-01 lacks disk space for the older Xcode 3.2 needs, so route to -02 instead.
+    if (platform in macDotnetPlatforms && version =~ /^3\.2\./) {
+        return 'mob-e2e-mac-02'
+    } else if (platform.contains("windows")) {
         return 'e2e&&windows-host'
     } else if (platform.contains("linux")) {
         return 'e2e&&linux-host'
