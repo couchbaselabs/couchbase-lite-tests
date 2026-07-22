@@ -21,12 +21,21 @@ exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 
 [tool.uv.sources]
 cbltest = { workspace = true }
+dotnetenv = { index = "cbl-py" }
+
+[[tool.uv.index]]
+name = "cbl-py"
+url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
+explicit = true
 
 [dependency-groups]
 lint = [
     "ty>=0.0.19",
     "ruff>=0.15.4",
     "types-netifaces==0.11.0.20241025",
+]
+dotnet-build = [
+    "dotnetenv",
 ]
 
 [tool.uv.workspace]
