@@ -1,0 +1,83 @@
+pipeline {
+    agent none
+// This job uses UI defined params and their default values.
+// That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
+// The default values in the UI will be used if no parameters are provided at build time.
+// But just for reference, these are the params that are used by the job :
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
+//         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
+//         string(name: 'DATASET_VERSION', description: 'The dataset version to be used for the Test Server, ')
+    stages {
+        stage('Init') {
+            agent any
+            steps {
+                script {
+                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
+                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    if (params.DATASET_VERSION == '') { error "DATASET_VERSION is required" }
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} DB:${env.DATASET_VERSION} (#${currentBuild.number})"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            steps {
+                build job: 'prebuild-test-server',
+                parameters: [
+                    string(name: 'TS_PLATFORM', value: 'c_macos'),
+                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
+                ],
+                wait: true,
+                propagate: true
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                TS_ARTIFACTS_DIR = 'sgw'
+            }
+            steps {
+                // Unlock keychain:
+                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
+                echo "=== Run SGW Tests"
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh "jenkins/pipelines/dev_e2e/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} ${env.DATASET_VERSION}"
+                }
+                echo "=== SGW Tests Complete"
+            }
+            post {
+                always {
+                    // Publish and archive pytest's JUnit XML so
+                    // per-test failures (messages and tracebacks) are
+                    // surfaced in Jenkins even if teardown fails.
+                    script {
+                        try {
+                            junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                        } catch (err) {
+                            echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                        }
+                    }
+
+                    echo "=== Teardown SGW Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/dev_e2e/sgw/teardown.sh"
+                    }
+                    // Archived after teardown because teardown's move_artifacts
+                    // is what populates tests/QE/sgw/.
+                    archiveArtifacts artifacts: 'tests/dev_e2e/sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== SGW Test Teardown Complete"
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

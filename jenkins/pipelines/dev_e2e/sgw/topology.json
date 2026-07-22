@@ -1,0 +1,32 @@
+{
+    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+		{
+			"platform": "c_macos",
+			"cbl_version": "{{version}}",
+			"location": "00008101-000E0519020A001E",
+			"ip_hint": "10.100.150.115",
+			"download": true
+		}
+	],
+    "clusters": [
+        {
+            "server_count": 1
+        }, {
+            "server_count": 1
+        }
+    ],
+    "sync_gateways": [
+        {
+            "cluster": 0
+        }, {
+            "cluster": 0
+        }
+    ],
+    "load_balancers": [
+        {
+            "sync_gateways": [0, 1]
+        }
+    ],
+    "logslurp": true
+}
