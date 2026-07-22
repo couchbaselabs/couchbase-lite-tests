@@ -20,7 +20,7 @@ function usage() {
 
 function prepare_dotnet() {
     # MAUI is installed by dotnetenv as part of the server build instead.
-    uv run dotnetenv install "$DOTNET_ENV_NAME"
+    uv run --group dotnet-build dotnetenv install "$DOTNET_ENV_NAME"
     if [ "$platform" != "macos" ]; then
         # XHarness is shared, machine-wide infra (swift_ios/c_ios also rely on
         # it), so install it at the default global tool location, not inside

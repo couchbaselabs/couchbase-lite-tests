@@ -5,7 +5,6 @@ version = "0.1.0"
 dependencies = [
     "cbltest",
     "click==8.1.8",
-    "dotnetenv",
     "paramiko==3.5.0",
     "psutil==7.0.0",
     "pyyaml==6.0.2",
@@ -33,6 +32,9 @@ lint = [
     "ty>=0.0.19",
     "ruff>=0.15.4",
     "types-netifaces==0.11.0.20241025",
+]
+dotnet-build = [
+    "dotnetenv",
 ]
 
 [tool.uv.workspace]
