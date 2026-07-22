@@ -54,10 +54,10 @@ class TestAuthentication(CBLTestClass):
         )
         self.mark_test_step("get server information with TLS")
         version = await edge_server.get_version()
-        self.mark_test_step(f"VERSION:{version}")
+        assert len(version.version) > 4, "invalid version fetched"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_mtls_config.json"
         )
-        self.mark_test_step("get server information with TLS")
+        self.mark_test_step("get server information with mTLS")
         version = await edge_server.get_version()
-        self.mark_test_step(f"VERSION:{version}")
+        assert len(version.version) > 4, "invalid version fetched"

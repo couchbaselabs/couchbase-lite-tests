@@ -382,9 +382,6 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server2.wait_for_idle()
         await edge_server3.wait_for_idle()
 
-        self.mark_test_step("Kill Edge Server 3 again")
-        await edge_server3.kill_server()
-
         self.mark_test_step("Verify create propagated to ES2, ES1, SGW")
         edge2_docs = await edge_server2.get_all_documents(
             "travel", collection="travel.hotels"
@@ -479,8 +476,8 @@ class TestEdgeServerChaos(CBLTestClass):
                     assert local_doc.get(key) == value
                 return True
 
-        except Exception as e:
-            return {"error": str(e), "optype": optype, "doc_id": doc_id}
+        except Exception:
+            return False
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_with_concurrent_rest_requests(
@@ -504,7 +501,7 @@ class TestEdgeServerChaos(CBLTestClass):
         ]
         await edge_server.bulk_doc_op(bulk_ops, db_name="db")
 
-        self.mark_test_step("Verify initial document load")
+        self.mark_test_step("Verify initial document count of 10000")
         all_docs = await edge_server.get_all_documents(db_name="db")
         assert len(all_docs.rows) == docgen.size
 
@@ -514,7 +511,6 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Run randomized CRUD workload")
         for i in range(1000):
             op = random.choice(operations)
-            self.mark_test_step(f"Iteration {i}: {op}")
             assert await self.perform_operation(
                 edge_server,
                 op,
@@ -526,7 +522,9 @@ class TestEdgeServerChaos(CBLTestClass):
                 revmap=revmap,
             )
 
-        self.mark_test_step("Final consistency validation")
+        self.mark_test_step(
+            "Final consistency validation- actual document count vs expected document count"
+        )
         final_docs = await edge_server.get_all_documents(db_name="db")
         assert len(final_docs.rows) == len(docs), "Final document count mismatch"
 

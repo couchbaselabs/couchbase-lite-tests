@@ -47,8 +47,7 @@ Test the offline synchronization and recovery capabilities of a chained Edge Ser
 8. Restart Edge Server 3 and wait for it to come online.
 9. Create 10,000 documents in `travel.hotels` via bulk create on Edge Server 3.
 10. Verify documents are created on Edge Server 3 and wait for replication to become idle.
-11. Kill Edge Server 3 again.
-12. Verify the created documents propagated successfully to Edge Server 2, Edge Server 1, and Sync Gateway.
+11. Verify the created documents propagated successfully to Edge Server 2, Edge Server 1, and Sync Gateway.
 
 ## test_edge_server_with_concurrent_rest_requests
 

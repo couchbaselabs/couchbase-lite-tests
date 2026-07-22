@@ -183,8 +183,6 @@ class TestCrud(CBLTestClass):
     async def test_multiple_doc_crud(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        self.mark_test_step("test_multiple_doc_crud")
-
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name="names",
             config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
@@ -225,19 +223,18 @@ class TestCrud(CBLTestClass):
             )
             updated.append(all_docs.rows[i + 50].id)
 
-        self.mark_test_step("Execute bulk document operations")
+        self.mark_test_step(
+            "Execute bulk document operations, verify creations, updates and deletions - actual document count vs expected doc count"
+        )
         await edge_server.bulk_doc_op(docs=bulk_changes, db_name=db_name)
 
-        self.mark_test_step("Validate the specifically created documents")
         create_task = await edge_server.get_all_documents(db_name=db_name, keys=created)
         assert len(create_task) == 10, "Created documents missing"
 
-        self.mark_test_step("Validate the specifically updated documents")
         update_task = await edge_server.get_all_documents(db_name=db_name, keys=updated)
         assert len(update_task) == 10, "Updated documents missing"
         for row in update_task.rows:
             assert row.revid.startswith("2")
 
-        self.mark_test_step("Validate the specifically deleted documents")
         delete_task = await edge_server.get_all_documents(db_name=db_name, keys=deleted)
         assert len(delete_task) == 0, "Deleted documents still exist"
