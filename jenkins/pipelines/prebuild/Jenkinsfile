@@ -17,8 +17,12 @@ pipeline {
             name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
+        booleanParam(
+            name: 'FORCE',
+            defaultValue: false,
+            description: 'Build the test server even if it already exists for this platform and CBL version/build'
+        )
     }
-
     stages {
         stage('Validate Parameters') {
             steps {
