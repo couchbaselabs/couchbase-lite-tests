@@ -111,6 +111,14 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - Test config: `tests/{dev_e2e,QE}/config.json` (schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`)
 - Topology: `environment/aws/topology_setup/*.json` (schema: `topology_schema.json`)
 
+## Branching
+
+`main` and `release/X.Y` split authority (full rationale: [docs/adr/0001-main-and-release-branch-strategy.md](docs/adr/0001-main-and-release-branch-strategy.md)):
+
+- **Tests always come from `main`.** Never run or consult a `release/X.Y` branch's `tests/` — it is a stale byproduct of the branch point, never executed by CI, and misleading.
+- **Test-server source is version-specific.** Each `release/X.Y` freezes test-server code at the last state compatible with the Couchbase Lite `X.Y` SDK line (breaking API changes across versions make a single-branch/conditional approach impossible — the JVM server has no preprocessor at all). The prebuild pipeline picks the branch from `CBL_VERSION`, falling back to `main` when no release branch exists.
+- **Propagation is forward-only.** Fixes land on `main`, then cherry-pick back to release branches. Release branches never merge into `main`.
+
 ## Git Hooks
 
 `.pre-commit-config.yaml` enforces on every commit:
