@@ -94,7 +94,6 @@ pipeline {
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
                                 if ( Test-Path -Path ./jenkins/pipelines/prebuild/setup.psm1 ) {
                                     Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
                                 } else {
