@@ -35,7 +35,6 @@ from abc import abstractmethod
 from pathlib import Path
 
 import click
-import dotnetenv
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
@@ -55,7 +54,13 @@ DOTNET_ENV_NAME = "8.0"
 
 def _dotnet_env() -> tuple[str, dict]:
     """Ensure the pinned dotnetenv environment (SDK + MAUI workload) is
-    installed, and return (dotnet_exe_path, env) to run it with."""
+    installed, and return (dotnet_exe_path, env) to run it with.
+
+    Imported lazily: dotnetenv lives in the optional `dotnet-build` dependency
+    group, not the default install, so only an actual .NET build requires it.
+    """
+    import dotnetenv
+
     cfg = dotnetenv.load_config(dotnetenv.discover_config())
     dotnetenv.install(DOTNET_ENV_NAME, cfg)
     ec = dotnetenv.env_config(cfg, DOTNET_ENV_NAME)

@@ -5,12 +5,16 @@ version = "0.1.0"
 dependencies = [
     "cbltest",
     "click==8.1.8",
-    "dotnetenv",
     "paramiko==3.5.0",
     "psutil==7.0.0",
     "pyyaml==6.0.2",
     "tqdm==4.67.1",
     "netifaces==0.11.0"
+]
+
+[dependency-groups]
+dotnet-build = [
+    "dotnetenv",
 ]
 
 [tool.ruff]
@@ -24,6 +28,7 @@ dotnetenv = { index = "cbl-py" }
 [[tool.uv.index]]
 name = "cbl-py"
 url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
+explicit = true
 
 [tool.uv.workspace]
 members = [ "client" ]
