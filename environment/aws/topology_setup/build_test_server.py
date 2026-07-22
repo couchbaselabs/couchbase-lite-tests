@@ -76,7 +76,7 @@ def main() -> None:
     parser.add_argument(
         "--upload",
         action="store_true",
-        help="Upload the built server to latestbuilds, if applicable",
+        help="Upload the built server to latestbuilds, overwriting any existing upload",
     )
     parser.add_argument(
         "--ci",
@@ -97,7 +97,7 @@ def main() -> None:
         click.secho("Upload not requested, skipping", fg="yellow")
         exit(0)
 
-    if upload_exists(server):
+    if not args.upload and upload_exists(server):
         click.secho(
             "Server already exists on latestbuilds, skipping upload", fg="yellow"
         )
