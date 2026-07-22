@@ -1,14 +1,9 @@
 {
     "$schema": "./topology_schema.json",
-    "clusters": [
+    "edge_servers": [
         {
-            "server_count": 1
+            "version": "1.1.0-53"
         }
     ],
-    "sync_gateways": [
-        {
-            "cluster": 0
-        }
-    ],
-    "logslurp": true
+    "logslurp": false
 }

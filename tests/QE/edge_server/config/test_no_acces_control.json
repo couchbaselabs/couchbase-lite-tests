@@ -1,0 +1,30 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59842",
+    "enable_user_access_control": true,
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "enable_client_sync": "pull",
+            "enable_adhoc_queries": false
+        },
+        "scratch": {
+            "path": "/home/ec2-user/database/scratch.cblite2",
+            "create": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true,
+            "enable_adhoc_queries": true
+        }
+    },
+    "users": "/home/ec2-user/user/users_access_control.json",
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}

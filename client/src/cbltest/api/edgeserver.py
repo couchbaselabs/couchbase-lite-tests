@@ -123,6 +123,7 @@ class EdgeServer:
         self.__auth_name = admin_user
         self.__auth_password = admin_password
         self.__auth = is_auth
+        self.__user_sessions={}
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
@@ -163,6 +164,10 @@ class EdgeServer:
             users,
             enable_anonymous_users,
         )
+
+    def get_user_session(self, name: str) -> ClientSession | None:
+        """Return a stored session for a named user, or None."""
+        return self.__user_sessions.get(name)
 
     def _create_session(
         self, scheme: str, url: str, port: int, auth: BasicAuth | None
@@ -894,18 +899,23 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def set_auth(self, auth: bool = True, name="admin_user", password="password"):
+    async def set_auth(self, auth: bool = True, name="admin_user", password="password", admin=False):
         if not auth:
             self.__auth = False
         else:
+            self.__auth = True
             self.__auth_name = name
             self.__auth_password = password
-            self.__admin_session = self._create_session(
+            session = self._create_session(
                 self.scheme,
                 self.__hostname,
                 self.__port,
                 BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
             )
+            self.__user_sessions[name] = session
+            if admin:
+                self.__admin_session = session
+
 
     async def kill_server(self):
         with self.__tracer.start_as_current_span("kill edge server"):
@@ -1048,16 +1058,29 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("reset firewall"):
             await self._send_request("post", "firewall", session=self.__shell_session)
 
-    async def add_user(self, name, password, role="admin"):
+    async def add_user(self, user_config:dict={}):
         with self.__tracer.start_as_current_span("Add user"):
             await self.kill_server()
-            payload = {"name": name, "password": password, "role": role}
-            await self._send_request(
-                "post",
-                "add-user",
-                JSONDictionary(payload),
-                session=self.__shell_session,
-            )
+            for name, v in user_config.items():
+                password = v["password"]
+                role = v.get("role", "")
+                payload: dict = {"name": name, "password": password, "role": role}
+                await self._send_request(
+                    "post",
+                    "add-user",
+                    JSONDictionary(payload),
+                    session=self.__shell_session,
+                )
+            for name, v in user_config.items():
+                access = v.get("access")
+                if access:
+                    payload = {"name": name, "password": v["password"], "role": v.get("role", ""), "access": access}
+                    await self._send_request(
+                        "post",
+                        "add-user",
+                        JSONDictionary(payload),
+                        session=self.__shell_session,
+                    )
             await self.start_server()
 
     async def wait_for_idle(self, replicator_key=0, timeout=30):

@@ -28,4 +28,6 @@ fi
 if ! command -v unzip >/dev/null 2>&1; then
   sudo dnf install unzip -y
 fi
+sudo yum install -y nodejs npm
+sudo npm install -g json5
 sudo iptables -F
