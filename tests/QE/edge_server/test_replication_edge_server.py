@@ -17,9 +17,9 @@ class TestEdgeServerSync(CBLTestClass):
     ):
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cloud.sync_gateway
-        source_db = sgw.replication_url("travel")
+        source_db = sync_gateway.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
@@ -48,7 +48,7 @@ class TestEdgeServerSync(CBLTestClass):
             )
 
             # Get from SGW
-            sgw_docs = await sgw.get_all_documents(
+            sgw_docs = await sync_gateway.get_all_documents(
                 "travel", scope="travel", collection=collection.split(".")[1]
             )
 
@@ -71,7 +71,7 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
@@ -85,7 +85,7 @@ class TestEdgeServerSync(CBLTestClass):
         self.mark_test_step(
             "Verify TTL document purged on Edge server and not Sync Gateway"
         )
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
