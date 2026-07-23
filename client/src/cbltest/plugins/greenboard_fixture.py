@@ -88,11 +88,22 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             library_version: str = "n/a"
             if len(cblpytest.test_servers) > 0:
                 test_server_info = await cblpytest.test_servers[0].get_info()
-                # Keep the platform as SGW if it has one of the sgw markers, since
-                # the test might still use test server with it, but still belong
-                # to SGW and not CBL test platform.
                 library_version = test_server_info.library_version
-                if not uploader.has_sgw_marker():
+                """
+                Only a DEDICATED SGW job — one where EVERY executed test is
+                SGW-markered — stays platform="sync-gateway" (an SGW test may
+                legitimately drive a test server, so a test server being
+                present doesn't make it a CBL run). A CBL run that merely
+                contains some sgw-markered tests keeps its own CBL platform;
+                otherwise the entire run's results and version leak onto the
+                SGW board.
+                
+                NOTE: This is a temporary workaround for the fact that CBL jobs 
+                are currently leaking into SGW section on greenboard,
+                a future PR would apply a different "nightly" marker for mixed jobs 
+                entirely, and the platform derivation logic would be changed too.
+                """
+                if not uploader.is_sgw_only_run():
                     test_platform = test_server_info.cbl
                 if "systemName" in test_server_info.device:
                     os_name = test_server_info.device["systemName"]
