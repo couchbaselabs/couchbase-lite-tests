@@ -95,21 +95,13 @@ pipeline {
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                if ( Test-Path -Path ./jenkins/pipelines/prebuild/setup.psm1 ) {
-                                    Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
-                                } else {
-                                    Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
-                                }
+                                Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
 
                                 uv run --python 3.13 ${groupFlags} ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION ${uploadFlag}
                             """
                         } else {
                             sh """#!/bin/bash -e
-                                if [ -f jenkins/pipelines/prebuild/setup.sh ]; then
-                                    source jenkins/pipelines/prebuild/setup.sh
-                                else
-                                    source jenkins/pipelines/shared/config.sh
-                                fi
+                                source jenkins/pipelines/shared/config.sh
 
                                 uv run --python 3.13 ${groupFlags} "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION ${uploadFlag}
                             """
