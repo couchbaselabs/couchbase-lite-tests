@@ -19,6 +19,11 @@ repos:
         language: unsupported
         types_or: [python, pyi]
         entry: uv run ty check
+      - id: topology-markers
+        name: check topology markers
+        language: unsupported
+        entry: uv run python scripts/check_topology_markers.py
+        files: ^tests/(dev_e2e|QE)/.*test_.*\.py$
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
     hooks:
