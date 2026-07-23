@@ -369,8 +369,7 @@ class TestGreenboardFixture:
 
     @pytest.mark.asyncio
     async def test_sgw_marker_keeps_sync_gateway_platform(self):
-        """A run whose every executed test carries @pytest.mark.sgw (here, the
-        sole test) is a dedicated SGW job — platform stays 'sync-gateway'."""
+        """When a test carries @pytest.mark.sgw the platform stays 'sync-gateway'."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
@@ -403,48 +402,8 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_mixed_run_keeps_cbl_platform(self):
-        """Regression: a CBL run that includes one SGW-markered test alongside
-        unmarked CBL tests is NOT a dedicated SGW job. It must keep its CBL
-        platform and CBL version — not leak onto the sync-gateway board.
-        (staging-e2e-test-dotnet leak, greenboard 3.3.7.)"""
-        server = _make_server(cbl="couchbase-lite-net", library_version="3.3.7-b0042")
-        cblpytest = _make_cblpytest(test_servers=[server])
-        config = _make_pytestconfig()
-        with patch(
-            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
-        ) as mock_upload:
-            gen = _raw_greenboard(cblpytest, config)
-            await gen.__anext__()
-            uploader = next(
-                p
-                for p in config.pluginmanager.get_plugins()
-                if isinstance(p, GreenboardUploader)
-            )
-            # One plain CBL test, one SGW-markered test — a mixed run.
-            drive_hook(uploader, make_report("call", passed=True), make_item())
-            drive_hook(
-                uploader, make_report("call", passed=True), make_item(markers=["sgw"])
-            )
-            try:
-                await gen.__anext__()
-            except StopAsyncIteration:
-                pass
-        assert mock_upload.call_args[0][0] == RunResult(
-            build=42,
-            version="3.3.7",
-            sgwVersion="n/a",
-            failCount=0,
-            passCount=2,
-            platform="couchbase-lite-net",
-            os="iOS",
-            jobUrl="local",
-        )
-
-    @pytest.mark.asyncio
     async def test_upg_sgw_marker_keeps_sync_gateway_platform(self):
-        """@pytest.mark.upg_sgw on every executed test (here, the sole test)
-        also classifies the run as sync-gateway."""
+        """@pytest.mark.upg_sgw also forces platform to 'sync-gateway'."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()

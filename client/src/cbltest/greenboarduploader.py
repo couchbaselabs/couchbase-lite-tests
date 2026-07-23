@@ -124,8 +124,7 @@ class GreenboardUploader:
         self.__pass_count = 0
         self.__overall_fail = False
         self.__test_ran = False
-        self.__executed_count = 0
-        self.__sgw_marked_count = 0
+        self.__has_sgw_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
@@ -143,36 +142,20 @@ class GreenboardUploader:
         if self.__overall_fail:
             return
 
-        # Tally SGW-focused markers per executed test. Classification as a
-        # dedicated sync-gateway run (see is_sgw_only_run) requires EVERY
-        # executed test to be SGW-markered — a mixed CBL run that merely
-        # includes a few @pytest.mark.sgw tests must keep its CBL platform,
-        # or the whole run's counts and version get misattributed to
-        # sync-gateway (e.g. a .NET run leaking onto the SGW board).
-        self.__executed_count += 1
+        # Track if any test has SGW-focused markers
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
-            self.__sgw_marked_count += 1
+            self.__has_sgw_marker = True
 
         if report.passed:
             self.__pass_count += 1
         elif report.failed:
             self.__fail_count += 1
 
-    def is_sgw_only_run(self) -> bool:
+    def has_sgw_marker(self) -> bool:
         """
-        Returns True only when EVERY executed test carried an SGW marker
-        (@pytest.mark.sgw or @pytest.mark.upg_sgw) — i.e. a dedicated
-        sync-gateway job. A mixed CBL run that happens to include one or more
-        SGW-markered tests returns False and keeps its own CBL platform, so
-        the whole run's counts and version aren't misattributed to
-        sync-gateway. Returns False for a zero-test run (nothing to classify).
-
-        NOTE: This is a temporary workaround for the fact that CBL jobs are currently
-        leaking into SGW section on greenboard, a future PR would apply
-        a different "nightly" marker for mixed jobs entirely, and the platform
-        derivation logic would be changed too.
+        Returns True if any test in the session has @pytest.mark.sgw or @pytest.mark.upg_sgw marker
         """
-        return 0 < self.__executed_count == self.__sgw_marked_count
+        return self.__has_sgw_marker
 
     def upload(
         self,
