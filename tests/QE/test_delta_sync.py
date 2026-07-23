@@ -32,6 +32,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -50,11 +51,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -68,7 +69,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -79,10 +80,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record baseline bytes before update")
-        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -99,7 +100,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "Updated Hotel"},
             )
         ]
-        await cloud.sync_gateway.update_documents("travel", updates, "travel", "hotels")
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
 
         self.mark_test_step("Start the same replicator again to pull the update")
         await replicator.start()
@@ -122,7 +123,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Record bytes transferred after delta sync")
-        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(
@@ -151,6 +152,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -169,11 +171,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -187,7 +189,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -198,10 +200,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -218,7 +220,7 @@ class TestDeltaSync(CBLTestClass):
                 {"name": "SGW", "nested": {"name": "I am a nested field"}},
             )
         ]
-        await cloud.sync_gateway.update_documents("travel", updates, "travel", "hotels")
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
 
         self.mark_test_step("Start the same replicator again:")
         await replicator.start()
@@ -256,7 +258,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step(
             "Verify delta sync bytes transferred is less than doc size."
@@ -276,6 +278,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -294,11 +297,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -312,7 +315,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -323,10 +326,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        bytes_pull_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_pull_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -344,7 +347,7 @@ class TestDeltaSync(CBLTestClass):
                 {"utf8": utf8_body},
             )
         ]
-        await cloud.sync_gateway.update_documents("travel", updates, "travel", "hotels")
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()
@@ -376,7 +379,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred again this time.")
-        bytes_pull_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_pull_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step(
             "Verify only delta is updated while replicating UTF-8 content."
@@ -396,6 +399,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled"
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -414,11 +418,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -432,7 +436,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "travel",
             ["travel.hotels"],
@@ -443,10 +447,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
@@ -459,7 +463,7 @@ class TestDeltaSync(CBLTestClass):
         updates = [
             DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": "SGW"})
         ]
-        await cloud.sync_gateway.update_documents("travel", updates, "travel", "hotels")
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()
@@ -491,7 +495,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify delta transferred is less than doc size.")
         delta_bytes_transferred = bytes_read_after - bytes_read_before
@@ -522,11 +526,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("posts"),
+            sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -540,17 +544,17 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "posts",
             ["_default.posts"],
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred("posts")
+        bytes_read_before, _ = await sync_gateway.bytes_transferred("posts")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "posts", "post_1", collection="posts"
         )
         assert original_doc is not None, "Document should exist in SGW"
@@ -559,7 +563,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify the `name` field of the doc (small change).
         """)
-        await cloud.sync_gateway.upsert_documents(
+        await sync_gateway.upsert_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -601,7 +605,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred("posts")
+        bytes_read_after, _ = await sync_gateway.bytes_transferred("posts")
 
         self.mark_test_step(
             "Verify delta transferred equivalent to doc size (full doc transfer)."
@@ -624,10 +628,11 @@ class TestDeltaSync(CBLTestClass):
                 * has a rev_cache size of 1.
         """)
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
 
         self.mark_test_step("Verify SGW config has correct revision expiry settings")
-        db_config = await cloud.sync_gateway.get_database_config("short_expiry")
+        db_config = await sync_gateway.get_database_config("short_expiry")
 
         assert db_config.get("old_rev_expiry_seconds") == 10, (
             f"Expected old_rev_expiry_seconds to be 10, got {db_config.get('old_rev_expiry_seconds')}"
@@ -654,11 +659,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("short_expiry"),
+            sync_gateway.replication_url("short_expiry"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -681,16 +686,12 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await cloud.sync_gateway.bytes_transferred(
-            "short_expiry"
-        )
+        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("short_expiry")
 
         self.mark_test_step(
             "Get the current document state and revision before update."
         )
-        sgw_doc_before_update = await cloud.sync_gateway.get_document(
-            "short_expiry", "doc1"
-        )
+        sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
         assert sgw_doc_before_update is not None, "Document should exist in SGW"
         assert sgw_doc_before_update.body.get("type") == "test", (
             "Expected doc to have `type` as `test`"
@@ -701,8 +702,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step(
             "Verify old revision body is accessible before expiry through public API."
         )
-        sg = cloud.sync_gateway
-        old_rev_doc = await sg.get_document_revision_public(
+        old_rev_doc = await sync_gateway.get_document_revision_public(
             "short_expiry", "doc1", old_revision, BasicAuth("user1", "pass", "ascii")
         )
 
@@ -717,7 +717,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify content in document "doc1": `"name": "SGW"` (small change)
         """)
-        await cloud.sync_gateway.upsert_documents(
+        await sync_gateway.upsert_documents(
             "short_expiry",
             [
                 DocumentUpdateEntry(
@@ -733,7 +733,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify old revision is not accessible through public API.")
         try:
-            expired_rev_doc = await sg.get_document_revision_public(
+            expired_rev_doc = await sync_gateway.get_document_revision_public(
                 "short_expiry",
                 "doc1",
                 old_revision,
@@ -757,9 +757,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await cloud.sync_gateway.bytes_transferred(
-            "short_expiry"
-        )
+        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("short_expiry")
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
 
         self.mark_test_step("""
@@ -785,6 +783,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -803,11 +802,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -818,7 +817,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify docs are replicated correctly.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
@@ -830,11 +829,11 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Update the same hotel document with identical content (no real change)
         """)
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document hotel_400 should exist"
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
             "travel",
@@ -851,7 +850,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get the original document size.")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
@@ -872,6 +871,7 @@ class TestDeltaSync(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -890,11 +890,11 @@ class TestDeltaSync(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
             enable_document_listener=True,
         )
         await replicator.start()
@@ -910,20 +910,20 @@ class TestDeltaSync(CBLTestClass):
         assert len(lite_all_docs["travel.hotels"]) == 700, (
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
-        original_doc = await cloud.sync_gateway.get_document(
+        original_doc = await sync_gateway.get_document(
             "travel", "hotel_400", "travel", "hotels"
         )
         assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_before, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("""
             Update docs in SGW:
                 * Update the same hotel document with much larger content (>2x original size)
         """)
         large_doc_body = "X" * 2_000_000
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "travel",
             [
                 DocumentUpdateEntry(
@@ -955,7 +955,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_after, _ = await cloud.sync_gateway.bytes_transferred("travel")
+        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify document is replicated correctly.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))

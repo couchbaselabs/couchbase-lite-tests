@@ -41,9 +41,9 @@ pipeline {
             parallel {
                 stage('macOS Desktop') {
                     when { beforeAgent true; expression { params.RUN_MACOS } }
-                    agent { label 'mac-mini-new' }
+                    agent { label 'mob-e2e-mac-02' }
                     options {
-                        lock('mac-mini-new')
+                        lock('mob-e2e-mac-02')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe')

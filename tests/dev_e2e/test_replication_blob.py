@@ -35,6 +35,7 @@ class TestReplicationBlob(CBLTestClass):
             "Reset SG and load `travel` dataset with delta sync enabled."
         )
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
@@ -55,11 +56,11 @@ class TestReplicationBlob(CBLTestClass):
         )
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -72,7 +73,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -80,9 +81,7 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Update hotel_1 on SG without changing the image key.")
         hotel_1 = assert_not_null(
-            await cloud.sync_gateway.get_document(
-                "travel", "hotel_1", "travel", "hotels"
-            ),
+            await sync_gateway.get_document("travel", "hotel_1", "travel", "hotels"),
             "hotel_1 vanished from SGW",
         )
         hotels_updates: list[DocumentUpdateEntry] = []
@@ -112,7 +111,7 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "travel", hotels_updates, "travel", "hotels"
         )
 
@@ -128,7 +127,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -138,9 +137,7 @@ class TestReplicationBlob(CBLTestClass):
             "Update hotel_1 on SG again without changing the image key."
         )
         hotel_1 = assert_not_null(
-            await cloud.sync_gateway.get_document(
-                "travel", "hotel_1", "travel", "hotels"
-            ),
+            await sync_gateway.get_document("travel", "hotel_1", "travel", "hotels"),
             "hotel_1 vanished from SGW",
         )
         hotels_updates = []
@@ -169,7 +166,7 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "travel", hotels_updates, "travel", "hotels"
         )
 
@@ -190,7 +187,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "travel",
             ["travel.hotels"],
@@ -215,6 +212,7 @@ class TestReplicationBlob(CBLTestClass):
     async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
@@ -239,11 +237,11 @@ class TestReplicationBlob(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -256,7 +254,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step(
             "Check that the document with the ID from step 3 contains a valid `watermelon` property"
         )
-        remote_doc = await cloud.sync_gateway.get_document("names", "fruits")
+        remote_doc = await sync_gateway.get_document("names", "fruits")
         assert remote_doc is not None, "Document `fruits` not found in SGW"
 
         def check_blob_prop(d: dict, prop: str, expected_value: Any):

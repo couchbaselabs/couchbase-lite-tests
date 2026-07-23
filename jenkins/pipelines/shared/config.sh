@@ -25,6 +25,10 @@ function move_artifacts() {
 
     echo "Moving artifacts to $dst_dir"
 
+    # The workspace persists across builds, so stale artifacts (e.g. an old
+    # http_log dir referencing IPs from a prior run) would otherwise linger
+    # alongside this build's output.
+    rm -rf "$dst_dir"
     mkdir -p "$dst_dir"
     mv "$src_dir/session.log" "$dst_dir/session.log" || true
     mv "$src_dir/http_log" "$dst_dir/http_log" || true

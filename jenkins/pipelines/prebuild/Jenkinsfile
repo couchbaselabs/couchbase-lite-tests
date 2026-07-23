@@ -17,8 +17,12 @@ pipeline {
             name: 'CBL_BUILD',
             description: 'The build of CBL to use'
         )
+        booleanParam(
+            name: 'FORCE',
+            defaultValue: false,
+            description: 'Build the test server even if it already exists for this platform and CBL version/build'
+        )
     }
-
     stages {
         stage('Validate Parameters') {
             steps {
@@ -61,14 +65,11 @@ pipeline {
         }
         stage('Build') {
             agent {
-                label getNodeForPlatform(params.TS_PLATFORM)
-            }
-            environment {
-                KEYCHAIN_PASSWORD = getKeychainPassword(params.TS_PLATFORM)
+                label getNodeForPlatform(params.TS_PLATFORM, params.CBL_VERSION)
             }
             steps {
                 cleanWs()
-                
+
                 checkout([
                     $class: 'GitSCM',
                     branches: [[name: "*/${env.BUILD_BRANCH}"]],
@@ -82,31 +83,27 @@ pipeline {
                         fullVersion = "${params.CBL_VERSION}-${params.CBL_BUILD}"
                     }
 
+                    def uploadFlag = params.FORCE ? "--upload" : "--ci"
+                    def groupFlags = params.TS_PLATFORM.contains("dotnet") ? "--group dotnet-build" : ""
+
                     withEnv(["FULL_CBL_VERSION=${fullVersion}"]) {
                         if (params.TS_PLATFORM.contains("ios")) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            withCredentials([string(credentialsId: "${env.NODE_NAME}-keychain-password", variable: 'KEYCHAIN_PASSWORD')]) {
+                                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                            }
                         }
 
                         if (params.TS_PLATFORM.contains("windows")) {
                             pwsh """
-                                Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
-                                if ( Test-Path -Path ./jenkins/pipelines/prebuild/setup.psm1 ) {
-                                    Import-Module ./jenkins/pipelines/prebuild/setup.psm1 -Force
-                                } else {
-                                    Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
-                                }
+                                Import-Module ./jenkins/pipelines/shared/config.psm1 -Force
 
-                                uv run --python 3.13 ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION --ci
+                                uv run --python 3.13 ${groupFlags} ./environment/aws/topology_setup/build_test_server.py \$env:TS_PLATFORM \$env:FULL_CBL_VERSION ${uploadFlag}
                             """
                         } else {
                             sh """#!/bin/bash -e
-                                if [ -f jenkins/pipelines/prebuild/setup.sh ]; then
-                                    source jenkins/pipelines/prebuild/setup.sh
-                                else 
-                                    source jenkins/pipelines/shared/config.sh
-                                fi
-                                
-                                uv run --python 3.13 "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION --ci
+                                source jenkins/pipelines/shared/config.sh
+
+                                uv run --python 3.13 ${groupFlags} "environment/aws/topology_setup/build_test_server.py" $TS_PLATFORM $FULL_CBL_VERSION ${uploadFlag}
                             """
                         }
                     }
@@ -116,19 +113,16 @@ pipeline {
     }
 }
 
-def getNodeForPlatform(platform) {
-    if (platform.contains("windows")) {
+def getNodeForPlatform(platform, version) {
+    def macDotnetPlatforms = ['dotnet_ios', 'dotnet_android', 'dotnet_macos']
+    // mob-e2e-mac-01 lacks disk space for the older Xcode 3.2 needs, so route to -02 instead.
+    if (platform in macDotnetPlatforms && version =~ /^3\.2\./) {
+        return 'mob-e2e-mac-02'
+    } else if (platform.contains("windows")) {
         return 'e2e&&windows-host'
     } else if (platform.contains("linux")) {
         return 'e2e&&linux-host'
     } else {
         return 'e2e&&macos-host'
     }
-}
-
-def getKeychainPassword(platform) {
-    if (!platform.contains("windows") && !platform.contains("linux")) {
-        return credentials("${env.NODE_NAME}-keychain-password")
-    }
-    return null
 }
