@@ -26,6 +26,9 @@ abstract class TypedCollection {
     protected final <T> T checkType(@NonNull Class<T> expectedType, @Nullable Object val) {
         if (val == null) { return null; }
         final Class<?> actualType = val.getClass();
+        if (expectedType == Integer.class && val instanceof Long) {
+            return expectedType.cast(((Long) val).intValue());
+        }
         if (expectedType.isAssignableFrom(actualType)) { return expectedType.cast(val); }
         throw new ServerError("Cannot convert " + actualType + " to " + expectedType);
     }

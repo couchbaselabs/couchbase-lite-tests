@@ -33,6 +33,8 @@ import java.security.UnrecoverableEntryException
 import java.security.cert.CertificateException
 import java.util.*
 import java.util.concurrent.atomic.AtomicReference
+import com.couchbase.lite.android.mobiletest.services.AndroidKeyStoreService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 
 
 class AndroidTestApp(private val context: Context) : TestApp("Android") {
@@ -138,4 +140,9 @@ class AndroidTestApp(private val context: Context) : TestApp("Android") {
     fun clearMultipeerReplSvc(): MultipeerReplicatorService? {
         return multipeerReplSvc.getAndSet(null)
     }
+
+    private val keyStoreService = AndroidKeyStoreService()
+    override fun getKeyStoreService(): KeyStoreService = keyStoreService
+
+
 }

@@ -45,6 +45,7 @@ import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ListenerService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.services.ReplicatorService;
 import com.couchbase.lite.mobiletest.util.StringUtils;
@@ -185,6 +186,9 @@ public abstract class TestApp {
 
     @Nullable
     public final ListenerService clearListenerService() { return listenerSvc.getAndSet(null); }
+
+    @NonNull
+    public abstract KeyStoreService getKeyStoreService();
 
     @NonNull
     protected final Date getExpirationTime() {
