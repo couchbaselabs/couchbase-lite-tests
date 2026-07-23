@@ -50,7 +50,7 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 2: Setup SGW with travel dataset and local_jwt auth ---
         self.mark_test_step("Configure SGW travel database with local_jwt provider")
         cloud = cblpytest.simple_cloud()
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
         # Clean up any existing travel database from previous runs
@@ -212,7 +212,7 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 2: Setup SGW with local_jwt containing BOTH keys ---
         self.mark_test_step("Configure SGW with both JWK keys (A and B)")
         cloud = cblpytest.simple_cloud()
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
         # Clean up
@@ -381,7 +381,7 @@ class TestJWTReplication(CBLTestClass):
         )
 
         cloud = cblpytest.simple_cloud()
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
         # Cleanup
@@ -536,7 +536,7 @@ class TestJWTReplication(CBLTestClass):
         jwk = public_key_to_jwk(public_key)
 
         cloud = cblpytest.simple_cloud()
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
         try:
@@ -707,7 +707,7 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 2: Setup SGW with keys A and C (not the invalid one) ---
         self.mark_test_step("Configure SGW with valid keys A and C")
         cloud = cblpytest.simple_cloud()
-        sgw = cloud.sync_gateway
+        sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
         try:
