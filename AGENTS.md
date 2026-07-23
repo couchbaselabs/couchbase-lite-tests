@@ -22,7 +22,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | Path             | Contents                                                                                  | Sub-doc                                     |
 |------------------|-------------------------------------------------------------------------------------------|---------------------------------------------|
 | `client/`        | `cbltest` Python framework, pytest plugins, request/response API                          | [client/AGENTS.md](client/AGENTS.md)        |
-| `tests/`         | `dev_e2e/` (12 test modules + 1 data helper) and `QE/` (20 tests + 12 edge-server tests)  | [tests/AGENTS.md](tests/AGENTS.md)          |
+| `tests/`         | `dev_e2e/` (developer E2E tests) and `QE/` (QA suite + an edge-server sub-suite)          | [tests/AGENTS.md](tests/AGENTS.md)          |
 | `servers/`       | Per-platform test servers: `c/`, `dotnet/`, `ios/`, `jak/`, `javascript/`                 | [servers/AGENTS.md](servers/AGENTS.md)      |
 | `environment/`   | `aws/` (Terraform + orchestrator), `docker/`, `LogSlurp/`, `otel-collector/`              | [environment/AGENTS.md](environment/AGENTS.md) |
 | `jenkins/`       | CI/CD pipelines under `pipelines/{dev_e2e,QE}/{platform}/`                                | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
@@ -129,9 +129,9 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Recurring Patterns (Know Before Editing)
 
-1. **Jenkins per-platform `setup_test.py`** — every file under `jenkins/pipelines/{dev_e2e,QE}/{platform}/` is a thin click wrapper calling `setup_test(...)` from `jenkins/pipelines/shared/`. Only `platform_name`, `topology_file`, and `config_file` differ.
+1. **Jenkins per-platform `setup_test.py`** — most files under `jenkins/pipelines/{dev_e2e,QE}/{platform}/` are thin click wrappers calling `setup_test(...)` from `jenkins/pipelines/shared/`, differing only in `platform_name`, `topology_file`, and `config_file`. Exceptions: `QE/es` and `QE/multiplatform` don't use the shared wrapper — they call `environment.aws.start_backend.script_entry` directly.
 2. **`conftest.py` `dataset_path` fixtures** — three near-identical copies in `tests/dev_e2e/`, `tests/QE/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
-3. **Server build scripts** — every platform under `servers/` follows: `download_cbl.sh` → `build_*.sh` → package.
+3. **Server build scripts** — the `download_cbl.sh` → `build_*.sh` → package chain applies to the `c` and `ios` platforms; `dotnet` only has `build_cli.sh`/`.ps1`, `jak` builds via Gradle, and `javascript` via `npm`.
 4. **AWS setup scripts** — every `environment/aws/*_setup/setup_*.py` follows: SSH via `paramiko` → SFTP upload → `remote_exec` → start service (Docker / systemd).
 
 ## CI/CD

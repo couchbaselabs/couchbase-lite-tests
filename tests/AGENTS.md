@@ -5,8 +5,9 @@ The two Python test suites that exercise Couchbase Lite via the `cbltest` framew
 ## Scope
 
 You own everything under `tests/`:
-- `tests/dev_e2e/` — Developer E2E (12 test modules + `test_replication_filter_data.py` data helper)
-- `tests/QE/` — QA suite (21 test files + 12 edge-server tests)
+- `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
+- `tests/QE/` — QA suite, including an edge-server sub-suite
+- `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
 - `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
 
 You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you understand how they wire into your tests.
@@ -49,6 +50,7 @@ tests/
 │   ├── test_replication_eventing.py
 │   ├── test_replication_functional.py
 │   ├── test_replication_multiple_clients.py
+│   ├── test_replication_upgrade_delta_sync.py
 │   ├── test_replicator_encryption_hook.py
 │   ├── test_rolling_upgrade_sgw.py
 │   ├── test_server_setup.py
@@ -57,7 +59,7 @@ tests/
 │   ├── test_upg_sgw.py
 │   ├── test_users_channels.py
 │   ├── test_xattrs.py
-│   └── edge_server/                    # Edge Server sub-suite (12 tests)
+│   └── edge_server/                    # Edge Server sub-suite
 │       ├── test_authentication.py
 │       ├── test_blobs.py
 │       ├── test_changes_feed.py
@@ -70,6 +72,9 @@ tests/
 │       ├── test_replication_sanity.py
 │       ├── test_system.py
 │       └── test_ttl_expires.py
+│
+├── shared/                              # Helpers shared across dev_e2e/QE
+│   └── upgrade_test_helpers.py
 │
 └── .tools/
     └── cbbackupmgr/                    # Couchbase Backup Manager binary
@@ -131,6 +136,7 @@ class TestFeatureName(CBLTestClass):
 | `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
 | `@pytest.mark.min_couchbase_servers(N)` | Topology: ≥ N CBS |
 | `@pytest.mark.min_load_balancers(N)` | Topology: ≥ N load balancers |
+| `@pytest.mark.min_edge_servers(N)` | Topology: ≥ N edge servers |
 | `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test** |
 
 ## dev_e2e vs QE
