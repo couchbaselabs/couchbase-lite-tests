@@ -8,6 +8,7 @@ TEST_NAME="${2:-test_crud.py}"
 TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
 SGW_VERSION="${4:-}"
 CBS_VERSION="${5:-}"
+DATASET_VERSION="${5:-4.0}"
 TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
 
 if [ -z "$SGW_VERSION" ]; then
@@ -25,7 +26,7 @@ echo "RUNNING COORDINATED TEST"
 pushd "${QE_TESTS_DIR}/edge_server" > /dev/null
 export COLUMNS=200
 
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json --dataset-version "$DATASET_VERSION" "$TEST_NAME"; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"

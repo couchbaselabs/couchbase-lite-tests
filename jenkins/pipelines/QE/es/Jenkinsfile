@@ -1,0 +1,59 @@
+pipeline {
+    agent none
+    parameters {
+        string(name: 'ES_VERSION', defaultValue: '1.0.1', description: 'Edge Server version')
+        string(name: 'TEST_NAME', defaultValue: 'test_crud.py', description: 'Test file to run')
+        string(name: 'TOPOLOGY_NAME', defaultValue: 'es_sgw_topology.json', description: 'Topology file name')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
+        string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
+        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+    }
+    stages {
+        stage('Init') {
+            steps {
+                script {
+                    if (params.ES_VERSION == '') { error "ES_VERSION is required" }
+                    if (params.TEST_NAME == '') { error "TEST_NAME is required" }
+                    currentBuild.displayName = "ES:${params.ES_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'}"
+                }
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                TS_ARTIFACTS_DIR = 'es'
+                TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                echo "=== Run Edge server Tests"
+                timeout(time: 60, unit: 'MINUTES') {
+                    sh """
+                        jenkins/pipelines/QE/es/test.sh \
+                            ${params.ES_VERSION} \
+                            ${params.TEST_NAME} \
+                            ${params.TOPOLOGY_NAME} \
+                            ${params.SGW_VERSION} \
+                            ${params.CBS_VERSION} \
+                            ${params.TS_DATASET_VERSION}
+                    """
+                }
+                echo "=== Edge server Tests Complete"
+            }
+            post {
+                always {
+                    echo "=== Teardown Edge server Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/es/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/QE/es/**/*', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Edge server Test Teardown Complete"
+                }
+            }
+        }
+    }
+}
