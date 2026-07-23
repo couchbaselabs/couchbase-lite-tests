@@ -25,6 +25,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
 
+@pytest.mark.sgw
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_jwt_replication_reconnect_false(
