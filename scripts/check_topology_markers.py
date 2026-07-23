@@ -100,6 +100,11 @@ def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
     """Return (marker -> min required by a constant index, markers accessed with no constant index).
 
     Only considers accesses written directly in ``func``'s own body, not calls it makes.
+
+    A single walk suffices: ``ast.walk`` is breadth-first, so a ``Subscript`` node is
+    always visited before its own ``.value`` child, meaning ``subscripted_attrs`` is
+    already populated by the time that same ``Attribute`` node is (potentially) visited
+    on its own.
     """
     required: dict[str, int] = {}
     dynamic: set[str] = set()
@@ -118,17 +123,10 @@ def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
                 required[marker] = max(required.get(marker, 0), needed)
             else:
                 dynamic.add(marker)
-
-    for node in ast.walk(func):
-        if (
-            isinstance(node, ast.Attribute)
-            and node.attr in TOPOLOGY_ATTRS
-            and id(node) not in subscripted_attrs
-        ):
-            dynamic.add(TOPOLOGY_ATTRS[node.attr])
-
-    for node in ast.walk(func):
-        if (
+        elif isinstance(node, ast.Attribute) and node.attr in TOPOLOGY_ATTRS:
+            if id(node) not in subscripted_attrs:
+                dynamic.add(TOPOLOGY_ATTRS[node.attr])
+        elif (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and node.func.attr in INDIRECT_TOPOLOGY_CALLS
@@ -159,11 +157,9 @@ def _build_scope(tree: ast.Module, path: Path) -> _FileScope:
     return _FileScope(module_funcs, imports, path.parent)
 
 
-def _load_scope(path: Path, cache: dict[str, _FileScope]) -> _FileScope:
-    key = str(path.resolve())
-    if key not in cache:
-        cache[key] = _build_scope(ast.parse(path.read_text(), filename=str(path)), path)
-    return cache[key]
+@functools.cache
+def _load_scope(path: Path) -> _FileScope:
+    return _build_scope(ast.parse(path.read_text(), filename=str(path)), path)
 
 
 @functools.cache
@@ -175,6 +171,7 @@ def _find_pyproject(start: Path) -> Path | None:
     return None
 
 
+@functools.cache
 def _resolve_import_path(module: str, importing_dir: Path) -> Path | None:
     """Locate the source file behind an absolute ``from <module> import ...``.
 
@@ -214,7 +211,6 @@ def _resolve_call(
     node: ast.Call,
     class_methods: dict[str, ast.AST],
     scope: _FileScope,
-    cache: dict[str, _FileScope],
 ) -> tuple[ast.AST, dict[str, ast.AST], _FileScope] | None:
     func = node.func
     if (
@@ -239,7 +235,7 @@ def _resolve_call(
     resolved_path = _resolve_import_path(module, scope.dir)
     if resolved_path is None:
         return None
-    target_scope = _load_scope(resolved_path, cache)
+    target_scope = _load_scope(resolved_path)
     target = target_scope.module_funcs.get(original_name)
     return (target, {}, target_scope) if target is not None else None
 
@@ -248,7 +244,6 @@ def _scan_usage(
     func: ast.AST,
     class_methods: dict[str, ast.AST],
     scope: _FileScope,
-    cache: dict[str, _FileScope],
     _visited: set[int] | None = None,
 ) -> tuple[dict[str, int], set[str]]:
     """Return usage in ``func``, plus usage in helpers it calls (recursively)."""
@@ -263,12 +258,12 @@ def _scan_usage(
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
             continue
-        resolved = _resolve_call(node, class_methods, scope, cache)
+        resolved = _resolve_call(node, class_methods, scope)
         if resolved is None:
             continue
         target, target_class_methods, target_scope = resolved
         sub_required, sub_dynamic = _scan_usage(
-            target, target_class_methods, target_scope, cache, _visited
+            target, target_class_methods, target_scope, _visited
         )
         for marker, needed in sub_required.items():
             required[marker] = max(required.get(marker, 0), needed)
@@ -278,13 +273,12 @@ def _scan_usage(
 
 
 class _Checker(ast.NodeVisitor):
-    def __init__(self, filename: str, scope: _FileScope, cache: dict[str, _FileScope]):
+    def __init__(self, filename: str, scope: _FileScope):
         self.filename = filename
         self.violations: list[str] = []
         self._class_markers: list[dict[str, int]] = []
         self._class_methods_stack: list[dict[str, ast.AST]] = []
         self._scope = scope
-        self._cache = cache
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._class_markers.append(_min_markers(node.decorator_list))
@@ -310,7 +304,7 @@ class _Checker(ast.NodeVisitor):
         class_methods = (
             self._class_methods_stack[-1] if self._class_methods_stack else {}
         )
-        required, dynamic = _scan_usage(node, class_methods, self._scope, self._cache)
+        required, dynamic = _scan_usage(node, class_methods, self._scope)
 
         for marker, needed in required.items():
             have = declared.get(marker)
@@ -344,8 +338,7 @@ class _Checker(ast.NodeVisitor):
 def check_file(path: Path) -> list[str]:
     tree = ast.parse(path.read_text(), filename=str(path))
     scope = _build_scope(tree, path)
-    cache = {str(path.resolve()): scope}
-    checker = _Checker(str(path), scope, cache)
+    checker = _Checker(str(path), scope)
     checker.visit(tree)
     return checker.violations
 
@@ -353,10 +346,7 @@ def check_file(path: Path) -> list[str]:
 def main(argv: list[str]) -> int:
     violations: list[str] = []
     for arg in argv:
-        path = Path(arg)
-        if path.suffix != ".py" or not path.name.startswith("test_"):
-            continue
-        violations.extend(check_file(path))
+        violations.extend(check_file(Path(arg)))
 
     for v in violations:
         print(v)
