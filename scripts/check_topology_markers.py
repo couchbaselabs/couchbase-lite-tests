@@ -9,17 +9,21 @@ declared at all. This only catches under-declaration (which causes a real
 IndexError/skip mismatch at runtime); over-declaring a minimum is never
 flagged since a test may legitimately want extra headroom.
 
-Usage is also traced one level of indirection deep: if a test function calls
-a same-class helper method (``self._setup_foo()``) or a module-level helper
-function, that helper's topology access is attributed back to the calling
-test. Resolution is by name within the same file only (no cross-file or
-inherited-method resolution), so calls into imported helpers or base-class
-methods defined elsewhere are not followed.
+Usage is also traced through helper calls: same-class methods, same-file
+functions, or imported functions (see ``_resolve_import_path``). Inherited
+base-class methods aren't followed.
+
+Calls on an arbitrary-typed receiver (e.g. ``cblpytest.simple_cloud()``)
+aren't traced either — that would need type inference to know which class to
+look the method up in. Those are hand-listed in ``INDIRECT_TOPOLOGY_CALLS``.
 """
 
 import ast
+import functools
+import importlib.util
 import sys
 from pathlib import Path
+from typing import NamedTuple
 
 TOPOLOGY_ATTRS = {
     "test_servers": "min_test_servers",
@@ -29,6 +33,15 @@ TOPOLOGY_ATTRS = {
     "edge_servers": "min_edge_servers",
 }
 TOPOLOGY_MARKERS = set(TOPOLOGY_ATTRS.values())
+
+
+# CBLPyTest.simple_cloud() unconditionally requires sync_gateways (raises if
+# empty) but only conditionally touches couchbase_servers (falls back to
+# rosmar). Listing min_couchbase_servers here would get tests that pass fine
+# on rosmar-only configs skipped, so only the always-true half is recorded.
+INDIRECT_TOPOLOGY_CALLS = {
+    "simple_cloud": "min_sync_gateways",
+}
 
 
 def _constant_int_index(index: ast.expr) -> int | None:
@@ -114,33 +127,131 @@ def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
         ):
             dynamic.add(TOPOLOGY_ATTRS[node.attr])
 
+    for node in ast.walk(func):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in INDIRECT_TOPOLOGY_CALLS
+        ):
+            marker = INDIRECT_TOPOLOGY_CALLS[node.func.attr]
+            required[marker] = max(required.get(marker, 0), 1)
+
     return required, dynamic
+
+
+class _FileScope(NamedTuple):
+    module_funcs: dict[str, ast.AST]
+    imports: dict[str, tuple[str, str]]  # local name -> (module, original name)
+    dir: Path
+
+
+def _build_scope(tree: ast.Module, path: Path) -> _FileScope:
+    module_funcs = {
+        n.name: n
+        for n in tree.body
+        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    imports: dict[str, tuple[str, str]] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            for alias in node.names:
+                imports[alias.asname or alias.name] = (node.module, alias.name)
+    return _FileScope(module_funcs, imports, path.parent)
+
+
+def _load_scope(path: Path, cache: dict[str, _FileScope]) -> _FileScope:
+    key = str(path.resolve())
+    if key not in cache:
+        cache[key] = _build_scope(ast.parse(path.read_text(), filename=str(path)), path)
+    return cache[key]
+
+
+@functools.cache
+def _find_pyproject(start: Path) -> Path | None:
+    for directory in (start, *start.parents):
+        candidate = directory / "pyproject.toml"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _resolve_import_path(module: str, importing_dir: Path) -> Path | None:
+    """Locate the source file behind an absolute ``from <module> import ...``.
+
+    Tries a real installed package first (e.g. ``cbltest`` submodules), then
+    searches for a matching file starting at the importing file's own
+    directory and walking up to the repo root — this is how pytest's
+    rootless import mode and its ``pythonpath``-configured roots (e.g.
+    ``tests/shared/...``) both resolve in practice, without needing to parse
+    pytest's config to know which directories count as roots. Returns
+    ``None`` if nothing matches — an ordinary outcome (most imports, e.g.
+    third-party libraries, aren't meant to be traced), not an error.
+    """
+    # find_spec(module) would raise ModuleNotFoundError for a dotted name whose
+    # parent package isn't installed (it has to import the parent to look up
+    # the submodule). A single-component lookup never raises that way — it
+    # just returns None — so check the top-level name first and only resolve
+    # the full dotted path once we know its parent actually exists.
+    spec = None
+    if importlib.util.find_spec(module.partition(".")[0]) is not None:
+        spec = importlib.util.find_spec(module)
+    if spec is not None and spec.origin and spec.origin != "built-in":
+        return Path(spec.origin)
+
+    rel_path = Path(*module.split("."))
+    pyproject = _find_pyproject(importing_dir)
+    repo_root = pyproject.parent if pyproject is not None else importing_dir
+    for directory in (importing_dir, *importing_dir.parents):
+        candidate = directory / f"{rel_path}.py"
+        if candidate.is_file():
+            return candidate
+        if directory == repo_root:
+            break
+    return None
 
 
 def _resolve_call(
     node: ast.Call,
     class_methods: dict[str, ast.AST],
-    module_funcs: dict[str, ast.AST],
-) -> ast.AST | None:
+    scope: _FileScope,
+    cache: dict[str, _FileScope],
+) -> tuple[ast.AST, dict[str, ast.AST], _FileScope] | None:
     func = node.func
     if (
         isinstance(func, ast.Attribute)
         and isinstance(func.value, ast.Name)
         and func.value.id in ("self", "cls")
     ):
-        return class_methods.get(func.attr)
-    if isinstance(func, ast.Name):
-        return module_funcs.get(func.id) or class_methods.get(func.id)
-    return None
+        target = class_methods.get(func.attr)
+        return (target, class_methods, scope) if target is not None else None
+
+    if not isinstance(func, ast.Name):
+        return None
+
+    target = scope.module_funcs.get(func.id) or class_methods.get(func.id)
+    if target is not None:
+        return target, class_methods, scope
+
+    imported = scope.imports.get(func.id)
+    if imported is None:
+        return None
+    module, original_name = imported
+    resolved_path = _resolve_import_path(module, scope.dir)
+    if resolved_path is None:
+        return None
+    target_scope = _load_scope(resolved_path, cache)
+    target = target_scope.module_funcs.get(original_name)
+    return (target, {}, target_scope) if target is not None else None
 
 
 def _scan_usage(
     func: ast.AST,
     class_methods: dict[str, ast.AST],
-    module_funcs: dict[str, ast.AST],
+    scope: _FileScope,
+    cache: dict[str, _FileScope],
     _visited: set[int] | None = None,
 ) -> tuple[dict[str, int], set[str]]:
-    """Return usage in ``func``, plus usage in same-file helpers it calls (recursively)."""
+    """Return usage in ``func``, plus usage in helpers it calls (recursively)."""
     if _visited is None:
         _visited = set()
     if id(func) in _visited:
@@ -152,11 +263,12 @@ def _scan_usage(
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
             continue
-        target = _resolve_call(node, class_methods, module_funcs)
-        if target is None:
+        resolved = _resolve_call(node, class_methods, scope, cache)
+        if resolved is None:
             continue
+        target, target_class_methods, target_scope = resolved
         sub_required, sub_dynamic = _scan_usage(
-            target, class_methods, module_funcs, _visited
+            target, target_class_methods, target_scope, cache, _visited
         )
         for marker, needed in sub_required.items():
             required[marker] = max(required.get(marker, 0), needed)
@@ -166,12 +278,13 @@ def _scan_usage(
 
 
 class _Checker(ast.NodeVisitor):
-    def __init__(self, filename: str, module_funcs: dict[str, ast.AST]):
+    def __init__(self, filename: str, scope: _FileScope, cache: dict[str, _FileScope]):
         self.filename = filename
         self.violations: list[str] = []
         self._class_markers: list[dict[str, int]] = []
         self._class_methods_stack: list[dict[str, ast.AST]] = []
-        self._module_funcs = module_funcs
+        self._scope = scope
+        self._cache = cache
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._class_markers.append(_min_markers(node.decorator_list))
@@ -197,7 +310,7 @@ class _Checker(ast.NodeVisitor):
         class_methods = (
             self._class_methods_stack[-1] if self._class_methods_stack else {}
         )
-        required, dynamic = _scan_usage(node, class_methods, self._module_funcs)
+        required, dynamic = _scan_usage(node, class_methods, self._scope, self._cache)
 
         for marker, needed in required.items():
             have = declared.get(marker)
@@ -229,16 +342,10 @@ class _Checker(ast.NodeVisitor):
 
 
 def check_file(path: Path) -> list[str]:
-    try:
-        tree = ast.parse(path.read_text(), filename=str(path))
-    except SyntaxError as e:
-        return [f"{path}: syntax error: {e}"]
-    module_funcs = {
-        n.name: n
-        for n in tree.body
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-    checker = _Checker(str(path), module_funcs)
+    tree = ast.parse(path.read_text(), filename=str(path))
+    scope = _build_scope(tree, path)
+    cache = {str(path.resolve()): scope}
+    checker = _Checker(str(path), scope, cache)
     checker.visit(tree)
     return checker.violations
 
