@@ -2,6 +2,8 @@ import asyncio
 import re
 import ssl
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
 from pathlib import Path
@@ -2222,25 +2224,21 @@ class SyncGateway(_SyncGatewayBase):
         )
         return import_count
 
-    async def create_user_client(
+    async def reset_user(
         self,
         db_name: str,
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayUserClient":
+    ) -> None:
         """
-        Helper method to create a user with channel access and return a user-specific SG client.
-
-        This is a convenience method for tests that need to verify user-level access control.
+        Helper method to delete a user if they exist and recreate them with specific channel access.
 
         :param db_name: The database name
-        :param username: The username to create
+        :param username: The username to reset
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
-        # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
         await self.add_user(
             db_name,
@@ -2249,14 +2247,40 @@ class SyncGateway(_SyncGatewayBase):
             collection_access={"_default": {"_default": {"admin_channels": channels}}},
         )
 
-        # Return user-specific SG client for public API access
-        return SyncGatewayUserClient(
+    @asynccontextmanager
+    async def create_user_client(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
+        """
+        Helper method to create a user with channel access and return a user-specific SG client
+        as an async context manager.
+
+        This is a convenience method for tests that need to verify user-level access control.
+        Upon exiting the context, the user client session is closed.
+
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        await self.reset_user(db_name, username, password, channels)
+
+        client = SyncGatewayUserClient(
             self.hostname,
             username,
             password,
             port=self.__public_port,
             secure=self.secure,
         )
+        try:
+            yield client
+        finally:
+            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """

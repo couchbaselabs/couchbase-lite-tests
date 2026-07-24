@@ -60,8 +60,7 @@ class TestLargeDocWorkloads(CBLTestClass):
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with channel access.")
-        await sg.create_user_client(sg_db, username, password, channels)
-
+        await sg.reset_user(sg_db, username, password, channels)
         self.mark_test_step("Reset local database with empty collection.")
         dbs = await ts.create_and_reset_db(["db1"], collections=["_default._default"])
         db = dbs[0]

@@ -233,3 +233,30 @@ class TestWaitForDbUp:
             await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
         assert "database not present in /_all_dbs?verbose=true" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_reset_user(self, sync_gateway):
+        sg, specs = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"ok": True}},  # delete_user
+            {"status": 201, "json": {"ok": True}},  # add_user
+        ]
+        await sg.reset_user("db1", "test_user", "test_pass", ["channel1"])
+
+    @pytest.mark.asyncio
+    async def test_create_user_client_context_manager(self, sync_gateway):
+        sg, specs = sync_gateway
+        # Specs for delete_user and add_user (via reset_user) during context enter
+        specs[:] = [
+            {"status": 200, "json": {"ok": True}},  # delete_user
+            {"status": 201, "json": {"ok": True}},  # add_user
+        ]
+
+        async with sg.create_user_client(
+            "db1", "test_user", "test_pass", ["channel1"]
+        ) as client:
+            assert client.hostname == sg.hostname
+            assert client.secure == sg.secure
+            assert not client._SyncGatewayBase__session.closed
+
+        assert client._SyncGatewayBase__session.closed
