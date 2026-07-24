@@ -7,13 +7,13 @@ import aiofiles
 
 async def read_json_file(path: str | Path) -> Any:
     """Read and parse a JSON file without blocking the event loop."""
-    async with aiofiles.open(path) as f:
+    async with aiofiles.open(path, "r", encoding="utf-8") as f:
         return json.loads(await f.read())
 
 
 async def write_json_file(path: str | Path, data: Any) -> None:
     """Serialize and write a JSON file without blocking the event loop."""
-    async with aiofiles.open(path, "w") as f:
+    async with aiofiles.open(path, "w", encoding="utf-8") as f:
         await f.write(json.dumps(data, indent=4))
 
 
