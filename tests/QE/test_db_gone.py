@@ -143,7 +143,7 @@ class TestDbGone(CBLTestClass):
         ]
 
         self.mark_test_step("Create buckets and configure databases")
-        for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
+        for db_name, bucket_name, channel, username in db_configs:
             cbs.create_bucket(bucket_name)
 
             db_config = {
@@ -153,9 +153,7 @@ class TestDbGone(CBLTestClass):
             }
             db_payload = PutDatabasePayload(db_config)
             await sg.put_database(db_name, db_payload)
-            db_configs[i][4] = await sg.create_user_client(
-                db_name, username, "pass", [channel]
-            )
+            await sg.reset_user(db_name, username, "pass", [channel])
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
             sg_docs: list[DocumentUpdateEntry] = []
@@ -207,7 +205,3 @@ class TestDbGone(CBLTestClass):
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
-
-        for [_, _, _, _, user_client] in db_configs:
-            if user_client is not None:
-                await user_client.close()
