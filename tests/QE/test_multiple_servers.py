@@ -326,7 +326,7 @@ class TestISGRCollectionMapping(CBLTestClass):
     ) -> None:
         sg_cluster = SyncGatewayCluster(cblpytest.sync_gateways)
         cbs = cblpytest.couchbase_servers[0]
-        sg1, sg2, sg3 = sg_cluster.sync_gateways[:2]
+        sg1, sg2, sg3 = sg_cluster.sync_gateways[:3]
         bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
