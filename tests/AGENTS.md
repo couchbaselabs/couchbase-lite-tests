@@ -5,7 +5,7 @@ The two Python test suites that exercise Couchbase Lite via the `cbltest` framew
 ## Scope
 
 You own everything under `tests/`:
-- `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
+- `tests/dev_e2e/` — Developer E2E tests, split into `cbl/` (CBL suite) and `edge_server/` (Edge Server sub-suite, ES-versioned)
 - `tests/QE/` — QA suite, including an edge-server sub-suite
 - `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
 - `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
@@ -17,22 +17,27 @@ You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you
 ```
 tests/
 ├── dev_e2e/                            # Developer E2E
-│   ├── conftest.py                     # dataset_path fixture (../../dataset/sg)
+│   ├── conftest.py                     # dataset_path fixture (../../dataset/sg) — shared by both sub-suites
 │   ├── config.json                     # Generated — DO NOT hand-edit
 │   ├── config.example.json
-│   ├── test_basic_replication.py
-│   ├── test_replication_filter.py
-│   ├── test_replication_filter_data.py # Data helper for filter tests
-│   ├── test_replication_auto_purge.py
-│   ├── test_replication_blob.py
-│   ├── test_replication_behavior.py
-│   ├── test_replication_upgrade.py
-│   ├── test_replication_xdcr.py
-│   ├── test_custom_conflict.py
-│   ├── test_encrypted_properties.py
-│   ├── test_fest.py
-│   ├── test_multipeer.py
-│   └── test_query_consistency.py
+│   ├── cbl/                            # CBL test suite (run by the per-platform jobs)
+│   │   ├── test_basic_replication.py
+│   │   ├── test_replication_filter.py
+│   │   ├── test_replication_filter_data.py # Data helper for filter tests
+│   │   ├── test_replication_auto_purge.py
+│   │   ├── test_replication_blob.py
+│   │   ├── test_replication_behavior.py
+│   │   ├── test_replication_upgrade.py
+│   │   ├── test_replication_xdcr.py
+│   │   ├── test_custom_conflict.py
+│   │   ├── test_encrypted_properties.py
+│   │   ├── test_fest.py
+│   │   ├── test_multipeer.py
+│   │   └── test_query_consistency.py
+│   └── edge_server/                    # Edge Server sub-suite (separate ES job; ES-versioned)
+│       ├── jwt_helper.py
+│       ├── test_jwt_simple.py
+│       └── test_jwt_rotation.py
 │
 ├── QE/                                 # QA — broader coverage + edge cases
 │   ├── conftest.py                     # dataset_path + cleanup_after_test (autouse)
@@ -146,7 +151,7 @@ class TestFeatureName(CBLTestClass):
 | Audience | CBL release validation | QA regression |
 | Cleanup | manual `await ts.cleanup()` | autouse `cleanup_after_test` |
 | Markers | topology only | `sgw` / `cbl` + topology |
-| Edge Server | — | `edge_server/` sub-suite |
+| Edge Server | `edge_server/` sub-suite (separate ES-versioned job) | `edge_server/` sub-suite |
 | SGW upgrade | `test_replication_upgrade.py` | `test_upg_sgw.py` |
 | Multi-SGW | `test_replication_xdcr.py` (2 SGW + 2 CBS + LB) | `test_users_channels.py` (3+ SGW), `test_high_availability.py` |
 | Spec location | `spec/tests/dev_e2e/NNN-feature.md` | `spec/tests/QE/test_feature.md` |

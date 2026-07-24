@@ -15,7 +15,7 @@ for our tests.  It is called `config.example.json`.
 
 The command, once you've started the environment from the tests folder is:
 
-`uv run pytest --config config.example.json test_basic_replication.py -k <test_name>`
+`uv run pytest --config config.example.json cbl/test_basic_replication.py -k <test_name>`
 
 Or leave off the -k to run all tests in that file.  For every http request that
 the framework directly issues, it will log the request and the response in a

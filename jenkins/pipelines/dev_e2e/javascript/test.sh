@@ -18,4 +18,4 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
 echo "Run tests..."
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json cbl/
