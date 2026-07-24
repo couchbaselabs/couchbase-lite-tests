@@ -15,6 +15,10 @@ You own all code under `jenkins/pipelines/dev_e2e/`:
 You do NOT own the dev_e2e test code itself (`tests/dev_e2e/`), but you are responsible for provisioning
 the infrastructure that those tests require.
 
+> **Suite split:** `tests/dev_e2e/` is divided into `cbl/` (the CBL suite) and `edge_server/` (Edge Server,
+> which ships on its own version cadence). The per-platform jobs here run `pytest ... cbl/` so they only pick
+> up CBL tests. The `edge_server/` suite runs as a separate, ES-versioned job against an edge-server topology.
+
 ## Your Responsibility: Topology-Test Synchronization
 
 ### The Rule

@@ -52,7 +52,7 @@ echo "========== PYTEST OUTPUT START =========="
 
 pushd "${DEV_E2E_TESTS_DIR}" > /dev/null
 
-if uv run pytest -v --no-header --config config.json --dataset-version=$dataset_version test_multipeer.py; then
+if uv run pytest -v --no-header --config config.json --dataset-version=$dataset_version cbl/test_multipeer.py; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED!"
