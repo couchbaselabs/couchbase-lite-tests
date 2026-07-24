@@ -22,11 +22,10 @@ the infrastructure that those tests require.
 Every QE test file has `@pytest.mark.min_*` decorators that declare infrastructure requirements:
 
 ```python
-@pytest.mark.min_sync_gateways(2)      # Test REQUIRES 2 SGW nodes
+@pytest.mark.min_sync_gateways(2)  # Test REQUIRES 2 SGW nodes
 @pytest.mark.min_couchbase_servers(2)  # Test REQUIRES 2 CBS instances
-@pytest.mark.min_test_servers(1)       # Test REQUIRES 1 test server
-class TestMultiNode(CBLTestClass):
-    ...
+@pytest.mark.min_test_servers(1)  # Test REQUIRES 1 test server
+class TestMultiNode(CBLTestClass): ...
 ```
 
 **YOUR JOB:** Ensure the corresponding `topology.json` provides **AT LEAST** these resources.
@@ -85,17 +84,20 @@ if __name__ == "__main__":
 
 from jenkins.pipelines.shared.setup_test import setup_test
 
+
 @click.command()
 @click.argument("cbl_version")
 @click.argument("sgw_version")
 def cli_entry(cbl_version: str, sgw_version: str) -> None:
     setup_test(
-        cbl_version, sgw_version,
-        SCRIPT_DIR / "topology.json",    # ← platform-specific topology
-        SCRIPT_DIR / "config.json",      # ← platform-specific config
-        "platform_tag",                  # ← e.g., "swift_ios", "jak_android"
-        setup_dir="QE"                   # ← MUST be "QE" for all QE pipelines
+        cbl_version,
+        sgw_version,
+        SCRIPT_DIR / "topology.json",  # ← platform-specific topology
+        SCRIPT_DIR / "config.json",  # ← platform-specific config
+        "platform_tag",  # ← e.g., "swift_ios", "jak_android"
+        setup_dir="QE",  # ← MUST be "QE" for all QE pipelines
     )
+
 
 if __name__ == "__main__":
     cli_entry()

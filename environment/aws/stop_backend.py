@@ -161,9 +161,8 @@ def main(
                 for i in range(topology_obj.total_lb_count)
             ]
         )
-    if steps & BackendStopSteps.DESTROY_LS:
-        if topology_obj.wants_logslurp:
-            targets.append('-target=aws_instance.log_slurp["log_slurp"]')
+    if steps & BackendStopSteps.DESTROY_LS and topology_obj.wants_logslurp:
+        targets.append('-target=aws_instance.log_slurp["log_slurp"]')
 
     if targets:
         terraform_command.extend(targets)
@@ -193,7 +192,7 @@ def main(
         topology_obj.stop_test_servers()
         header("Done!")
 
-    exit(result.returncode if result else 0)
+    sys.exit(result.returncode if result else 0)
 
 
 if __name__ == "__main__":

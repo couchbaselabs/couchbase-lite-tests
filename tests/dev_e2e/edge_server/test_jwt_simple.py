@@ -11,14 +11,14 @@ Valid openid_token config formats (per ES config schema oneOf):
 """
 
 import asyncio
-import json
 from pathlib import Path
 
+import aiohttp
 import pytest
-import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.asyncfile import read_json_file, write_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -169,13 +169,17 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
         sgw_public_url = f"https://{sync_gateway.hostname}:4984/{sg_db_name}/"
-        resp = requests.get(
-            sgw_public_url,
-            headers={"Authorization": f"Bearer {jwt_token}"},
-            verify=False,
-        )
-        assert resp.status_code == 200, (
-            f"JWT verification against SGW failed: {resp.status_code} {resp.text}"
+        async with (
+            aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
+            session.get(
+                sgw_public_url,
+                headers={"Authorization": f"Bearer {jwt_token}"},
+            ) as resp,
+        ):
+            status_code = resp.status
+            resp_text = await resp.text()
+        assert status_code == 200, (
+            f"JWT verification against SGW failed: {status_code} {resp_text}"
         )
 
         # =====================================================================
@@ -198,8 +202,7 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         self.mark_test_step("Configuring Edge Server with JWT auth (inline token).")
         config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
 
         # Set the real SGW replication URL (wss://hostname:4984/travel)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
@@ -211,8 +214,7 @@ class TestJWTSimple(CBLTestClass):
             "reconnect_on_token_change": False,
         }
 
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
 
         es_manager = cblpytest.edge_servers[0]
         edge_server = await es_manager.configure_dataset(

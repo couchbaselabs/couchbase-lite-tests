@@ -36,7 +36,7 @@ def adb_logcat(adb_path, device_serial):
                 m = test_start.search(line)
                 if m:
                     test_name = m.group(1)
-                    out_file = open(f"{test_name}.log", "w")
+                    out_file = open(f"{test_name}.log", "w")  # noqa: SIM115
                     out_file.write(line)
 
 

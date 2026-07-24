@@ -23,6 +23,7 @@ classifiers = [
     "Environment :: Console"
 ]
 dependencies = [
+    "aiofiles==25.1.0",
     "aiohttp==3.11.11",
     "couchbase==4.3.4",
     "cryptography==44.0.0",

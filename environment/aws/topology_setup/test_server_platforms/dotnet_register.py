@@ -88,7 +88,6 @@ class DotnetTestServer(TestServer):
         Returns:
             str: The .NET framework version.
         """
-        pass
 
     @property
     def extra_args(self) -> str | None:
@@ -113,7 +112,6 @@ class DotnetTestServer(TestServer):
         Returns:
             bool: True if the test server should be published, False otherwise.
         """
-        pass
 
     def build(self) -> None:
         """
@@ -183,7 +181,6 @@ class DotnetTestServerCli(TestServer):
         Returns:
             str: The runtime identifier.
         """
-        pass
 
     @property
     def product(self) -> str:

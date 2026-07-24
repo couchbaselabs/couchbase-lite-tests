@@ -14,7 +14,18 @@ dependencies = [
 
 [tool.ruff]
 lint.extend-select = ["I"]
-lint.ignore = ["E402"]
+lint.ignore = [
+    "E402",
+    "BLE001",   # TODO: BLE001 (blind-except) - will fix later
+    "S110",     # TODO: S110 (try-except-pass) - will fix later
+    "PLW1510",  # TODO: PLW1510 (subprocess-run-without-check) - will fix later
+    "TRY002",   # TODO: TRY002 (raise-vanilla-exception) - will fix later
+    "TRY201",   # TODO: TRY201 (verbose-raise) - will fix later
+    "TRY004",   # TODO: TRY004 (type-check-without-type-error) - will fix later
+    "S112",     # TODO: S112 (try-except-continue) - will fix later
+    "B023",     # TODO: B023 (function-uses-loop-loopvar) - will fix later
+    "LOG015",   # TODO: LOG015 (root-logger-calls) - will fix later
+]
 target-version = "py310"
 exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 

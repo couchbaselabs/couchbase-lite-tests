@@ -89,7 +89,10 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
-from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorBasicAuthenticator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+)
 
 
 @pytest.mark.min_test_servers(1)
@@ -99,15 +102,21 @@ class TestFeatureName(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_something(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = CouchbaseCloud([cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0])
+        cloud = CouchbaseCloud(
+            [cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0]
+        )
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+            ["db1"], dataset="names"
+        )
         db = dbs[0]
 
         self.mark_test_step("Start a replicator …")
-        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), ...)
+        replicator = Replicator(
+            db, cblpytest.sync_gateways[0].replication_url("names"), ...
+        )
         await replicator.start()
 
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)

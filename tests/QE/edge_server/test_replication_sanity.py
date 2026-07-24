@@ -1,5 +1,4 @@
-import json
-import time
+import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +10,7 @@ from cbltest.api.error import (
     CblSyncGatewayBadResponseError,
 )
 from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -64,11 +64,9 @@ class TestReplicationSanity(CBLTestClass):
         )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
@@ -107,7 +105,7 @@ class TestReplicationSanity(CBLTestClass):
             f"Failed to create document {doc_id_sg} via Sync Gateway."
         )
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_sg)
@@ -137,7 +135,7 @@ class TestReplicationSanity(CBLTestClass):
             f"Failed to update document {doc_id_sg} via Edge Server"
         )
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
@@ -153,7 +151,7 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating deletion of {doc_id_sg} on Edge Server.")
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, doc_id_sg)
@@ -171,7 +169,7 @@ class TestReplicationSanity(CBLTestClass):
             f"Failed to create document {doc_id_es} via Edge Server."
         )
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
@@ -197,7 +195,7 @@ class TestReplicationSanity(CBLTestClass):
             f"Failed to update document {doc_id_es} via Sync Gateway."
         )
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_es)
@@ -216,7 +214,7 @@ class TestReplicationSanity(CBLTestClass):
             f"Failed to delete document {doc_id_es} via Edge Server."
         )
         # Allow replication to propagate before validating (eventual consistency).
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating deletion of {doc_id_es} on Sync Gateway.")
 

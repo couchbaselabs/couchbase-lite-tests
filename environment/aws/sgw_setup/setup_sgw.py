@@ -398,10 +398,8 @@ def main(topology: TopologyConfig) -> None:
     if len(topology.sync_gateways) == 0:
         return
 
-    i = 0
     for sgw in topology.sync_gateways:
         sgw_info = SgwDownloadInfo(sgw.version)
         download_sgw_package(sgw_info)
         setup_config(sgw.cluster_hostname)
         setup_server(sgw.hostname, topology.ssh_key, sgw_info)
-        i += 1

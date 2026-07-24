@@ -54,11 +54,11 @@ def start_environment():
                 if which not in seen:
                     seen.add(which)
                     sg_count -= 1
-                    print("")
+                    print()
                     print(f"\tSG {which} is ready!")
                     found = True
 
-    print("")
+    print()
     print("Done!")
 
 

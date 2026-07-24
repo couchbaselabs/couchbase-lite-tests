@@ -22,11 +22,10 @@ the infrastructure that those tests require.
 Every dev_e2e test file has `@pytest.mark.min_*` decorators that declare infrastructure requirements:
 
 ```python
-@pytest.mark.min_sync_gateways(1)      # Test REQUIRES 1 SGW node
+@pytest.mark.min_sync_gateways(1)  # Test REQUIRES 1 SGW node
 @pytest.mark.min_couchbase_servers(1)  # Test REQUIRES 1 CBS instance
-@pytest.mark.min_test_servers(1)       # Test REQUIRES 1 test server
-class TestBasicReplication(CBLTestClass):
-    ...
+@pytest.mark.min_test_servers(1)  # Test REQUIRES 1 test server
+class TestBasicReplication(CBLTestClass): ...
 ```
 
 **YOUR JOB:** Ensure the corresponding `topology.json` provides **AT LEAST** these resources.
@@ -83,17 +82,20 @@ if __name__ == "__main__":
 
 from jenkins.pipelines.shared.setup_test import setup_test
 
+
 @click.command()
 @click.argument("cbl_version")
 @click.argument("sgw_version")
 def cli_entry(cbl_version: str, sgw_version: str) -> None:
     setup_test(
-        cbl_version, sgw_version,
-        SCRIPT_DIR / "topology.json",    # ← platform-specific topology
-        SCRIPT_DIR / "config.json",      # ← platform-specific config
-        "platform_tag",                  # ← e.g., "swift_ios", "jak_android"
+        cbl_version,
+        sgw_version,
+        SCRIPT_DIR / "topology.json",  # ← platform-specific topology
+        SCRIPT_DIR / "config.json",  # ← platform-specific config
+        "platform_tag",  # ← e.g., "swift_ios", "jak_android"
         # setup_dir omitted — defaults to "dev_e2e"
     )
+
 
 if __name__ == "__main__":
     cli_entry()

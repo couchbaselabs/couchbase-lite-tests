@@ -1,13 +1,13 @@
 import asyncio
-import json
 from pathlib import Path
 
+import aiohttp
 import pytest
-import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.asyncfile import read_json_file, write_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -60,10 +60,14 @@ class TestJWTReplication(CBLTestClass):
             pass  # Database may not exist
 
         # Flush CBS bucket to clear stale documents
-        requests.post(
-            f"http://{cbs.hostname}:8091/pools/default/buckets/travel/controller/doFlush",
-            auth=("Administrator", "password"),
-        )
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
+                f"http://{cbs.hostname}:8091/pools/default/buckets/travel/controller/doFlush",
+                auth=aiohttp.BasicAuth("Administrator", "password"),
+            ) as resp,
+        ):
+            await resp.read()
 
         # Build the SGW database config with local_jwt for JWT validation
         sg_config = {
@@ -135,8 +139,7 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 4: Configure ES with JWT file auth ---
         self.mark_test_step("Configure ES with openid_token.path auth")
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = [
             "travel.airlines",
@@ -145,8 +148,7 @@ class TestJWTReplication(CBLTestClass):
             "travel.landmarks",
             "travel.routes",
         ]
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(
             db_name="travel", config_file=config_path
@@ -279,13 +281,11 @@ class TestJWTReplication(CBLTestClass):
         await self._write_file_on_es(es_manager, JWT_FILE, token_a)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         # Only sync airlines for this test
         config["replications"][0]["collections"] = ["travel.airlines"]
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(
             db_name="travel", config_file=config_path
@@ -439,12 +439,10 @@ class TestJWTReplication(CBLTestClass):
         await self._write_file_on_es(es_manager, JWT_FILE, token_valid)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(
             db_name="travel", config_file=config_path
@@ -593,12 +591,10 @@ class TestJWTReplication(CBLTestClass):
         await self._write_file_on_es(es_manager, JWT_FILE, token)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(
             db_name="travel", config_file=config_path
@@ -770,12 +766,10 @@ class TestJWTReplication(CBLTestClass):
         await self._write_file_on_es(es_manager, JWT_FILE, token_a)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        with open(config_path, "w") as f:
-            json.dump(config, f, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(
             db_name="travel", config_file=config_path

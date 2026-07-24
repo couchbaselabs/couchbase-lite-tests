@@ -1,7 +1,8 @@
-from json import dumps, load
+from json import dumps, loads
 from pathlib import Path
 from typing import cast
 
+import aiofiles
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.couchbaseserver import CouchbaseServer
@@ -112,8 +113,8 @@ class CouchbaseCloud:
             if not data_filepath.exists():
                 raise FileNotFoundError(f"Data file {dataset_name}-sg.json not found!")
 
-            with open(config_filepath, encoding="utf-8") as fin:
-                dataset_config = cast(dict, load(fin))
+            async with aiofiles.open(config_filepath, encoding="utf-8") as fin:
+                dataset_config = cast(dict, loads(await fin.read()))
                 if not isinstance(dataset_config, dict):
                     raise ValueError(
                         f"Badly formatted {dataset_name}-sg-config.json (not an object)"
@@ -129,7 +130,7 @@ class CouchbaseCloud:
                 for option in sg_config_options:
                     if option not in valid_options:
                         raise CblTestError(
-                            f"{option} is not a valid option for {dataset_name} (valid options are {dumps(list(str(k) for k in valid_options.keys()))})"
+                            f"{option} is not a valid option for {dataset_name} (valid options are {dumps([str(k) for k in valid_options])})"
                         )
 
                     addition = _get_typed_required(valid_options, option, dict)

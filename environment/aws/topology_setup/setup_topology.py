@@ -163,11 +163,10 @@ class ConfigDefaults:
 
             self.SyncGateway.version.set_value(other.SyncGateway.version.value)
 
-        if other.EdgeServer.version.is_set:
-            if self.EdgeServer.version.is_set:
-                raise Exception(
-                    "Both main and included file are setting default ES version"
-                )
+        if other.EdgeServer.version.is_set and self.EdgeServer.version.is_set:
+            raise Exception(
+                "Both main and included file are setting default ES version"
+            )
 
 
 class ClusterConfig:
@@ -768,7 +767,7 @@ class TopologyConfig:
             )
 
             success = False
-            for _ in range(0, 30):
+            for _ in range(30):
                 try:
                     requests.get(f"http://{ip}:{port}")
                     success = True
@@ -778,7 +777,6 @@ class TopologyConfig:
                         fg="yellow",
                     )
                     sleep(1)
-                    pass
 
             if not success:
                 raise RuntimeError(
@@ -888,7 +886,7 @@ class TopologyConfig:
         i = 1
         for cluster in self.__clusters:
             click.echo(f"Cluster {i} ({cluster.version}):")
-            for j in range(0, len(cluster.public_hostnames)):
+            for j in range(len(cluster.public_hostnames)):
                 click.echo(
                     f"\t{cluster.public_hostnames[j]} / {cluster.internal_hostnames[j]}"
                 )

@@ -116,7 +116,7 @@ def _get_typed(d: dict, key: str, expected_type: type[T]) -> T | None:
 
     if not isinstance(ret_val, origin):
         raise ValueError(
-            f"Expecting {str(type)} for key {key} but found {ret_val} instead"
+            f"Expecting {type!s} for key {key} but found {ret_val} instead"
         )
 
     return cast(T, ret_val)
@@ -138,7 +138,7 @@ def _get_typed_required(d: dict, key: str, expected_type: type[T]) -> T:
     ret_val = d[key]
     if not isinstance(ret_val, origin):
         raise ValueError(
-            f"Expecting {str(type)} for key {key} but found {ret_val} instead"
+            f"Expecting {type!s} for key {key} but found {ret_val} instead"
         )
 
     return cast(T, ret_val)
@@ -193,7 +193,7 @@ def json_equivalent(left: Any, right: Any, current_path: str = "") -> bool:
             )
             return False
 
-        for i in range(0, len(left_list)):
+        for i in range(len(left_list)):
             next_path = f"{current_path}[{i}]"
             cbl_info(f"Entering index '{next_path}'")
             if not json_equivalent(left_list[i], right_list[i]):
