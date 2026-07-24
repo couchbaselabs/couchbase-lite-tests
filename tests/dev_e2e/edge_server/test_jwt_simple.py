@@ -25,6 +25,9 @@ SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
 
+@pytest.mark.min_edge_servers(1)
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_jwt_replication_reconnect_false(
@@ -37,7 +40,7 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         # STEP 0: Cleanup stale resources from previous test runs.
         # This ensures a fresh state even if a prior run crashed mid-test.
-        # The @pytest.mark.sgw marker triggers auto-cleanup AFTER the test too.
+        # dev_e2e has no auto-cleanup fixture, so we clean up explicitly here.
         # =====================================================================
         try:
             await sync_gateway.delete_database("travel")
