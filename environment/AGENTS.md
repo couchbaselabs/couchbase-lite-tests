@@ -133,11 +133,12 @@ from environment.aws.common.io import sftp_progress_bar, get_ec2_hostname
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
+
 def main(topology: TopologyConfig) -> None:
-    hostname = get_ec2_hostname(...)            # Hostname from Terraform state
+    hostname = get_ec2_hostname(...)  # Hostname from Terraform state
     ssh = paramiko.SSHClient()
     ssh.connect(hostname, username="ec2-user", pkey=pkey)
-    sftp_progress_bar(sftp, local_path, remote_path)   # Upload via SFTP
+    sftp_progress_bar(sftp, local_path, remote_path)  # Upload via SFTP
     remote_exec(ssh, "install_command", "Installing…")
     start_container(name, image, hostname, pkey, ...)  # Docker / systemd
 ```
