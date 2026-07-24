@@ -230,8 +230,6 @@ def check_sts_status() -> bool:
     if result.returncode == 0:
         return True
 
-    click.Choice
-
     click.secho(
         "The TDK has detected that you don't have valid STS credentials configured.",
         fg="red",

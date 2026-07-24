@@ -341,9 +341,7 @@ def main(topology: TopologyConfig) -> None:
     if len(topology.edge_servers) == 0:
         return
 
-    i = 0
     for es in topology.edge_servers:
         es_info = EsDownloadInfo(es.version)
         download_es_package(es_info)
         setup_server(es.hostname, topology.ssh_key, es_info)
-        i += 1

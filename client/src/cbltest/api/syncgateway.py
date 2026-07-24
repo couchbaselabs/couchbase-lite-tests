@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import aiofiles
 import packaging.version
 import requests
 import tenacity
@@ -297,7 +298,7 @@ class AllDocumentsResponse:
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: list[AllDocumentsResponseRow] = []
-        self.__revmap = dict()
+        self.__revmap = {}
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             doc = cast(dict, row["doc"]) if "doc" in row else None
@@ -956,31 +957,33 @@ class _SyncGatewayBase:
             last_scope: str = ""
             last_coll: str = ""
             collected: list[dict] = []
-            with open(path, encoding="utf8") as fin:
-                json_line = fin.readline()
-                while json_line:
+            async with aiofiles.open(path, encoding="utf8") as fin:
+                async for json_line in fin:
                     json = cast(dict, loads(json_line))
                     assert isinstance(json, dict), f"Invalid entry in {path}!"
                     scope = cast(str, json["scope"])
                     collection = cast(str, json["collection"])
                     if (
-                        last_scope != scope
-                        or last_coll != collection
-                        or len(collected) > 500
+                        (
+                            last_scope != scope
+                            or last_coll != collection
+                            or len(collected) > 500
+                        )
+                        and last_scope
+                        and last_coll
+                        and collected
                     ):
-                        if last_scope and last_coll and collected:
-                            resp = await self._send_request(
-                                "post",
-                                f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
-                                JSONDictionary({"docs": collected}),
-                            )
-                            self._analyze_dataset_response(resp)
-                            collected.clear()
+                        resp = await self._send_request(
+                            "post",
+                            f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
+                            JSONDictionary({"docs": collected}),
+                        )
+                        self._analyze_dataset_response(resp)
+                        collected.clear()
 
                     last_scope = scope
                     last_coll = collection
                     collected.append(json)
-                    json_line = fin.readline()
 
             if collected:
                 resp = await self._send_request(
@@ -1093,7 +1096,7 @@ class _SyncGatewayBase:
         scope: str,
         collection: str,
     ) -> None:
-        all_docs_body = list(u.id for u in updates if u.rev is not None)
+        all_docs_body = [u.id for u in updates if u.rev is not None]
         all_docs_response = await self._send_request(
             "post",
             f"/{db_name}.{scope}.{collection}/_all_docs",
@@ -1148,7 +1151,7 @@ class _SyncGatewayBase:
         ):
             await self._rewrite_rev_ids(db_name, updates, scope, collection)
 
-            body = {"docs": list(u.to_json() for u in updates)}
+            body = {"docs": [u.to_json() for u in updates]}
 
             await self._send_request(
                 "post",
@@ -1204,7 +1207,7 @@ class _SyncGatewayBase:
                 )
 
             await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
-            body = {"docs": list(u.to_json() for u in merged_updates)}
+            body = {"docs": [u.to_json() for u in merged_updates]}
             await self._send_request(
                 "post",
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
@@ -1542,21 +1545,23 @@ class _SyncGatewayBase:
         :raises Exception: For other HTTP or network errors
         """
         try:
-            async with ClientSession() as session:
-                async with session.get(
+            async with (
+                ClientSession() as session,
+                session.get(
                     url, timeout=ClientTimeout(total=timeout), headers=headers
-                ) as response:
-                    if response.status == 404:
-                        raise FileNotFoundError(f"{operation} not found at {url}")
-                    elif response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(
-                            f"{operation} failed: HTTP {response.status} - {error_text}"
-                        )
+                ) as response,
+            ):
+                if response.status == 404:
+                    raise FileNotFoundError(f"{operation} not found at {url}")
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(
+                        f"{operation} failed: HTTP {response.status} - {error_text}"
+                    )
 
-                    # Return content as bytes
-                    content = await response.read()
-                    return response.status, content
+                # Return content as bytes
+                content = await response.read()
+                return response.status, content
 
         except ClientError as e:
             raise Exception(f"Network error during {operation}: {e}") from e
@@ -1857,13 +1862,12 @@ class SyncGateway(_SyncGatewayBase):
         """
 
         ret_val = {}
-        for c in input:
+        for c, channels in input.items():
             if not isinstance(c, str):
                 raise ValueError(
                     "Non-string key found in input dictionary to create_collection_access_dict"
                 )
 
-            channels = input[c]
             if not isinstance(channels, list):
                 raise ValueError(
                     f"Non-list found for value of collection {c} in create_collection_access_dict"
@@ -1886,7 +1890,7 @@ class SyncGateway(_SyncGatewayBase):
             else:
                 scope_dict = ret_val[spec[0]]
 
-            scope_dict[spec[1]] = {"admin_channels": input[c]}
+            scope_dict[spec[1]] = {"admin_channels": channels}
 
         return ret_val
 
@@ -1994,25 +1998,25 @@ class SyncGateway(_SyncGatewayBase):
             # Use simple line-based protocol: first line is name, rest is content
             body = f"{cert_name}\n{cert_content.decode('utf-8')}"
 
-            async with ClientSession() as session:
-                async with session.post(
+            async with (
+                ClientSession() as session,
+                session.post(
                     f"http://{self.hostname}:20001/upload-cert",
                     data=body,
                     headers={"Content-Type": "text/plain"},
                     timeout=ClientTimeout(total=30),
-                ) as resp:
-                    if resp.status != 200:
-                        resp_body = await resp.text()
-                        raise Exception(
-                            f"Failed to upload certificate: {resp.status} - {resp_body}"
-                        )
-
-                    # Return the path where certificate was stored
-                    cert_path = f"/home/ec2-user/cert/{cert_name}"
-                    print(
-                        f"Certificate '{cert_name}' uploaded successfully to {cert_path}"
+                ) as resp,
+            ):
+                if resp.status != 200:
+                    resp_body = await resp.text()
+                    raise Exception(
+                        f"Failed to upload certificate: {resp.status} - {resp_body}"
                     )
-                    return cert_path
+
+                # Return the path where certificate was stored
+                cert_path = f"/home/ec2-user/cert/{cert_name}"
+                print(f"Certificate '{cert_name}' uploaded successfully to {cert_path}")
+                return cert_path
 
     async def _wait_for_rest_api(self) -> None:
         """
@@ -2096,13 +2100,15 @@ class SyncGateway(_SyncGatewayBase):
         # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
-            async with self._create_session(
-                self.secure, self.scheme, self.hostname, 4984, None
-            ) as session:
-                async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
-                    if resp.status == 200:
-                        cbl_info("SGW is already running, skipping start")
-                        return
+            async with (
+                self._create_session(
+                    self.secure, self.scheme, self.hostname, 4984, None
+                ) as session,
+                session.get("/", timeout=ClientTimeout(total=5)) as resp,
+            ):
+                if resp.status == 200:
+                    cbl_info("SGW is already running, skipping start")
+                    return
         except (ClientConnectorError, asyncio.TimeoutError):
             # SGW is not reachable or slow, proceed with start
             pass
@@ -2325,7 +2331,7 @@ class SyncGateway(_SyncGatewayBase):
                 if e.code == 404 and continuous:
                     cbl_error(f"ISGR {replication_id} is continuous but does not exist")
                     raise
-            return None
+            return
 
     async def wait_for_isgr_status(
         self,

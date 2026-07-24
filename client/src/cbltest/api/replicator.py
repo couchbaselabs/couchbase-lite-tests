@@ -141,7 +141,7 @@ class Replicator:
             if resp.error is not None:
                 cbl_error("Failed to start replicator (see trace log for details)")
                 cbl_trace(resp.error.message)
-                return None
+                return
 
             cast_resp = cast(PostStartReplicatorResponseMethods, resp)
             self.__id = cast_resp.replicator_id

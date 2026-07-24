@@ -59,15 +59,15 @@ class JavascriptBridge(PlatformBridge):
         header("Running bun run dev")
 
         log_file = JS_TEST_SERVER_DIR / "server.log"
-        log_fd = open(log_file, "w")
-        process = subprocess.Popen(
-            ["bun", "run", "dev"],
-            start_new_session=True,
-            stdin=subprocess.DEVNULL,
-            stdout=log_fd,
-            stderr=log_fd,
-            cwd=self.__working_dir,
-        )
+        with open(log_file, "w") as log_fd:
+            process = subprocess.Popen(
+                ["bun", "run", "dev"],
+                start_new_session=True,
+                stdin=subprocess.DEVNULL,
+                stdout=log_fd,
+                stderr=log_fd,
+                cwd=self.__working_dir,
+            )
         click.echo(f"Started bun with PID {process.pid}")
 
     def stop(self, location: str) -> None:
@@ -93,7 +93,6 @@ class JavascriptBridge(PlatformBridge):
                     )
                 except StopIteration:
                     click.secho("No child node process found...", fg="yellow")
-                    pass
 
                 proc.terminate()
                 click.secho(f"Stopped PID {proc.pid}", fg="green")

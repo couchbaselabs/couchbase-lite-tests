@@ -38,7 +38,6 @@ class PostGetAllDocumentsResponseMethods(ABC):
     @abstractmethod
     def collection_keys(self) -> list[str]:
         """Gets all the collections that are specified in the response"""
-        pass
 
     @abstractmethod
     def documents_for_collection(
@@ -49,7 +48,6 @@ class PostGetAllDocumentsResponseMethods(ABC):
 
         :param collection: The collection to return documents from
         """
-        pass
 
 
 class PostSnapshotDocumentsResponseMethods(ABC):
@@ -57,7 +55,6 @@ class PostSnapshotDocumentsResponseMethods(ABC):
     @abstractmethod
     def snapshot_id(self) -> str:
         """Gets the ID of the snapshot that was created"""
-        pass
 
 
 class ValueOrMissing:
@@ -71,31 +68,26 @@ class PostVerifyDocumentsResponseMethods(ABC):
     @abstractmethod
     def result(self) -> bool:
         """Gets the result of the verification"""
-        pass
 
     @property
     @abstractmethod
     def description(self) -> str | None:
         """Gets the description of what went wrong if result is false"""
-        pass
 
     @property
     @abstractmethod
     def expected(self) -> ValueOrMissing:
         """Gets the expected value of the faulty keypath, if applicable"""
-        pass
 
     @property
     @abstractmethod
     def actual(self) -> ValueOrMissing:
         """Gets the actual value of the faulty keypath, if applicable"""
-        pass
 
     @property
     @abstractmethod
     def document(self) -> dict[str, Any] | None:
         """Gets the document body of the document with the faulty keypath, if applicable"""
-        pass
 
 
 class PostStartReplicatorResponseMethods(ABC):
@@ -103,7 +95,6 @@ class PostStartReplicatorResponseMethods(ABC):
     @abstractmethod
     def replicator_id(self) -> str:
         """Gets the ID of the started replicator"""
-        pass
 
 
 class ReplicatorStatusBody:
@@ -160,26 +151,22 @@ class PostGetReplicatorStatusResponseMethods(ABC):
     @abstractmethod
     def activity(self) -> ReplicatorActivityLevel:
         """Gets the activity level of the replicator"""
-        pass
 
     @property
     @abstractmethod
     def progress(self) -> ReplicatorProgress:
         """Gets the current progress of the replicator"""
-        pass
 
     @property
     @abstractmethod
     def replicator_error(self) -> ErrorResponseBody | None:
         """Gets the error that occurred during replication, if any"""
-        pass
 
     @property
     @abstractmethod
     def documents(self) -> list[ReplicatorDocumentEntry]:
         """Gets the unseen list of documents replicated previously.  Note
         that once viewed it will be cleared"""
-        pass
 
 
 class PostRunQueryResponseMethods(ABC):
@@ -187,7 +174,6 @@ class PostRunQueryResponseMethods(ABC):
     @abstractmethod
     def results(self) -> list[dict]:
         """Gets the results of the query"""
-        pass
 
 
 class PostGetDocumentResponseMethods(ABC):
@@ -195,7 +181,6 @@ class PostGetDocumentResponseMethods(ABC):
     @abstractmethod
     def raw_body(self) -> dict:
         """The raw return value from the server (containing id, revs, and body)"""
-        pass
 
 
 class PostStartListenerResponseMethods(ABC):
@@ -203,13 +188,11 @@ class PostStartListenerResponseMethods(ABC):
     @abstractmethod
     def listener_id(self) -> str:
         """Gets the ID of the listener that was started"""
-        pass
 
     @property
     @abstractmethod
     def port(self) -> int:
         """Gets the port of the listener that was started"""
-        pass
 
 
 class PostStartMultipeerReplicatorResponseMethods(ABC):
@@ -217,7 +200,6 @@ class PostStartMultipeerReplicatorResponseMethods(ABC):
     @abstractmethod
     def replicator_id(self) -> str:
         """Gets the ID of the multipeer replicator that was started"""
-        pass
 
 
 class MultipeerReplicatorStatusEntry:
@@ -260,4 +242,3 @@ class PostGetMultipeerReplicatorStatusResponseMethods(ABC):
     @abstractmethod
     def replicators(self) -> list[MultipeerReplicatorStatusEntry]:
         """Gets the list of multipeer replicator status entries"""
-        pass

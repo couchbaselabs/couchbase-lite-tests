@@ -89,15 +89,13 @@ class CBLPyTest:
         await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
-        ts_index = 0
         await ret_val.resolve_api_version()
-        for ts in ret_val.test_servers:
+        for ts_index, ts in enumerate(ret_val.test_servers):
             await ts.new_session(
                 str(ret_val.request_factory.uuid),
                 ret_val.config.logslurp_url,
                 f"test-server[{ts_index}]",
             )
-            ts_index += 1
 
         return ret_val
 
@@ -118,14 +116,12 @@ class CBLPyTest:
 
         self.__request_factory = RequestFactory(self.__config)
         self.__test_servers: list[TestServer] = []
-        index = 0
-        for ts in self.__config.test_servers:
+        for index, ts in enumerate(self.__config.test_servers):
             ts_info = TestServerInfo(ts)
             dataset_version = ts_info.dataset_version or dataset_version
             self.__test_servers.append(
                 TestServer(self.__request_factory, index, ts_info.url, dataset_version)
             )
-            index += 1
 
         self.__sync_gateways: list[SyncGateway] = []
         index = 0
@@ -167,9 +163,8 @@ class CBLPyTest:
                 )
 
     async def resolve_api_version(self) -> None:
-        ts_index = 0
         apiVersion = 0
-        for ts in self.test_servers:
+        for ts_index, ts in enumerate(self.test_servers):
             root_info = await ts.get_info()
             if apiVersion != 0 and root_info.version != apiVersion:
                 raise ValueError(
@@ -179,7 +174,6 @@ class CBLPyTest:
                 )
 
             apiVersion = available_api_version(root_info.version)
-            ts_index += 1
 
         self.__request_factory.version = apiVersion
 

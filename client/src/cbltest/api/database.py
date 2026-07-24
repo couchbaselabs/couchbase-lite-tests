@@ -229,7 +229,7 @@ class AllDocumentsCollection:
         return self.__documents
 
     def __init__(self, docs: list[PostGetAllDocumentsEntry]):
-        self.__documents = list(AllDocumentsEntry(x) for x in docs)
+        self.__documents = [AllDocumentsEntry(x) for x in docs]
 
 
 class Snapshot:
@@ -392,9 +392,9 @@ class Database:
             cast_resp = cast(PostGetAllDocumentsResponseMethods, resp)
             ret_val: dict[str, list[AllDocumentsEntry]] = {}
             for c in cast_resp.collection_keys:
-                ret_val[c] = list(
+                ret_val[c] = [
                     AllDocumentsEntry(d) for d in cast_resp.documents_for_collection(c)
-                )
+                ]
 
             return ret_val
 

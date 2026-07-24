@@ -1,7 +1,7 @@
-import time
+import asyncio
 
+import aiohttp
 import pytest
-import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.logging import LogSlurpHandler, _cbl_log
@@ -24,13 +24,17 @@ class TestLogEndpoint(CBLTestClass):
 
         # This test is so fast the the message doesn't have time to make it to log slurp
         # before this pulls it, so sleep a bit
-        time.sleep(0.5)
+        await asyncio.sleep(0.5)
 
         handler = next(h for h in _cbl_log.handlers if isinstance(h, LogSlurpHandler))
         print(handler.id)
-        resp = requests.get(
-            f"http://{cblpytest.config.logslurp_url}/retrieveLog",
-            headers={"CBL-Log-ID": handler.id},
-        )
-        print(resp.text)
-        assert msg in resp.text
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(
+                f"http://{cblpytest.config.logslurp_url}/retrieveLog",
+                headers={"CBL-Log-ID": handler.id},
+            ) as resp,
+        ):
+            resp_text = await resp.text()
+        print(resp_text)
+        assert msg in resp_text

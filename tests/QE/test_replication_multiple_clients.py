@@ -290,7 +290,7 @@ class TestReplicationMultipleClients(CBLTestClass):
             doc = await db1.get_document(DocumentEntry("_default._default", doc_id))
             assert doc is not None, f"Document {doc_id} not found in db1"
             attachment_count = sum(
-                1 for key in doc.body.keys() if key.startswith("attachment_")
+                1 for key in doc.body if key.startswith("attachment_")
             )
             assert attachment_count == 20, (
                 f"Document {doc_id} should have 20 attachments, got {attachment_count}"
@@ -301,7 +301,7 @@ class TestReplicationMultipleClients(CBLTestClass):
             doc = await db2.get_document(DocumentEntry("_default._default", doc_id))
             assert doc is not None, f"Document {doc_id} not found in db2"
             attachment_count = sum(
-                1 for key in doc.body.keys() if key.startswith("attachment_")
+                1 for key in doc.body if key.startswith("attachment_")
             )
             assert attachment_count == 20, (
                 f"Document {doc_id} should have 20 attachments, got {attachment_count}"

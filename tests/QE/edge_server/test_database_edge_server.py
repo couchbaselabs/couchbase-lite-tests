@@ -1,9 +1,9 @@
-import json
 from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -23,12 +23,10 @@ class TestDatabase(CBLTestClass):
             await edge_server.get_version()
         except Exception:
             self.mark_test_step("Edge server failed to get version as expected")
-        with open(config_path) as f:
-            config = json.load(f)
+        config = await read_json_file(config_path)
         config["databases"]["db"]["create"] = True
         config["databases"]["db"]["collections"] = ["test"]
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             config_file=config_path
@@ -45,5 +43,4 @@ class TestDatabase(CBLTestClass):
             self.mark_test_step("Edge server failed to add document as expected")
         config["databases"]["db"]["create"] = False
         del config["databases"]["db"]["collections"]
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)

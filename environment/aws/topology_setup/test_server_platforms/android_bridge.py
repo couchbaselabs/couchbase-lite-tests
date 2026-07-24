@@ -31,6 +31,7 @@ Functions:
 import platform
 import subprocess
 from pathlib import Path
+from typing import ClassVar
 
 import click
 
@@ -44,7 +45,7 @@ class AndroidBridge(PlatformBridge):
     A class to manage Android applications on devices using ADB.
     """
 
-    __potential_adb_locations: list[str] = [
+    __potential_adb_locations: ClassVar[list[str]] = [
         "/opt/homebrew/share/android-commandlinetools/platform-tools/",
         "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
     ]
@@ -53,7 +54,7 @@ class AndroidBridge(PlatformBridge):
     # granted right after install so the test server doesn't need to block waiting
     # for a system permission dialog during a test run. Each entry is
     # (permission, min_api, max_api); None means unbounded on that side.
-    __runtime_permissions: list[tuple[str, int | None, int | None]] = [
+    __runtime_permissions: ClassVar[list[tuple[str, int | None, int | None]]] = [
         (
             "android.permission.ACCESS_FINE_LOCATION",
             None,

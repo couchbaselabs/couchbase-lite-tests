@@ -520,12 +520,14 @@ class TestGreenboardFixture:
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
-        with patch(
-            "cbltest.greenboarduploader.GreenboardUploader._upload_document",
-            side_effect=RuntimeError("connection refused"),
+        with (
+            patch(
+                "cbltest.greenboarduploader.GreenboardUploader._upload_document",
+                side_effect=RuntimeError("connection refused"),
+            ),
+            pytest.raises(RuntimeError, match="connection refused"),
         ):
-            with pytest.raises(RuntimeError, match="connection refused"):
-                await _run_fixture(_raw_greenboard(cblpytest, config))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
         assert not any(
             isinstance(p, GreenboardUploader)
             for p in config.pluginmanager.get_plugins()

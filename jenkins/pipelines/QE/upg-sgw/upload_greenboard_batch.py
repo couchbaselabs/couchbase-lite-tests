@@ -16,7 +16,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parents[3]))
 
-from cbltest.greenboarduploader import GreenboardUploader  # noqa: E402
+from cbltest.greenboarduploader import GreenboardUploader
 
 
 @click.command()

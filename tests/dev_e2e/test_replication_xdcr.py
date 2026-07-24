@@ -1,4 +1,4 @@
-import time
+import asyncio
 from pathlib import Path
 
 import pytest
@@ -63,7 +63,7 @@ class TestReplicationXdcr(CBLTestClass):
         )
 
         self.mark_test_step("Wait 5 secs to ensure that clusters are ready.")
-        time.sleep(5)
+        await asyncio.sleep(5)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_and_pull_with_xdcr(
@@ -109,7 +109,7 @@ class TestReplicationXdcr(CBLTestClass):
         self.mark_test_step(
             "Wait 5 secs to ensure that the docs are sync between two SGs."
         )
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step("Check that all docs are replicated correctly at SG1.")
         await compare_local_and_remote(
@@ -187,7 +187,7 @@ class TestReplicationXdcr(CBLTestClass):
         self.mark_test_step(
             "Wait 5 secs to ensure that the docs are sync between two SGs."
         )
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step(
             "Check that all updated docs are replicated correctly at SG1."
@@ -255,7 +255,7 @@ class TestReplicationXdcr(CBLTestClass):
         self.mark_test_step(
             "Wait 5 secs to ensure that the docs are sync between two SGs."
         )
-        time.sleep(5)
+        await asyncio.sleep(5)
 
         self.mark_test_step("Check that all docs are replicated correctly at SG1.")
         await compare_local_and_remote(
