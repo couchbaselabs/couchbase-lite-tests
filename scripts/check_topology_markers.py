@@ -3,11 +3,12 @@
 
 Scans test functions for indexed or bare access to a topology list
 (``sync_gateways``, ``couchbase_servers``, ``test_servers``, ``load_balancers``,
-``edge_servers``) and flags cases where the accessed index exceeds the
-declared ``@pytest.mark.min_*`` requirement, or where no such marker is
-declared at all. This only catches under-declaration (which causes a real
-IndexError/skip mismatch at runtime); over-declaring a minimum is never
-flagged since a test may legitimately want extra headroom.
+``edge_servers``), or the singular ``couchbase_server`` property, and flags
+cases where the accessed index exceeds the declared ``@pytest.mark.min_*``
+requirement, or where no such marker is declared at all. This only catches
+under-declaration (which causes a real IndexError/skip mismatch at runtime);
+over-declaring a minimum is never flagged since a test may legitimately want
+extra headroom.
 
 Usage is also traced through helper calls: same-class methods, same-file
 functions, or imported functions (see ``_resolve_import_path``). Inherited
@@ -29,6 +30,9 @@ TOPOLOGY_ATTRS = {
     "test_servers": "min_test_servers",
     "sync_gateways": "min_sync_gateways",
     "couchbase_servers": "min_couchbase_servers",
+    # Singular `CouchbaseCloud.couchbase_server` raises if no Couchbase Server
+    # was configured (no rosmar fallback), unlike the plural list above.
+    "couchbase_server": "min_couchbase_servers",
     "load_balancers": "min_load_balancers",
     "edge_servers": "min_edge_servers",
 }
