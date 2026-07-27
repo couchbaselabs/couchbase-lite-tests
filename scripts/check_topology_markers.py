@@ -22,11 +22,15 @@ message is even about.
 Usage is also traced through helper calls: same-class methods, same-file
 functions, or imported functions (see ``_resolve_import_path``). Inherited
 base-class methods aren't followed. Type inference resets at each function
-boundary and is seeded only from that function's own parameter annotations
-plus simple local assignments (``_seed_type_env``, ``_collect_assign_types``)
+boundary and is seeded only from that function's own parameters
+(``_seed_type_env``) plus simple local assignments (``_collect_assign_types``)
 — it does not follow call-site argument types into a callee, since that
-would require inlining the caller's env into every helper, and every helper
-in this codebase already annotates the parameters it needs traced.
+would require inlining the caller's env into every helper. A parameter is
+recognized either by name, for a well-known pytest fixture (``FIXTURE_TYPES``
+— fixtures are resolved by name at runtime, so the name alone is a reliable
+type signal, annotated or not), or by its own type annotation otherwise;
+every helper in this codebase that needs a non-fixture local traced (e.g. a
+``cloud: CouchbaseCloud`` parameter) already annotates it.
 
 Calls on a receiver type the local inference can't resolve (e.g. a variable
 returned from an un-annotated helper) aren't traced — that would need real
@@ -77,9 +81,21 @@ INDIRECT_TOPOLOGY_CALLS: dict[str, dict[str, str]] = {
     "CBLPyTest": {"simple_cloud": "min_sync_gateways"},
 }
 
+# Pytest fixture parameter names whose type is fixed by fixture registration
+# rather than by annotation: pytest resolves fixtures by parameter name, so a
+# parameter named "cblpytest" is a CBLPyTest instance regardless of whether
+# it's annotated as one -- the name itself is the actual runtime contract.
+FIXTURE_TYPES: dict[str, str] = {
+    "cblpytest": "CBLPyTest",
+}
+
 # The classes this script's local type inference resolves receivers to --
-# every class named as a key above.
-KNOWN_TYPES = frozenset(TOPOLOGY_ATTRS) | frozenset(INDIRECT_TOPOLOGY_CALLS)
+# every class named as a key or fixture-bound value above.
+KNOWN_TYPES = (
+    frozenset(TOPOLOGY_ATTRS)
+    | frozenset(INDIRECT_TOPOLOGY_CALLS)
+    | frozenset(FIXTURE_TYPES.values())
+)
 
 
 def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
@@ -118,20 +134,21 @@ def _member_marker(
 
 
 def _seed_type_env(func: ast.AST) -> dict[str, str]:
-    """Seed a type env from a function's own parameter annotations.
+    """Seed a type env from a function's own parameters.
 
-    A parameter named exactly ``cblpytest`` is always bound to ``CBLPyTest``,
-    annotated or not: pytest resolves fixtures by parameter name, so that
-    name *is* the actual runtime contract -- the annotation is just a
-    (usually, but not always, present) type-checker convenience.
+    A parameter named after a known fixture (``FIXTURE_TYPES``) is bound to
+    that fixture's type directly, annotated or not -- the annotation is only
+    consulted as a fallback, for locals that aren't fixtures (e.g. a
+    ``cloud: CouchbaseCloud`` helper parameter), where the name carries no
+    such guarantee on its own.
     """
     env: dict[str, str] = {}
     if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return env
     args = func.args
     for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
-        if arg.arg == "cblpytest":
-            env[arg.arg] = "CBLPyTest"
+        if arg.arg in FIXTURE_TYPES:
+            env[arg.arg] = FIXTURE_TYPES[arg.arg]
         elif isinstance(arg.annotation, ast.Name) and arg.annotation.id in KNOWN_TYPES:
             env[arg.arg] = arg.annotation.id
     return env
