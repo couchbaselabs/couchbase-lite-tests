@@ -1,22 +1,39 @@
 #!/usr/bin/env python3
 """Pre-commit check: verify topology markers match server-list usage in test files.
 
-Scans test functions for indexed or bare access to a topology list
+Scans test functions for indexed or bare access to a topology attribute
 (``sync_gateways``, ``couchbase_servers``, ``test_servers``, ``load_balancers``,
-``edge_servers``), or the singular ``couchbase_server`` property, and flags
+``edge_servers``, or the singular ``couchbase_server`` property) and flags
 cases where the accessed index exceeds the declared ``@pytest.mark.min_*``
 requirement, or where no such marker is declared at all. This only catches
 under-declaration (which causes a real IndexError/skip mismatch at runtime);
 over-declaring a minimum is never flagged since a test may legitimately want
 extra headroom.
 
+Each attribute name is only recognized on a receiver expression that
+resolves — via the lightweight local inference in ``_infer_type`` — to the
+specific class that actually owns it (``CBLPyTest`` or ``CouchbaseCloud``;
+see ``TOPOLOGY_ATTRS``). Matching by bare attribute name alone, regardless
+of receiver, would be ambiguous: an unrelated object with a same-named
+attribute would false-positive, and it would blur which class a violation
+message is even about.
+
 Usage is also traced through helper calls: same-class methods, same-file
 functions, or imported functions (see ``_resolve_import_path``). Inherited
-base-class methods aren't followed.
+base-class methods aren't followed. Type inference resets at each function
+boundary and is seeded only from that function's own parameter annotations
+plus simple local assignments (``_seed_type_env``, ``_collect_assign_types``)
+— it does not follow call-site argument types into a callee, since that
+would require inlining the caller's env into every helper, and every helper
+in this codebase already annotates the parameters it needs traced.
 
-Calls on an arbitrary-typed receiver (e.g. ``cblpytest.simple_cloud()``)
-aren't traced either — that would need type inference to know which class to
-look the method up in. Those are hand-listed in ``INDIRECT_TOPOLOGY_CALLS``.
+Calls on a receiver type the local inference can't resolve (e.g. a variable
+returned from an un-annotated helper) aren't traced — that would need real
+type inference. ``cblpytest.simple_cloud()`` is a special case: it returns a
+``CouchbaseCloud`` but conditionally requires ``couchbase_servers``
+(falls back to rosmar), so instead of inferring a return type for it,
+its always-true half (``min_sync_gateways``) is hand-listed in
+``INDIRECT_TOPOLOGY_CALLS``, scoped to a ``CBLPyTest`` receiver.
 """
 
 import ast
@@ -26,26 +43,93 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-TOPOLOGY_ATTRS = {
-    "test_servers": "min_test_servers",
-    "sync_gateways": "min_sync_gateways",
-    "couchbase_servers": "min_couchbase_servers",
+# The only classes this script's type inference resolves receivers to.
+KNOWN_TYPES = frozenset({"CBLPyTest", "CouchbaseCloud"})
+
+TOPOLOGY_ATTRS: dict[str, tuple[str, frozenset[str]]] = {
+    "test_servers": ("min_test_servers", frozenset({"CBLPyTest"})),
+    # CouchbaseCloud also exposes a `sync_gateways` property (the SGW nodes
+    # it was constructed with), so either receiver type is valid here.
+    "sync_gateways": (
+        "min_sync_gateways",
+        frozenset({"CBLPyTest", "CouchbaseCloud"}),
+    ),
+    "couchbase_servers": ("min_couchbase_servers", frozenset({"CBLPyTest"})),
     # Singular `CouchbaseCloud.couchbase_server` raises if no Couchbase Server
     # was configured (no rosmar fallback), unlike the plural list above.
-    "couchbase_server": "min_couchbase_servers",
-    "load_balancers": "min_load_balancers",
-    "edge_servers": "min_edge_servers",
+    "couchbase_server": ("min_couchbase_servers", frozenset({"CouchbaseCloud"})),
+    "load_balancers": ("min_load_balancers", frozenset({"CBLPyTest"})),
+    "edge_servers": ("min_edge_servers", frozenset({"CBLPyTest"})),
 }
-TOPOLOGY_MARKERS = set(TOPOLOGY_ATTRS.values())
+TOPOLOGY_MARKERS = {marker for marker, _allowed in TOPOLOGY_ATTRS.values()}
 
 
 # CBLPyTest.simple_cloud() unconditionally requires sync_gateways (raises if
 # empty) but only conditionally touches couchbase_servers (falls back to
 # rosmar). Listing min_couchbase_servers here would get tests that pass fine
 # on rosmar-only configs skipped, so only the always-true half is recorded.
-INDIRECT_TOPOLOGY_CALLS = {
-    "simple_cloud": "min_sync_gateways",
+INDIRECT_TOPOLOGY_CALLS: dict[str, tuple[str, frozenset[str]]] = {
+    "simple_cloud": ("min_sync_gateways", frozenset({"CBLPyTest"})),
 }
+
+
+def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
+    """Best-effort local type of a receiver expression, or None if unresolved.
+
+    Recognizes a name already bound in ``env`` (from a parameter annotation
+    or an earlier local assignment — see ``_seed_type_env`` and
+    ``_collect_assign_types``), a direct constructor call
+    (``CouchbaseCloud(...)``), and ``<CBLPyTest-typed-expr>.simple_cloud()``.
+    Anything else — attribute chains through un-annotated helpers, dict/list
+    lookups, etc. — returns None, excluding it from consideration rather
+    than guessing.
+    """
+    if isinstance(expr, ast.Name):
+        return env.get(expr.id)
+    if isinstance(expr, ast.Call):
+        func = expr.func
+        if isinstance(func, ast.Name) and func.id in KNOWN_TYPES:
+            return func.id
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == "simple_cloud"
+            and _infer_type(func.value, env) == "CBLPyTest"
+        ):
+            return "CouchbaseCloud"
+    return None
+
+
+def _seed_type_env(func: ast.AST) -> dict[str, str]:
+    """Seed a type env from a function's own parameter annotations."""
+    env: dict[str, str] = {}
+    if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return env
+    args = func.args
+    for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
+        if isinstance(arg.annotation, ast.Name) and arg.annotation.id in KNOWN_TYPES:
+            env[arg.arg] = arg.annotation.id
+    return env
+
+
+def _collect_assign_types(func: ast.AST, env: dict[str, str]) -> None:
+    """Extend ``env`` in place from simple local assignments in ``func``.
+
+    Runs two passes so a two-hop chain (e.g. an alias of an alias) still
+    resolves; every pattern currently in the test suite only needs one.
+    """
+    for _ in range(2):
+        for node in ast.walk(func):
+            if isinstance(node, ast.Assign) and len(node.targets) == 1:
+                target, value = node.targets[0], node.value
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                target, value = node.target, node.value
+            else:
+                continue
+            if not isinstance(target, ast.Name):
+                continue
+            inferred = _infer_type(value, env)
+            if inferred is not None:
+                env[target.id] = inferred
 
 
 def _constant_int_index(index: ast.expr) -> int | None:
@@ -100,10 +184,14 @@ def _min_markers(decorator_list: list[ast.expr]) -> dict[str, int]:
     return markers
 
 
-def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
+def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], set[str]]:
     """Return (marker -> min required by a constant index, markers accessed with no constant index).
 
     Only considers accesses written directly in ``func``'s own body, not calls it makes.
+    ``env`` maps local names to their inferred class (see ``_seed_type_env`` /
+    ``_collect_assign_types``); an attribute or call is only counted as topology
+    usage when its receiver resolves to a class that actually owns that name
+    (``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS``).
 
     A single walk suffices: ``ast.walk`` is breadth-first, so a ``Subscript`` node is
     always visited before its own ``.value`` child, meaning ``subscripted_attrs`` is
@@ -116,11 +204,12 @@ def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
 
     for node in ast.walk(func):
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
-            attr = node.value.attr
-            if attr not in TOPOLOGY_ATTRS:
+            attr_node = node.value
+            entry = TOPOLOGY_ATTRS.get(attr_node.attr)
+            if entry is None or _infer_type(attr_node.value, env) not in entry[1]:
                 continue
-            marker = TOPOLOGY_ATTRS[attr]
-            subscripted_attrs.add(id(node.value))
+            marker, _allowed = entry
+            subscripted_attrs.add(id(attr_node))
             index_value = _constant_int_index(node.slice)
             if index_value is not None:
                 needed = abs(index_value) if index_value < 0 else index_value + 1
@@ -128,15 +217,19 @@ def _local_usage(func: ast.AST) -> tuple[dict[str, int], set[str]]:
             else:
                 dynamic.add(marker)
         elif isinstance(node, ast.Attribute) and node.attr in TOPOLOGY_ATTRS:
-            if id(node) not in subscripted_attrs:
-                dynamic.add(TOPOLOGY_ATTRS[node.attr])
+            if id(node) in subscripted_attrs:
+                continue
+            marker, allowed = TOPOLOGY_ATTRS[node.attr]
+            if _infer_type(node.value, env) in allowed:
+                dynamic.add(marker)
         elif (
             isinstance(node, ast.Call)
             and isinstance(node.func, ast.Attribute)
             and node.func.attr in INDIRECT_TOPOLOGY_CALLS
         ):
-            marker = INDIRECT_TOPOLOGY_CALLS[node.func.attr]
-            required[marker] = max(required.get(marker, 0), 1)
+            marker, allowed = INDIRECT_TOPOLOGY_CALLS[node.func.attr]
+            if _infer_type(node.func.value, env) in allowed:
+                required[marker] = max(required.get(marker, 0), 1)
 
     return required, dynamic
 
@@ -257,7 +350,9 @@ def _scan_usage(
         return {}, set()
     _visited.add(id(func))
 
-    required, dynamic = _local_usage(func)
+    env = _seed_type_env(func)
+    _collect_assign_types(func, env)
+    required, dynamic = _local_usage(func, env)
 
     for node in ast.walk(func):
         if not isinstance(node, ast.Call):
