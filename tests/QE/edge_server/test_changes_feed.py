@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -6,6 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -59,11 +59,9 @@ class TestChangesFeed(CBLTestClass):
         )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )

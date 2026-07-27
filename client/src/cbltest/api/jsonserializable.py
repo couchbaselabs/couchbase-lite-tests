@@ -20,7 +20,6 @@ class JSONSerializable(ABC):
     @abstractmethod
     def to_json(self) -> Any:
         """Converts the object into a JSON compatible one"""
-        pass
 
 
 class JSONDictionary(JSONSerializable):

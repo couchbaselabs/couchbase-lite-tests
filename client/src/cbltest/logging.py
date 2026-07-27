@@ -3,7 +3,7 @@ from logging import (
     DEBUG,
     ERROR,
     INFO,
-    WARN,
+    WARNING,
     FileHandler,
     Formatter,
     Handler,
@@ -51,8 +51,7 @@ class LogSlurpHandler(Handler):
             stream=True,
         )
         with open("session.log", "w") as fout:
-            for c in resp.iter_content(8192):
-                fout.write(c.decode("utf-8"))
+            fout.writelines(c.decode("utf-8") for c in resp.iter_content(8192))
 
 
 class LogLevel(Enum):
@@ -96,7 +95,7 @@ def cbl_setLogLevel(level: LogLevel):
     if level == LogLevel.ERROR:
         console.setLevel(ERROR)
     elif level == LogLevel.WARNING:
-        console.setLevel(WARN)
+        console.setLevel(WARNING)
     elif level == LogLevel.INFO:
         console.setLevel(INFO)
     elif level == LogLevel.VERBOSE or level == LogLevel.DEBUG:

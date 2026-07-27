@@ -100,6 +100,7 @@ Two registries indexed by `(TestServerRequestType, version)` resolve request/bod
 @register_request(TestServerRequestType.RESET, version=1)
 class PostResetRequestV1(TestServerRequest): ...
 
+
 @register_body(TestServerRequestType.RESET, version=1)
 class PostResetRequestBodyV1(JSONSerializable): ...
 ```

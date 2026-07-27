@@ -46,7 +46,7 @@ import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import Final
+from typing import ClassVar, Final
 
 import click
 import requests
@@ -101,9 +101,9 @@ class TestServer(ABC):
             Create a platform bridge for the test server.
     """
 
-    __registry: dict[str, type[TestServer]] = {}
+    __registry: ClassVar[dict[str, type[TestServer]]] = {}
     __version_filename: Final[str] = ".version"
-    __build_no_cache: dict[str, dict[str, str]] = {}
+    __build_no_cache: ClassVar[dict[str, dict[str, str]]] = {}
 
     def __init__(self, version: str) -> None:
         if self.product not in self.__build_no_cache:
@@ -234,7 +234,6 @@ class TestServer(ABC):
         Returns:
             str: The platform of the test server.
         """
-        pass
 
     @property
     @abstractmethod
@@ -245,7 +244,6 @@ class TestServer(ABC):
         Returns:
             str: The product name of the test server.
         """
-        pass
 
     @property
     @abstractmethod
@@ -256,14 +254,12 @@ class TestServer(ABC):
         Returns:
             str: The path for the latest builds of the test server.
         """
-        pass
 
     @abstractmethod
     def build(self) -> None:
         """
         Build the test server.
         """
-        pass
 
     def download(self) -> None:
         """
@@ -302,7 +298,6 @@ class TestServer(ABC):
         Returns:
             str: The path to the compressed package.
         """
-        pass
 
     @abstractmethod
     def uncompress_package(self, path: Path) -> None:
@@ -312,7 +307,6 @@ class TestServer(ABC):
         Args:
             path (Path): The path to the compressed package.
         """
-        pass
 
     @abstractmethod
     def create_bridge(self, **kwargs) -> PlatformBridge:
@@ -328,7 +322,6 @@ class TestServer(ABC):
         Returns:
             PlatformBridge: The platform bridge for the test server.
         """
-        pass
 
     def _check_downloaded(self, location: Path) -> bool:
         """

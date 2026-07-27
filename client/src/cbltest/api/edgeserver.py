@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import aiofiles
 import pyjson5 as json5
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from opentelemetry.trace import get_tracer
@@ -155,7 +156,7 @@ class EdgeServer:
             if client_cert_path:
                 mtls = True
             https = True
-        users = True if config.get("users", False) else False
+        users = bool(config.get("users", False))
         return (
             port,
             https,
@@ -879,7 +880,7 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            body = {"docs": list(u.body for u in docs), "new_edits": new_edits}
+            body = {"docs": [u.body for u in docs], "new_edits": new_edits}
             resp = await self._send_request(
                 "post", f"/{keyspace}/_bulk_docs", JSONDictionary(body)
             )
@@ -924,18 +925,18 @@ class EdgeServer:
             attributes={"cbl.caddy.url": url},
         ):
             try:
-                async with ClientSession() as session:
-                    async with session.get(
-                        url, timeout=ClientTimeout(total=timeout)
-                    ) as response:
-                        if response.status == 404:
-                            raise FileNotFoundError(f"{operation} not found at {url}")
-                        if response.status != 200:
-                            error_text = await response.text()
-                            raise Exception(
-                                f"{operation} failed: HTTP {response.status} - {error_text}"
-                            )
-                        return await response.read()
+                async with (
+                    ClientSession() as session,
+                    session.get(url, timeout=ClientTimeout(total=timeout)) as response,
+                ):
+                    if response.status == 404:
+                        raise FileNotFoundError(f"{operation} not found at {url}")
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise Exception(
+                            f"{operation} failed: HTTP {response.status} - {error_text}"
+                        )
+                    return await response.read()
             except ClientError as e:
                 raise Exception(f"Network error during {operation}: {e}") from e
 
@@ -991,7 +992,9 @@ class EdgeServer:
             content = await self.get_log_content(log_file)
             return [line for line in content.splitlines() if search_string in line]
 
-    async def start_server(self, config: dict = {}):
+    async def start_server(self, config: dict | None = None):
+        if config is None:
+            config = {}
         with self.__tracer.start_as_current_span("start edge server"):
             await self._send_request(
                 "post",
@@ -1015,8 +1018,8 @@ class EdgeServer:
             JSONDictionary({"filename": f"{db_name}.cblite2"}),
             session=self.__shell_session,
         )
-        with open(config_file) as f:
-            cfg = json.load(f)
+        async with aiofiles.open(config_file) as f:
+            cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
         return EdgeServer(self.__hostname, config_file=config_file)
 
@@ -1066,7 +1069,7 @@ class EdgeServer:
         while not is_idle and retry > 0:
             status = await self.all_replication_status()
             if len(status) != 0:
-                assert "error" not in status[replicator_key].keys(), (
+                assert "error" not in status[replicator_key], (
                     f"Replication setup failure: {status}"
                 )
                 if status[replicator_key]["status"] == "Idle":

@@ -62,7 +62,6 @@ class PlatformBridge(ABC):
         Args:
             location (str): The location of the application (e.g., device serial number).
         """
-        pass
 
     @abstractmethod
     def install(self, location: str) -> None:
@@ -72,7 +71,6 @@ class PlatformBridge(ABC):
         Args:
             location (str): The location of the application (e.g., device serial number).
         """
-        pass
 
     @abstractmethod
     def run(self, location: str) -> None:
@@ -82,7 +80,6 @@ class PlatformBridge(ABC):
         Args:
             location (str): The location of the application (e.g., device serial number).
         """
-        pass
 
     @abstractmethod
     def stop(self, location: str) -> None:
@@ -92,7 +89,6 @@ class PlatformBridge(ABC):
         Args:
             location (str): The location of the application (e.g., device serial number).
         """
-        pass
 
     @abstractmethod
     def uninstall(self, location: str) -> None:
@@ -102,7 +98,6 @@ class PlatformBridge(ABC):
         Args:
             location (str): The location of the application (e.g., device serial number).
         """
-        pass
 
     def get_ip(self, location: str, *, fallback: str | None = None) -> str:
         """
@@ -141,4 +136,3 @@ class PlatformBridge(ABC):
         Returns:
             str: The IP address of the location.
         """
-        pass

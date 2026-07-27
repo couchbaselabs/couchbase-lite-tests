@@ -170,8 +170,7 @@ class TestSgwUpgrade(CBLTestClass):
         print(f"Documents in SGW after update: {revs_after}")
 
         self.mark_test_step("Verify that revisions have progressed on SGW")
-        for doc_id in revs_before:
-            before_rev = revs_before[doc_id]
+        for doc_id, before_rev in revs_before.items():
             after_rev = revs_after.get(doc_id)
             assert before_rev is not None, f"Doc {doc_id} missing before update"
             assert after_rev is not None, f"Doc {doc_id} missing after update"

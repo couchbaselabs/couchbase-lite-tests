@@ -193,7 +193,7 @@ class CouchbaseServer:
                         pass
 
                 success = False
-                for _ in range(0, 10):
+                for _ in range(10):
                     try:
                         bucket_obj.scope(scope).collection(name).get("_nonexistent")
                     except DocumentNotFoundException:
@@ -472,7 +472,7 @@ class CouchbaseServer:
             except QueryIndexAlreadyExistsException:
                 pass
 
-            return list(dict(result) for result in query_obj.execute())
+            return [dict(result) for result in query_obj.execute()]
 
     def upsert_document(
         self,
@@ -725,15 +725,14 @@ class CouchbaseServer:
                 )
                 resp.raise_for_status()
                 for task in resp.json():
-                    if "type" in task and task["type"] == "xdcr":
-                        if "id" in task:
-                            id = task["id"]
-                            if (
-                                id
-                                == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
-                            ):
-                                needs_replication = False
-                                break
+                    if isinstance(task, dict) and task.get("type") == "xdcr":
+                        task_id = task.get("id")
+                        if (
+                            task_id
+                            == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
+                        ):
+                            needs_replication = False
+                            break
 
             if needs_replication:
                 resp = self.__http_session.post(
@@ -790,12 +789,11 @@ class CouchbaseServer:
             resp.raise_for_status()
             xdcr_id: str | None = None
             for task in resp.json():
-                if "type" in task and task["type"] == "xdcr":
-                    if "id" in task:
-                        id = task["id"]
-                        if id == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}":
-                            xdcr_id = id
-                            break
+                if isinstance(task, dict) and task.get("type") == "xdcr":
+                    task_id = task.get("id")
+                    if task_id == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}":
+                        xdcr_id = task_id
+                        break
 
             if xdcr_id is not None:
                 encoded = quote_plus(xdcr_id)
@@ -1183,11 +1181,13 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"http://{self.hostname}:20001/stop-cbs") as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+        async with (
+            aiohttp.ClientSession() as session,
+            session.get(f"http://{self.hostname}:20001/stop-cbs") as resp,
+        ):
+            if resp.status != 200:
+                body = await resp.text()
+                raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
 
     async def start_server(self, port: int = 8091) -> None:
         """
@@ -1195,15 +1195,17 @@ class CouchbaseServer:
 
         :param port: REST API port to wait for readiness (default 8091)
         """
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession() as session,
+            session.post(
                 f"http://{self.hostname}:20001/start-cbs",
                 data=json.dumps({"port": port}),
                 headers={"Content-Type": "application/json"},
-            ) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+            ) as resp,
+        ):
+            if resp.status != 200:
+                body = await resp.text()
+                raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
 
     async def get_root_ca_certificate(self) -> bytes:
         """
@@ -1215,11 +1217,8 @@ class CouchbaseServer:
         # Use CBS REST API directly - returns clean PEM certificate
         url = f"http://{self.__hostname}:8091/pools/default/certificate"
 
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url) as resp:
-                body = await resp.text()
-                if resp.status != 200:
-                    raise CblTestError(
-                        f"Failed to get CBS root CA: {resp.status} - {body}"
-                    )
-                return body.strip().encode("utf-8")
+        async with aiohttp.ClientSession() as session, session.get(url) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise CblTestError(f"Failed to get CBS root CA: {resp.status} - {body}")
+            return body.strip().encode("utf-8")
