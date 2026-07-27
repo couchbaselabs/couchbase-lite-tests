@@ -21,20 +21,27 @@ message is even about.
 
 Usage is also traced through helper calls: same-class methods, same-file
 functions, or imported functions (see ``_resolve_import_path``). Inherited
-base-class methods aren't followed. Type inference resets at each function
-boundary and is seeded only from that function's own parameters
-(``_seed_type_env``) plus simple local assignments (``_collect_assign_types``)
-— it does not follow call-site argument types into a callee, since that
-would require inlining the caller's env into every helper. A parameter is
-recognized either by name, for a well-known pytest fixture (``FIXTURE_TYPES``
-— fixtures are resolved by name at runtime, so the name alone is a reliable
-type signal, annotated or not), or by its own type annotation otherwise;
-every helper in this codebase that needs a non-fixture local traced (e.g. a
-``cloud: CouchbaseCloud`` parameter) already annotates it.
+base-class methods aren't followed. A callee's type env (``_scan_usage``) is
+seeded from three sources, each layered over the previous: its own
+parameters (``_seed_type_env`` — a parameter named after a well-known pytest
+fixture like ``cblpytest`` is bound by name alone, since fixtures are
+resolved by name at runtime regardless of annotation; otherwise its own type
+annotation, if any); its actual argument types at *this* call site
+(``_call_site_env``, matched positionally/by keyword against the caller's
+already-inferred env — this is what lets an un-annotated ``cloud`` parameter
+still resolve to ``CouchbaseCloud`` when the caller passed something
+constructed as one); and simple local assignments in its own body
+(``_collect_assign_types``). Call-site inference doesn't merge argument
+types across multiple call sites of the same helper within one scan — the
+first call reached wins, since ``_scan_usage`` visits each function at most
+once per top-level test (``_visited``) — but no helper in this codebase is
+ever called with genuinely different argument types from within a single
+test.
 
-Calls on a receiver type the local inference can't resolve (e.g. a variable
-returned from an un-annotated helper) aren't traced — that would need real
-type inference. ``cblpytest.simple_cloud()`` is a special case: it returns a
+Calls on a receiver type the local inference still can't resolve (e.g. an
+argument expression too dynamic for ``_infer_type`` to follow, with no
+annotation to fall back on) aren't traced — that would need real type
+inference. ``cblpytest.simple_cloud()`` is a special case: it returns a
 ``CouchbaseCloud`` but conditionally requires ``couchbase_servers``
 (falls back to rosmar), so instead of inferring a return type for it,
 its always-true half (``min_sync_gateways``) is hand-listed in
@@ -375,7 +382,15 @@ def _resolve_call(
     node: ast.Call,
     class_methods: dict[str, ast.AST],
     scope: _FileScope,
-) -> tuple[ast.AST, dict[str, ast.AST], _FileScope] | None:
+) -> tuple[ast.AST, dict[str, ast.AST], _FileScope, bool] | None:
+    """Resolve a call to its target function, plus whether it's a method call.
+
+    The ``bool`` is whether ``node`` is a ``self./cls.`` method call, where
+    the target's own leading ``self``/``cls`` parameter has no corresponding
+    argument at the call site -- callers matching ``node.args`` positionally
+    against the target's parameters (see ``_call_site_env``) need to know to
+    skip it.
+    """
     func = node.func
     if (
         isinstance(func, ast.Attribute)
@@ -383,14 +398,14 @@ def _resolve_call(
         and func.value.id in ("self", "cls")
     ):
         target = class_methods.get(func.attr)
-        return (target, class_methods, scope) if target is not None else None
+        return (target, class_methods, scope, True) if target is not None else None
 
     if not isinstance(func, ast.Name):
         return None
 
     target = scope.module_funcs.get(func.id) or class_methods.get(func.id)
     if target is not None:
-        return target, class_methods, scope
+        return target, class_methods, scope, False
 
     imported = scope.imports.get(func.id)
     if imported is None:
@@ -401,7 +416,48 @@ def _resolve_call(
         return None
     target_scope = _load_scope(resolved_path)
     target = target_scope.module_funcs.get(original_name)
-    return (target, {}, target_scope) if target is not None else None
+    return (target, {}, target_scope, False) if target is not None else None
+
+
+def _call_site_env(
+    node: ast.Call,
+    target: ast.AST,
+    env: dict[str, str],
+    is_method_call: bool,
+) -> dict[str, str]:
+    """Infer the target function's own parameter types from this call site.
+
+    Matches ``node``'s positional and keyword arguments to ``target``'s
+    parameters and infers each argument expression's type using the
+    *caller's* env -- e.g. for ``self.setup(cloud, ...)`` where ``cloud``
+    was assigned from ``cblpytest.simple_cloud()`` earlier in the caller,
+    this binds ``target``'s corresponding parameter to ``CouchbaseCloud``
+    even if that parameter isn't itself annotated. ``is_method_call`` skips
+    the target's leading ``self``/``cls`` parameter, which the call site
+    never passes explicitly.
+    """
+    if not isinstance(target, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return {}
+
+    params = [*target.args.posonlyargs, *target.args.args]
+    if is_method_call and params:
+        params = params[1:]
+
+    seed: dict[str, str] = {}
+    for param, arg_expr in zip(params, node.args):
+        inferred = _infer_type(arg_expr, env)
+        if inferred is not None:
+            seed[param.arg] = inferred
+
+    param_names = {p.arg for p in params} | {p.arg for p in target.args.kwonlyargs}
+    for kw in node.keywords:
+        if kw.arg is None or kw.arg not in param_names:
+            continue
+        inferred = _infer_type(kw.value, env)
+        if inferred is not None:
+            seed[kw.arg] = inferred
+
+    return seed
 
 
 def _scan_usage(
@@ -409,8 +465,16 @@ def _scan_usage(
     class_methods: dict[str, ast.AST],
     scope: _FileScope,
     _visited: set[int] | None = None,
+    _call_env: dict[str, str] | None = None,
 ) -> tuple[dict[str, int], set[str]]:
-    """Return usage in ``func``, plus usage in helpers it calls (recursively)."""
+    """Return usage in ``func``, plus usage in helpers it calls (recursively).
+
+    ``_call_env`` is this call's own parameters as inferred at its call site
+    (see ``_call_site_env``); it's layered on top of ``func``'s own
+    parameter/fixture bindings, taking priority where both resolve the same
+    name, since it reflects what's actually being passed at this particular
+    call rather than a static declaration on the parameter.
+    """
     if _visited is None:
         _visited = set()
     if id(func) in _visited:
@@ -418,6 +482,8 @@ def _scan_usage(
     _visited.add(id(func))
 
     env = _seed_type_env(func)
+    if _call_env:
+        env.update(_call_env)
     _collect_assign_types(func, env)
     required, dynamic = _local_usage(func, env)
 
@@ -427,9 +493,10 @@ def _scan_usage(
         resolved = _resolve_call(node, class_methods, scope)
         if resolved is None:
             continue
-        target, target_class_methods, target_scope = resolved
+        target, target_class_methods, target_scope, is_method_call = resolved
+        call_env = _call_site_env(node, target, env, is_method_call)
         sub_required, sub_dynamic = _scan_usage(
-            target, target_class_methods, target_scope, _visited
+            target, target_class_methods, target_scope, _visited, call_env
         )
         for marker, needed in sub_required.items():
             required[marker] = max(required.get(marker, 0), needed)
