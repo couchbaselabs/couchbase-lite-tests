@@ -12,9 +12,10 @@ extra headroom.
 
 Each attribute name is only recognized on a receiver expression that
 resolves — via the lightweight local inference in ``_infer_type`` — to the
-specific class that actually owns it (``CBLPyTest`` or ``CouchbaseCloud``;
-see ``TOPOLOGY_ATTRS``). Matching by bare attribute name alone, regardless
-of receiver, would be ambiguous: an unrelated object with a same-named
+specific class that actually owns it: see ``TOPOLOGY_ATTRS``, keyed first by
+class (``CBLPyTest``, ``CouchbaseCloud``) and then by the attribute that
+class exposes. Matching by bare attribute name alone, regardless of
+receiver, would be ambiguous: an unrelated object with a same-named
 attribute would false-positive, and it would blur which class a violation
 message is even about.
 
@@ -43,34 +44,42 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-# The only classes this script's type inference resolves receivers to.
-KNOWN_TYPES = frozenset({"CBLPyTest", "CouchbaseCloud"})
-
-TOPOLOGY_ATTRS: dict[str, tuple[str, frozenset[str]]] = {
-    "test_servers": ("min_test_servers", frozenset({"CBLPyTest"})),
-    # CouchbaseCloud also exposes a `sync_gateways` property (the SGW nodes
-    # it was constructed with), so either receiver type is valid here.
-    "sync_gateways": (
-        "min_sync_gateways",
-        frozenset({"CBLPyTest", "CouchbaseCloud"}),
-    ),
-    "couchbase_servers": ("min_couchbase_servers", frozenset({"CBLPyTest"})),
-    # Singular `CouchbaseCloud.couchbase_server` raises if no Couchbase Server
-    # was configured (no rosmar fallback), unlike the plural list above.
-    "couchbase_server": ("min_couchbase_servers", frozenset({"CouchbaseCloud"})),
-    "load_balancers": ("min_load_balancers", frozenset({"CBLPyTest"})),
-    "edge_servers": ("min_edge_servers", frozenset({"CBLPyTest"})),
+# Topology attributes this script tracks, keyed by the class that owns each
+# one and then by the attribute name itself -- e.g. TOPOLOGY_ATTRS["CBLPyTest"]
+# ["test_servers"] is "min_test_servers". Keying by owning class first means a
+# receiver only ever matches the attributes its inferred class actually has.
+TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
+    "CBLPyTest": {
+        "test_servers": "min_test_servers",
+        "sync_gateways": "min_sync_gateways",
+        "couchbase_servers": "min_couchbase_servers",
+        "edge_servers": "min_edge_servers",
+        "load_balancers": "min_load_balancers",
+    },
+    "CouchbaseCloud": {
+        # Also exposes the SGW nodes it was constructed with.
+        "sync_gateways": "min_sync_gateways",
+        # Singular property; raises if no Couchbase Server was configured
+        # (no rosmar fallback), unlike CBLPyTest.couchbase_servers above.
+        "couchbase_server": "min_couchbase_servers",
+    },
 }
-TOPOLOGY_MARKERS = {marker for marker, _allowed in TOPOLOGY_ATTRS.values()}
-
+TOPOLOGY_MARKERS = {
+    marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()
+}
 
 # CBLPyTest.simple_cloud() unconditionally requires sync_gateways (raises if
 # empty) but only conditionally touches couchbase_servers (falls back to
 # rosmar). Listing min_couchbase_servers here would get tests that pass fine
 # on rosmar-only configs skipped, so only the always-true half is recorded.
-INDIRECT_TOPOLOGY_CALLS: dict[str, tuple[str, frozenset[str]]] = {
-    "simple_cloud": ("min_sync_gateways", frozenset({"CBLPyTest"})),
+# Same shape as TOPOLOGY_ATTRS: class -> method name -> marker.
+INDIRECT_TOPOLOGY_CALLS: dict[str, dict[str, str]] = {
+    "CBLPyTest": {"simple_cloud": "min_sync_gateways"},
 }
+
+# The classes this script's local type inference resolves receivers to --
+# every class named as a key above.
+KNOWN_TYPES = frozenset(TOPOLOGY_ATTRS) | frozenset(INDIRECT_TOPOLOGY_CALLS)
 
 
 def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
@@ -97,6 +106,15 @@ def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
         ):
             return "CouchbaseCloud"
     return None
+
+
+def _member_marker(
+    table: dict[str, dict[str, str]], receiver_type: str | None, name: str
+) -> str | None:
+    """Marker for ``receiver_type.name`` per ``table`` (class -> member -> marker)."""
+    if receiver_type is None:
+        return None
+    return table.get(receiver_type, {}).get(name)
 
 
 def _seed_type_env(func: ast.AST) -> dict[str, str]:
@@ -189,9 +207,10 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
 
     Only considers accesses written directly in ``func``'s own body, not calls it makes.
     ``env`` maps local names to their inferred class (see ``_seed_type_env`` /
-    ``_collect_assign_types``); an attribute or call is only counted as topology
-    usage when its receiver resolves to a class that actually owns that name
-    (``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS``).
+    ``_collect_assign_types``); a receiver's inferred class is looked up directly
+    in ``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS`` (class -> member -> marker),
+    so an attribute or call only counts as topology usage when its receiver's own
+    class actually exposes that member.
 
     A single walk suffices: ``ast.walk`` is breadth-first, so a ``Subscript`` node is
     always visited before its own ``.value`` child, meaning ``subscripted_attrs`` is
@@ -205,10 +224,10 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
     for node in ast.walk(func):
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
             attr_node = node.value
-            entry = TOPOLOGY_ATTRS.get(attr_node.attr)
-            if entry is None or _infer_type(attr_node.value, env) not in entry[1]:
+            receiver_type = _infer_type(attr_node.value, env)
+            marker = _member_marker(TOPOLOGY_ATTRS, receiver_type, attr_node.attr)
+            if marker is None:
                 continue
-            marker, _allowed = entry
             subscripted_attrs.add(id(attr_node))
             index_value = _constant_int_index(node.slice)
             if index_value is not None:
@@ -216,19 +235,19 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
                 required[marker] = max(required.get(marker, 0), needed)
             else:
                 dynamic.add(marker)
-        elif isinstance(node, ast.Attribute) and node.attr in TOPOLOGY_ATTRS:
+        elif isinstance(node, ast.Attribute):
             if id(node) in subscripted_attrs:
                 continue
-            marker, allowed = TOPOLOGY_ATTRS[node.attr]
-            if _infer_type(node.value, env) in allowed:
+            receiver_type = _infer_type(node.value, env)
+            marker = _member_marker(TOPOLOGY_ATTRS, receiver_type, node.attr)
+            if marker is not None:
                 dynamic.add(marker)
-        elif (
-            isinstance(node, ast.Call)
-            and isinstance(node.func, ast.Attribute)
-            and node.func.attr in INDIRECT_TOPOLOGY_CALLS
-        ):
-            marker, allowed = INDIRECT_TOPOLOGY_CALLS[node.func.attr]
-            if _infer_type(node.func.value, env) in allowed:
+        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
+            receiver_type = _infer_type(node.func.value, env)
+            marker = _member_marker(
+                INDIRECT_TOPOLOGY_CALLS, receiver_type, node.func.attr
+            )
+            if marker is not None:
                 required[marker] = max(required.get(marker, 0), 1)
 
     return required, dynamic
