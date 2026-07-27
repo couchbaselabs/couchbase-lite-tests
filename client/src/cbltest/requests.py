@@ -87,9 +87,8 @@ class RequestFactory:
     def __init__(self, config: ParsedConfig):
         self.__record_path = Path("http_log")
         self.__version = 0
-        if RequestFactory.__first_run:
-            if self.__record_path.exists():
-                rmtree(self.__record_path)
+        if RequestFactory.__first_run and self.__record_path.exists():
+            rmtree(self.__record_path)
 
         RequestFactory.__first_run = False
 
@@ -128,9 +127,8 @@ class RequestFactory:
             importlib.import_module(f"cbltest.v{api_version}.requests")
             importlib.import_module(f"cbltest.v{api_version}.responses")
 
-        for request_tuple in _request_registry:
+        for request_tuple, request_cls in _request_registry.items():
             version = request_tuple[1]
-            request_cls = _request_registry[request_tuple]
             if (request_cls, version) not in _response_registry:
                 raise ValueError(
                     f"Response type for '{request_cls}' not registered for version {version}!"
@@ -212,12 +210,12 @@ class RequestFactory:
             )
             ret_val = await transport.send(r, writer.num)
         except CblTestServerBadResponseError as e:
-            cbl_error(f"Failed to send {r} to {server_info[0]} ({str(e)})")
-            msg = f"{str(e)}\n\n{e.response.serialize()}"
+            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})")
+            msg = f"{e!s}\n\n{e.response.serialize()}"
             writer.write_error(msg)
             raise
         except Exception as e:
-            cbl_error(f"Failed to send {r} to {server_info[0]} ({str(e)})")
+            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})")
             writer.write_error(traceback.format_exc())
             raise
 

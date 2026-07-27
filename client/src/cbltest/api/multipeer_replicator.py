@@ -110,7 +110,7 @@ class MultipeerReplicator:
                     "Failed to start multipeer replicator (see trace log for details)"
                 )
                 cbl_trace(resp.error.message)
-                return None
+                return
 
             cast_resp = cast(PostStartMultipeerReplicatorResponseMethods, resp)
             self.__id = cast_resp.replicator_id
@@ -122,7 +122,7 @@ class MultipeerReplicator:
         with self.__tracer.start_as_current_span("stop_multipeer_replicator"):
             if not self.__id:
                 cbl_error("Cannot stop multipeer replicator, it has not been started")
-                return None
+                return
 
             req = self.__request_factory.create_request(
                 TestServerRequestType.STOP_MULTIPEER_REPLICATOR,
