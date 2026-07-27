@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -99,18 +99,17 @@ class TestLogging(CBLTestClass):
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")

@@ -6,7 +6,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
@@ -70,11 +70,11 @@ class TestJWTReplication(CBLTestClass):
             await resp.read()
 
         # Build the SGW database config with local_jwt for JWT validation
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
                         "airlines": {
                             "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
                         },
@@ -91,28 +91,22 @@ class TestJWTReplication(CBLTestClass):
                             "sync": "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
                         },
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk],
-                }
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk],
+                )
             },
-        }
-
-        # Create bucket and collections on CBS, then create SGW database
-        payload = PutDatabasePayload(sg_config)
+        )
         if not sgw.using_rosmar:
             cbs.create_bucket("travel")
-            for scope_name in payload.scopes():
-                cbs.create_collections(
-                    "travel", scope_name, payload.collections(scope_name)
-                )
+            cloud._create_collections(payload)
 
         await sgw.put_database("travel", payload)
 
@@ -206,10 +200,8 @@ class TestJWTReplication(CBLTestClass):
         token_b = generate_jwt(
             private_key_b, subject="user1", expires_in=3600, kid="test-key-2"
         )
-        jwk_a = public_key_to_jwk(public_key_a)
-        jwk_b = public_key_to_jwk(public_key_b)
-        # Use different kid for key B
-        jwk_b["kid"] = "test-key-2"
+        jwk_a = public_key_to_jwk(public_key_a, kid="test-key-1")
+        jwk_b = public_key_to_jwk(public_key_b, kid="test-key-2")
 
         # --- Step 2: Setup SGW with local_jwt containing BOTH keys ---
         self.mark_test_step("Configure SGW with both JWK keys (A and B)")
@@ -229,31 +221,29 @@ class TestJWTReplication(CBLTestClass):
         except Exception:
             pass
 
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
-                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                }
-            },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk_a, jwk_b],
-                }
-            },
-        }
-
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
 
-        payload = PutDatabasePayload(sg_config)
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
+                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                )
+            },
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk_a, jwk_b],
+                )
+            },
+        )
         await sgw.put_database("travel", payload)
 
         # Create JWT user with channel access
@@ -390,30 +380,28 @@ class TestJWTReplication(CBLTestClass):
         except Exception:
             pass
 
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
-                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                }
-            },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk],  # Only valid key registered
-                }
-            },
-        }
-
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
-        payload = PutDatabasePayload(sg_config)
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
+                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                )
+            },
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk],  # Only valid key registered
+                )
+            },
+        )
         await sgw.put_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
@@ -542,30 +530,28 @@ class TestJWTReplication(CBLTestClass):
         except Exception:
             pass
 
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
-                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                }
-            },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk],
-                }
-            },
-        }
-
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
-        payload = PutDatabasePayload(sg_config)
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
+                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                )
+            },
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk],
+                )
+            },
+        )
         await sgw.put_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
@@ -696,9 +682,8 @@ class TestJWTReplication(CBLTestClass):
             private_key_c, subject="user1", expires_in=3600, kid="test-key-3"
         )
 
-        jwk_a = public_key_to_jwk(public_key_a)
-        jwk_c = public_key_to_jwk(public_key_c)
-        jwk_c["kid"] = "test-key-3"
+        jwk_a = public_key_to_jwk(public_key_a, kid="test-key-1")
+        jwk_c = public_key_to_jwk(public_key_c, kid="test-key-3")
 
         # --- Step 2: Setup SGW with keys A and C (not the invalid one) ---
         self.mark_test_step("Configure SGW with valid keys A and C")
@@ -716,30 +701,28 @@ class TestJWTReplication(CBLTestClass):
         except Exception:
             pass
 
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
-                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                }
-            },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk_a, jwk_c],
-                }
-            },
-        }
-
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
-        payload = PutDatabasePayload(sg_config)
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
+                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
+                    }
+                )
+            },
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk_a, jwk_c],
+                )
+            },
+        )
         await sgw.put_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}

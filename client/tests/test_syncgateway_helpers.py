@@ -16,7 +16,12 @@ import pytest_asyncio
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DatabaseState, SyncGateway
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DatabaseState,
+    ScopeConfig,
+    SyncGateway,
+)
 from cbltest.httplog import _HttpLogWriter
 from pydantic import ValidationError
 
@@ -233,3 +238,50 @@ class TestWaitForDbUp:
             await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
         assert "database not present in /_all_dbs?verbose=true" in str(exc_info.value)
+
+
+class TestDatabaseConfig:
+    def test_init_with_nested_config(self) -> None:
+        payload = DatabaseConfig(
+            bucket="travel-sample",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={"_default": {"sync": "function(doc){}"}}
+                )
+            },
+        )
+        assert payload.bucket == "travel-sample"
+        assert payload.scopes is not None
+        assert list(payload.scopes.keys()) == ["_default"]
+        assert payload.scopes["_default"].collections == {
+            "_default": {"sync": "function(doc){}"}
+        }
+        assert payload.to_json() == {
+            "bucket": "travel-sample",
+            "scopes": {
+                "_default": {"collections": {"_default": {"sync": "function(doc){}"}}}
+            },
+        }
+
+    def test_init_with_flat_config(self) -> None:
+        payload = DatabaseConfig(
+            bucket="test-bucket",
+            scopes={"s1": ScopeConfig(collections={"c1": {}})},
+        )
+        assert payload.bucket == "test-bucket"
+        assert payload.scopes is not None
+        assert list(payload.scopes.keys()) == ["s1"]
+        assert payload.scopes["s1"].collections == {"c1": {}}
+
+    def test_init_with_kwargs(self) -> None:
+        payload = DatabaseConfig(bucket="kw-bucket", sync="function(doc){}")
+        assert payload.bucket == "kw-bucket"
+        assert payload.sync == "function(doc){}"
+        assert payload.to_json() == {
+            "bucket": "kw-bucket",
+            "sync": "function(doc){}",
+        }
+
+    def test_invalid_input(self) -> None:
+        with pytest.raises(ValidationError):
+            DatabaseConfig(scopes="not_a_dict")  # ty: ignore[invalid-argument-type]

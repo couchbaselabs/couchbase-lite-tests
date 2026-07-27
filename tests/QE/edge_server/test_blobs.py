@@ -5,7 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -37,18 +37,17 @@ class TestBlobs(CBLTestClass):
             "Creating a database in Sync Gateway and adding a user and role."
         )
         sg_db_name = "db-1"
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}
@@ -217,18 +216,17 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
@@ -586,18 +584,17 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}

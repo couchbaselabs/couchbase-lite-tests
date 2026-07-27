@@ -4,7 +4,12 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DocumentUpdateEntry,
+    IndexConfig,
+    ScopeConfig,
+)
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
@@ -35,12 +40,11 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step(
             f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)"
         )
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sgs[0].put_database(sg_db, db_payload)
         await sg_cluster.wait_for_db_online(sg_db)
 

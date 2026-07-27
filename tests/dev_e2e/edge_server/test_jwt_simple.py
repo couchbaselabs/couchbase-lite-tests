@@ -17,7 +17,7 @@ import aiohttp
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
@@ -80,27 +80,26 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         self.mark_test_step("Creating SGW database with local_jwt provider.")
         sg_db_name = "travel"
-        sg_config = {
-            "bucket": "travel",
-            "scopes": {
-                "travel": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="travel",
+            scopes={
+                "travel": ScopeConfig(
+                    collections={
                         "airlines": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-            "local_jwt": {
-                "test-provider": {
-                    "issuer": "test-issuer",
-                    "client_id": "edge-server",
-                    "register": True,
-                    "algorithms": ["RS256"],
-                    "keys": [jwk],
-                }
+            num_index_replicas=0,
+            local_jwt={
+                "test-provider": LocalJWT(
+                    issuer="test-issuer",
+                    client_id="edge-server",
+                    register=True,
+                    algorithms=["RS256"],
+                    keys=[jwk],
+                )
             },
-        }
-        payload = PutDatabasePayload(sg_config)
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         # =====================================================================

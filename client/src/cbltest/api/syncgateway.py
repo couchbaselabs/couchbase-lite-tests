@@ -1,6 +1,7 @@
 import asyncio
 import re
 import ssl
+import warnings
 from abc import ABC, abstractmethod
 from enum import Enum
 from json import dumps, loads
@@ -15,13 +16,12 @@ import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
-from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import assert_not_null, retry_assert
 from cbltest.version import VERSION
@@ -62,94 +62,125 @@ WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
 """
 
 
-class _CollectionMap(JSONSerializable):
-    @property
-    def scope_name(self) -> str:
-        return self.__scope_name
+class ScopeConfig(BaseModel):
+    collections: dict[str, Any] | list[str] | None = None
 
-    @property
-    def collections(self) -> list[str]:
-        return list(self.__collections.keys())
 
-    def __init__(self, scope_name: str) -> None:
-        _assert_not_null(scope_name, "scope_name")
-        self.__scope_name = scope_name
-        self.__collections: dict[str, dict] = {}
+class IndexConfig(BaseModel):
+    num_replicas: int | None = None
 
-    def add_collection(self, collection_name: str, payload: dict) -> None:
-        if collection_name in self.__collections:
-            raise ValueError(f"{collection_name} already exists in this map")
 
-        self.__collections[collection_name] = payload
+class JWK(BaseModel):
+    kty: str | None = None
+    n: str | None = None
+    e: str | None = None
+    alg: str | None = None
+    use: str | None = None
+    kid: str | None = None
+
+
+with warnings.catch_warnings():
+    # "register" is the field name Sync Gateway's wire format requires; it
+    # happens to shadow abc.ABCMeta.register (pydantic's metaclass subclasses
+    # ABCMeta), which pydantic warns about on class definition. Harmless here.
+    warnings.filterwarnings(
+        "ignore",
+        message='Field name "register" in "LocalJWT" shadows an attribute',
+        category=UserWarning,
+    )
+
+    class LocalJWT(BaseModel):
+        issuer: str | None = None
+        client_id: str | None = None
+        register: bool | None = None
+        algorithms: list[str] | None = None
+        keys: list[JWK] | None = None
+
+
+class DeltaSyncConfig(BaseModel):
+    enabled: bool | None = None
+    rev_max_age_seconds: int | None = None
+
+
+class UnsupportedSettings(BaseModel):
+    rosmar_bucket_management: bool | None = None
+    sgr_tls_skip_verify: bool | None = None
+
+
+class DatabaseConfig(BaseModel):
+    """
+    A Pydantic model containing configuration options for a Sync Gateway database endpoint
+    (PUT /{db}/), based on the OpenAPI Database schema spec:
+    https://github.com/couchbase/sync_gateway/blob/main/docs/api/components/schemas.yaml
+    """
+
+    allow_conflicts: bool | None = None
+    allow_empty_password: bool | None = None
+    bucket: str | None = Field(default=None)
+    bucket_op_timeout_ms: float | None = None
+    cacertpath: str | None = None
+    cache: dict[str, Any] | None = None
+    certpath: str | None = None
+    changes_request_plus: bool | None = None
+    client_partition_window_secs: int | None = None
+    compact_interval_days: float | None = None
+    cors: dict[str, Any] | None = None
+    delta_sync: DeltaSyncConfig | None = None
+    disable_password_auth: bool | None = None
+    disable_public_all_docs: bool | None = None
+    enable_shared_bucket_access: bool | None = None
+    event_handlers: dict[str, Any] | None = None
+    feed_type: str | None = None
+    guest: dict[str, Any] | None = None
+    import_backup_old_rev: bool | None = None
+    import_docs: bool | str | None = None
+    import_filter: str | None = None
+    import_partitions: int | None = None
+    index: IndexConfig | None = None
+    javascript_timeout_secs: float | None = None
+    keypath: str | None = None
+    kv_tls_port: int | None = None
+    local_doc_expiry_secs: int | None = None
+    local_jwt: dict[str, LocalJWT] | None = None
+    logging: dict[str, Any] | None = None
+    max_concurrent_query_ops: int | None = None
+    name: str | None = None
+    num_index_replicas: float | None = None
+    offline: bool | None = None
+    oidc: dict[str, Any] | None = None
+    old_rev_expiry_seconds: float | None = None
+    password: str | None = None
+    pool: str | None = None
+    query_pagination_limit: int | None = None
+    replications: dict[str, Any] | None = None
+    rev_cache_size: float | None = None
+    revs_limit: float | None = None
+    roles: dict[str, Any] | None = None
+    scopes: dict[str, ScopeConfig] | None = None
+    send_www_authenticate_header: bool | None = None
+    serve_insecure_attachment_types: bool | None = None
+    server: str | None = None
+    session_cookie_http_only: bool | None = None
+    session_cookie_name: str | None = None
+    session_cookie_secure: bool | None = None
+    sgreplicate_enabled: bool | None = None
+    sgreplicate_websocket_heartbeat_secs: int | None = None
+    slow_query_warning_threshold: float | None = None
+    store_legacy_revtree_data: bool | None = None
+    suspendable: bool | None = None
+    sync: str | None = None
+    unsupported: UnsupportedSettings | None = None
+    use_views: bool | None = None
+    user_xattr_key: str | None = None
+    username: str | None = None
+    users: dict[str, Any] | None = None
+    view_query_timeout_secs: int | None = None
 
     def to_json(self) -> Any:
-        return {"collections": self.__collections}
+        return self.model_dump(mode="json", exclude_none=True)
 
-
-class PutDatabasePayload(JSONSerializable):
-    """
-    A class containing configuration options for a Sync Gateway database endpoint
-    """
-
-    @property
-    def bucket(self) -> str:
-        return self.__bucket
-
-    def __init__(self, dataset_or_config: dict):
-        _assert_not_null(dataset_or_config, "dataset_or_config")
-        assert isinstance(dataset_or_config, dict), (
-            "Invalid dataset_or_config passed to PutDatabasePayload"
-        )
-        self.__config: dict = dataset_or_config
-        if "config" in dataset_or_config:
-            self.__config = _get_typed_required(dataset_or_config, "config", dict)
-
-        self.__bucket = _get_typed_required(self.__config, "bucket", str)
-        """The bucket name in the backing Couchbase Server"""
-
-        self.__scopes: dict[str, _CollectionMap] = {}
-        scopes = _get_typed_required(self.__config, "scopes", dict)
-        for scope in scopes:
-            scope_dict = _get_typed_required(scopes, scope, dict)
-            collections = _get_typed_required(scope_dict, "collections", dict)
-            for collection in collections:
-                collection_dict = _get_typed_required(collections, collection, dict)
-                self._add_collection(collection_dict, scope, collection)
-
-    def scopes(self) -> list[str]:
-        """Gets all the scopes contained in the payload"""
-        return list(self.__scopes.keys())
-
-    def collections(self, scope: str) -> list[str]:
-        """
-        Gets a list of collections specified for the given scope
-
-        :param scope: The name of the scope to check
-        """
-
-        map = self.__scopes.get(scope)
-        if not map:
-            raise KeyError(f"No collections present for {scope}")
-
-        return map.collections
-
-    def _add_collection(
-        self, payload: dict, scope_name: str, collection_name: str
-    ) -> None:
-        """
-        Adds a collection to the configuration of the database (must exist on Couchbase Server).
-        The scope name and collection name both default to "_default".
-
-        :param scope_name: The name of the scope in which the collection resides
-        :param collection_name: The name of the collection to retrieve data from
-        """
-        _assert_not_null(scope_name, "scope_name")
-        col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
-        self.__scopes[scope_name] = col_map
-        col_map.add_collection(collection_name, payload)
-
-    def to_json(self) -> Any:
-        return self.__config
+    def serialize(self) -> str:
+        return dumps(self.to_json(), indent=2)
 
 
 class ISGRPayload(JSONSerializable):
@@ -689,7 +720,7 @@ class _SyncGatewayBase:
         self,
         method: str,
         path: str,
-        payload: JSONSerializable | None = None,
+        payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
     ) -> Any:
@@ -825,32 +856,17 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _put_database(
-        self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
-    ) -> None:
-        with self._tracer.start_as_current_span(
-            "put_database", attributes={"cbl.database.name": db_name}
-        ) as current_span:
-            try:
-                await self._send_request("put", f"/{db_name}/", payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 3:
-                    cbl_warning(
-                        f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})..."
-                    )
-                    current_span.add_event("SGW returned 500, retry")
-                    await self._put_database(db_name, payload, retry_count + 1)
-                else:
-                    raise
-
-    async def put_database(self, db_name: str, payload: PutDatabasePayload) -> None:
+    async def put_database(self, db_name: str, payload: DatabaseConfig) -> None:
         """
         Attempts to create a database on the Sync Gateway instance
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        await self._put_database(db_name, payload, 0)
+        with self._tracer.start_as_current_span(
+            "put_database", attributes={"sg.database.name": db_name}
+        ):
+            await self._send_request("put", f"/{db_name}/", payload)
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -860,7 +876,7 @@ class _SyncGatewayBase:
         :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
         with self._tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
+            "get_database_status", attributes={"sg.database.name": db_name}
         ):
             try:
                 resp = await self._send_request("get", f"/{db_name}/")
@@ -873,7 +889,7 @@ class _SyncGatewayBase:
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self._tracer.start_as_current_span(
-            "delete_database", attributes={"cbl.database.name": db_name}
+            "delete_database", attributes={"sg.database.name": db_name}
         ) as current_span:
             try:
                 await self._send_request("delete", f"/{db_name}")
@@ -952,7 +968,7 @@ class _SyncGatewayBase:
         """
         with self._tracer.start_as_current_span(
             "load_dataset",
-            attributes={"cbl.database.name": db_name, "cbl.dataset.path": str(path)},
+            attributes={"sg.database.name": db_name, "cbl.dataset.path": str(path)},
         ):
             last_scope: str = ""
             last_coll: str = ""
@@ -1467,7 +1483,7 @@ class _SyncGatewayBase:
         if not self.__session.closed:
             await self.__session.close()
 
-    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+    async def get_database_config(self, db_name: str) -> DatabaseConfig:
         """
         Gets the configuration for a specific database from the admin API.
 
@@ -1475,13 +1491,14 @@ class _SyncGatewayBase:
             db_name: The name of the database to get configuration for
 
         Returns:
-            Dictionary containing the database configuration
+            DatabaseConfig containing the database configuration
         """
         _assert_not_null(db_name, "db_name")
         with self._tracer.start_as_current_span(
             "get_database_config", attributes={"cbl.database.name": db_name}
         ):
-            return await self._send_request("GET", f"/{db_name}/_config")
+            resp = await self._send_request("GET", f"/{db_name}/_config")
+            return DatabaseConfig.model_validate(resp)
 
     async def get_document_revision_public(
         self,
@@ -2275,9 +2292,9 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "start_isgr",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": payload.replication_id,
-                "cbl.replication.direction": payload.direction,
+                "sg.database.name": db_name,
+                "sg.replication.id": payload.replication_id,
+                "sg.replication.direction": payload.direction,
             },
         ):
             await self._send_request(
@@ -2296,8 +2313,8 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "get_isgr_status",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
             },
         ):
             resp = await self._send_request(
@@ -2319,8 +2336,8 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "stop_isgr",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
             },
         ):
             try:
@@ -2355,9 +2372,9 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "wait_for_isgr_status",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
-                "cbl.target.status": target_status,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
+                "sg.target.status": target_status,
             },
         ):
             for _ in range(timeout // poll_interval):

@@ -6,7 +6,12 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DocumentUpdateEntry,
+    IndexConfig,
+    ScopeConfig,
+)
 
 
 @pytest.mark.sgw
@@ -29,12 +34,11 @@ class TestTTL(CBLTestClass):
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
@@ -127,12 +131,11 @@ class TestTTL(CBLTestClass):
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
