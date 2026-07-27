@@ -118,13 +118,21 @@ def _member_marker(
 
 
 def _seed_type_env(func: ast.AST) -> dict[str, str]:
-    """Seed a type env from a function's own parameter annotations."""
+    """Seed a type env from a function's own parameter annotations.
+
+    A parameter named exactly ``cblpytest`` is always bound to ``CBLPyTest``,
+    annotated or not: pytest resolves fixtures by parameter name, so that
+    name *is* the actual runtime contract -- the annotation is just a
+    (usually, but not always, present) type-checker convenience.
+    """
     env: dict[str, str] = {}
     if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return env
     args = func.args
     for arg in (*args.posonlyargs, *args.args, *args.kwonlyargs):
-        if isinstance(arg.annotation, ast.Name) and arg.annotation.id in KNOWN_TYPES:
+        if arg.arg == "cblpytest":
+            env[arg.arg] = "CBLPyTest"
+        elif isinstance(arg.annotation, ast.Name) and arg.annotation.id in KNOWN_TYPES:
             env[arg.arg] = arg.annotation.id
     return env
 
@@ -132,22 +140,21 @@ def _seed_type_env(func: ast.AST) -> dict[str, str]:
 def _collect_assign_types(func: ast.AST, env: dict[str, str]) -> None:
     """Extend ``env`` in place from simple local assignments in ``func``.
 
-    Runs two passes so a two-hop chain (e.g. an alias of an alias) still
-    resolves; every pattern currently in the test suite only needs one.
+    A two-hop chain (an alias of an alias) wouldn't resolve in this single
+    pass, but no pattern in the test suite needs that.
     """
-    for _ in range(2):
-        for node in ast.walk(func):
-            if isinstance(node, ast.Assign) and len(node.targets) == 1:
-                target, value = node.targets[0], node.value
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                target, value = node.target, node.value
-            else:
-                continue
-            if not isinstance(target, ast.Name):
-                continue
-            inferred = _infer_type(value, env)
-            if inferred is not None:
-                env[target.id] = inferred
+    for node in ast.walk(func):
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            target, value = node.targets[0], node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            target, value = node.target, node.value
+        else:
+            continue
+        if not isinstance(target, ast.Name):
+            continue
+        inferred = _infer_type(value, env)
+        if inferred is not None:
+            env[target.id] = inferred
 
 
 def _constant_int_index(index: ast.expr) -> int | None:
@@ -169,6 +176,13 @@ def _constant_int_index(index: ast.expr) -> int | None:
 
 
 def _min_markers(decorator_list: list[ast.expr]) -> dict[str, int]:
+    """Extract each ``@pytest.mark.min_*(n)`` decorator's declared minimum.
+
+    Only the positional argument is read: the runtime consumer
+    (``required_topology.py``) reads ``mark.args[0]`` exclusively, so a
+    keyword-invoked marker (e.g. ``min_sync_gateways(count=3)``) would
+    already fail at collection time before this check's opinion matters.
+    """
     markers: dict[str, int] = {}
     for dec in decorator_list:
         if not isinstance(dec, ast.Call) or not isinstance(dec.func, ast.Attribute):
@@ -185,21 +199,38 @@ def _min_markers(decorator_list: list[ast.expr]) -> dict[str, int]:
         ):
             continue
 
-        value = None
         if (
             dec.args
             and isinstance(dec.args[0], ast.Constant)
             and type(dec.args[0].value) is int
         ):
-            value = dec.args[0].value
-        else:
-            for kw in dec.keywords:
-                if isinstance(kw.value, ast.Constant) and type(kw.value.value) is int:
-                    value = kw.value.value
-                    break
-        if value is not None:
-            markers[marker_name] = value
+            markers[marker_name] = dec.args[0].value
     return markers
+
+
+def _is_autouse_fixture(decorator_list: list[ast.expr]) -> bool:
+    """Whether a decorator list includes an autouse pytest fixture.
+
+    Matches any ``@<name>.fixture(autouse=True)`` (``pytest`` or
+    ``pytest_asyncio``, hence matching on the ``fixture`` attribute alone
+    rather than hard-coding both module names). An autouse fixture runs for
+    every test in its class automatically -- no test body calls it directly
+    -- so its topology usage has to be attributed to every test method in
+    the class rather than discovered via the normal call-tracing path.
+    """
+    for dec in decorator_list:
+        if not isinstance(dec, ast.Call) or not isinstance(dec.func, ast.Attribute):
+            continue
+        if dec.func.attr != "fixture":
+            continue
+        for kw in dec.keywords:
+            if (
+                kw.arg == "autouse"
+                and isinstance(kw.value, ast.Constant)
+                and kw.value.value is True
+            ):
+                return True
+    return False
 
 
 def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], set[str]]:
@@ -390,12 +421,37 @@ def _scan_usage(
     return required, dynamic
 
 
+def _class_autouse_usage(
+    methods: dict[str, ast.AST], scope: _FileScope
+) -> tuple[dict[str, int], set[str]]:
+    """Usage from every autouse fixture among a class's own ``methods``.
+
+    An autouse fixture runs for every test in its class automatically -- no
+    test body calls it directly -- so its topology usage can't be found via
+    the normal call-tracing path in ``_scan_usage``; it has to be attributed
+    to every test method in the class separately, by the caller.
+    """
+    required: dict[str, int] = {}
+    dynamic: set[str] = set()
+    for member in methods.values():
+        if not isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not _is_autouse_fixture(member.decorator_list):
+            continue
+        req, dyn = _scan_usage(member, methods, scope)
+        for marker, needed in req.items():
+            required[marker] = max(required.get(marker, 0), needed)
+        dynamic |= dyn
+    return required, dynamic
+
+
 class _Checker(ast.NodeVisitor):
     def __init__(self, filename: str, scope: _FileScope):
         self.filename = filename
         self.violations: list[str] = []
         self._class_markers: list[dict[str, int]] = []
         self._class_methods_stack: list[dict[str, ast.AST]] = []
+        self._class_autouse_stack: list[tuple[dict[str, int], set[str]]] = []
         self._scope = scope
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
@@ -406,7 +462,10 @@ class _Checker(ast.NodeVisitor):
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         self._class_methods_stack.append(methods)
+        self._class_autouse_stack.append(_class_autouse_usage(methods, self._scope))
+
         self.generic_visit(node)
+        self._class_autouse_stack.pop()
         self._class_methods_stack.pop()
         self._class_markers.pop()
 
@@ -423,6 +482,11 @@ class _Checker(ast.NodeVisitor):
             self._class_methods_stack[-1] if self._class_methods_stack else {}
         )
         required, dynamic = _scan_usage(node, class_methods, self._scope)
+        if self._class_autouse_stack:
+            autouse_required, autouse_dynamic = self._class_autouse_stack[-1]
+            for marker, needed in autouse_required.items():
+                required[marker] = max(required.get(marker, 0), needed)
+            dynamic |= autouse_dynamic
 
         for marker, needed in required.items():
             have = declared.get(marker)
