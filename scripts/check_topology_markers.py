@@ -1,51 +1,34 @@
 #!/usr/bin/env python3
-"""Pre-commit check: verify topology markers match server-list usage in test files.
+"""Pre-commit check: verify @pytest.mark.min_*(n) markers match topology usage.
 
-Scans test functions for indexed or bare access to a topology attribute
-(``sync_gateways``, ``couchbase_servers``, ``test_servers``, ``load_balancers``,
-``edge_servers``, or the singular ``couchbase_server`` property) and flags
-cases where the accessed index exceeds the declared ``@pytest.mark.min_*``
-requirement, or where no such marker is declared at all. This only catches
-under-declaration (which causes a real IndexError/skip mismatch at runtime);
-over-declaring a minimum is never flagged since a test may legitimately want
-extra headroom.
+Flags a marker that's missing or too low for what a test actually uses --
+a real IndexError/skip mismatch at runtime. Never flags an over-declared
+minimum; a test may legitimately want extra headroom.
 
-Each attribute name is only recognized on a receiver expression that
-resolves — via the lightweight local inference in ``_infer_type`` — to the
-specific class that actually owns it: see ``TOPOLOGY_ATTRS``, keyed first by
-class (``CBLPyTest``, ``CouchbaseCloud``) and then by the attribute that
-class exposes. Matching by bare attribute name alone, regardless of
-receiver, would be ambiguous: an unrelated object with a same-named
-attribute would false-positive, and it would blur which class a violation
-message is even about.
+A topology attribute (e.g. ``sync_gateways``) is only recognized on a
+receiver whose class actually owns it -- see ``TOPOLOGY_ATTRS``, keyed by
+class then attribute. Matching by bare attribute name alone would
+false-positive on an unrelated same-named attribute.
 
-Usage is also traced through helper calls: same-class methods, same-file
-functions, or imported functions (see ``_resolve_import_path``). Inherited
-base-class methods aren't followed. A callee's type env (``_scan_usage``) is
-seeded from three sources, each layered over the previous: its own
-parameters (``_seed_type_env`` — a parameter named after a well-known pytest
-fixture like ``cblpytest`` is bound by name alone, since fixtures are
-resolved by name at runtime regardless of annotation; otherwise its own type
-annotation, if any); its actual argument types at *this* call site
-(``_call_site_env``, matched positionally/by keyword against the caller's
-already-inferred env — this is what lets an un-annotated ``cloud`` parameter
-still resolve to ``CouchbaseCloud`` when the caller passed something
-constructed as one); and simple local assignments in its own body
-(``_collect_assign_types``). Call-site inference doesn't merge argument
-types across multiple call sites of the same helper within one scan — the
-first call reached wins, since ``_scan_usage`` visits each function at most
-once per top-level test (``_visited``) — but no helper in this codebase is
-ever called with genuinely different argument types from within a single
-test.
+A receiver's class is inferred locally, function by function
+(``_scan_usage``), from three sources layered in priority order:
 
-Calls on a receiver type the local inference still can't resolve (e.g. an
-argument expression too dynamic for ``_infer_type`` to follow, with no
-annotation to fall back on) aren't traced — that would need real type
-inference. ``cblpytest.simple_cloud()`` is a special case: it returns a
-``CouchbaseCloud`` but conditionally requires ``couchbase_servers``
-(falls back to rosmar), so instead of inferring a return type for it,
-its always-true half (``min_sync_gateways``) is hand-listed in
-``INDIRECT_TOPOLOGY_CALLS``, scoped to a ``CBLPyTest`` receiver.
+- its own parameters (``_seed_type_env``) -- a well-known fixture name
+  (``FIXTURE_TYPES``) binds by name alone; otherwise its own annotation
+- its arguments at this call site (``_call_site_env``) -- lets an
+  un-annotated helper parameter resolve when the caller passed something
+  traceable
+- simple local assignments in its own body (``_collect_assign_types``)
+
+Usage is traced through helper calls -- same-class methods, same-file
+functions, imported functions (``_resolve_import_path``) -- and through
+autouse fixtures (``_class_autouse_usage``), but not through inherited
+base-class methods or expressions ``_infer_type`` can't follow.
+
+``cblpytest.simple_cloud()`` is a special case: it returns a
+``CouchbaseCloud`` but only conditionally requires ``couchbase_servers``
+(falls back to rosmar), so only its always-true half (``min_sync_gateways``)
+is hand-listed in ``INDIRECT_TOPOLOGY_CALLS``.
 """
 
 import ast
@@ -55,10 +38,9 @@ import sys
 from pathlib import Path
 from typing import NamedTuple
 
-# Topology attributes this script tracks, keyed by the class that owns each
-# one and then by the attribute name itself -- e.g. TOPOLOGY_ATTRS["CBLPyTest"]
-# ["test_servers"] is "min_test_servers". Keying by owning class first means a
-# receiver only ever matches the attributes its inferred class actually has.
+# Topology attributes this script tracks, keyed by owning class then
+# attribute name -- so a receiver only matches attributes its own class
+# actually has, not just any object with a matching attribute name.
 TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
     "CBLPyTest": {
         "test_servers": "min_test_servers",
@@ -79,25 +61,22 @@ TOPOLOGY_MARKERS = {
     marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()
 }
 
-# CBLPyTest.simple_cloud() unconditionally requires sync_gateways (raises if
-# empty) but only conditionally touches couchbase_servers (falls back to
-# rosmar). Listing min_couchbase_servers here would get tests that pass fine
-# on rosmar-only configs skipped, so only the always-true half is recorded.
-# Same shape as TOPOLOGY_ATTRS: class -> method name -> marker.
+# simple_cloud() always requires sync_gateways, but only conditionally
+# touches couchbase_servers (falls back to rosmar) -- so only the
+# always-true half is listed. Same shape as TOPOLOGY_ATTRS: class -> method
+# name -> marker.
 INDIRECT_TOPOLOGY_CALLS: dict[str, dict[str, str]] = {
     "CBLPyTest": {"simple_cloud": "min_sync_gateways"},
 }
 
-# Pytest fixture parameter names whose type is fixed by fixture registration
-# rather than by annotation: pytest resolves fixtures by parameter name, so a
-# parameter named "cblpytest" is a CBLPyTest instance regardless of whether
-# it's annotated as one -- the name itself is the actual runtime contract.
+# Pytest fixture names bound to their type regardless of annotation: pytest
+# resolves fixtures by parameter name, so a "cblpytest" parameter is always
+# a CBLPyTest instance.
 FIXTURE_TYPES: dict[str, str] = {
     "cblpytest": "CBLPyTest",
 }
 
-# The classes this script's local type inference resolves receivers to --
-# every class named as a key or fixture-bound value above.
+# Every class this script can resolve a receiver to.
 KNOWN_TYPES = (
     frozenset(TOPOLOGY_ATTRS)
     | frozenset(INDIRECT_TOPOLOGY_CALLS)
@@ -108,13 +87,12 @@ KNOWN_TYPES = (
 def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
     """Best-effort local type of a receiver expression, or None if unresolved.
 
-    Recognizes a name already bound in ``env`` (from a parameter annotation
-    or an earlier local assignment — see ``_seed_type_env`` and
-    ``_collect_assign_types``), a direct constructor call
-    (``CouchbaseCloud(...)``), and ``<CBLPyTest-typed-expr>.simple_cloud()``.
-    Anything else — attribute chains through un-annotated helpers, dict/list
-    lookups, etc. — returns None, excluding it from consideration rather
-    than guessing.
+    Recognizes:
+    - a name already bound in ``env`` (see ``_seed_type_env``, ``_collect_assign_types``)
+    - a direct constructor call, e.g. ``CouchbaseCloud(...)``
+    - ``<CBLPyTest-typed-expr>.simple_cloud()``
+
+    Anything else returns None rather than guessing.
     """
     if isinstance(expr, ast.Name):
         return env.get(expr.id)
@@ -143,11 +121,9 @@ def _member_marker(
 def _seed_type_env(func: ast.AST) -> dict[str, str]:
     """Seed a type env from a function's own parameters.
 
-    A parameter named after a known fixture (``FIXTURE_TYPES``) is bound to
-    that fixture's type directly, annotated or not -- the annotation is only
-    consulted as a fallback, for locals that aren't fixtures (e.g. a
-    ``cloud: CouchbaseCloud`` helper parameter), where the name carries no
-    such guarantee on its own.
+    A well-known fixture name (``FIXTURE_TYPES``) binds by name alone, even
+    without an annotation. Everything else falls back to its own type
+    annotation, if any.
     """
     env: dict[str, str] = {}
     if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -235,12 +211,9 @@ def _min_markers(decorator_list: list[ast.expr]) -> dict[str, int]:
 def _is_autouse_fixture(decorator_list: list[ast.expr]) -> bool:
     """Whether a decorator list includes an autouse pytest fixture.
 
-    Matches any ``@<name>.fixture(autouse=True)`` (``pytest`` or
-    ``pytest_asyncio``, hence matching on the ``fixture`` attribute alone
-    rather than hard-coding both module names). An autouse fixture runs for
-    every test in its class automatically -- no test body calls it directly
-    -- so its topology usage has to be attributed to every test method in
-    the class rather than discovered via the normal call-tracing path.
+    Matches any ``@<name>.fixture(autouse=True)`` -- ``pytest`` or
+    ``pytest_asyncio`` -- by the ``fixture`` attribute alone, so both
+    modules match without hard-coding either name.
     """
     for dec in decorator_list:
         if not isinstance(dec, ast.Call) or not isinstance(dec.func, ast.Attribute):
@@ -258,19 +231,16 @@ def _is_autouse_fixture(decorator_list: list[ast.expr]) -> bool:
 
 
 def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], set[str]]:
-    """Return (marker -> min required by a constant index, markers accessed with no constant index).
+    """Usage written directly in ``func``'s own body, not calls it makes.
 
-    Only considers accesses written directly in ``func``'s own body, not calls it makes.
-    ``env`` maps local names to their inferred class (see ``_seed_type_env`` /
-    ``_collect_assign_types``); a receiver's inferred class is looked up directly
-    in ``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS`` (class -> member -> marker),
-    so an attribute or call only counts as topology usage when its receiver's own
-    class actually exposes that member.
+    Returns (marker -> min required by a constant index, markers accessed
+    with no constant index). ``env`` maps names to inferred classes; an
+    attribute or call only counts if its receiver's class actually owns
+    that member (``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS``).
 
-    A single walk suffices: ``ast.walk`` is breadth-first, so a ``Subscript`` node is
-    always visited before its own ``.value`` child, meaning ``subscripted_attrs`` is
-    already populated by the time that same ``Attribute`` node is (potentially) visited
-    on its own.
+    One walk suffices for ``subscripted_attrs``: ``ast.walk`` visits a
+    ``Subscript`` before its own ``.value`` child, so it's already recorded
+    by the time that same ``Attribute`` node is visited on its own.
     """
     required: dict[str, int] = {}
     dynamic: set[str] = set()
@@ -346,20 +316,16 @@ def _find_pyproject(start: Path) -> Path | None:
 def _resolve_import_path(module: str, importing_dir: Path) -> Path | None:
     """Locate the source file behind an absolute ``from <module> import ...``.
 
-    Tries a real installed package first (e.g. ``cbltest`` submodules), then
-    searches for a matching file starting at the importing file's own
-    directory and walking up to the repo root — this is how pytest's
-    rootless import mode and its ``pythonpath``-configured roots (e.g.
-    ``tests/shared/...``) both resolve in practice, without needing to parse
-    pytest's config to know which directories count as roots. Returns
-    ``None`` if nothing matches — an ordinary outcome (most imports, e.g.
-    third-party libraries, aren't meant to be traced), not an error.
+    Tries an installed package first, then searches from the importing
+    file's own directory up to the repo root -- covers both real packages
+    (e.g. ``cbltest``) and pytest's own import roots (e.g.
+    ``tests/shared/...``). Returns None for anything that doesn't match
+    (most imports, e.g. third-party libraries) -- that's normal, not an
+    error.
     """
-    # find_spec(module) would raise ModuleNotFoundError for a dotted name whose
-    # parent package isn't installed (it has to import the parent to look up
-    # the submodule). A single-component lookup never raises that way — it
-    # just returns None — so check the top-level name first and only resolve
-    # the full dotted path once we know its parent actually exists.
+    # Check the top-level name first: find_spec on a dotted name raises
+    # ModuleNotFoundError if its parent package isn't installed, but a
+    # single-component lookup never does -- it just returns None.
     spec = None
     if importlib.util.find_spec(module.partition(".")[0]) is not None:
         spec = importlib.util.find_spec(module)
@@ -385,11 +351,9 @@ def _resolve_call(
 ) -> tuple[ast.AST, dict[str, ast.AST], _FileScope, bool] | None:
     """Resolve a call to its target function, plus whether it's a method call.
 
-    The ``bool`` is whether ``node`` is a ``self./cls.`` method call, where
-    the target's own leading ``self``/``cls`` parameter has no corresponding
-    argument at the call site -- callers matching ``node.args`` positionally
-    against the target's parameters (see ``_call_site_env``) need to know to
-    skip it.
+    The ``bool`` says whether to skip the target's leading ``self``/``cls``
+    parameter when matching call-site arguments (``_call_site_env``) -- a
+    ``self./cls.`` call never passes it explicitly.
     """
     func = node.func
     if (
@@ -425,16 +389,14 @@ def _call_site_env(
     env: dict[str, str],
     is_method_call: bool,
 ) -> dict[str, str]:
-    """Infer the target function's own parameter types from this call site.
+    """Infer ``target``'s own parameter types from this call's arguments.
 
-    Matches ``node``'s positional and keyword arguments to ``target``'s
-    parameters and infers each argument expression's type using the
-    *caller's* env -- e.g. for ``self.setup(cloud, ...)`` where ``cloud``
-    was assigned from ``cblpytest.simple_cloud()`` earlier in the caller,
-    this binds ``target``'s corresponding parameter to ``CouchbaseCloud``
-    even if that parameter isn't itself annotated. ``is_method_call`` skips
-    the target's leading ``self``/``cls`` parameter, which the call site
-    never passes explicitly.
+    Matches ``node``'s positional/keyword arguments to ``target``'s
+    parameters and infers each one's type using the *caller's* env -- e.g.
+    ``self.setup(cloud, ...)`` binds ``target``'s ``cloud`` parameter even
+    if it isn't itself annotated, as long as the caller's ``cloud`` is
+    traceable. ``is_method_call`` skips ``target``'s leading ``self``/``cls``,
+    which the call site never passes explicitly.
     """
     if not isinstance(target, (ast.FunctionDef, ast.AsyncFunctionDef)):
         return {}
@@ -469,11 +431,9 @@ def _scan_usage(
 ) -> tuple[dict[str, int], set[str]]:
     """Return usage in ``func``, plus usage in helpers it calls (recursively).
 
-    ``_call_env`` is this call's own parameters as inferred at its call site
-    (see ``_call_site_env``); it's layered on top of ``func``'s own
-    parameter/fixture bindings, taking priority where both resolve the same
-    name, since it reflects what's actually being passed at this particular
-    call rather than a static declaration on the parameter.
+    ``_call_env`` (see ``_call_site_env``) is layered on top of ``func``'s
+    own parameter/fixture bindings and wins on conflicts, since it reflects
+    what's actually passed at this call rather than a static declaration.
     """
     if _visited is None:
         _visited = set()
