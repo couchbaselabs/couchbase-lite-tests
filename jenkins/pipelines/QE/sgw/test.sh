@@ -41,7 +41,28 @@ if [ "$SETUP_ONLY" = true ]; then
 fi
 
 # Run Tests :
+# Run the whole tests/ tree (both QE and dev_e2e) in a single session and let
+# markers pick the SGW-relevant tests:
+#   * "sgw"  -> QE tests already tagged for Sync Gateway.
+#   * "nightly" -> every dev_e2e test (auto-tagged in tests/dev_e2e/conftest.py).
+#   * "and min_sync_gateways" -> drop tests that never touch SGW (e.g. the
+#     P2P-only tests/dev_e2e/test_multipeer.py, which has no min_sync_gateways).
+# The edge_server sub-suites are out of scope for the nightly SGW run, so they
+# are excluded explicitly rather than by marker.
+# test_replication_xdcr.py needs two separate Couchbase Server clusters, which
+# this single-cluster topology does not provide; it is deferred until the
+# multi-cluster topology is sorted out (tracked separately) rather than left to
+# fail every night.
+# --import-mode=importlib is required because tests/dev_e2e/test_multipeer.py
+# and tests/QE/test_multipeer.py share a basename and would otherwise collide
+# at import time (pytest imports every collected module before -m deselection).
 echo "Run tests..."
-pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw \
+pushd $TESTS_DIR > /dev/null
+uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config QE/config.json \
+    --import-mode=importlib \
+    -m "(sgw or nightly) and min_sync_gateways" \
+    --ignore=QE/edge_server \
+    --ignore=dev_e2e/edge_server \
+    --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure
