@@ -27,11 +27,11 @@ for arg in "$@"; do
 done
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/../../shared/config.sh
+source "$SCRIPT_DIR"/../../shared/config.sh
 
 echo "Setup backend..."
-pushd $AWS_ENVIRONMENT_DIR > /dev/null
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+pushd "$AWS_ENVIRONMENT_DIR" > /dev/null
+uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 popd > /dev/null
 
 # Exit early if setup-only mode
@@ -57,7 +57,7 @@ fi
 # and tests/QE/test_multipeer.py share a basename and would otherwise collide
 # at import time (pytest imports every collected module before -m deselection).
 echo "Run tests..."
-pushd $TESTS_DIR > /dev/null
+pushd "$TESTS_DIR" > /dev/null
 uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config QE/config.json \
     --import-mode=importlib \
@@ -65,4 +65,5 @@ uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --ignore=QE/edge_server \
     --ignore=dev_e2e/edge_server \
     --ignore=dev_e2e/test_replication_xdcr.py \
-    --sgcollect-on-test-failure
+    --sgcollect-on-test-failure \
+    dev_e2e QE
