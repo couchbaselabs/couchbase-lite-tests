@@ -62,23 +62,26 @@ import click
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))            # repo root on sys.path
+    sys.path.append(str(SCRIPT_DIR.parents[3]))  # repo root on sys.path
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
 from jenkins.pipelines.shared.setup_test import setup_test
+
 
 @click.command()
 @click.argument("cbl_version")
 @click.argument("sgw_version")
 def cli_entry(cbl_version: str, sgw_version: str) -> None:
     setup_test(
-        cbl_version, sgw_version,
-        SCRIPT_DIR / "TOPOLOGY_FILE",       # ← varies per platform
-        SCRIPT_DIR / "CONFIG_FILE",         # ← varies per platform
-        "PLATFORM_TAG",                     # ← varies per platform
-        setup_dir="SUITE",                  # "dev_e2e" (default) or "QE"
+        cbl_version,
+        sgw_version,
+        SCRIPT_DIR / "TOPOLOGY_FILE",  # ← varies per platform
+        SCRIPT_DIR / "CONFIG_FILE",  # ← varies per platform
+        "PLATFORM_TAG",  # ← varies per platform
+        setup_dir="SUITE",  # "dev_e2e" (default) or "QE"
     )
+
 
 if __name__ == "__main__":
     cli_entry()

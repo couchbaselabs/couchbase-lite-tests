@@ -250,7 +250,7 @@ class TestLogRedaction(CBLTestClass):
                 "No redacted SGCollect zip files found. "
                 "Make sure SGCollect was run with redaction enabled and Caddy has 'browse' enabled."
             )
-            redacted_zip_filename = sorted(files)[-1]
+            redacted_zip_filename = max(files)
             self.mark_test_step(f"Found redacted zip: {redacted_zip_filename}")
 
         except Exception as e:

@@ -30,7 +30,7 @@ def test_cloud_without_couchbase_server():
         CblTestError,
         match="Couchbase Server is not available",
     ):
-        cloud.couchbase_server
+        _ = cloud.couchbase_server
 
 
 def test_cloud_with_couchbase_server():
@@ -60,9 +60,11 @@ def test_cloud_with_multiple_sync_gateways():
 
 
 def test_cloud_multiple_sync_gateways_requires_couchbase_server():
-    with fake_sync_gateways(2) as sync_gateways:
-        with pytest.raises(
+    with (
+        fake_sync_gateways(2) as sync_gateways,
+        pytest.raises(
             CblTestError,
             match="Couchbase Server must be provided when configuring multiple Sync Gateway nodes",
-        ):
-            CouchbaseCloud(sync_gateways, None)
+        ),
+    ):
+        CouchbaseCloud(sync_gateways, None)

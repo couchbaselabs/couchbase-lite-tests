@@ -38,7 +38,7 @@ class TestTTLExpires(CBLTestClass):
         assert response is not None, "Document is not present in the database"
 
         self.mark_test_step("Checking if the document is expired after 5 seconds")
-        time.sleep(5)
+        await asyncio.sleep(5)
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_doc")
 
@@ -72,7 +72,7 @@ class TestTTLExpires(CBLTestClass):
 
         self.mark_test_step("Checking if the document is expired after 5 seconds")
 
-        time.sleep(5)
+        await asyncio.sleep(5)
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl_doc")
 
@@ -117,7 +117,7 @@ class TestTTLExpires(CBLTestClass):
 
         self.mark_test_step("Check if the document is expired after 5 seconds")
 
-        time.sleep(5)
+        await asyncio.sleep(5)
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(es_db_name, "ttl")
 
@@ -159,7 +159,7 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step(
             "Waiting 10 seconds - document should expire based on TTL (lower value)"
         )
-        time.sleep(10)
+        await asyncio.sleep(10)
 
         self.mark_test_step(
             "Document expired after 10 seconds - TTL took precedence over expires"
@@ -194,7 +194,7 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step(
             "Waiting 10 seconds - document should expire based on expires (lower value)"
         )
-        time.sleep(10)
+        await asyncio.sleep(10)
 
         self.mark_test_step(
             "Document expired after 10 seconds - expires took precedence over TTL"
@@ -327,7 +327,7 @@ class TestTTLExpires(CBLTestClass):
 
         # Step 1: After 10s, check that docs with 30s and 60s TTL remain
         self.mark_test_step("Waiting 10 seconds - 10s TTL documents should expire")
-        time.sleep(10)
+        await asyncio.sleep(10)
 
         response_10s = await edge_server.get_all_documents(es_db_name)
         count_10s = len(response_10s.rows)
@@ -343,7 +343,7 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step(
             "Waiting additional 20 seconds (30s total) - 30s TTL documents should expire"
         )
-        time.sleep(20)
+        await asyncio.sleep(20)
 
         response_30s = await edge_server.get_all_documents(es_db_name)
         count_30s = len(response_30s.rows)
@@ -359,7 +359,7 @@ class TestTTLExpires(CBLTestClass):
         self.mark_test_step(
             "Waiting additional 30 seconds (60s total) - 60s TTL documents should expire"
         )
-        time.sleep(30)
+        await asyncio.sleep(30)
 
         response_60s = await edge_server.get_all_documents(es_db_name)
         count_60s = len(response_60s.rows)

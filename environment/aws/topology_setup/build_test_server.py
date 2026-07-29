@@ -91,23 +91,23 @@ def main() -> None:
 
     if args.ci and upload_exists(server):
         click.secho("Server already exists on latestbuilds, skipping build", fg="green")
-        exit(0)
+        sys.exit(0)
 
     server.build()
 
     if not args.ci and not args.upload:
         click.secho("Upload not requested, skipping", fg="yellow")
-        exit(0)
+        sys.exit(0)
 
     if not args.upload and upload_exists(server):
         click.secho(
             "Server already exists on latestbuilds, skipping upload", fg="yellow"
         )
-        exit(0)
+        sys.exit(0)
 
     if "LATESTBUILDS_PASSWORD" not in os.environ:
         click.secho("LATESTBUILDS_PASSWORD env var is not set", fg="red")
-        exit(1)
+        sys.exit(1)
 
     package_path = Path(server.compress_package())
     ssh = paramiko.SSHClient()

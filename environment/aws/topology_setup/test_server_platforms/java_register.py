@@ -135,14 +135,14 @@ class JarBridge(JavaBridge):
             args.insert(0, "nohup")
 
         info_dir = JAK_TEST_SERVER_DIR / "desktop"
-        log_file = open(info_dir / "server.log", "w")
-        process = subprocess.Popen(
-            args,
-            stdout=log_file,
-            stderr=log_file,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        with open(info_dir / "server.log", "w") as log_file:
+            process = subprocess.Popen(
+                args,
+                stdout=log_file,
+                stderr=log_file,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+            )
 
         click.echo(f"Started {self.__jar_path} with PID {process.pid}")
         with open(info_dir / "server.pid", "w") as pid_file:
@@ -201,15 +201,15 @@ class JettyBridge(JavaBridge):
             args.insert(0, "nohup")
 
         info_dir = JAK_TEST_SERVER_DIR / "webservice"
-        log_file = open(info_dir / "server.log", "w")
-        process = subprocess.Popen(
-            args,
-            stdout=log_file,
-            stderr=log_file,
-            stdin=subprocess.DEVNULL,
-            start_new_session=True,
-            cwd=self.__gradle_path.parent,
-        )
+        with open(info_dir / "server.log", "w") as log_file:
+            process = subprocess.Popen(
+                args,
+                stdout=log_file,
+                stderr=log_file,
+                stdin=subprocess.DEVNULL,
+                start_new_session=True,
+                cwd=self.__gradle_path.parent,
+            )
         click.echo(f"Started web service with PID {process.pid}")
 
     def stop(self, location: str) -> None:
