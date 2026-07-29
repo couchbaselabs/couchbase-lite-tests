@@ -12,6 +12,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 
 @pytest.mark.min_edge_servers(1)
+@pytest.mark.min_sync_gateways(1)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
