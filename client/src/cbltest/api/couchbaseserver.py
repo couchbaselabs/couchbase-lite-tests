@@ -874,7 +874,17 @@ class CouchbaseServer:
                 try:
                     self.__http_session.put(
                         f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
-                        data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
+                        data={
+                            "hostname": node_to_add.__hostname,
+                            "kv": "11210",
+                            "kvSSL": "11207",
+                            "mgmt": "8091",
+                            "mgmtSSL": "18091",
+                            "capi": "8092",
+                            "capiSSL": "18092",
+                            "n1ql": "8093",
+                            "n1qlSSL": "18093",
+                        },
                     ).raise_for_status()
                     span.add_event(
                         "alternate_address_set",

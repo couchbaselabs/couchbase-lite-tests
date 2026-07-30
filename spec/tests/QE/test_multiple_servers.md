@@ -41,26 +41,25 @@ Test that Sync Gateway continues to function when a Couchbase Server node fails 
 
 Test Inter-Sync Gateway Replication (ISGR) with explicit collection mapping between different buckets.
 
-1. Clean up any leftover state from all Sync Gateways
-2. Create 3 buckets on single CBS cluster (isgr_bucket1, isgr_bucket2, isgr_bucket3)
-3. Create collections in _default scope for each bucket:
+1. Create 3 buckets on single CBS cluster (isgr_bucket1, isgr_bucket2, isgr_bucket3)
+2. Create collections in _default scope for each bucket:
    - bucket1: collection1, collection2, collection3
    - bucket2: collection4, collection5
    - bucket3: collection6, collection7, collection8, collection9
-4. Configure SG1 with bucket1 (db1), SG2 with bucket2 (db2), SG3 with bucket3 (db3)
-5. Upload 3 docs to each collection in SG1 (collection1, collection2, collection3)
-6. Start one-shot push ISGR from SG1 to SG2 with collection remapping:
+3. Configure SG1 with bucket1 (db1), SG2 with bucket2 (db2), SG3 with bucket3 (db3)
+4. Upload 3 docs to each collection in SG1 (collection1, collection2, collection3)
+5. Start one-shot push ISGR from SG1 to SG2 with collection remapping:
    - _default.collection1 -> _default.collection4
    - _default.collection2 -> _default.collection5
-7. Start one-shot pull ISGR from SG1 to SG3 with collection remapping:
+6. Start one-shot pull ISGR from SG1 to SG3 with collection remapping:
    - _default.collection1 -> _default.collection6
    - _default.collection2 -> _default.collection7
    - _default.collection3 -> _default.collection8
-8. Wait for both ISGR replications to complete (status: stopped)
-9. Verify docs replicated to SG2:
+7. Wait for both ISGR replications to complete (status: stopped)
+8. Verify docs replicated to SG2:
    - collection4 should have docs from collection1
    - collection5 should have docs from collection2
-10. Verify docs replicated to SG3:
-    - collection6 should have docs from collection1
-    - collection7 should have docs from collection2
-    - collection8 should have docs from collection3
+9. Verify docs replicated to SG3:
+   - collection6 should have docs from collection1
+   - collection7 should have docs from collection2
+   - collection8 should have docs from collection3
