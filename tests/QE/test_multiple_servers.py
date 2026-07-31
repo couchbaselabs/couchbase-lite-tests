@@ -66,6 +66,42 @@ async def _setup_database_and_user(
     return await sg.create_user_client(sg_db, user_name, user_password, channels)
 
 
+def _readvertise_external_addresses(cbs_servers: list) -> None:
+    """
+    Re-advertise the external alternate address on every CBS node so the external
+    test agent's SDK can reach all services (incl. KV). A node that was
+    ejected/re-added or failed-over/recovered can lose its alternate address,
+    leaving it unreachable from outside the VPC; this restores it. Setting only
+    the hostname makes Couchbase Server auto-map all standard service ports --
+    the same thing provisioning's `couchbase-cli setting-alternate-address` does.
+    """
+    session = requests.Session()
+    session.auth = ("Administrator", "password")
+    for cbs_node in cbs_servers:
+        session.put(
+            f"http://{cbs_node.hostname}:8091/node/controller/setupAlternateAddresses/external",
+            data={"hostname": cbs_node.hostname},
+        )
+
+
+@pytest.fixture
+def restore_cbs_cluster(cblpytest: CBLPyTest):
+    """
+    Restore the Couchbase Server cluster after a test that mutates its topology
+    (failover / rebalance / eject). After the test, re-add or recover any
+    missing/failed nodes and rebalance back to health, then re-advertise
+    external addresses on all nodes -- so the churn does not leak into later
+    tests and the suite stays order-independent (verify with pytest-random-order).
+    """
+    yield
+    cbs_servers = cblpytest.couchbase_servers
+    if len(cbs_servers) < 2:
+        return
+    cbs_servers[0].ensure_cluster_healthy(cbs_servers)
+    _readvertise_external_addresses(cbs_servers)
+
+
+@pytest.mark.usefixtures("restore_cbs_cluster")
 @pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(2)
