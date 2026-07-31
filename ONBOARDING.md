@@ -147,9 +147,9 @@ Start here:
   custom-built SGW, [environment/local/](environment/local/README.md) can run an
   in-memory `rosmar` SGW or a build from source against a locally-launched Test
   Server — e.g.
-  `uv run environment/local/run_sync_gateway.py --start --server rosmar`, then
-  `pytest --config environment/local/rosmar_config.json`. This is *not* the
-  supported path for normal test runs; reach for AWS instead.
+  `uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway`,
+  then `pytest --config "$(cat environment/local/topology_config)"`. This is
+  *not* the supported path for normal test runs; reach for AWS instead.
 
 > The Docker environment under `environment/docker/` is **deprecated** — it may
 > still work but is unmaintained.
