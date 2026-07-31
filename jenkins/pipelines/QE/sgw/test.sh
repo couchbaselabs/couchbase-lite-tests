@@ -58,7 +58,7 @@ fi
 # at import time (pytest imports every collected module before -m deselection).
 echo "Run tests..."
 pushd "$TESTS_DIR" > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning \
+uv run pytest -v --no-header \
     --config QE/config.json \
     --import-mode=importlib \
     -m "(sgw or nightly) and min_sync_gateways" \
