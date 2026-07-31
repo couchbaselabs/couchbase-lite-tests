@@ -44,13 +44,13 @@ fi
 # this single-cluster topology does not provide; it is deferred until the
 # multi-cluster topology is sorted out rather than left to fail every night.
 
-# --import-mode=importlib is required because tests/dev_e2e/test_multipeer.py
-# and tests/QE/test_multipeer.py share a basename and would otherwise collide
-# at import time can be removed after: https://jira.issues.couchbase.com/browse/CBL-8685.
+# --import-mode=importlib AND --ignore=dev_e2e/edge_server is required because
+# tests/dev_e2e/test_multipeer.py and tests/QE/test_multipeer.py share
+# a basename and would otherwise collide at import time can be removed after:
+# https://jira.issues.couchbase.com/browse/CBL-8685.
 echo "Run tests..."
 pushd "$TESTS_DIR" > /dev/null
-uv run pytest -v --no-header -m sgw \
-    --config QE/config.json \
-    --import-mode=importlib \
+uv run pytest -v --no-header --config QE/config.json \
+    --import-mode=importlib --ignore=dev_e2e/edge_server \
     --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure
