@@ -57,7 +57,7 @@ pipeline {
                     )
 
                     if (response.status != 200) {
-                        env.BUILD_BRANCH = 'dotnet-p2p-tls'
+                        env.BUILD_BRANCH = 'main'
                     }
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
