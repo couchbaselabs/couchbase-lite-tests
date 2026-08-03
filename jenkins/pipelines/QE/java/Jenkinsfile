@@ -8,6 +8,7 @@ pipeline {
         booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS Desktop tests')
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Run Windows Desktop tests')
         booleanParam(name: 'RUN_LINUX',   defaultValue: true, description: 'Run Linux Desktop tests')
+        string(name: 'TEST_NAME', defaultValue: '', description: 'Running a specific test or test expression')
     }
     options {
         timeout(time: 150, unit: 'MINUTES')
@@ -54,7 +55,7 @@ pipeline {
                     steps {
                         echo "=== Run macOS Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-name ${params.TEST_NAME}"
                         }
                         echo "=== macOS Desktop Tests Complete"
                     }
@@ -89,7 +90,7 @@ pipeline {
                             -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
                             -Version %CBL_VERSION% ^
                             -SgwVersion %SGW_VERSION% ^
-                            -DatasetVersion %TS_DATASET_VERSION%
+                            -DatasetVersion %TS_DATASET_VERSION% -TestName ${params.TEST_NAME}
                             '''                        }
                         echo "=== Windows Desktop Tests Complete"
                     }
@@ -124,7 +125,7 @@ pipeline {
                         checkout scm
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-name ${params.TEST_NAME}"
                         }
                         echo "=== Linux Desktop Tests Complete"
                     }
