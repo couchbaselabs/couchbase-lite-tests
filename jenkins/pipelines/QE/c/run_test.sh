@@ -1,3 +1,11 @@
+#!/bin/bash
+
+trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
+set -euo pipefail
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+source $SCRIPT_DIR/../../shared/config.sh
+
 function usage() {
     echo "Usage: $0 <version> <platform> <sgw_version> [options]"
     echo "  version:      CBL version (e.g. 3.2.1-2)"
