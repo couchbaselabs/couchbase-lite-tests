@@ -1,11 +1,14 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
-    [Parameter()][string]$DatasetVersion = "4.0"
+    [Parameter()][string]$DatasetVersion = "4.0",
+    [Parameter()][string]$TestName = ""
 )
 
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 $ErrorActionPreference = "Stop"
+
+if ([string]::IsNullOrWhiteSpace($DatasetVersion)) { $DatasetVersion = "4.0" }
 
 uv run --group dotnet-build dotnetenv install "10.0"
 
@@ -16,7 +19,23 @@ if($LASTEXITCODE -ne 0) {
 
 Push-Location $QE_TESTS_DIR
 try {
-    uv run pytest -v --no-header --config config.json --dataset-version $DatasetVersion -m cbl
+    $pytestArgs = @(
+        "-v", "--no-header",
+        "--config", "config.json",
+        "--dataset-version", $DatasetVersion,
+        "-m", "cbl"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($TestName)) {
+        if ($TestName -like "*.py*") {
+            $pytestArgs += $TestName
+        } else {
+            $pytestArgs += @("-k", $TestName)
+        }
+    }
+
+    Write-Host "pytest $($pytestArgs -join ' ')"
+    uv run pytest @pytestArgs
     $saved_exit = $LASTEXITCODE
 } finally {
     Pop-Location
@@ -24,6 +43,12 @@ try {
 
 # FIXME: Find another way to do this so this is not hardcoded here
 taskkill /F /IM "testserver.cli.exe"
+
+if($saved_exit -eq 5) {
+    Write-Host "ERROR: no tests collected. TestName='$TestName' matched nothing under -m cbl."
+} elseif($saved_exit -eq 4) {
+    Write-Host "ERROR: pytest usage error. Check the expression: '$TestName'"
+}
 if($saved_exit -ne 0) {
     throw "Testing failed!"
 }

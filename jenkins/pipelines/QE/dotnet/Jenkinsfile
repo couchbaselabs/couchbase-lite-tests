@@ -9,6 +9,7 @@ pipeline {
         booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS tests')
         booleanParam(name: 'RUN_IOS',     defaultValue: true, description: 'Run iOS tests')
         booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Run Android tests')
+        string(name: 'TEST_NAME', defaultValue: '', description: 'Running a specific test or test expression')
     }
     options {
         timeout(time: 150, unit: 'MINUTES')
@@ -68,7 +69,7 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestName ${params.TEST_NAME}"
                         }
                         echo "=== Dotnet Windows Tests Complete"
                     }
@@ -96,7 +97,12 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                        sh """
+                                jenkins/pipelines/QE/dotnet/run_test.sh \
+                                    "${params.CBL_VERSION}" macos "${params.SGW_VERSION}" \
+                                    --dataset-version "${params.TS_DATASET_VERSION}" \
+                                    --test-name "${env.TEST_NAME}"
+                            """
                         }
                         echo "=== Dotnet macOS Tests Complete"
                     }
@@ -128,7 +134,12 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh """
+                                jenkins/pipelines/QE/dotnet/run_test.sh \
+                                    "${params.CBL_VERSION}" ios "${params.SGW_VERSION}" \
+                                    --dataset-version "${params.TS_DATASET_VERSION}" \
+                                    --test-name "${env.TEST_NAME}"
+                            """
                         }
                         echo "=== Dotnet iOS Tests Complete"
                     }
@@ -159,7 +170,12 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh """
+                                jenkins/pipelines/QE/dotnet/run_test.sh \
+                                    "${params.CBL_VERSION}" android "${params.SGW_VERSION}" \
+                                    --dataset-version "${params.TS_DATASET_VERSION}" \
+                                    --test-name "${env.TEST_NAME}"
+                            """
                         }
                         echo "=== Dotnet Android Tests Complete"
                     }
