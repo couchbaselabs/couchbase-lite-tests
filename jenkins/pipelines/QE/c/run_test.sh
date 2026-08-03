@@ -1,54 +1,71 @@
-#!/bin/bash
-
-trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
-set -euo pipefail
-
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-source $SCRIPT_DIR/../../shared/config.sh
-
 function usage() {
-    echo "Usage: $0 <version> <platform> <sgw_version> [dataset_version] [--setup-only]"
-    echo "version: CBL version (e.g. 3.2.1-2)"
-    echo "platform: The C platform to build (e.g. ios)"
-    echo "sgw_version: Version of Sync Gateway to download and use"
-    echo "dataset_version: Optional dataset version (default: 4.0)"
-    echo "  --setup-only: Only build test server and setup backend, skip test execution"
+    echo "Usage: $0 <version> <platform> <sgw_version> [options]"
+    echo "  version:      CBL version (e.g. 3.2.1-2)"
+    echo "  platform:     The C platform to build (e.g. ios)"
+    echo "  sgw_version:  Version of Sync Gateway to download and use"
+    echo "  --dataset-version <ver>  Dataset version (default: 4.0)"
+    echo "  --test-name <expr>       pytest -k expression, or a test path"
+    echo "  --setup-only             Only build test server and setup backend, skip tests"
+    exit 1
 }
 
-if [ $# -lt 3 ]; then
-    usage
-    exit 1
-fi
+if [ $# -lt 3 ]; then usage; fi
 
-cbl_version=$1
-platform=$2
-sgw_version=$3
+cbl_version="$1"
+platform="$2"
+sgw_version="$3"
+shift 3
 
 SETUP_ONLY=false
 DATASET_VERSION="4.0"
+TEST_NAME=""
 
-# Parse optional arguments
-for arg in "${@:4}"; do
-    case "$arg" in
-        --setup-only)
-            SETUP_ONLY=true
-            ;;
-        *)
-            DATASET_VERSION="$arg"
-            ;;
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --dataset-version) DATASET_VERSION="${2:-}"; shift 2 ;;
+        --test-name)       TEST_NAME="${2:-}";       shift 2 ;;
+        --setup-only)      SETUP_ONLY=true;          shift   ;;
+        "")                shift ;;   # tolerate empty args from Jenkins interpolation
+        *) echo "Unknown option: $1"; usage ;;
     esac
 done
+[ -n "$DATASET_VERSION" ] || DATASET_VERSION="4.0"
+[ "$TEST_NAME" = "null" ] && TEST_NAME=""
+uv run "$SCRIPT_DIR/setup_test.py" "$platform" "$cbl_version" "$sgw_version"
 
-uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
-
-# Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
     echo "Setup completed. Exiting due to --setup-only flag."
     exit 0
 fi
 
-pushd $QE_TESTS_DIR
-uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
+pushd "$QE_TESTS_DIR" > /dev/null
+
+PYTEST_ARGS=(
+    -v --no-header
+    -W ignore::DeprecationWarning
+    --config config.json
+    --dataset-version "$DATASET_VERSION"
     -m cbl
+)
+
+if [ -n "$TEST_NAME" ]; then
+    if [[ "$TEST_NAME" == *".py"* ]]; then
+        PYTEST_ARGS+=("$TEST_NAME")        # path
+    else
+        PYTEST_ARGS+=(-k "$TEST_NAME")     # keyword expression
+    fi
+fi
+
+echo "pytest ${PYTEST_ARGS[*]}"
+set +e
+uv run pytest "${PYTEST_ARGS[@]}"
+PYTEST_RC=$?
+set -e
+popd > /dev/null
+
+if [ "$PYTEST_RC" -eq 5 ]; then
+    echo "ERROR: no tests collected. TEST_NAME='${TEST_NAME}' matched nothing under -m cbl."
+elif [ "$PYTEST_RC" -eq 4 ]; then
+    echo "ERROR: pytest usage error. Check the expression: '${TEST_NAME}'"
+fi
+exit $PYTEST_RC
