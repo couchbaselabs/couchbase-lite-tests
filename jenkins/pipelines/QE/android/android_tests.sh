@@ -68,7 +68,7 @@ PYTEST_ARGS=(
     --config config.json
     --dataset-version "$DATASET_VERSION"
     -m cbl
-    -maxfail=7
+    --maxfail=7
 )
 
 if [ -n "$TEST_NAME" ]; then
