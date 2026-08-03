@@ -66,39 +66,82 @@ async def _setup_database_and_user(
     return await sg.create_user_client(sg_db, user_name, user_password, channels)
 
 
-def _readvertise_external_addresses(cbs_servers: list) -> None:
+def _snapshot_cluster(cbs_servers: list) -> tuple[dict[str, str], set[str]]:
     """
-    Re-advertise the external alternate address on every CBS node so the external
-    test agent's SDK can reach all services (incl. KV). A node that was
-    ejected/re-added or failed-over/recovered can lose its alternate address,
-    leaving it unreachable from outside the VPC; this restores it. Setting only
-    the hostname makes Couchbase Server auto-map all standard service ports --
-    the same thing provisioning's `couchbase-cli setting-alternate-address` does.
+    Capture, from /pools/default, each CBS node's external alternate address and
+    whether it is currently in the cluster -- both keyed by the node's public
+    hostname -- so the cluster can be restored to this exact state after a
+    topology-mutating test.
+
+    :return: (alternate address per hostname, set of in-cluster hostnames)
     """
     session = requests.Session()
     session.auth = ("Administrator", "password")
-    for cbs_node in cbs_servers:
+    resp = session.get(f"http://{cbs_servers[0].hostname}:8091/pools/default")
+    resp.raise_for_status()
+    nodes = resp.json().get("nodes", [])
+
+    addresses: dict[str, str] = {}
+    in_cluster: set[str] = set()
+    for cbs in cbs_servers:
+        for node in nodes:
+            hostname = node.get("hostname", "").split(":")[0]
+            alt = (
+                node.get("alternateAddresses", {})
+                .get("external", {})
+                .get("hostname", "")
+            )
+            if cbs.hostname in (hostname, alt):
+                in_cluster.add(cbs.hostname)
+                addresses[cbs.hostname] = alt or cbs.hostname
+                break
+    return addresses, in_cluster
+
+
+def _restore_cluster(
+    cbs_servers: list, addresses: dict[str, str], in_cluster: set[str]
+) -> None:
+    """
+    Restore the cluster to a captured snapshot: rejoin any ejected node and
+    recover any failed one (rebalancing back to health via
+    ``ensure_cluster_healthy``), then re-advertise each node's captured external
+    alternate address so the external test agent's SDK can reach every service
+    (incl. KV). Setting the hostname alone makes Couchbase Server auto-map all
+    standard service ports -- what provisioning's
+    ``couchbase-cli setting-alternate-address`` also does.
+    """
+    # Membership first: rejoin/recover any node that left, then rebalance.
+    cbs_servers[0].ensure_cluster_healthy(cbs_servers)
+
+    # Then addressing: put back the external alternate address each node had.
+    session = requests.Session()
+    session.auth = ("Administrator", "password")
+    for cbs in cbs_servers:
+        if cbs.hostname not in in_cluster:
+            continue
         session.put(
-            f"http://{cbs_node.hostname}:8091/node/controller/setupAlternateAddresses/external",
-            data={"hostname": cbs_node.hostname},
+            f"http://{cbs.hostname}:8091/node/controller/setupAlternateAddresses/external",
+            data={"hostname": addresses.get(cbs.hostname, cbs.hostname)},
         )
 
 
 @pytest.fixture
 def restore_cbs_cluster(cblpytest: CBLPyTest):
     """
-    Restore the Couchbase Server cluster after a test that mutates its topology
-    (failover / rebalance / eject). After the test, re-add or recover any
-    missing/failed nodes and rebalance back to health, then re-advertise
-    external addresses on all nodes -- so the churn does not leak into later
-    tests and the suite stays order-independent (verify with pytest-random-order).
+    Snapshot the Couchbase Server cluster's node membership + external addresses
+    before a test that mutates its topology (failover / rebalance / eject), and
+    force-restore that snapshot in teardown -- rejoining ejected nodes, recovering
+    failed ones, and re-advertising each node's alternate address -- so cluster
+    churn does not leak into later tests. Keeps the suite order-independent
+    (verify with the pytest-random-order plugin).
     """
-    yield
     cbs_servers = cblpytest.couchbase_servers
     if len(cbs_servers) < 2:
+        yield
         return
-    cbs_servers[0].ensure_cluster_healthy(cbs_servers)
-    _readvertise_external_addresses(cbs_servers)
+    addresses, in_cluster = _snapshot_cluster(cbs_servers)
+    yield
+    _restore_cluster(cbs_servers, addresses, in_cluster)
 
 
 @pytest.mark.usefixtures("restore_cbs_cluster")
