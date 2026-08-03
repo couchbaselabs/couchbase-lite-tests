@@ -69,7 +69,9 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestName ${params.TEST_NAME}"
+                            powershell """
+                            jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion "${params.TS_DATASET_VERSION}" -TestName "${params.TEST_NAME}""
+                            """
                         }
                         echo "=== Dotnet Windows Tests Complete"
                     }
