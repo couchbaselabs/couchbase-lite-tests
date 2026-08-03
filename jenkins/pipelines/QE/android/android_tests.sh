@@ -11,35 +11,34 @@ export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <cbl_version> <sg_version> [dataset_version] [--setup-only]"
-    echo "  dataset_version: Version of CBL dataset to use (default: 4.0)"
-    echo "  --setup-only: Only build test server and setup backend, skip test execution"
+    echo "Usage: $0 <cbl_version> <sg_version> [options]"
+    echo "  --dataset-version <ver>   CBL dataset version (default: 4.0)"
+    echo "  --test-name <expr>        pytest -k expression, or a test path / node id"
+    echo "  --setup-only              Build test server + backend only, skip tests"
     exit 1
 }
 
-# Allow up to 4 args now (2 required + dataset + flag)
-if [ "$#" -lt 2 ] || [ "$#" -gt 4 ] ; then usage; fi
-
+if [ "$#" -lt 2 ]; then usage; fi
 CBL_VERSION="$1"
-if [ -z "$CBL_VERSION" ]; then usage; fi
-
 SG_VERSION="$2"
-if [ -z "$SG_VERSION" ]; then usage; fi
+shift 2
+[ -n "$CBL_VERSION" ] || usage
+[ -n "$SG_VERSION" ] || usage
 
 DATASET_VERSION="4.0"
+TEST_NAME=""
 SETUP_ONLY=false
 
-# Parse optional args (starting from 3rd)
-for arg in "${@:3}"; do
-    case "$arg" in
-        --setup-only)
-            SETUP_ONLY=true
-            ;;
-        *)
-            DATASET_VERSION="$arg"
-            ;;
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --dataset-version) DATASET_VERSION="${2:-}"; shift 2 ;;
+        --test-name)       TEST_NAME="${2:-}";       shift 2 ;;
+        --setup-only)      SETUP_ONLY=true;          shift   ;;
+        "")                shift ;;   # tolerate empty args from Jenkins interpolation
+        *) echo "Unknown option: $1"; usage ;;
     esac
 done
+[ -n "$DATASET_VERSION" ] || DATASET_VERSION="4.0"
 
 echo "Install Android SDK"
 yes | "$SDK_MGR" --channel=1 --licenses
@@ -58,11 +57,30 @@ echo "Start logcat"
 pushd $SCRIPT_DIR
 python3 logcat.py &
 echo $! > logcat.pid
+popd
 
 echo "Run tests..."
 pushd $QE_TESTS_DIR > /dev/null
 adb shell input keyevent KEYCODE_WAKEUP
-uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl
+
+PYTEST_ARGS=(
+    -W ignore::DeprecationWarning
+    --config config.json
+    --dataset-version "$DATASET_VERSION"
+    --junitxml="${QE_TESTS_DIR}/results/android-results.xml"
+)
+
+if [ -n "$TEST_NAME" ]; then
+    # Targeted run: no marker filter (the target may not carry -m cbl), no maxfail
+    if [[ "$TEST_NAME" == *".py"* ]]; then
+        PYTEST_ARGS+=("$TEST_NAME")        # path or node id: tests/test_x.py::test_y
+    else
+        PYTEST_ARGS+=(-k "$TEST_NAME")     # keyword expression
+    fi
+else
+    PYTEST_ARGS+=(--maxfail=7 -m cbl)
+fi
+
+echo "pytest ${PYTEST_ARGS[*]}"
+uv run pytest "${PYTEST_ARGS[@]}"
+popd > /dev/null
