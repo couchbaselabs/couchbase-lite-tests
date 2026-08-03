@@ -21,7 +21,7 @@ Push-Location $QE_TESTS_DIR
 try {
     $pytestArgs = @(
         "-v", "--no-header",
-        "--config", "config_aws.json",
+        "--config", "config.json",
         "--dataset-version", $DatasetVersion,
         "-m", "cbl"
     )
