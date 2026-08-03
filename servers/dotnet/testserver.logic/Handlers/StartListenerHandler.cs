@@ -84,23 +84,18 @@ internal static partial class HandlerList
             collectionObjects.Add(collection);
         }
 
-        var listenerConfig = new URLEndpointListenerConfiguration(collectionObjects)
-        {
-            Port = deserializedBody.port,
-            DisableTLS = deserializedBody.disableTLS
-        };
+        TLSIdentity? tlsIdentity = null;
 
         if (!deserializedBody.disableTLS) {
             var label = $"dotnet-p2p-{deserializedBody.database}";
-            TLSIdentity? identity;
 
             try {
-                identity = CreateOrReuseTLSIdentity(deserializedBody.identity, label);
+                tlsIdentity = CreateOrReuseTLSIdentity(deserializedBody.identity, label);
             } catch (Exception e) {
                 var errorObject = new
                 {
                     domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
-                    code = (int)CouchbaseLiteError.CryptoError,
+                    code = (int)CouchbaseLiteError.NotFound,
                     message = $"Failed to import TLS identity for label '{label}': {e.Message}"
                 };
 
@@ -108,7 +103,7 @@ internal static partial class HandlerList
                 return Task.CompletedTask;
             }
 
-            if (identity == null) {
+            if (tlsIdentity == null) {
                 var errorObject = new
                 {
                     domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
@@ -119,9 +114,13 @@ internal static partial class HandlerList
                 response.WriteBody(errorObject, HttpStatusCode.BadRequest);
                 return Task.CompletedTask;
             }
-
-            listenerConfig.TlsIdentity = identity;
         }
+        var listenerConfig = new URLEndpointListenerConfiguration(collectionObjects)
+        {
+            Port = deserializedBody.port,
+            DisableTLS = deserializedBody.disableTLS,
+            TlsIdentity = tlsIdentity
+        };
 
         (var listener, var id) = session.ObjectManager.RegisterObject(() => new URLEndpointListener(listenerConfig));
         listener.Start();
