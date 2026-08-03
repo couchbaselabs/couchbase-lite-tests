@@ -59,11 +59,11 @@ pipeline {
         }
     }
     post {
-        success {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "sanjivani.patra@couchbase.com";
         }
-        regression {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
+        fixed {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "sanjivani.patra@couchbase.com";
         }
     }
 }
