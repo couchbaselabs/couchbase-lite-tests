@@ -67,18 +67,16 @@ PYTEST_ARGS=(
     -W ignore::DeprecationWarning
     --config config.json
     --dataset-version "$DATASET_VERSION"
-    --junitxml="${QE_TESTS_DIR}/results/android-results.xml"
+    -m cbl
+    -maxfail=7
 )
 
 if [ -n "$TEST_NAME" ]; then
-    # Targeted run: no marker filter (the target may not carry -m cbl), no maxfail
     if [[ "$TEST_NAME" == *".py"* ]]; then
         PYTEST_ARGS+=("$TEST_NAME")        # path or node id: tests/test_x.py::test_y
     else
         PYTEST_ARGS+=(-k "$TEST_NAME")     # keyword expression
     fi
-else
-    PYTEST_ARGS+=(--maxfail=7 -m cbl)
 fi
 
 echo "pytest ${PYTEST_ARGS[*]}"
