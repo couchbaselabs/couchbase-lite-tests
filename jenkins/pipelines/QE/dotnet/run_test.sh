@@ -38,7 +38,7 @@ export DEVELOPER_DIR="/Applications/Xcode-$DOTNET_XCODE_VERSION.app/"
 PYTEST_ARGS=(
     -v --no-header
     -W ignore::DeprecationWarning
-    --config config.json
+    --config config_aws.json
     --dataset-version "$DATASET_VERSION"
     -m cbl
 )
