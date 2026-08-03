@@ -5,6 +5,7 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
+        string(name: 'TEST_NAME', defaultValue: '', description: 'Running a specific test or test expression')
     }
     stages {
         stage('Init') {
@@ -42,7 +43,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run iOS Tests"
                 timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-name ${params.TEST_NAME}"
                 }
                 echo "=== iOS Tests Complete"
             }
@@ -56,14 +57,6 @@ pipeline {
                     echo "=== iOS Test Teardown Complete"
                 }
             }
-        }
-    }
-    post {
-        success {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
-        }
-        regression {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
         }
     }
 }
