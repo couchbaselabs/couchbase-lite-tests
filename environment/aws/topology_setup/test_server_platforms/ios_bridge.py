@@ -26,6 +26,7 @@ import platform
 import re
 import shutil
 import subprocess
+import time
 from os import environ
 from pathlib import Path
 
@@ -48,6 +49,12 @@ else:
 
 SCRIPT_PATH = Path(__file__).resolve().parent
 _xharness_devices: set[str] = set()
+
+# devicectl's RSD tunnel to iOS 17+ devices is intermittently flaky (e.g.
+# "Failed to allocate RSD device", com.apple.mobiledevice error -402653181).
+# Retry a few times before giving up and falling back to xharness.
+_DEVICECTL_INSTALL_ATTEMPTS = 3
+_DEVICECTL_INSTALL_RETRY_DELAY = 10  # seconds
 
 
 def _ios_pid_file_path(location: str) -> Path:
@@ -114,9 +121,25 @@ class iOSBridge(PlatformBridge):
             location (str): The device location (e.g., device UUID).
         """
         header(f"Installing {self.__app_path} to {location}")
-        if location not in _xharness_devices:
+        if location in _xharness_devices:
+            self.__install_xharness(location)
+            return
+
+        try:
             self.__install_devicectl(location)
-        else:
+        except subprocess.CalledProcessError as e:
+            click.secho(
+                f"devicectl failed to install after {_DEVICECTL_INSTALL_ATTEMPTS} "
+                f"attempt(s) (exit {e.returncode}).",
+                fg="yellow",
+            )
+            if not self.__has_xharness:
+                raise
+
+            click.secho("Falling back to xharness for install...", fg="yellow")
+            # Route subsequent run()/stop() calls through xharness too, since the
+            # app was installed via xharness rather than devicectl.
+            _xharness_devices.add(location)
             self.__install_xharness(location)
 
     def run(self, location: str) -> None:
@@ -185,20 +208,31 @@ class iOSBridge(PlatformBridge):
         return result.returncode == 0
 
     def __install_devicectl(self, location: str) -> None:
-        subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "install",
-                "app",
-                "--device",
-                location,
-                self.__app_path,
-            ],
-            check=True,
-            capture_output=False,
-        )
+        command = [
+            "xcrun",
+            "devicectl",
+            "device",
+            "install",
+            "app",
+            "--device",
+            location,
+            self.__app_path,
+        ]
+        for attempt in range(1, _DEVICECTL_INSTALL_ATTEMPTS + 1):
+            result = subprocess.run(command, check=False, capture_output=False)
+            if result.returncode == 0:
+                return
+
+            if attempt < _DEVICECTL_INSTALL_ATTEMPTS:
+                click.secho(
+                    f"devicectl install attempt {attempt}/{_DEVICECTL_INSTALL_ATTEMPTS} "
+                    f"failed (exit {result.returncode}); retrying in "
+                    f"{_DEVICECTL_INSTALL_RETRY_DELAY}s...",
+                    fg="yellow",
+                )
+                time.sleep(_DEVICECTL_INSTALL_RETRY_DELAY)
+
+        raise subprocess.CalledProcessError(result.returncode, command)
 
     def __install_xharness(self, location: str) -> None:
         xcode_select_path = subprocess.run(
