@@ -28,6 +28,7 @@ try {
     )
 
     if (-not [string]::IsNullOrWhiteSpace($TestName)) {
+        $pytestArgs += "--no-result-upload"
         if ($TestName -like "*.py*") {
             $pytestArgs += $TestName
         } else {

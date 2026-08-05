@@ -72,6 +72,7 @@ PYTEST_ARGS=(
 )
 
 if [ -n "$TEST_NAME" ]; then
+    PYTEST_ARGS+=(--no-result-upload)
     if [[ "$TEST_NAME" == *".py"* ]]; then
         PYTEST_ARGS+=("$TEST_NAME")        # path or node id: tests/test_x.py::test_y
     else
