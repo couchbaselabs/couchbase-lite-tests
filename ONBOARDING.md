@@ -150,6 +150,3 @@ Start here:
   `uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway`,
   then `pytest --config "$(cat environment/local/topology_config)"`. This is
   *not* the supported path for normal test runs; reach for AWS instead.
-
-> The Docker environment under `environment/docker/` is **deprecated** — it may
-> still work but is unmaintained.

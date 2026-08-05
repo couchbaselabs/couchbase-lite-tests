@@ -15,6 +15,7 @@ import concurrent.futures
 import json
 import os
 import pathlib
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -63,6 +64,15 @@ TEST_CONFIG = {
     "Only valid with --server cbs. Defaults to $SG_TEST_COUCHBASE_SERVER_URL.",
 )
 @click.option(
+    "--start-cbs",
+    is_flag=True,
+    help="Start a local single-node Couchbase Server cluster via cbdinocluster (using the "
+    "Sync Gateway checkout's integration-test/start_cbs.py) instead of pointing at an "
+    "existing one with --connstr. Only valid with --server cbs; requires Docker and Go. "
+    "Reuses a previously started cluster (tracked in environment/local/) if one is still "
+    "running.",
+)
+@click.option(
     "--build-testserver",
     help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
 )
@@ -77,13 +87,14 @@ TEST_CONFIG = {
     "--admin-user",
     default="Administrator",
     show_default=True,
-    help="Couchbase Server admin username. Only used with --connstr.",
+    help="Couchbase Server admin username. Only used with --connstr/--start-cbs.",
 )
 @click.option(
     "--admin-password",
     default="password",
     show_default=True,
-    help="Couchbase Server admin password. Only used with --connstr.",
+    help="Couchbase Server admin password. Only used with --connstr/--start-cbs. cbdinocluster's "
+    "docker clusters (started by --start-cbs) always use the default Administrator/password.",
 )
 @click.option(
     "--skip-testserver",
@@ -108,6 +119,7 @@ TEST_CONFIG = {
 def main(
     server: str,
     connstr: str | None,
+    start_cbs: bool,
     build_testserver: str | None,
     repo_path: str | None,
     git_tag: str | None,
@@ -141,23 +153,52 @@ def main(
             raise click.UsageError("--connstr is only valid with --server cbs.")
         connstr = None
 
+    if start_cbs:
+        if server != "cbs":
+            raise click.UsageError("--start-cbs is only valid with --server cbs.")
+        if connstr and click.get_current_context().get_parameter_source("connstr") == (
+            ParameterSource.COMMANDLINE
+        ):
+            raise click.UsageError(
+                "--start-cbs cannot be combined with --connstr; use one or the other."
+            )
+        # Ignore any env-var-sourced --connstr default; --start-cbs supplies its own.
+        connstr = None
+        # cbdinocluster's docker clusters always use these credentials; --admin-user/
+        # --admin-password aren't configurable for a cluster --start-cbs creates.
+        admin_user, admin_password = "Administrator", "password"
+
     if connstr:
         _validate_single_node_connstr(connstr)
 
-    if not skip_sync_gateway_build and bool(repo_path) == bool(git_tag):
+    if (not skip_sync_gateway_build or start_cbs) and bool(repo_path) == bool(git_tag):
         raise click.UsageError(
             "Exactly one of --repo-path or --git-tag must be provided, unless "
-            "--skip-sync-gateway-build is set."
+            "--skip-sync-gateway-build is set (still required with --start-cbs, to locate "
+            "integration-test/start_cbs.py in the checkout)."
         )
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    repo_dir = None
+    if not skip_sync_gateway_build or start_cbs:
+        repo_dir = resolve_sync_gateway_repo_dir(repo_path, git_tag)
+
+    cbs_future = None
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if not skip_testserver:
             futures.append(executor.submit(run_test_server, build_testserver))
         if not skip_sync_gateway_build:
-            futures.append(executor.submit(build_sync_gateway, repo_path, git_tag))
+            assert repo_dir is not None
+            futures.append(executor.submit(build_sync_gateway, repo_dir))
+        if start_cbs:
+            assert repo_dir is not None
+            cbs_future = executor.submit(start_cbs_cluster, repo_dir)
+            futures.append(cbs_future)
         for future in futures:
             future.result()
+
+    if cbs_future:
+        connstr = cbs_future.result()
 
     if not skip_sync_gateway_start:
         start_sync_gateway(server, connstr, admin_user, admin_password)
@@ -219,11 +260,12 @@ def _run(cmd: list[str], step: str, cwd: str | None = None) -> None:
         ) from e
 
 
-def build_sync_gateway(repo_path: str | None, git_tag: str | None) -> str:
+def resolve_sync_gateway_repo_dir(repo_path: str | None, git_tag: str | None) -> str:
     """
-    Build sync_gateway from source, returning the path to the built binary.
+    Resolve the Sync Gateway repo directory to build from / locate integration-test scripts in.
 
-    Exactly one of repo_path or git_tag must be provided.
+    Exactly one of repo_path or git_tag must be provided. If git_tag is given, clones (if
+    needed) into sync_gateway_clone and checks out the tag.
     """
     if bool(repo_path) == bool(git_tag):
         raise ValueError("Exactly one of repo_path or git_tag must be provided.")
@@ -232,21 +274,26 @@ def build_sync_gateway(repo_path: str | None, git_tag: str | None) -> str:
         repo_dir = os.path.abspath(repo_path)
         if not os.path.isdir(repo_dir):
             raise FileNotFoundError(f"Repository path {repo_dir} does not exist.")
-    else:
-        assert git_tag is not None
-        # We use a local clone
-        repo_dir = str(SCRIPT_DIR / "sync_gateway_clone")
-        repo_url = "https://github.com/couchbase/sync_gateway.git"
+        return repo_dir
 
-        if not os.path.exists(repo_dir):
-            click.echo(f"Cloning {repo_url} into {repo_dir}...")
-            _run(["git", "clone", repo_url, repo_dir], step="git clone")
+    assert git_tag is not None
+    # We use a local clone
+    repo_dir = str(SCRIPT_DIR / "sync_gateway_clone")
+    repo_url = "https://github.com/couchbase/sync_gateway.git"
 
-        click.echo(f"Fetching updates and checking out {git_tag}...")
-        _run(["git", "fetch", "--all", "--tags"], step="git fetch", cwd=repo_dir)
-        _run(["git", "reset", "--hard"], step="git reset", cwd=repo_dir)
-        _run(["git", "checkout", git_tag], step=f"git checkout {git_tag}", cwd=repo_dir)
+    if not os.path.exists(repo_dir):
+        click.echo(f"Cloning {repo_url} into {repo_dir}...")
+        _run(["git", "clone", repo_url, repo_dir], step="git clone")
 
+    click.echo(f"Fetching updates and checking out {git_tag}...")
+    _run(["git", "fetch", "--all", "--tags"], step="git fetch", cwd=repo_dir)
+    _run(["git", "reset", "--hard"], step="git reset", cwd=repo_dir)
+    _run(["git", "checkout", git_tag], step=f"git checkout {git_tag}", cwd=repo_dir)
+    return repo_dir
+
+
+def build_sync_gateway(repo_dir: str) -> str:
+    """Build sync_gateway from source in repo_dir, returning the path to the built binary."""
     click.echo(f"Building sync_gateway in {repo_dir}...")
     build_cmd = [
         "go",
@@ -260,6 +307,45 @@ def build_sync_gateway(repo_path: str | None, git_tag: str | None) -> str:
     _run(build_cmd, step="go build", cwd=repo_dir)
     click.secho(f"Successfully built sync_gateway to {SYNC_GATEWAY_BIN}", fg="green")
     return str(SYNC_GATEWAY_BIN)
+
+
+def start_cbs_cluster(repo_dir: str) -> str:
+    """
+    Start (or reuse) a local single-node Couchbase Server cluster via the Sync Gateway
+    checkout's integration-test/start_cbs.py (which drives cbdinocluster), returning its
+    connection string.
+
+    Requires Docker and Go on PATH; cbdinocluster itself is fetched automatically via `go run`.
+    """
+    script = os.path.join(repo_dir, "integration-test", "start_cbs.py")
+    if not os.path.exists(script):
+        raise click.ClickException(
+            f"{script} not found. --start-cbs requires a Sync Gateway checkout that includes "
+            "integration-test/start_cbs.py — use a newer --git-tag/--repo-path, or start "
+            "Couchbase Server yourself and pass --connstr instead."
+        )
+
+    click.echo("Starting local Couchbase Server via cbdinocluster...")
+    env_var = "SG_TEST_COUCHBASE_SERVER_URL"
+    with tempfile.NamedTemporaryFile(suffix=".env", delete=False) as env_file:
+        env_file_path = pathlib.Path(env_file.name)
+    try:
+        _run(
+            [sys.executable, script, "--env-file", str(env_file_path)],
+            step="start_cbs.py",
+            cwd=str(SCRIPT_DIR),
+        )
+
+        for line in env_file_path.read_text().splitlines():
+            prefix = f"export {env_var}="
+            if line.startswith(prefix):
+                connstr = shlex.split(line[len(prefix) :])[0]
+                click.secho(f"Couchbase Server available at {connstr}", fg="green")
+                return connstr
+    finally:
+        env_file_path.unlink(missing_ok=True)
+
+    raise click.ClickException(f"Could not find {env_var} in start_cbs.py's output")
 
 
 def parse_hostname(connstr: str) -> str:
