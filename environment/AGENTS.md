@@ -204,7 +204,11 @@ uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-g
 uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
-- Writes the TDK config path to `environment/local/topology_config` for direct use with `pytest --config`.
+- Writes the TDK config path to `environment/local/topology_config` — `topology_config` holds a *path*, not the config itself, so run tests with:
+  ```bash
+  cd tests/dev_e2e
+  uv run pytest --config "$(cat ../../environment/local/topology_config)"
+  ```
 - `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
 - `--stop-sync-gateway` stops the background Sync Gateway process. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
@@ -255,7 +259,9 @@ cd environment/aws && uv run python topology_setup/build_test_server.py \
   --platform swift_ios --version 4.0.0
 
 # Local (no Docker/AWS): test server + Sync Gateway
-uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
+# Pick one: rosmar for fast in-memory iteration, cbs for real Couchbase Server coverage
+uv run environment/local/start_local.py --server rosmar --git-tag main
+uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
 ## Cross-References

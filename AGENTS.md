@@ -74,7 +74,7 @@ cd environment/aws && uv run python start_backend.py --topology topology_setup/t
 cd environment/aws && uv run python stop_backend.py  --topology topology_setup/topology.json
 
 # Local environment (no Docker/AWS): test server + Sync Gateway
-uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
+uv run environment/local/start_local.py --server rosmar --git-tag main
 ```
 
 ## Python Workspace
