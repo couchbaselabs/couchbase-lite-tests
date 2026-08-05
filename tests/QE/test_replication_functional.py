@@ -480,7 +480,7 @@ class TestReplicationFunctional(CBLTestClass):
         )
 
         self.mark_test_step("Verify replication completed successfully")
-        if channel == "*" and await cloud.sync_gateway.is_using_views("short_expiry"):
+        if channel == "*" and await sync_gateway.is_using_views("short_expiry"):
             # Checking the progress on documents explicitly assigned * channel will
             # show completed: false instead of true when running with views. There
             # are no other non progress side effects. See CBG-5573 and CBL-8624.
