@@ -70,7 +70,7 @@ AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
     "enabled": _apply_audit_config_enabled,
 }
 
-
+@pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)

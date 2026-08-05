@@ -7,7 +7,7 @@ from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
-
+@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 class TestDatabase(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
