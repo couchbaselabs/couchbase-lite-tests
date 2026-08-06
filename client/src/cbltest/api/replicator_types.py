@@ -416,10 +416,9 @@ class WaitForDocumentEventEntry:
     def __hash__(self) -> int:
         return hash(f"{self.__collection}{self.__id}")
 
-    def __eq__(self, obj: object) -> bool:
-        if not isinstance(obj, WaitForDocumentEventEntry):
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, WaitForDocumentEventEntry):
             return False
-        other = cast(WaitForDocumentEventEntry, obj)
 
         return (
             (self.__collection == other.__collection and self.__id == other.__id)
