@@ -87,14 +87,15 @@ TEST_CONFIG = {
     "--admin-user",
     default="Administrator",
     show_default=True,
-    help="Couchbase Server admin username. Only used with --connstr/--start-cbs.",
+    help="Couchbase Server admin username. Only used with --connstr; ignored with --start-cbs, "
+    "which always uses the default Administrator/password.",
 )
 @click.option(
     "--admin-password",
     default="password",
     show_default=True,
-    help="Couchbase Server admin password. Only used with --connstr/--start-cbs. cbdinocluster's "
-    "docker clusters (started by --start-cbs) always use the default Administrator/password.",
+    help="Couchbase Server admin password. Only used with --connstr; ignored with --start-cbs, "
+    "which always uses the default Administrator/password.",
 )
 @click.option(
     "--skip-testserver",
@@ -164,8 +165,7 @@ def main(
             )
         # Ignore any env-var-sourced --connstr default; --start-cbs supplies its own.
         connstr = None
-        # cbdinocluster's docker clusters always use these credentials; --admin-user/
-        # --admin-password aren't configurable for a cluster --start-cbs creates.
+        # --start-cbs always uses these credentials; --admin-user/--admin-password are ignored.
         admin_user, admin_password = "Administrator", "password"
 
     if connstr:

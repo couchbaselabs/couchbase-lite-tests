@@ -194,7 +194,7 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 
 ## Local Environment
 
-No Docker or AWS — runs the test server and Sync Gateway as native processes. See [environment/local/README.md](local/README.md) for full usage.
+No AWS — runs the test server and Sync Gateway as native processes. Docker is only needed for the optional `--start-cbs` path below. See [environment/local/README.md](local/README.md) for full usage.
 
 `--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write). For `--server cbs`, point at an existing Couchbase Server with `--connstr`, or have `start_local.py` start one for you locally with `--start-cbs` (drives `cbdinocluster` via the Sync Gateway checkout's `integration-test/start_cbs.py`; requires Docker + Go) — the two are mutually exclusive.
 
