@@ -57,8 +57,6 @@ async def setup_upgrade_env(
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
     cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
     cbs.drop_bucket("upgrade")
-    # reset_expired_ttl restores the delta-sync old-revision backup bodies
-    # (`_sync:rev:*`) so SGW can delta against a legacy ancestor rev.
     cbs.restore_bucket(
         "upgrade",
         tools_path(),
@@ -69,11 +67,6 @@ async def setup_upgrade_env(
 
     test_case.mark_test_step("Wait for SG to bring the restored database online.")
 
-    # As of Sync Gateway 4.1.0, this can take a long time to come online (20s+) due to import-feed rollbacks caused by mismatched vBucket UUIDs.
-    #
-    # A good practice when taking new snapshots is to remove _sync:* docs before running a cbbackup.
-    # cbbackupmgr restore --filter-keys cannot do a negative regex to filter out the dbconfig, checkpoints, etc.
-    #
     await SyncGatewayCluster(cblpytest.sync_gateways[:1]).wait_for_db_online(
         "upgrade", max_retries=120, retry_delay=1
     )

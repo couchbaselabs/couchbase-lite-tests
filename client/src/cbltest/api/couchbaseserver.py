@@ -1,4 +1,5 @@
 import asyncio
+import os
 import platform
 import subprocess
 import tempfile
@@ -414,6 +415,13 @@ class CouchbaseServer:
                     "-p",
                     self.__password,
                     "--auto-create-buckets",
+                    "--no-progress-bar",
+                    "--disable-ft-indexes",  # requires access to private ports
+                    "--disable-gsi-indexes",  # requires access to private ports
+                    "--threads",
+                    str(
+                        os.cpu_count()
+                    ),  # replace with os.process_cpu_count after CBL-8716, python upgrade to respect cgroups
                 ]
                 if reset_expired_ttl:
                     restore_args += [
