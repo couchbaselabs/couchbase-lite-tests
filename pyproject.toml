@@ -57,7 +57,11 @@ root = [".", "client/src", "tests"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"
-pythonpath = ["tests"]
+# "tests" puts tests/shared on the path; "tests/dev_e2e" keeps the bare
+# sibling import in test_replication_filter.py (from test_replication_filter_data
+# import ...) working under --import-mode=importlib, which the nightly SGW job
+# uses so the two test_multipeer.py modules don't collide at collection.
+pythonpath = ["tests", "tests/dev_e2e"]
 filterwarnings = [
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]
