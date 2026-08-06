@@ -206,3 +206,4 @@ class TestLogging(CBLTestClass):
                 assert expected_non_empty and len(log) > 0, (
                     f"Audit log for {step_name} event not found"
                 )
+            await sync_gateway.delete_database(sg_db)

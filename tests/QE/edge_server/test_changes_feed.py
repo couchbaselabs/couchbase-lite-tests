@@ -20,7 +20,6 @@ class TestChangesFeed(CBLTestClass):
     ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
-
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
@@ -161,3 +160,4 @@ class TestChangesFeed(CBLTestClass):
         assert len(changes["results"]) == 2, (
             f"Expected 2 changes, but got {len(changes['results'])} changes."
         )
+        await sync_gateway.delete_database(sg_db)

@@ -159,6 +159,7 @@ class TestBlobs(CBLTestClass):
         assert "_attachments" not in sg_doc.body, (
             "'_attachments' field is present in the document response"
         )
+        await sync_gateway.delete_database(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -196,6 +197,7 @@ class TestBlobs(CBLTestClass):
         blob = await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
         assert blob is not None, "Failed to retrieve empty blob from document."
         assert blob.body == empty_blob, "Empty blob data mismatch."
+        await sync_gateway.delete_database(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -310,6 +312,7 @@ class TestBlobs(CBLTestClass):
         )
         assert blob_info["digest"] == blob_metadata["digest"], "Blob digest mismatch"
         assert blob_info["length"] == blob_metadata["length"], "Blob length mismatch"
+        await sync_gateway.delete_database(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_get_nonexistent(
@@ -336,6 +339,7 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that get nonexistent blob fails.")
         attachment_name = "missing_blob.png"
+        await sync_gateway.delete_database(sg_db)
 
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_sub_document(doc_id, attachment_name, es_db_name)
@@ -373,6 +377,7 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verify delete nonexistent blob fails.")
         attachment_name = "missing_blob.png"
+        await sync_gateway.delete_database(sg_db)
 
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.delete_sub_document(
@@ -424,7 +429,7 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that update blob with wrong rev fails.")
         updated_data = b"updated blob data"
-
+        await sync_gateway.delete_database(sg_db)
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(
                 doc_id, "incorrect rev", attachment_name, es_db_name, value=updated_data
@@ -448,7 +453,7 @@ class TestBlobs(CBLTestClass):
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)
-
+        await sync_gateway.delete_database(sg_db)
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(
                 doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data
@@ -516,6 +521,7 @@ class TestBlobs(CBLTestClass):
             doc_id, rev_id, attachment_name, es_db_name, value=image_data
         )
         assert response is not None, "Failed to add attachment to document."
+        await sync_gateway.delete_database(sg_db)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_exceeding_maxsize(
@@ -554,6 +560,7 @@ class TestBlobs(CBLTestClass):
         rev_id = document.revid
 
         attachment_name = "20mb.jpg"
+        await sync_gateway.delete_database(sg_db)
 
         with pytest.raises(CblEdgeServerBadResponseError) as excinfo:
             await edge_server.put_sub_document(
@@ -686,3 +693,4 @@ class TestBlobs(CBLTestClass):
         assert blob_info["length"] == blob_metadata["length"], (
             f"Blob length mismatch, expected '{blob_metadata['length']}', got '{blob_info['length']}'"
         )
+        await sync_gateway.delete_database(sg_db)
