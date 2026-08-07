@@ -14,6 +14,10 @@ class TestServerSetup(CBLTestClass):
     async def test_sgw_server_alternative_address(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on this Sync Gateway host",
+        )
         sg_db = "db"
         bucket_name = "alternate-addr-bucket"
         num_docs = 5
@@ -60,6 +64,10 @@ class TestServerSetup(CBLTestClass):
     async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on this Sync Gateway host",
+        )
         bucket_name = "data-bucket"
         sg_db = "db"
 

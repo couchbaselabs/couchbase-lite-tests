@@ -61,6 +61,18 @@ WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
 -----END CERTIFICATE-----
 """
 
+CADDY_PORT = 20000
+SHELL2HTTP_PORT = 20001
+
+
+def _is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
+    """Whether anything responds on hostname:port (any status counts)."""
+    try:
+        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
+
 
 class _CollectionMap(JSONSerializable):
     @property
@@ -1852,6 +1864,11 @@ class SyncGateway(_SyncGatewayBase):
             raise CblTestError(
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
+
+        # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
+        # failing on a connection error.
+        self.has_caddy_sidecar: bool = _is_sidecar_reachable(url, CADDY_PORT)
+        self.has_shell2http_sidecar: bool = _is_sidecar_reachable(url, SHELL2HTTP_PORT)
 
     async def is_using_views(self, db_name: str) -> bool:
         """Determine whether the given Sync Gateway database is using views rather than GSI.
