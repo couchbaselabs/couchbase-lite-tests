@@ -95,6 +95,10 @@ class TestLogRedaction(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_caddy_sidecar,
+            "Caddy sidecar is not reachable on this Sync Gateway host",
+        )
         num_docs = 10
         sg_db = "db"
         bucket_name = "data-bucket"
@@ -185,6 +189,10 @@ class TestLogRedaction(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_caddy_sidecar,
+            "Caddy sidecar is not reachable on this Sync Gateway host",
+        )
         num_docs = 10
         sg_db = "db"
         bucket_name = "data-bucket"
