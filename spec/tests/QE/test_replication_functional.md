@@ -40,6 +40,16 @@ Test replication behavior with role-based access control.
 
 Test replication behavior with revision messages and document purging.
 
+Parametrized over `channel`: `*` (wildcard) and `ChannelA` (an explicit channel name),
+used as the `channels` value on every document created in this test. Both
+variants are otherwise identical — user1 keeps its default dataset-configured
+`*` access in both cases. When `channel` is `*` and Sync Gateway is configured
+to use views (i.e. `enable_shared_bucket_access` is disabled), the "Verify
+replication completed successfully" step is skipped: checking the progress on
+documents explicitly assigned the `*` channel will show `completed: false`
+instead of `true` when running with views. There are no other non progress
+side effects. See CBG-5573 and CBL-8624.
+
 1. Reset SG and load `short_expiry` dataset.
 2. Reset local database.
 3. Create initial document in CBL.
@@ -67,7 +77,7 @@ Test replication behavior with revision messages and document purging.
     * continuous: false
     * credentials: user1/pass
 16. Wait for pull replication to finish.
-17. Verify replication completed successfully.
+17. Verify replication completed successfully (skipped for `channel` `*` on views — see above).
 18. Verify all docs from SGW replicated successfully:
     * Should have: doc1 (from dataset), doc_2, doc_3 (created docs)
     * Should NOT have: doc_1 (purged document)

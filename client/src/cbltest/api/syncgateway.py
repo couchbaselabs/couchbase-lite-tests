@@ -1855,6 +1855,24 @@ class SyncGateway(_SyncGatewayBase):
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
 
+    async def is_using_views(self, db_name: str) -> bool:
+        """Determine whether the given Sync Gateway database is using views rather than GSI.
+
+        Rosmar has no GSI support, so it always behaves as though views are in use,
+        regardless of `enable_shared_bucket_access`.
+
+        Args:
+            db_name: The name of the database to check.
+
+        Returns:
+            True if using Rosmar, or if the database is configured with
+            enable_shared_bucket_access=false.
+        """
+        if self.using_rosmar:
+            return True
+        config = await self.get_database_config(db_name)
+        return not config.get("enable_shared_bucket_access", True)
+
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
         Creates a collection access dictionary in the format that Sync Gateway expects,

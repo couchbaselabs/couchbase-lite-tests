@@ -5,8 +5,10 @@ All infrastructure provisioning for the test harness. The AWS orchestrator is pr
 ## Scope
 
 You own everything under `environment/`:
+
 - `environment/aws/` — AWS orchestrator (Terraform + Python SSH scripts, topology management)
 - `environment/docker/` — local Docker Compose environment (CBS + SGW + LogSlurp)
+- `environment/local/` — local test server + Sync Gateway runner (no Docker/AWS)
 - `environment/LogSlurp/` — C# log aggregation service
 - `environment/otel-collector/` — OpenTelemetry collector config
 
@@ -81,6 +83,12 @@ environment/
 │   ├── cbs/                            # CBS Dockerfile + init scripts
 │   └── sg/                             # SGW Dockerfile + config
 │
+├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
+│   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
+│   ├── sync_gateway_config/             # basic_sync_gateway_{rosmar,cbs}.json
+│   ├── topology_configs/                # rosmar_config.json, cbs_config.json (TDK config output)
+│   └── sync_gateway_clone/              # Git checkout of sync-gateway, built by start_local.py
+│
 ├── LogSlurp/                           # C# log aggregation service
 │   ├── LogSlurp.sln
 │   ├── LogSlurp/                       # ASP.NET server (Dockerfile)
@@ -108,6 +116,7 @@ environment/
 Skip flags: `--no-terraform-apply`, `--no-cbs-provision`, `--no-sgw-provision`, `--no-es-provision`, `--no-lb-provision`, `--no-ls-provision`, `--no-ts-run`.
 
 Entry points:
+
 - CLI: `cli_entry()` (via `@click.command()`) — direct command line use
 - Programmatic: `script_entry(topology, config_in, config_out, steps)` — used by Jenkins
 
@@ -155,6 +164,7 @@ def main(topology: TopologyConfig) -> None:
 ### `TestServer` (`test_server.py`)
 
 Abstract base with registry pattern:
+
 - `TestServer.register(name)` — decorator
 - `TestServer.create(name, version)` — factory
 - `TestServer.initialize()` — imports all platform modules to trigger registration
@@ -166,13 +176,13 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 
 ### Platform Registrations
 
-| File | Platform Keys | Bridge Types |
-|---|---|---|
-| `c_register.py` | `c_macos`, `c_linux_x86_64`, `c_windows`, `c_ios`, `c_android` | `ExeBridge`, `iOSBridge`, `AndroidBridge` |
+| File                 | Platform Keys                                                    | Bridge Types                                             |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| `c_register.py`      | `c_macos`, `c_linux_x86_64`, `c_windows`, `c_ios`, `c_android`   | `ExeBridge`, `iOSBridge`, `AndroidBridge`                |
 | `dotnet_register.py` | `dotnet_macos`, `dotnet_windows`, `dotnet_ios`, `dotnet_android` | `ExeBridge`, `macOSBridge`, `iOSBridge`, `AndroidBridge` |
-| `swift_register.py` | `swift_ios` | `iOSBridge` |
-| `java_register.py` | `jak_android`, `jak_desktop`, `jak_webservice` | `AndroidBridge`, `ExeBridge` |
-| `js_register.py` | `js` | `ExeBridge` |
+| `swift_register.py`  | `swift_ios`                                                      | `iOSBridge`                                              |
+| `java_register.py`   | `jak_android`, `jak_desktop`, `jak_webservice`                   | `AndroidBridge`, `ExeBridge`                             |
+| `js_register.py`     | `js`                                                             | `ExeBridge`                                              |
 
 ### Topology JSON Shape
 
@@ -201,6 +211,22 @@ cd environment/docker && python start_environment.py
 
 - Services: `cbl-test-cbs`, `cbl-test-sg`, `cbl-test-logslurp`
 - Env vars: `COUCHBASE_VERSION`, `SG_DEB`
+
+## Local Environment
+
+No Docker or AWS — runs the test server and Sync Gateway as native processes. See [environment/local/README.md](local/README.md) for full usage.
+
+`--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write).
+
+```bash
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
+uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-gateway --connstr couchbase://127.0.0.1
+```
+
+- Writes the TDK config path to `environment/local/topology_config` for direct use with `pytest --config`.
+- `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
+- `--stop-sync-gateway` stops the background Sync Gateway process.
+- `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 
 ## Prerequisites (AWS)
 
@@ -249,16 +275,20 @@ cd environment/aws && uv run python topology_setup/build_test_server.py \
 
 # Local Docker
 cd environment/docker && python start_environment.py
+
+# Local (no Docker/AWS): test server + Sync Gateway
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
 ```
 
 ## Cross-References
 
-| What | Where | Relationship |
-|---|---|---|
-| Test server source | [servers/](../servers/) | Built and deployed by `topology_setup/` |
-| Platform bridges | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop |
-| Jenkins pipelines | [jenkins/pipelines/](../jenkins/pipelines/) | Call `start_backend.py`/`stop_backend.py` via `setup_test.py` |
-| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Consume the `config.json` this generates |
-| Config parser | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py) | Parses the config JSON this outputs |
-| Topology schema | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json) | Validates topology JSON |
-| Datasets | [dataset/](../dataset/) | Copied into test servers during build |
+| What               | Where                                                                                              | Relationship                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Test server source | [servers/](../servers/)                                                                            | Built and deployed by `topology_setup/`                               |
+| Platform bridges   | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop                                    |
+| Jenkins pipelines  | [jenkins/pipelines/](../jenkins/pipelines/)                                                        | Call `start_backend.py`/`stop_backend.py` via `setup_test.py`         |
+| Test suites        | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/)                                     | Consume the `config.json` this generates                              |
+| Config parser      | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py)                        | Parses the config JSON this outputs                                   |
+| Topology schema    | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json)                 | Validates topology JSON                                               |
+| Datasets           | [dataset/](../dataset/)                                                                            | Copied into test servers during build                                 |
+| Local runner       | [environment/local/](local/)                                                                       | Alternative to AWS/Docker for iterating locally against rosmar or CBS |
