@@ -1,7 +1,7 @@
 import asyncio
+from collections import namedtuple
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -135,11 +135,14 @@ class TestDbGone(CBLTestClass):
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
 
-        db_configs: list[list[Any]] = [
-            ["db1", "data-bucket-1", "ABC", "vipul", None],
-            ["db2", "data-bucket-2", "CBS", "lupiv", None],
-            ["db3", "data-bucket-3", "ABC", "vipul", None],
-            ["db4", "data-bucket-4", "CBS", "lupiv", None],
+        DbConfig = namedtuple(
+            "DbConfig", ["db_name", "bucket_name", "channel", "username"]
+        )
+        db_configs = [
+            DbConfig("db1", "data-bucket-1", "ABC", "vipul"),
+            DbConfig("db2", "data-bucket-2", "CBS", "lupiv"),
+            DbConfig("db3", "data-bucket-3", "ABC", "vipul"),
+            DbConfig("db4", "data-bucket-4", "CBS", "lupiv"),
         ]
 
         self.mark_test_step("Create buckets and configure databases")
@@ -168,7 +171,8 @@ class TestDbGone(CBLTestClass):
             await sg.update_documents(db_name, sg_docs, "_default", "_default")
 
         self.mark_test_step("Verify all databases are online")
-        for [db_name, _, _, _, _] in db_configs:
+        for config in db_configs:
+            db_name = config.db_name
             status = await sg.get_database_status(db_name)
             assert status is not None, f"{db_name} database doesn't exist"
             assert status.state == "Online", (
