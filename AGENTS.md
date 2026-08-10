@@ -24,7 +24,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | `client/`        | `cbltest` Python framework, pytest plugins, request/response API                          | [client/AGENTS.md](client/AGENTS.md)        |
 | `tests/`         | `dev_e2e/` (developer E2E tests) and `QE/` (QA suite + an edge-server sub-suite)          | [tests/AGENTS.md](tests/AGENTS.md)          |
 | `servers/`       | Per-platform test servers: `c/`, `dotnet/`, `ios/`, `jak/`, `javascript/`                 | [servers/AGENTS.md](servers/AGENTS.md)      |
-| `environment/`   | `aws/` (Terraform + orchestrator), `docker/`, `LogSlurp/`, `otel-collector/`              | [environment/AGENTS.md](environment/AGENTS.md) |
+| `environment/`   | `aws/` (Terraform + orchestrator), `local/`, `LogSlurp/`, `otel-collector/`               | [environment/AGENTS.md](environment/AGENTS.md) |
 | `jenkins/`       | CI/CD pipelines under `pipelines/{dev_e2e,QE}/{platform}/`                                | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
 | `spec/`          | OpenAPI spec (`api/api.yaml`), test specs, dataset docs                                   | [spec/AGENTS.md](spec/AGENTS.md)            |
 | `dataset/`       | Test datasets: cblite2 databases, SGW configs, blobs                                      | —                                           |
@@ -73,8 +73,8 @@ cd tests/QE      && uv run pytest -x -v --config config.json
 cd environment/aws && uv run python start_backend.py --topology topology_setup/topology.json
 cd environment/aws && uv run python stop_backend.py  --topology topology_setup/topology.json
 
-# Local Docker environment (CBS + SGW + LogSlurp)
-cd environment/docker && python start_environment.py
+# Local environment (no Docker/AWS): test server + Sync Gateway
+uv run environment/local/start_local.py --server rosmar --git-tag main
 ```
 
 ## Python Workspace

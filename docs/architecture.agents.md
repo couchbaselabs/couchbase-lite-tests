@@ -7,7 +7,7 @@ It coordinates infrastructure, platform test servers, and Python tests to valida
 
 ## High-Level Flow
 
-1. Provision backend + test-server topology (`environment/aws` or `environment/docker`)
+1. Provision backend + test-server topology (`environment/aws` or `environment/local`)
 2. Generate/consume test config JSON
 3. Execute Python suites (`tests/dev_e2e`, `tests/QE`, or `client/smoke_tests`)
 4. Tests call `cbltest` APIs (`client/src/cbltest`)
@@ -22,7 +22,7 @@ It coordinates infrastructure, platform test servers, and Python tests to valida
 | Framework | Request factory, API wrappers, pytest plugins, config parsing | `client/src/cbltest/` |
 | Test suites | Scenario orchestration and assertions | `tests/dev_e2e/`, `tests/QE/` |
 | Platform servers | Platform-specific execution of CBL operations | `servers/` |
-| Environment | Provisioning and lifecycle of CBS/SGW/ES/LB/LogSlurp/test servers | `environment/aws/`, `environment/docker/` |
+| Environment | Provisioning and lifecycle of CBS/SGW/ES/LB/LogSlurp/test servers | `environment/aws/`, `environment/local/` |
 | CI/CD | Repeatable validation and pipeline setup | `.github/workflows/`, `jenkins/pipelines/` |
 | Contract/spec | API and scenario specs | `spec/api/`, `spec/tests/` |
 | Data | Test datasets and configs | `dataset/` |

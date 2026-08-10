@@ -16,7 +16,7 @@
 - `client/smoke_tests/`: smoke validation entry points
 - `tests/dev_e2e/`, `tests/QE/`: system test suites and `conftest.py` fixtures
 - `environment/aws/`: Terraform + Python orchestrator (`start_backend.py`, `stop_backend.py`)
-- `environment/docker/`: local compose-based backend
+- `environment/local/`: local test server + Sync Gateway runner (no Docker/AWS)
 - `jenkins/pipelines/`: shared and platform-specific setup/test pipeline code
 - `spec/api/api.yaml`: OpenAPI contract
 - `dataset/`: test datasets and SG configs

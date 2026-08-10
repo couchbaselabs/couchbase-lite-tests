@@ -1,13 +1,12 @@
 # Infrastructure & Environment — `environment/`
 
-All infrastructure provisioning for the test harness. The AWS orchestrator is primary — Terraform creates EC2 instances, then Python scripts SSH in and configure Couchbase Server (CBS), Sync Gateway (SGW), Edge Server (ES), load balancers, and LogSlurp. A Docker Compose stack exists for local development.
+All infrastructure provisioning for the test harness. The AWS orchestrator is primary — Terraform creates EC2 instances, then Python scripts SSH in and configure Couchbase Server (CBS), Sync Gateway (SGW), Edge Server (ES), load balancers, and LogSlurp. For local development, `environment/local/` runs the test server and Sync Gateway as native processes (no Docker/AWS).
 
 ## Scope
 
 You own everything under `environment/`:
 
 - `environment/aws/` — AWS orchestrator (Terraform + Python SSH scripts, topology management)
-- `environment/docker/` — local Docker Compose environment (CBS + SGW + LogSlurp)
 - `environment/local/` — local test server + Sync Gateway runner (no Docker/AWS)
 - `environment/LogSlurp/` — C# log aggregation service
 - `environment/otel-collector/` — OpenTelemetry collector config
@@ -74,14 +73,6 @@ environment/
 │           ├── macos_bridge.py
 │           ├── android_bridge.py       # ADB
 │           └── ios_bridge.py           # XHarness
-│
-├── docker/                             # Local Docker Compose (not actively maintained)
-│   ├── docker-compose.yml              # CBS + SGW + LogSlurp services
-│   ├── start_environment.py
-│   ├── sample-config.json
-│   ├── telemetry.yml
-│   ├── cbs/                            # CBS Dockerfile + init scripts
-│   └── sg/                             # SGW Dockerfile + config
 │
 ├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
 │   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
@@ -201,31 +192,25 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 }
 ```
 
-## Docker Environment
-
-⚠️ Not actively maintained — AWS is primary.
-
-```bash
-cd environment/docker && python start_environment.py
-```
-
-- Services: `cbl-test-cbs`, `cbl-test-sg`, `cbl-test-logslurp`
-- Env vars: `COUCHBASE_VERSION`, `SG_DEB`
-
 ## Local Environment
 
-No Docker or AWS — runs the test server and Sync Gateway as native processes. See [environment/local/README.md](local/README.md) for full usage.
+No AWS — runs the test server and Sync Gateway as native processes. Docker is only needed for the optional `--start-cbs` path below. See [environment/local/README.md](local/README.md) for full usage.
 
-`--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write).
+`--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write). For `--server cbs`, point at an existing Couchbase Server with `--connstr`, or have `start_local.py` start one for you locally with `--start-cbs` (drives `cbdinocluster` via the Sync Gateway checkout's `integration-test/start_cbs.py`; requires Docker + Go) — the two are mutually exclusive.
 
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
 uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-gateway --connstr couchbase://127.0.0.1
+uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
-- Writes the TDK config path to `environment/local/topology_config` for direct use with `pytest --config`.
+- Writes the TDK config path to `environment/local/topology_config` — `topology_config` holds a *path*, not the config itself, so run tests with:
+  ```bash
+  cd tests/dev_e2e
+  uv run pytest --config "$(cat ../../environment/local/topology_config)"
+  ```
 - `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
-- `--stop-sync-gateway` stops the background Sync Gateway process.
+- `--stop-sync-gateway` stops the background Sync Gateway process. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 
 ## Prerequisites (AWS)
@@ -273,11 +258,10 @@ cd environment/aws && uv run python stop_backend.py \
 cd environment/aws && uv run python topology_setup/build_test_server.py \
   --platform swift_ios --version 4.0.0
 
-# Local Docker
-cd environment/docker && python start_environment.py
-
 # Local (no Docker/AWS): test server + Sync Gateway
-uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
+# Pick one: rosmar for fast in-memory iteration, cbs for real Couchbase Server coverage
+uv run environment/local/start_local.py --server rosmar --git-tag main
+uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
 ## Cross-References
@@ -291,4 +275,4 @@ uv run environment/local/start_local.py --server rosmar --repo-path /path/to/syn
 | Config parser      | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py)                        | Parses the config JSON this outputs                                   |
 | Topology schema    | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json)                 | Validates topology JSON                                               |
 | Datasets           | [dataset/](../dataset/)                                                                            | Copied into test servers during build                                 |
-| Local runner       | [environment/local/](local/)                                                                       | Alternative to AWS/Docker for iterating locally against rosmar or CBS |
+| Local runner       | [environment/local/](local/)                                                                       | Alternative to AWS for iterating locally against rosmar or CBS |
