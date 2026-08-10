@@ -47,104 +47,112 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step(
             f"Create user '{username}' with access to {channels} (stored in shared bucket)"
         )
-        sg_user = await sgs[0].create_user_client(sg_db, username, password, channels)
-
-        self.mark_test_step(
-            f"Bulk create {total_docs} documents in {num_batches} batches of {batch_size} docs "
-            f"using round-robin across {num_sgs} SGW nodes"
-        )
-        doc_ids: list[str] = []
-        for batch_num in range(num_batches):
-            target_sg = sgs[batch_num % num_sgs]
-            docs: list[DocumentUpdateEntry] = []
-            for i in range(batch_size):
-                doc_id = f"doc_{batch_num}_{i}"
-                doc_ids.append(doc_id)
-                channel = channels[i % len(channels)]
-                docs.append(
-                    DocumentUpdateEntry(
-                        doc_id,
-                        None,
-                        body={
-                            "type": "test_doc",
-                            "batch": batch_num,
-                            "index": i,
-                            "channels": [channel],
-                            "updates": 0,
-                            "created_via_sgw": batch_num % num_sgs,
-                        },
-                    )
-                )
-            await target_sg.update_documents(sg_db, docs, "_default", "_default")
-
-        self.mark_test_step("Wait for documents to propagate across all SGW nodes")
-        await asyncio.sleep(10)
-
-        self.mark_test_step(
-            f"Verify user sees all {total_docs} docs via changes feed from first SGW"
-        )
-        changes = await sg_user.get_changes(sg_db)
-        user_doc_changes = [entry for entry in changes.results if entry.id in doc_ids]
-        assert len(user_doc_changes) == total_docs, (
-            f"Expected {total_docs} docs in changes feed, got {len(user_doc_changes)}"
-        )
-
-        self.mark_test_step("Verify no duplicate documents in changes feed")
-        unique_ids = {entry.id for entry in user_doc_changes}
-        assert len(unique_ids) == total_docs, (
-            f"Duplicate documents found in changes feed. "
-            f"Expected: {total_docs}, Got: {len(unique_ids)}"
-        )
-
-        self.mark_test_step("Verify all expected document IDs are present")
-        expected_ids = set(doc_ids)
-        actual_ids = unique_ids
-        missing_ids = expected_ids - actual_ids
-        unexpected_ids = actual_ids - expected_ids
-        assert len(missing_ids) == 0, f"Missing document IDs: {missing_ids}"
-        assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
-
-        self.mark_test_step(
-            "Verify user can retrieve all documents via _all_docs from one SGW node"
-        )
-        all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
-        all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
-        assert len(all_docs_ids) == total_docs, (
-            f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
-        )
-
-        self.mark_test_step("Verify all documents have correct revision format")
-        for row in all_docs.rows:
-            if row.id in doc_ids:
-                assert len(row.revision) > 0, f"Document {row.id} has no revision"
-                assert "-" in row.revision, (
-                    f"Invalid revision format for {row.id}: {row.revision}"
-                )
-
-        supports_version_vectors = await sgs[0].supports_version_vectors()
-        if supports_version_vectors:
+        async with sgs[0].create_user_client(
+            sg_db, username, password, channels
+        ) as sg_user:
             self.mark_test_step(
-                "Verify all documents have correct version vector format (SGW 4.0+)"
+                f"Bulk create {total_docs} documents in {num_batches} batches of {batch_size} docs "
+                f"using round-robin across {num_sgs} SGW nodes"
             )
+            doc_ids: list[str] = []
+            for batch_num in range(num_batches):
+                target_sg = sgs[batch_num % num_sgs]
+                docs: list[DocumentUpdateEntry] = []
+                for i in range(batch_size):
+                    doc_id = f"doc_{batch_num}_{i}"
+                    doc_ids.append(doc_id)
+                    channel = channels[i % len(channels)]
+                    docs.append(
+                        DocumentUpdateEntry(
+                            doc_id,
+                            None,
+                            body={
+                                "type": "test_doc",
+                                "batch": batch_num,
+                                "index": i,
+                                "channels": [channel],
+                                "updates": 0,
+                                "created_via_sgw": batch_num % num_sgs,
+                            },
+                        )
+                    )
+                await target_sg.update_documents(sg_db, docs, "_default", "_default")
+
+            self.mark_test_step("Wait for documents to propagate across all SGW nodes")
+            await asyncio.sleep(10)
+
+            self.mark_test_step(
+                f"Verify user sees all {total_docs} docs via changes feed from first SGW"
+            )
+            changes = await sg_user.get_changes(sg_db)
+            user_doc_changes = [
+                entry for entry in changes.results if entry.id in doc_ids
+            ]
+            assert len(user_doc_changes) == total_docs, (
+                f"Expected {total_docs} docs in changes feed, got {len(user_doc_changes)}"
+            )
+
+            self.mark_test_step("Verify no duplicate documents in changes feed")
+            unique_ids = {entry.id for entry in user_doc_changes}
+            assert len(unique_ids) == total_docs, (
+                f"Duplicate documents found in changes feed. "
+                f"Expected: {total_docs}, Got: {len(unique_ids)}"
+            )
+
+            self.mark_test_step("Verify all expected document IDs are present")
+            expected_ids = set(doc_ids)
+            actual_ids = unique_ids
+            missing_ids = expected_ids - actual_ids
+            unexpected_ids = actual_ids - expected_ids
+            assert len(missing_ids) == 0, f"Missing document IDs: {missing_ids}"
+            assert len(unexpected_ids) == 0, (
+                f"Unexpected document IDs: {unexpected_ids}"
+            )
+
+            self.mark_test_step(
+                "Verify user can retrieve all documents via _all_docs from one SGW node"
+            )
+            all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
+            all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
+            assert len(all_docs_ids) == total_docs, (
+                f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
+            )
+
+            self.mark_test_step("Verify all documents have correct revision format")
             for row in all_docs.rows:
                 if row.id in doc_ids:
-                    assert row.cv is not None and len(row.cv) > 0, (
-                        f"Document {row.id} has no version vector"
-                    )
-                    assert "@" in row.cv, (
-                        f"Invalid version vector format for {row.id}: {row.cv}"
+                    assert len(row.revision) > 0, f"Document {row.id} has no revision"
+                    assert "-" in row.revision, (
+                        f"Invalid revision format for {row.id}: {row.revision}"
                     )
 
-        self.mark_test_step(
-            "Verify all documents are accessible from each SGW node independently"
-        )
-        for i, sg in enumerate(sgs):
-            test_user = await sg.create_user_client(sg_db, username, password, channels)
-            node_all_docs = await test_user.wait_for_all_documents(sg_db, total_docs)
-            node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
-            assert len(node_doc_ids) == total_docs, (
-                f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"
+            supports_version_vectors = await sgs[0].supports_version_vectors()
+            if supports_version_vectors:
+                self.mark_test_step(
+                    "Verify all documents have correct version vector format (SGW 4.0+)"
+                )
+                for row in all_docs.rows:
+                    if row.id in doc_ids:
+                        assert row.cv is not None and len(row.cv) > 0, (
+                            f"Document {row.id} has no version vector"
+                        )
+                        assert "@" in row.cv, (
+                            f"Invalid version vector format for {row.id}: {row.cv}"
+                        )
+
+            self.mark_test_step(
+                "Verify all documents are accessible from each SGW node independently"
             )
-            await test_user.close()
-
-        await sg_user.close()
+            for i, sg in enumerate(sgs):
+                async with sg.create_user_client(
+                    sg_db, username, password, channels
+                ) as test_user:
+                    node_all_docs = await test_user.wait_for_all_documents(
+                        sg_db, total_docs
+                    )
+                    node_doc_ids = [
+                        row.id for row in node_all_docs.rows if row.id in doc_ids
+                    ]
+                    assert len(node_doc_ids) == total_docs, (
+                        f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"
+                    )
