@@ -43,6 +43,7 @@ SGW_CONFIG = DatabaseConfig(
 
 
 @pytest.mark.upg_sgw
+@pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(3)
 @pytest.mark.min_couchbase_servers(1)
 class TestSgwRollingUpgrade(CBLTestClass):

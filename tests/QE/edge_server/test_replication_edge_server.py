@@ -10,6 +10,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 
 @pytest.mark.min_edge_servers(1)
+@pytest.mark.min_sync_gateways(1)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_sgw_replication(

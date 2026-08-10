@@ -91,7 +91,7 @@ class TestReplicationMultipleClients(CBLTestClass):
                             "type": "client_doc",
                             "source": "db1",
                             "index": i,
-                            "channels": ["*"],
+                            "channels": ["chan1"],
                         }
                     ],
                 )
@@ -110,7 +110,7 @@ class TestReplicationMultipleClients(CBLTestClass):
                             "type": "client_doc",
                             "source": "db2",
                             "index": i,
-                            "channels": ["*"],
+                            "channels": ["chan1"],
                         }
                     ],
                 )

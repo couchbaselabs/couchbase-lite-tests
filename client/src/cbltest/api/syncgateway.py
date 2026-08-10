@@ -3,6 +3,8 @@ import re
 import ssl
 import warnings
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
 from pathlib import Path
@@ -60,6 +62,18 @@ qv6PMC0fI7jhvrr2Uf2Hhw9SQlBFwZ7LjjLqjuuJkclM4VooDElsLbPjSUbA+c5h
 WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
 -----END CERTIFICATE-----
 """
+
+CADDY_PORT = 20000
+SHELL2HTTP_PORT = 20001
+
+
+def _is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
+    """Whether anything responds on hostname:port (any status counts)."""
+    try:
+        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
 
 
 class ScopeConfig(BaseModel):
@@ -1870,6 +1884,29 @@ class SyncGateway(_SyncGatewayBase):
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
 
+        # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
+        # failing on a connection error.
+        self.has_caddy_sidecar: bool = _is_sidecar_reachable(url, CADDY_PORT)
+        self.has_shell2http_sidecar: bool = _is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    async def is_using_views(self, db_name: str) -> bool:
+        """Determine whether the given Sync Gateway database is using views rather than GSI.
+
+        Rosmar has no GSI support, so it always behaves as though views are in use,
+        regardless of `enable_shared_bucket_access`.
+
+        Args:
+            db_name: The name of the database to check.
+
+        Returns:
+            True if using Rosmar, or if the database is configured with
+            enable_shared_bucket_access=false.
+        """
+        if self.using_rosmar:
+            return True
+        config = await self.get_database_config(db_name)
+        return config.enable_shared_bucket_access is False
+
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
         Creates a collection access dictionary in the format that Sync Gateway expects,
@@ -2245,25 +2282,21 @@ class SyncGateway(_SyncGatewayBase):
         )
         return import_count
 
-    async def create_user_client(
+    async def reset_user(
         self,
         db_name: str,
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayUserClient":
+    ) -> None:
         """
-        Helper method to create a user with channel access and return a user-specific SG client.
-
-        This is a convenience method for tests that need to verify user-level access control.
+        Helper method to delete a user if they exist and recreate them with specific channel access.
 
         :param db_name: The database name
-        :param username: The username to create
+        :param username: The username to reset
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
-        # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
         await self.add_user(
             db_name,
@@ -2272,14 +2305,40 @@ class SyncGateway(_SyncGatewayBase):
             collection_access={"_default": {"_default": {"admin_channels": channels}}},
         )
 
-        # Return user-specific SG client for public API access
-        return SyncGatewayUserClient(
+    @asynccontextmanager
+    async def create_user_client(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
+        """
+        Helper method to create a user with channel access and return a user-specific SG client
+        as an async context manager.
+
+        This is a convenience method for tests that need to verify user-level access control.
+        Upon exiting the context, the user client session is closed.
+
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        await self.reset_user(db_name, username, password, channels)
+
+        client = SyncGatewayUserClient(
             self.hostname,
             username,
             password,
             port=self.__public_port,
             secure=self.secure,
         )
+        try:
+            yield client
+        finally:
+            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """

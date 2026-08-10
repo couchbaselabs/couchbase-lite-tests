@@ -21,6 +21,8 @@ from cbltest.api.test_functions import compare_local_and_remote
 
 
 @pytest.mark.cbl
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_replication(

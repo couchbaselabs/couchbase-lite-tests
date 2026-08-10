@@ -81,6 +81,12 @@ pipeline {
                             archiveArtifacts artifacts: 'tests/QE/c_macos/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C macOS Test Teardown Complete"
                         }
+                        failure {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C macOS) has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C macOS failed", to: "sanjivani.patra@couchbase.com";
+                        }
+                        fixed {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C macOS) is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C macOS fixed", to: "sanjivani.patra@couchbase.com";
+                        }
                     }
                 }
                 stage('iOS') {
@@ -112,6 +118,12 @@ pipeline {
                             }
                             archiveArtifacts artifacts: 'tests/QE/c_ios/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C iOS Test Teardown Complete"
+                        }
+                        failure {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C iOS) has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C iOS failed", to: "barkha.goyal@couchbase.com";
+                        }
+                        fixed {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C iOS) is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C iOS fixed", to: "barkha.goyal@couchbase.com";
                         }
                     }
                 }
@@ -145,6 +157,12 @@ pipeline {
                             archiveArtifacts artifacts: 'tests/QE/c_android/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C Android Test Teardown Complete"
                         }
+                        failure {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Android) has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Android failed", to: "barkha.goyal@couchbase.com";
+                        }
+                        fixed {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Android) is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Android fixed", to: "barkha.goyal@couchbase.com";
+                        }
                     }
                 }
                 stage('Linux') {
@@ -169,6 +187,12 @@ pipeline {
                             archiveArtifacts artifacts: 'tests/QE/c_linux/**/*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C Linux Test Teardown Complete"
                         }
+                        failure {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Linux) has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Linux failed", to: "sanjivani.patra@couchbase.com";
+                        }
+                        fixed {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Linux) is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Linux fixed", to: "sanjivani.patra@couchbase.com";
+                        }
                     }
                 }
                 stage('Windows') {
@@ -192,6 +216,12 @@ pipeline {
                             }
                             archiveArtifacts artifacts: 'tests\\QE\\c_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
                             echo "=== C Windows Test Teardown Complete"
+                        }
+                        failure {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Windows) has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Windows failed", to: "barkha.goyal@couchbase.com";
+                        }
+                        fixed {
+                            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> (C Windows) is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} - C Windows fixed", to: "barkha.goyal@couchbase.com";
                         }
                     }
                 }

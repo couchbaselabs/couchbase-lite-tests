@@ -27,11 +27,11 @@ for arg in "$@"; do
 done
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-source $SCRIPT_DIR/../../shared/config.sh
+source "$SCRIPT_DIR"/../../shared/config.sh
 
 echo "Setup backend..."
-pushd $AWS_ENVIRONMENT_DIR > /dev/null
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
+pushd "$AWS_ENVIRONMENT_DIR" > /dev/null
+uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 popd > /dev/null
 
 # Exit early if setup-only mode
@@ -40,8 +40,17 @@ if [ "$SETUP_ONLY" = true ]; then
     exit 0
 fi
 
-# Run Tests :
+# test_replication_xdcr.py needs two separate Couchbase Server clusters, which
+# this single-cluster topology does not provide; it is deferred until the
+# multi-cluster topology is sorted out rather than left to fail every night.
+
+# --import-mode=importlib AND --ignore=dev_e2e/edge_server is required because
+# tests/dev_e2e/test_multipeer.py and tests/QE/test_multipeer.py share
+# a basename and would otherwise collide at import time can be removed after:
+# https://jira.issues.couchbase.com/browse/CBL-8685.
 echo "Run tests..."
-pushd $QE_TESTS_DIR > /dev/null
-uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m sgw \
+pushd "$TESTS_DIR" > /dev/null
+uv run pytest -v --no-header --config QE/config.json \
+    --import-mode=importlib --ignore=dev_e2e/edge_server \
+    --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure
