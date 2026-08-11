@@ -27,7 +27,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | `environment/`   | `aws/` (Terraform + orchestrator), `local/`, `LogSlurp/`, `otel-collector/`               | [environment/AGENTS.md](environment/AGENTS.md) |
 | `jenkins/`       | CI/CD pipelines under `pipelines/{dev_e2e,QE}/{platform}/`                                | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
 | `spec/`          | OpenAPI spec (`api/api.yaml`), test specs, dataset docs                                   | [spec/AGENTS.md](spec/AGENTS.md)            |
-| `dataset/`       | Test datasets: cblite2 databases, SGW configs, blobs                                      | —                                           |
+| `dataset/`       | Test datasets: cblite2 databases, SGW configs, blobs                                      | [dataset/AGENTS.md](dataset/AGENTS.md)      |
 
 ## Prerequisites
 
