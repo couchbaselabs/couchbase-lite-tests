@@ -17,6 +17,7 @@ from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
     GreenboardUploader,
     RunResult,
+    resolve_branch,
     resolve_job_url,
 )
 from cbltest.plugins import greenboard_fixture
@@ -44,6 +45,20 @@ def _clear_build_url(monkeypatch: pytest.MonkeyPatch) -> None:
     set it explicitly via ``monkeypatch.setenv``.
     """
     monkeypatch.delenv("BUILD_URL", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _clear_tdk_branch(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip ``TDK_BRANCH`` from the test environment so ``resolve_branch()``
+    is driven only by what each test sets explicitly.
+
+    Same rationale as :func:`_clear_build_url`: a CI host with ``TDK_BRANCH``
+    exported (e.g. a Jenkins agent) would otherwise leak "main" into the
+    branch gate and mask the skip-path assertions. Tests that need a branch
+    pass it via ``--branch`` (see ``_make_pytestconfig``) or set the env var
+    explicitly with ``monkeypatch.setenv``.
+    """
+    monkeypatch.delenv("TDK_BRANCH", raising=False)
 
 
 def make_report(
@@ -147,13 +162,21 @@ def _make_cblpytest(
     return cblpytest
 
 
-def _make_pytestconfig(*, no_upload: bool = False) -> pytest.Config:
+def _make_pytestconfig(
+    *, no_upload: bool = False, branch: str | None = "main"
+) -> pytest.Config:
     # Resolve relative to this test file so the helper works regardless of
     # pytest's cwd. A cwd-relative "tests/empty_config.json" only worked
     # when pytest was invoked from the client/ directory.
     args = ["--config", str(Path(__file__).with_name("empty_config.json"))]
     if no_upload:
         args.append("--no-result-upload")
+    # Default to the 'main' branch so the greenboard branch gate lets the
+    # upload proceed; the fixture only publishes results from main. Pass
+    # branch=None to simulate a local run (no --branch, TDK_BRANCH unset) and
+    # exercise the skip path.
+    if branch is not None:
+        args += ["--branch", branch]
     return pytest.Config.fromdictargs({}, args)
 
 
@@ -709,3 +732,116 @@ class TestJobUrlPropagation:
         doc = mock_upsert.call_args[0][0]
         assert doc["jobUrl"] == build_url
         assert doc["platform"] == "sgw-upgrade"
+
+
+class TestResolveBranch:
+    """Direct unit tests for :func:`resolve_branch`.
+
+    Documents the contract the greenboard branch gate depends on: an explicit
+    ``--branch`` value wins, otherwise the ``TDK_BRANCH`` environment variable
+    (exported by the QE pipelines from the real checked-out branch); neither
+    set collapses to ``None``, the local-run case the gate treats as non-main.
+    """
+
+    def test_override_wins_over_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TDK_BRANCH", "release/3.3")
+        assert resolve_branch("main") == "main"
+
+    def test_env_used_when_no_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("TDK_BRANCH", "main")
+        assert resolve_branch() == "main"
+        assert resolve_branch(None) == "main"
+
+    def test_unset_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("TDK_BRANCH", raising=False)
+        assert resolve_branch() is None
+
+    def test_empty_override_falls_back_to_env(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("TDK_BRANCH", "main")
+        assert resolve_branch("") == "main"
+
+    def test_empty_values_collapse_to_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # An empty string is operationally indistinguishable from unset — the
+        # same reason resolve_job_url collapses "" to "local".
+        monkeypatch.setenv("TDK_BRANCH", "")
+        assert resolve_branch("") is None
+        assert resolve_branch(None) is None
+
+
+class TestBranchGate:
+    """The greenboard fixture uploads results only from the 'main' tests
+    branch. Feature-branch and local runs carry potentially-modified tests, so
+    their results must never be published; the upgrade path stays exempt.
+    """
+
+    @pytest.mark.asyncio
+    async def test_main_branch_uploads(self) -> None:
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch="main")
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_non_main_branch_skips_upload(self) -> None:
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch="my-feature-branch")
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_local_run_skips_upload(self) -> None:
+        """No --branch and TDK_BRANCH stripped => resolve_branch() is None =>
+        treated as a local run => upload skipped."""
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch=None)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_tdk_branch_env_var_enables_upload(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The pipelines feed the branch via the TDK_BRANCH env var (not
+        --branch); 'main' there must enable the upload just the same."""
+        monkeypatch.setenv("TDK_BRANCH", "main")
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch=None)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upgrade_path_exempt_from_branch_gate(self) -> None:
+        """The upgrade path records regardless of branch. The upg-sgw pipeline
+        is deprecated and does not export TDK_BRANCH, so gating it here would
+        silently stop its per-step recording."""
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        # --upgrade-versions set, no --branch and TDK_BRANCH stripped => the
+        # branch resolves non-main, yet the upgrade path must still run.
+        args = [
+            "--config",
+            str(Path(__file__).with_name("empty_config.json")),
+            "--upgrade-versions",
+            "3.3.0,4.0.0",
+        ]
+        config = pytest.Config.fromdictargs({}, args)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader.record_upgrade_step"
+        ) as mock_record:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_record.assert_called_once()

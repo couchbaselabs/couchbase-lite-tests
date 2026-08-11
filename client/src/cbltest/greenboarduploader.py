@@ -75,6 +75,20 @@ def resolve_job_url() -> str:
     return os.environ.get("BUILD_URL") or "local"
 
 
+def resolve_branch(override: str | None = None) -> str | None:
+    """Return the TDK (tests repo) branch this run executed from, or ``None``.
+
+    Resolution precedence, mirroring :func:`resolve_job_url`'s read-env-at-
+    upload-time contract:
+
+    1. ``override`` — the ``--branch`` pytest option, when explicitly passed.
+    2. the ``TDK_BRANCH`` environment variable, which the QE Jenkins
+       pipelines export from the *real* checked-out branch (``GIT_BRANCH``
+       with the ``origin/`` prefix stripped).
+    """
+    return (override or os.environ.get("TDK_BRANCH")) or None
+
+
 class RunResult(BaseModel):
     """
     Store the information for a test run in greenboard

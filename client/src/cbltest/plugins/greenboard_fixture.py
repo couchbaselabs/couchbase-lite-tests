@@ -5,7 +5,7 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.greenboarduploader import GreenboardUploader, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
 # This plugin provides an automatic (i.e. not used directly by tests)
@@ -35,6 +35,19 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
         yield
         return
 
+    # Only results produced from the 'main' tests branch are allowed
+    # into greenboard.
+    upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
+    if not upgrade_versions_str:
+        branch = resolve_branch(pytestconfig.getoption("--branch"))
+        if branch != "main":
+            cbl_info(
+                "Greenboard upload skipped: results are uploaded only from "
+                f"the 'main' tests branch (resolved branch: {branch or 'local'})"
+            )
+            yield
+            return
+
     uploader = GreenboardUploader(
         cblpytest.config.greenboard_url,
         cblpytest.config.greenboard_username,
@@ -50,7 +63,6 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
     yield
 
     try:
-        upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
         if upgrade_versions_str:
             # Upgrade job — record this iteration's result to a state file.
             # The aggregate batch document is uploaded once at the end of
@@ -137,6 +149,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         help="Comma-separated ordered SGW version list for upgrade jobs "
         "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
         "targets. Triggers sgw-upgrade platform upload.",
+    )
+    group.addoption(
+        "--branch",
+        type=str,
+        default=None,
+        help="The couchbase-lite-tests (TDK) branch this run executed from. "
+        "Greenboard results are uploaded only when this resolves to 'main'. "
+        "Falls back to the TDK_BRANCH environment variable (exported by the "
+        "QE pipelines from the real checked-out branch); unset means a local "
+        "run, which is treated as non-main and skipped.",
     )
 
 
