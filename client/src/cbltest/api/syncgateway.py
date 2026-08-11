@@ -159,7 +159,7 @@ class DatabaseConfig(BaseModel):
     logging: dict[str, Any] | None = None
     max_concurrent_query_ops: int | None = None
     name: str | None = None
-    num_index_replicas: float | None = None
+    num_index_replicas: int | None = None
     offline: bool | None = None
     oidc: dict[str, Any] | None = None
     old_rev_expiry_seconds: float | None = None
