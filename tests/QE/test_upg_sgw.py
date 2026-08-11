@@ -11,7 +11,12 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DeltaSyncConfig,
+    DocumentUpdateEntry,
+    ScopeConfig,
+)
 
 
 @pytest.mark.upg_sgw
@@ -58,12 +63,12 @@ class TestSgwUpgrade(CBLTestClass):
         db = self.db
 
         self.mark_test_step("Configure Sync Gateway database")
-        stable_upgrade_config = {
-            "bucket": bucket,
-            "num_index_replicas": 0,
-            "scopes": {
-                "_default": {
-                    "collections": {
+        db_payload = DatabaseConfig(
+            bucket=bucket,
+            num_index_replicas=0,
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {
                             "sync": """
                                 function(doc, oldDoc) {
@@ -72,14 +77,13 @@ class TestSgwUpgrade(CBLTestClass):
                             """
                         }
                     }
-                }
+                )
             },
-            "revs_limit": 1000,
-            "import_docs": True,
-            "enable_shared_bucket_access": True,
-            "delta_sync": {"enabled": True},
-        }
-        db_payload = PutDatabasePayload(stable_upgrade_config)
+            revs_limit=1000,
+            import_docs=True,
+            enable_shared_bucket_access=True,
+            delta_sync=DeltaSyncConfig(enabled=True),
+        )
         try:
             await sg.put_database(sg_db, db_payload)
         except CblSyncGatewayBadResponseError as e:

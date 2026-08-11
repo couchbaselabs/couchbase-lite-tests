@@ -634,15 +634,16 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify SGW config has correct revision expiry settings")
         db_config = await sync_gateway.get_database_config("short_expiry")
 
-        assert db_config.get("old_rev_expiry_seconds") == 10, (
-            f"Expected old_rev_expiry_seconds to be 10, got {db_config.get('old_rev_expiry_seconds')}"
+        assert db_config.old_rev_expiry_seconds == 10, (
+            f"Expected old_rev_expiry_seconds to be 10, got {db_config.old_rev_expiry_seconds}"
         )
-        delta_sync_config = db_config.get("delta_sync", {})
-        assert delta_sync_config.get("enabled") is True, (
-            f"Expected delta sync to be enabled, got {delta_sync_config.get('enabled')}"
+        delta_sync_config = db_config.delta_sync
+        assert delta_sync_config is not None
+        assert delta_sync_config.enabled is True, (
+            f"Expected delta sync to be enabled, got {delta_sync_config.enabled}"
         )
-        assert delta_sync_config.get("rev_max_age_seconds") == 10, (
-            f"Expected rev_max_age_seconds to be 10, got {delta_sync_config.get('rev_max_age_seconds')}"
+        assert delta_sync_config.rev_max_age_seconds == 10, (
+            f"Expected rev_max_age_seconds to be 10, got {delta_sync_config.rev_max_age_seconds}"
         )
 
         self.mark_test_step("Reset local database.")

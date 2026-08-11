@@ -6,7 +6,14 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DocumentUpdateEntry, ISGRPayload, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DocumentUpdateEntry,
+    IndexConfig,
+    ISGRPayload,
+    ScopeConfig,
+    UnsupportedSettings,
+)
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
@@ -72,12 +79,14 @@ async def _setup_database_and_user(
 ):
     """Setup bucket, database, and user."""
     cbs.create_bucket(bucket_name, num_replicas=1)
-    db_config = {
-        "bucket": bucket_name,
-        "index": {"num_replicas": 1},
-        "scopes": {"_default": {"collections": {"_default": {}}}},
-    }
-    await sg.put_database(sg_db, PutDatabasePayload(db_config))
+    await sg.put_database(
+        sg_db,
+        DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=1),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        ),
+    )
 
     await sg.delete_user(sg_db, user_name)
     await sg.add_user(
@@ -359,17 +368,17 @@ class TestISGRCollectionMapping(CBLTestClass):
             (sg2, sg_db2, bucket2, b2_collections),
             (sg3, sg_db3, bucket3, b3_collections),
         ]:
-            config = {
-                "bucket": bucket,
-                "num_index_replicas": 0,
-                "scopes": {
-                    "_default": {
-                        "collections": {"_default": {}, **{c: {} for c in collections}}
-                    },
+            db_payload = DatabaseConfig(
+                bucket=bucket,
+                num_index_replicas=0,
+                scopes={
+                    "_default": ScopeConfig(
+                        collections={"_default": {}, **{c: {} for c in collections}}
+                    )
                 },
-                "unsupported": {"sgr_tls_skip_verify": True},
-            }
-            await sg.put_database(sg_db, PutDatabasePayload(config))
+                unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
+            )
+            await sg.put_database(sg_db, db_payload)
             await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")

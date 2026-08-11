@@ -6,8 +6,10 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DeltaSyncConfig,
     DocumentUpdateEntry,
-    PutDatabasePayload,
+    ScopeConfig,
     SyncGateway,
 )
 from shared.upgrade_test_helpers import (
@@ -43,12 +45,12 @@ async def _assert_delta_sync_participated(
     )
 
 
-_DELTA_SYNC_UPGRADE_CONFIG: dict = {
-    "bucket": "upgrade",
-    "num_index_replicas": 0,
-    "scopes": {
-        "_default": {
-            "collections": {
+_DELTA_SYNC_UPGRADE_CONFIG = DatabaseConfig(
+    bucket="upgrade",
+    num_index_replicas=0,
+    scopes={
+        "_default": ScopeConfig(
+            collections={
                 "_default": {
                     "sync": (
                         "function(doc, oldDoc, meta) {"
@@ -58,12 +60,12 @@ _DELTA_SYNC_UPGRADE_CONFIG: dict = {
                     )
                 }
             }
-        }
+        )
     },
-    "import_docs": True,
-    "enable_shared_bucket_access": True,
-    "delta_sync": {"enabled": True},
-}
+    import_docs=True,
+    enable_shared_bucket_access=True,
+    delta_sync=DeltaSyncConfig(enabled=True),
+)
 
 
 @pytest.mark.sgw
@@ -73,7 +75,7 @@ _DELTA_SYNC_UPGRADE_CONFIG: dict = {
 class TestUpgradeDeltaSync(CBLTestClass):
     async def _prepare_sg_with_delta_sync(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        payload = PutDatabasePayload(_DELTA_SYNC_UPGRADE_CONFIG)
+        payload = _DELTA_SYNC_UPGRADE_CONFIG
 
         self.mark_test_step(
             "Create SG 'upgrade' database with delta_sync enabled and import from bucket"
@@ -94,8 +96,8 @@ class TestUpgradeDeltaSync(CBLTestClass):
             "Verify delta_sync is actually enabled on SGW 'upgrade' database"
         )
         config = await sg.get_database_config("upgrade")
-        delta_sync = config.get("delta_sync") or {}
-        assert delta_sync.get("enabled") is True, (
+        assert config.delta_sync is not None
+        assert config.delta_sync.enabled is True, (
             "Prerequisite failed: SGW 'upgrade' database does not have "
             f"delta_sync.enabled=True. Active config: {config!r}"
         )

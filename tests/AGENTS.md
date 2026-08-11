@@ -171,7 +171,7 @@ class TestFeatureName(CBLTestClass):
 | `Database`, `SnapshotUpdater` | `cbltest.api.database` | CRUD, snapshot, verify, queries, `async with db.batch_updater()` |
 | `Listener` | `cbltest.api.listener` | P2P passive listener |
 | `MultipeerReplicator` | `cbltest.api.multipeer_replicator` | Multi-device mesh sync |
-| `SyncGateway`, `PutDatabasePayload`, `DocumentUpdateEntry` | `cbltest.api.syncgateway` | SGW admin API |
+| `SyncGateway`, `DatabaseConfig`, `DocumentUpdateEntry` | `cbltest.api.syncgateway` | SGW admin API |
 | `CouchbaseServer` | `cbltest.api.couchbaseserver` | CBS bucket/scope/collection mgmt |
 | `ServerVariant` | `cbltest.responses` | Platform checks (`C`, `DOTNET`, `JAVA`, `JS`) |
 

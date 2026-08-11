@@ -7,7 +7,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
-from cbltest.api.syncgateway import PutDatabasePayload, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
@@ -61,13 +61,23 @@ class CouchbaseCloud:
             )
         return self.__couchbase_server
 
-    def _create_collections(self, db_payload: PutDatabasePayload) -> None:
+    def _create_collections(self, db_payload: DatabaseConfig) -> None:
         if self.__sync_gateways[0].using_rosmar:
             return
-        for scope in db_payload.scopes():
-            self.__couchbase_server.create_collections(
-                db_payload.bucket, scope, db_payload.collections(scope)
-            )
+        assert db_payload.bucket is not None, (
+            "DatabaseConfig is missing required field 'bucket'"
+        )
+        if db_payload.scopes:
+            for scope, scope_config in db_payload.scopes.items():
+                collections: list[str] = []
+                if scope_config.collections:
+                    if isinstance(scope_config.collections, dict):
+                        collections = list(scope_config.collections.keys())
+                    elif isinstance(scope_config.collections, list):
+                        collections = scope_config.collections
+                self.__couchbase_server.create_collections(
+                    db_payload.bucket, scope, collections
+                )
 
     def _check_all_indexes_removed(self, bucket: str) -> None:
         count = self.__couchbase_server.indexes_count(bucket)
@@ -137,7 +147,12 @@ class CouchbaseCloud:
                     for k in addition:
                         nested_config[k] = addition[k]
 
-            db_payload: PutDatabasePayload = PutDatabasePayload(dataset_config)
+            db_payload: DatabaseConfig = DatabaseConfig.model_validate(
+                dataset_config["config"]
+            )
+            assert db_payload.bucket is not None, (
+                f"{dataset_name}-sg-config.json config is missing required field 'bucket'"
+            )
             sg = self.__sync_gateways[0]
             try:
                 # buckets and collections are implicitly created when using Rosmar

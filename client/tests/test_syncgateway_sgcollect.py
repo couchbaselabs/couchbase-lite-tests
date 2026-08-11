@@ -10,7 +10,7 @@ import pytest
 from aiohttp import ClientSession
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
-from cbltest.api.syncgateway import SGCollectRedactLevel, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, SGCollectRedactLevel, SyncGateway
 from cbltest.plugins.sgcollect_fixture import run_sgcollects
 
 
@@ -28,7 +28,9 @@ class FakeSyncGateway(SyncGateway):
         ):
             super().__init__(url=hostname, username="user", password="pass")
 
-        self.sent_requests: list[tuple[str, str, JSONSerializable | None]] = []
+        self.sent_requests: list[
+            tuple[str, str, JSONSerializable | DatabaseConfig | None]
+        ] = []
         self.send_request_result: Any = {"status": "started"}
         # Each run_sgcollect() call pops the next snapshot off the front, so
         # tests configure [before, after] (or more, for run_sgcollects()).
@@ -39,7 +41,7 @@ class FakeSyncGateway(SyncGateway):
         self,
         method: str,
         path: str,
-        payload: JSONSerializable | None = None,
+        payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
     ) -> Any:

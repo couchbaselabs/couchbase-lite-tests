@@ -19,19 +19,22 @@ def generate_rsa_keypair():
     return private_key, private_key.public_key()
 
 
-def public_key_to_jwk(public_key) -> dict:
+from cbltest.api.syncgateway import JWK
+
+
+def public_key_to_jwk(public_key, kid: str = "test-key-1") -> JWK:
     """Convert RSA public key to JWK format for SGW OIDC config."""
     numbers = public_key.public_numbers()
     n = numbers.n.to_bytes((numbers.n.bit_length() + 7) // 8, "big")
     e = numbers.e.to_bytes((numbers.e.bit_length() + 7) // 8, "big")
-    return {
-        "kty": "RSA",
-        "n": _b64url(n),
-        "e": _b64url(e),
-        "alg": "RS256",
-        "use": "sig",
-        "kid": "test-key-1",
-    }
+    return JWK(
+        kty="RSA",
+        n=_b64url(n),
+        e=_b64url(e),
+        alg="RS256",
+        use="sig",
+        kid=kid,
+    )
 
 
 def generate_jwt(private_key, subject="edge", expires_in=300, kid="test-key-1") -> str:

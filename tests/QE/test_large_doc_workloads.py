@@ -11,7 +11,7 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig
 
 SIZE_MB = 1024 * 1024  # A megabyte
 SGW_MAX_DOC_SIZE_BYTES = 20 * SIZE_MB  # SGW rejects documents exceeding 20MB
@@ -51,12 +51,11 @@ class TestLargeDocWorkloads(CBLTestClass):
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint.")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with channel access.")
