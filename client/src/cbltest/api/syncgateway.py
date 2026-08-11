@@ -131,7 +131,7 @@ class DatabaseConfig(BaseModel):
     allow_conflicts: bool | None = None
     allow_empty_password: bool | None = None
     bucket: str | None = Field(default=None)
-    bucket_op_timeout_ms: float | None = None
+    bucket_op_timeout_ms: int | None = None
     cacertpath: str | None = None
     cache: dict[str, Any] | None = None
     certpath: str | None = None
@@ -151,7 +151,7 @@ class DatabaseConfig(BaseModel):
     import_filter: str | None = None
     import_partitions: int | None = None
     index: IndexConfig | None = None
-    javascript_timeout_secs: float | None = None
+    javascript_timeout_secs: int | None = None
     keypath: str | None = None
     kv_tls_port: int | None = None
     local_doc_expiry_secs: int | None = None
@@ -162,13 +162,13 @@ class DatabaseConfig(BaseModel):
     num_index_replicas: int | None = None
     offline: bool | None = None
     oidc: dict[str, Any] | None = None
-    old_rev_expiry_seconds: float | None = None
+    old_rev_expiry_seconds: int | None = None
     password: str | None = None
     pool: str | None = None
     query_pagination_limit: int | None = None
     replications: dict[str, Any] | None = None
-    rev_cache_size: float | None = None
-    revs_limit: float | None = None
+    rev_cache_size: int | None = None
+    revs_limit: int | None = None
     roles: dict[str, Any] | None = None
     scopes: dict[str, ScopeConfig] | None = None
     send_www_authenticate_header: bool | None = None
@@ -179,7 +179,7 @@ class DatabaseConfig(BaseModel):
     session_cookie_secure: bool | None = None
     sgreplicate_enabled: bool | None = None
     sgreplicate_websocket_heartbeat_secs: int | None = None
-    slow_query_warning_threshold: float | None = None
+    slow_query_warning_threshold: int | None = None
     store_legacy_revtree_data: bool | None = None
     suspendable: bool | None = None
     sync: str | None = None
