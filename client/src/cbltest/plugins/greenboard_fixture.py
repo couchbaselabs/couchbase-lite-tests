@@ -154,11 +154,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--branch",
         type=str,
         default=None,
-        help="The couchbase-lite-tests (TDK) branch this run executed from. "
-        "Greenboard results are uploaded only when this resolves to 'main'. "
-        "Falls back to the TDK_BRANCH environment variable (exported by the "
-        "QE pipelines from the real checked-out branch); unset means a local "
-        "run, which is treated as non-main and skipped.",
+        help="Optional override for the couchbase-lite-tests (TDK) branch this "
+        "run executed from; greenboard results are uploaded only when it "
+        "resolves to 'main'. Normally left unset: the branch is auto-detected "
+        "from Jenkins' GIT_BRANCH/BRANCH_NAME. Unset off-CI means a local run, "
+        "treated as non-main and skipped.",
     )
 
 

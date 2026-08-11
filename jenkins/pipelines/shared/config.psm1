@@ -109,14 +109,6 @@ AWS_ENVIRONMENT_DIR: $AWS_ENVIRONMENT_DIR
 
 Write-Box -Content $content -Title "Defining the following values:"
 
-if ([string]::IsNullOrEmpty($env:TDK_BRANCH)) {
-    $branch = if (-not [string]::IsNullOrEmpty($env:GIT_BRANCH)) { $env:GIT_BRANCH } else { $env:BRANCH_NAME }
-    $env:TDK_BRANCH = $branch
-}
-if (-not [string]::IsNullOrEmpty($env:TDK_BRANCH)) {
-    $env:TDK_BRANCH = $env:TDK_BRANCH -replace '^origin/', ''
-}
-
 Export-ModuleMember -Variable PIPELINES_DIR, TESTS_DIR, `
 ENVIRONMENT_DIR, SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, `
 DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR `

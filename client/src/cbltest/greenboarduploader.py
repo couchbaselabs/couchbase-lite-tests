@@ -78,15 +78,33 @@ def resolve_job_url() -> str:
 def resolve_branch(override: str | None = None) -> str | None:
     """Return the TDK (tests repo) branch this run executed from, or ``None``.
 
-    Resolution precedence, mirroring :func:`resolve_job_url`'s read-env-at-
-    upload-time contract:
+    "Branch" is the branch of the *couchbase-lite-tests* checkout that produced
+    these results — not the Couchbase Lite or Sync Gateway release line. The
+    greenboard fixture uploads only from ``main`` so feature-branch or local
+    runs never publish results from modified tests.
 
-    1. ``override`` — the ``--branch`` pytest option, when explicitly passed.
-    2. the ``TDK_BRANCH`` environment variable, which the QE Jenkins
-       pipelines export from the *real* checked-out branch (``GIT_BRANCH``
-       with the ``origin/`` prefix stripped).
+    Auto-detected — nothing needs to be passed on CI. Resolution order:
+
+    1. ``override`` — the ``--branch`` pytest option; an explicit escape hatch
+       for manual runs and tests, rarely used in practice.
+    2. ``GIT_BRANCH`` — set by Jenkins' git plugin after ``checkout scm``
+       (e.g. ``"origin/main"``); the ``origin/`` prefix is stripped.
+    3. ``BRANCH_NAME`` — set by Jenkins multibranch pipelines.
+
+    We read the branch from Jenkins' own environment rather than inspecting the
+    working tree with a git library (GitPython/pygit2): Jenkins checks out a
+    *detached HEAD* at a specific commit, where ``git.Repo.active_branch``
+    raises — there is no active branch to name. Jenkins knows the branch it
+    cloned and exports it as ``GIT_BRANCH``, which the pytest process inherits,
+    so reading it is both reliable and dependency-free. Off-CI none of these
+    are set, so the result is ``None`` — the local-run case, which the fixture
+    treats as non-main and skips (a local run must never upload, whatever
+    branch it happens to be on).
     """
-    return (override or os.environ.get("TDK_BRANCH")) or None
+    branch = override or os.environ.get("GIT_BRANCH") or os.environ.get("BRANCH_NAME")
+    if not branch:
+        return None
+    return branch.removeprefix("origin/") or None
 
 
 class RunResult(BaseModel):
