@@ -31,6 +31,7 @@ async def run_sgcollects(
                 f"sgcollect: failed to collect logs from {sg.hostname}: {e}",
                 include_stack=False,
             )
+            return None
 
     results = await asyncio.gather(*(_collect_one(sg) for sg in sync_gateways))
     collected = [path for path in results if path is not None]
