@@ -62,11 +62,13 @@ class CouchbaseCloud:
         return self.__couchbase_server
 
     def _create_collections(self, db_payload: DatabaseConfig) -> None:
+        """Creates the backing bucket and its scopes/collections; no-op under
+        Rosmar, which creates both implicitly. Callers must have already
+        validated that db_payload.bucket is set."""
         if self.__sync_gateways[0].using_rosmar:
             return
-        assert db_payload.bucket is not None, (
-            "DatabaseConfig is missing required field 'bucket'"
-        )
+        bucket = cast(str, db_payload.bucket)
+        self.__couchbase_server.create_bucket(bucket)
         if db_payload.scopes:
             for scope, scope_config in db_payload.scopes.items():
                 collections: list[str] = []
@@ -75,9 +77,7 @@ class CouchbaseCloud:
                         collections = list(scope_config.collections.keys())
                     elif isinstance(scope_config.collections, list):
                         collections = scope_config.collections
-                self.__couchbase_server.create_collections(
-                    db_payload.bucket, scope, collections
-                )
+                self.__couchbase_server.create_collections(bucket, scope, collections)
 
     def _check_all_indexes_removed(self, bucket: str) -> None:
         count = self.__couchbase_server.indexes_count(bucket)
@@ -155,10 +155,7 @@ class CouchbaseCloud:
             )
             sg = self.__sync_gateways[0]
             try:
-                # buckets and collections are implicitly created when using Rosmar
-                if not sg.using_rosmar:
-                    self.couchbase_server.create_bucket(db_payload.bucket)
-                    self._create_collections(db_payload)
+                self._create_collections(db_payload)
                 await sg.put_database(dataset_name, db_payload)
             except CblSyncGatewayBadResponseError as e:
                 if e.code != 412:
@@ -168,10 +165,8 @@ class CouchbaseCloud:
                 await sg.delete_database(dataset_name)
                 await self.drop_bucket(db_payload.bucket)
                 await self.sync_gateway_cluster.wait_for_no_databases(db_payload.bucket)
+                self._create_collections(db_payload)
                 if not sg.using_rosmar:
-                    self.__couchbase_server.create_bucket(db_payload.bucket)
-                    self._create_collections(db_payload)
-
                     # CBL-4977 :
                     # The bucket's indexes will be deleted asynchronously after the bucket is dropped.
                     # When recreating the sg database, sg may wrongly detect that the indexes already exist,
@@ -198,6 +193,33 @@ class CouchbaseCloud:
 
             if len(self.__sync_gateways) > 1:
                 await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
+
+    async def create_database(
+        self,
+        db_name: str,
+        db_config: DatabaseConfig,
+    ) -> None:
+        """
+        Creates a Sync Gateway database backed by the bucket/scopes/collections
+        described directly by db_config, without requiring on-disk dataset files.
+        Fails if a database with this name already exists.
+
+        :param db_name: The name of the Sync Gateway database to create.
+        :param db_config: The database configuration, including the backing bucket
+            and its scopes/collections.
+        """
+        with self.__tracer.start_as_current_span(
+            "create_database", attributes={"sg.database.name": db_name}
+        ):
+            assert db_config.bucket is not None, (
+                "DatabaseConfig is missing required field 'bucket'"
+            )
+            self._create_collections(db_config)
+            await self.sync_gateway_cluster.round_robin_node.put_database(
+                db_name, db_config
+            )
+
+            await self.sync_gateway_cluster.wait_for_db_online(db_name)
 
     async def drop_bucket(self, bucket_name: str):
         """Drop the bucket from the backing cluster."""
