@@ -73,7 +73,9 @@ client/
         ├── required_topology.py        # min_test_servers / min_sync_gateways / … markers
         ├── cbse_filter.py              # CBSE (CBS Edition) test filtering
         ├── greenboard_fixture.py
-        └── span_generation_fixture.py  # OpenTelemetry spans
+        ├── span_generation_fixture.py  # OpenTelemetry spans
+        ├── sgcollect_fixture.py        # sgcollect on failure
+        └── cloud_cleanup.py            # cleanup_buckets (autouse) — wipes SGW DBs + CBS/Rosmar buckets
 ```
 
 ## Core Concepts
@@ -123,6 +125,8 @@ cbse_filter             = "cbltest.plugins.cbse_filter"
 cblpytest_fixture       = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture      = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
+sgcollect_fixture       = "cbltest.plugins.sgcollect_fixture"
+cloud_cleanup           = "cbltest.plugins.cloud_cleanup"
 ```
 
 CLI options added by `cblpytest_fixture`:

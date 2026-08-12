@@ -61,36 +61,11 @@ class SyncGatewayCluster:
             )
         )
 
-    async def wait_for_db_gone(
-        self,
-        db_name: str,
-        max_retries: int = 30,
-        retry_delay: int = 2,
-    ) -> None:
+    async def wait_for_no_databases(self) -> None:
         """
-        Wait until every node in the cluster no longer lists the database, polling
-        all nodes concurrently.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
+        Wait until every node in the cluster has no databases at all, polling all
+        nodes concurrently.
         """
         await asyncio.gather(
-            *(
-                sg._wait_for_db_gone(
-                    db_name, max_retries=max_retries, retry_delay=retry_delay
-                )
-                for sg in self.__sync_gateways
-            )
-        )
-
-    async def wait_for_no_databases(self, bucket_name: str) -> None:
-        """
-        Wait until every node in the cluster no longer backs any database with the
-        given bucket, polling all nodes concurrently.
-
-        :param bucket_name: Bucket name to check for.
-        """
-        await asyncio.gather(
-            *(sg._wait_for_no_databases(bucket_name) for sg in self.__sync_gateways)
+            *(sg._wait_for_no_databases() for sg in self.__sync_gateways)
         )

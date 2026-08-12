@@ -20,7 +20,7 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgw_high_availability_with_load_balancer(
-        self, cblpytest: CBLPyTest, cleanup_after_test
+        self, cblpytest: CBLPyTest
     ) -> None:
         sgs = cblpytest.sync_gateways
         sg_cluster = SyncGatewayCluster(sgs)

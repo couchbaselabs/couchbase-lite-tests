@@ -1,7 +1,6 @@
 import asyncio
 from pathlib import Path
 
-import aiohttp
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -55,22 +54,6 @@ class TestJWTReplication(CBLTestClass):
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
-
-        # Clean up any existing travel database from previous runs
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass  # Database may not exist
-
-        # Flush CBS bucket to clear stale documents
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                f"http://{cbs.hostname}:8091/pools/default/buckets/travel/controller/doFlush",
-                auth=aiohttp.BasicAuth("Administrator", "password"),
-            ) as resp,
-        ):
-            await resp.read()
 
         # Build the SGW database config with local_jwt for JWT validation
         payload = DatabaseConfig(
@@ -211,18 +194,6 @@ class TestJWTReplication(CBLTestClass):
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
-
-        # Clean up
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-
-        try:
-            cbs.drop_bucket("travel")
-            await cbs.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
@@ -377,12 +348,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
 
-        # Cleanup
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
@@ -527,11 +492,6 @@ class TestJWTReplication(CBLTestClass):
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
-
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
@@ -693,16 +653,6 @@ class TestJWTReplication(CBLTestClass):
         cloud = cblpytest.simple_cloud()
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_server
-
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-        try:
-            cbs.drop_bucket("travel")
-            await cbs.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])

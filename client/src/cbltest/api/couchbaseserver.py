@@ -18,6 +18,7 @@ import json
 from urllib.parse import quote_plus, urlparse
 
 import requests
+import tenacity
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (
@@ -37,7 +38,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
-from cbltest.utils import _try_n_times
+from cbltest.utils import _try_n_times, async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
 
@@ -249,9 +250,23 @@ class CouchbaseServer:
                     and self.bucket_kv_responding(name)
                     and self.collections_ready(name)
                 ):
+                    retry_assert(
+                        lambda: self._check_all_indexes_removed(name),
+                        tenacity.wait_fixed(2),
+                        tenacity.stop_after_attempt(10),
+                    )
                     return
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
+
+    def _check_all_indexes_removed(self, bucket: str) -> None:
+        """
+        CBL-4977: Buckets recreated with the same name can have stale, asynchronously
+        deleting indexes. Check for remaining indexes so we can wait out their removal
+        before starting Sync Gateway.
+        """
+        count = self.indexes_count(bucket)
+        assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
 
     def drop_bucket(self, name: str):
         """
@@ -348,6 +363,27 @@ class CouchbaseServer:
             raise CblTestError(
                 f"Bucket '{bucket_name}' was not deleted after "
                 f"{max_retries * retry_delay} seconds"
+            )
+
+    async def wait_for_no_buckets(
+        self,
+        max_retries: int = 30,
+        retry_delay: float = 2.0,
+    ) -> None:
+        """
+        Waits for the Couchbase cluster to have no buckets at all.
+        Async because deletion is eventual and requires polling remote state.
+        """
+
+        async def _wait_for_no_buckets_poll() -> None:
+            bucket_names = self.get_bucket_names()
+            assert not bucket_names, f"Cluster still has buckets: {bucket_names}"
+
+        with self.__tracer.start_as_current_span("wait_for_no_buckets"):
+            await async_retry_assert(
+                _wait_for_no_buckets_poll,
+                tenacity.wait_fixed(retry_delay),
+                tenacity.stop_after_attempt(max_retries),
             )
 
     def restore_bucket(

@@ -31,7 +31,6 @@ class TestXattrs(CBLTestClass):
         bucket_name = "data-bucket"
 
         self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")

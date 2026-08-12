@@ -1,9 +1,9 @@
 import pytest
 import tenacity
-from cbltest.utils import retry_assert
+from cbltest.utils import async_retry_assert
 
 
-class TestRetryAssert:
+class TestAsyncRetryAssert:
     @pytest.mark.asyncio
     async def test_returns_result_once_assertion_passes(self):
         calls = {"n": 0}
@@ -13,7 +13,7 @@ class TestRetryAssert:
             assert calls["n"] >= 3, f"not ready yet (attempt {calls['n']})"
             return "ok"
 
-        result = await retry_assert(
+        result = await async_retry_assert(
             poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5)
         )
 
@@ -26,7 +26,7 @@ class TestRetryAssert:
             raise AssertionError("still not ready")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await retry_assert(
+            await async_retry_assert(
                 poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(3)
             )
 
@@ -38,7 +38,7 @@ class TestRetryAssert:
             raise AssertionError("still not ready")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await retry_assert(
+            await async_retry_assert(
                 poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(1)
             )
 
@@ -54,7 +54,7 @@ class TestRetryAssert:
             raise AssertionError(f"attempt {calls['n']}")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await retry_assert(
+            await async_retry_assert(
                 poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(4)
             )
 
@@ -70,7 +70,7 @@ class TestRetryAssert:
             raise ValueError("boom")
 
         with pytest.raises(ValueError):
-            await retry_assert(
+            await async_retry_assert(
                 poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5)
             )
 

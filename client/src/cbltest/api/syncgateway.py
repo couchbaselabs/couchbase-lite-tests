@@ -25,7 +25,7 @@ from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import assert_not_null, retry_assert
+from cbltest.utils import assert_not_null, async_retry_assert
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -931,6 +931,26 @@ class _SyncGatewayBase:
         :param db_name: The name of the Database to delete
         """
         await self._delete_database(db_name, 0)
+
+    async def drop_rosmar_bucket(self, bucket_name: str) -> None:
+        """
+        Drops a Rosmar-backed bucket. Unlike a Couchbase Server bucket, Rosmar data
+        is not deleted by removing the Sync Gateway database that uses it, so this
+        must be called separately to clear it out.
+
+        .. note:: Only valid when this Sync Gateway node is using Rosmar
+            (``self.using_rosmar``).
+
+        :param bucket_name: The name of the Rosmar bucket to drop
+        """
+        with self._tracer.start_as_current_span(
+            "drop_rosmar_bucket", attributes={"cbl.bucket.name": bucket_name}
+        ):
+            try:
+                await self._send_request("delete", f"/_rosmar/{bucket_name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
 
     async def get_all_database_names(self) -> list[str]:
         """
@@ -2085,7 +2105,7 @@ class SyncGateway(_SyncGatewayBase):
             except (CblSyncGatewayBadResponseError, ClientConnectorError) as exc:
                 raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
 
-        await retry_assert(
+        await async_retry_assert(
             _wait_for_rest_api_poll,
             tenacity.wait_fixed(0.1),
             tenacity.stop_after_delay(70),
@@ -2190,12 +2210,12 @@ class SyncGateway(_SyncGatewayBase):
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def _wait_for_no_databases(self, bucket_name: str):
+    async def _wait_for_no_databases(self):
+        """
+        Assert that there are no databases at all.
+        """
         dbs = await self.get_all_databases_verbose()
-        for db in dbs.values():
-            assert db.bucket != bucket_name, (
-                f"Database {db=} is still backed by bucket {bucket_name}"
-            )
+        assert not dbs, f"SGW still has databases: {list(dbs)}"
 
     async def _wait_for_db_online(
         self,
@@ -2223,33 +2243,8 @@ class SyncGateway(_SyncGatewayBase):
                 f"Database {db_name} is not online: {entry}"
             )
 
-        await retry_assert(
+        await async_retry_assert(
             _wait_for_db_online_poll,
-            tenacity.wait_fixed(retry_delay),
-            tenacity.stop_after_attempt(max_retries),
-        )
-
-    async def _wait_for_db_gone(
-        self,
-        db_name: str,
-        *,
-        max_retries: int = 30,
-        retry_delay: int = 2,
-    ) -> None:
-        """
-        Wait until the SGW node no longer lists the database.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        """
-
-        async def _wait_for_db_gone_poll() -> None:
-            dbs = await self.get_all_database_names()
-            assert db_name not in dbs
-
-        await retry_assert(
-            _wait_for_db_gone_poll,
             tenacity.wait_fixed(retry_delay),
             tenacity.stop_after_attempt(max_retries),
         )

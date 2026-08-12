@@ -49,14 +49,8 @@ async def setup_upgrade_env(
         dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
     )
 
-    test_case.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
-    # delete_database silently swallows 403 internally (config-managed DBs)
-    # and retries 500s; no need to wrap further.
-    await cblpytest.sync_gateways[0].delete_database("upgrade")
-
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
     cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
-    cbs.drop_bucket("upgrade")
     cbs.restore_bucket(
         "upgrade",
         tools_path(),

@@ -38,22 +38,6 @@ class TestJWTSimple(CBLTestClass):
         sync_gateway = cblpytest.sync_gateways[0]
 
         # =====================================================================
-        # STEP 0: Cleanup stale resources from previous test runs.
-        # This ensures a fresh state even if a prior run crashed mid-test.
-        # The @pytest.mark.sgw marker triggers auto-cleanup AFTER the test too.
-        # =====================================================================
-        try:
-            await sync_gateway.delete_database("travel")
-        except Exception:
-            pass  # Database may not exist
-
-        try:
-            server.drop_bucket("travel")
-            await server.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass  # Bucket may not exist
-
-        # =====================================================================
         # STEP 1: Generate RSA key pair and JWT token.
         # - Private key signs the JWT token
         # - Public key (as JWK) goes into SGW's local_jwt config for validation

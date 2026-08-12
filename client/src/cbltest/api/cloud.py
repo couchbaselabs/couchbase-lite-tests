@@ -6,12 +6,11 @@ import aiofiles
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
+from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
 
 
@@ -79,14 +78,6 @@ class CouchbaseCloud:
                     db_payload.bucket, scope, collections
                 )
 
-    def _check_all_indexes_removed(self, bucket: str) -> None:
-        count = self.__couchbase_server.indexes_count(bucket)
-        if count > 0:
-            raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
-
-    def _wait_for_all_indexed_removed(self, bucket: str) -> None:
-        _try_n_times(10, 2, True, self._check_all_indexes_removed, bucket)
-
     async def configure_dataset(
         self,
         dataset_path: Path,
@@ -109,7 +100,7 @@ class CouchbaseCloud:
         """
         with self.__tracer.start_as_current_span(
             "configure_dataset", attributes={"cbl.dataset.name": dataset_name}
-        ) as current_span:
+        ):
             _assert_not_null(dataset_path, "dataset_path")
             _assert_not_null(dataset_name, "dataset_name")
 
@@ -154,36 +145,11 @@ class CouchbaseCloud:
                 f"{dataset_name}-sg-config.json config is missing required field 'bucket'"
             )
             sg = self.__sync_gateways[0]
-            try:
-                # buckets and collections are implicitly created when using Rosmar
-                if not sg.using_rosmar:
-                    self.couchbase_server.create_bucket(db_payload.bucket)
-                    self._create_collections(db_payload)
-                await sg.put_database(dataset_name, db_payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code != 412:
-                    raise
-
-                current_span.add_event("Handle HTTP 412")
-                await sg.delete_database(dataset_name)
-                await self.drop_bucket(db_payload.bucket)
-                await self.sync_gateway_cluster.wait_for_no_databases(db_payload.bucket)
-                if not sg.using_rosmar:
-                    self.__couchbase_server.create_bucket(db_payload.bucket)
-                    self._create_collections(db_payload)
-
-                    # CBL-4977 :
-                    # The bucket's indexes will be deleted asynchronously after the bucket is dropped.
-                    # When recreating the sg database, sg may wrongly detect that the indexes already exist,
-                    # but later when trying to use the indexes for querying, the index-not-available error occurs
-                    # as the index has already been deleted by that time.
-                    #
-                    # Wait until all indexes are removed will help prevent that problem. It's important
-                    # to wait after the bucket and its collections are created, otherwise, QueryIndexManager
-                    # will not be able to return the pending-to-removed indexes created for the collections.
-                    self._wait_for_all_indexed_removed(db_payload.bucket)
-
-                await sg.put_database(dataset_name, db_payload)
+            # buckets and collections are implicitly created when using Rosmar
+            if not sg.using_rosmar:
+                self.couchbase_server.create_bucket(db_payload.bucket)
+                self._create_collections(db_payload)
+            await sg.put_database(dataset_name, db_payload)
 
             for user in users:
                 user_dict = _get_typed_required(users, user, dict)
@@ -198,15 +164,3 @@ class CouchbaseCloud:
 
             if len(self.__sync_gateways) > 1:
                 await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
-
-    async def drop_bucket(self, bucket_name: str):
-        """Drop the bucket from the backing cluster."""
-        sg = self.__sync_gateways[0]
-        if sg.using_rosmar:
-            try:
-                await sg._send_request("delete", f"/_rosmar/{bucket_name}")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code != 404:
-                    raise
-        else:
-            self.couchbase_server.drop_bucket(bucket_name)

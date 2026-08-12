@@ -56,6 +56,7 @@ cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
+cloud_cleanup = "cbltest.plugins.cloud_cleanup"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"

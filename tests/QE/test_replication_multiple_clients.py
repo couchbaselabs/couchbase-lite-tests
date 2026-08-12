@@ -170,7 +170,6 @@ class TestReplicationMultipleClients(CBLTestClass):
             f"SG changes feed should have 200 documents, got {len(sg_changes_ids)}"
         )
 
-        await sg.delete_database(sg_db)
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
 
@@ -377,6 +376,5 @@ class TestReplicationMultipleClients(CBLTestClass):
                 f"Document {doc_id} should have source={expected_source}"
             )
 
-        await sg.delete_database(sg_db)
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
