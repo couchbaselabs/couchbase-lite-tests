@@ -12,7 +12,7 @@ from cbltest.api.json_generator import JSONGenerator
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.min_edge_servers(1)
+@pytest.mark.min_edge_servers(3)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
