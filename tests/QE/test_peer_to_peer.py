@@ -14,6 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.responses import ServerVariant
 
 
 @pytest.mark.min_test_servers(3)
@@ -609,9 +610,11 @@ class TestPeerToPeer(CBLTestClass):
         async def stop_restart_task():
             port = listener1.port
             await listener1.stop()
-            await asyncio.sleep(
-                30
-            )  # Java Linux reports address in use error sometimes because the same port doesn't get freed, hence adding a longer sleep time.
+            variant = (await cblpytest.test_servers[0].get_info()).variant
+            if variant == ServerVariant.JVM:
+                await asyncio.sleep(
+                    30
+                )  # Java Linux reports address in use error sometimes because the same port doesn't get freed, hence adding a longer sleep time.
             listener2 = Listener(all_dbs[0], ["_default._default"], port, identity=None)
             await listener2.start()
             return listener2
