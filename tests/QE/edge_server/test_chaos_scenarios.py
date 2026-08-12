@@ -299,8 +299,7 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Configure Edge Server 3 to replicate from Edge Server 2")
         source_db = edge_server2.replication_url("travel")
         config["replications"][0]["source"] = source_db
-        with open(config_path2, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path2, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(
             db_name="travel", config_file=config_path2
         )
