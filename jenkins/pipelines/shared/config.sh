@@ -31,6 +31,11 @@ function move_artifacts() {
     rm -rf "$dst_dir"
     mkdir -p "$dst_dir"
     mv "$src_dir/session.log" "$dst_dir/session.log" || true
+    # session.log is the full LogSlurp DEBUG aggregate and can reach ~100 MB,
+    # which stalls the Jenkins artifact download behind the reverse proxy.
+    # Compress it (text → ~10x smaller) so it stays downloadable; browsers and
+    # curl fetch the .gz fine and it decompresses with gunzip/`zless`.
+    [ -f "$dst_dir/session.log" ] && gzip -f "$dst_dir/session.log"
     mv "$src_dir/http_log" "$dst_dir/http_log" || true
     # Include the JUnit XML so each platform's results are preserved per
     # artifacts dir in a multi-pipeline (matrix) build.
