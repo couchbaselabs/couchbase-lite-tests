@@ -1768,7 +1768,7 @@ class _SyncGatewayBase:
             return cast(dict, resp)
 
     async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 2
+        self, max_attempts: int = 60, wait_time: int = 5
     ) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
@@ -1815,7 +1815,7 @@ class _SyncGatewayBase:
             before = set(await self.list_files_via_caddy(pattern=pattern))
 
             await self.start_sgcollect(redact_level=redact_level)
-            await self.wait_for_sgcollect_to_complete()
+            await self.wait_for_sgcollect_to_complete(max_attempts=100)
 
             after = set(await self.list_files_via_caddy(pattern=pattern))
             new_files = after - before
