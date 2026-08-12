@@ -108,7 +108,7 @@ class TestMultipeer(CBLTestClass):
             if len(set(rev_ids)) == 1:
                 break
             self.mark_test_step(
-                f"Rev IDs don't match across devices, waiting 30 seconds (retries left: {retry})"
+                f"Rev IDs don't match across devices, waiting 10 seconds (retries left: {retry})"
             )
             await asyncio.sleep(10)
             retry -= 1
