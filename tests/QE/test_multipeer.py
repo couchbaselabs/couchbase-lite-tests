@@ -110,7 +110,7 @@ class TestMultipeer(CBLTestClass):
             self.mark_test_step(
                 f"Rev IDs don't match across devices, waiting 30 seconds (retries left: {retry})"
             )
-            await asyncio.sleep(30)
+            await asyncio.sleep(10)
             retry -= 1
             for mp in multipeer_replicators:
                 status = await mp.wait_for_idle(timeout=timedelta(seconds=timeout))
