@@ -1,7 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$Edition,
     [Parameter(Mandatory=$true)][string]$Version,
-    [Parameter(Mandatory=$true)][string]$Build,
+    [Parameter(Mandatory=$true)][string]$Build
 )
 
 $DOWNLOAD_DIR="$PSScriptRoot\..\downloaded"

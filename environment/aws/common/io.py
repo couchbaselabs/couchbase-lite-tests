@@ -119,9 +119,13 @@ def zip_directory(input: Path, output: Path, excludes: list[str] | None = None) 
         # For directories also test pattern with trailing slash variants
         for pat in excludes:
             # Expand simple directory name patterns (e.g. '__pycache__')
-            if is_dir and not any(ch in pat for ch in "*?[]") and "/" not in pat:
-                if rel_posix == pat:
-                    return True
+            if (
+                is_dir
+                and not any(ch in pat for ch in "*?[]")
+                and "/" not in pat
+                and rel_posix == pat
+            ):
+                return True
             # Direct match
             if fnmatch(rel_posix, pat):
                 return True

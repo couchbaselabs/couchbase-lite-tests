@@ -5,8 +5,9 @@ The two Python test suites that exercise Couchbase Lite via the `cbltest` framew
 ## Scope
 
 You own everything under `tests/`:
-- `tests/dev_e2e/` — Developer E2E (12 test modules + `test_replication_filter_data.py` data helper)
-- `tests/QE/` — QA suite (21 test files + 12 edge-server tests)
+- `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
+- `tests/QE/` — QA suite, including an edge-server sub-suite
+- `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
 - `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
 
 You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you understand how they wire into your tests.
@@ -49,6 +50,7 @@ tests/
 │   ├── test_replication_eventing.py
 │   ├── test_replication_functional.py
 │   ├── test_replication_multiple_clients.py
+│   ├── test_replication_upgrade_delta_sync.py
 │   ├── test_replicator_encryption_hook.py
 │   ├── test_rolling_upgrade_sgw.py
 │   ├── test_server_setup.py
@@ -57,7 +59,7 @@ tests/
 │   ├── test_upg_sgw.py
 │   ├── test_users_channels.py
 │   ├── test_xattrs.py
-│   └── edge_server/                    # Edge Server sub-suite (12 tests)
+│   └── edge_server/                    # Edge Server sub-suite
 │       ├── test_authentication.py
 │       ├── test_blobs.py
 │       ├── test_changes_feed.py
@@ -70,6 +72,9 @@ tests/
 │       ├── test_replication_sanity.py
 │       ├── test_system.py
 │       └── test_ttl_expires.py
+│
+├── shared/                              # Helpers shared across dev_e2e/QE
+│   └── upgrade_test_helpers.py
 │
 └── .tools/
     └── cbbackupmgr/                    # Couchbase Backup Manager binary
@@ -84,7 +89,10 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
-from cbltest.api.replicator_types import ReplicatorActivityLevel, ReplicatorBasicAuthenticator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+)
 
 
 @pytest.mark.min_test_servers(1)
@@ -94,15 +102,21 @@ class TestFeatureName(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_something(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = CouchbaseCloud(cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0])
+        cloud = CouchbaseCloud(
+            [cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0]
+        )
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(
+            ["db1"], dataset="names"
+        )
         db = dbs[0]
 
         self.mark_test_step("Start a replicator …")
-        replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), ...)
+        replicator = Replicator(
+            db, cblpytest.sync_gateways[0].replication_url("names"), ...
+        )
         await replicator.start()
 
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
@@ -131,6 +145,7 @@ class TestFeatureName(CBLTestClass):
 | `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
 | `@pytest.mark.min_couchbase_servers(N)` | Topology: ≥ N CBS |
 | `@pytest.mark.min_load_balancers(N)` | Topology: ≥ N load balancers |
+| `@pytest.mark.min_edge_servers(N)` | Topology: ≥ N edge servers |
 | `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test** |
 
 ## dev_e2e vs QE
@@ -156,7 +171,7 @@ class TestFeatureName(CBLTestClass):
 | `Database`, `SnapshotUpdater` | `cbltest.api.database` | CRUD, snapshot, verify, queries, `async with db.batch_updater()` |
 | `Listener` | `cbltest.api.listener` | P2P passive listener |
 | `MultipeerReplicator` | `cbltest.api.multipeer_replicator` | Multi-device mesh sync |
-| `SyncGateway`, `PutDatabasePayload`, `DocumentUpdateEntry` | `cbltest.api.syncgateway` | SGW admin API |
+| `SyncGateway`, `DatabaseConfig`, `DocumentUpdateEntry` | `cbltest.api.syncgateway` | SGW admin API |
 | `CouchbaseServer` | `cbltest.api.couchbaseserver` | CBS bucket/scope/collection mgmt |
 | `ServerVariant` | `cbltest.responses` | Platform checks (`C`, `DOTNET`, `JAVA`, `JS`) |
 

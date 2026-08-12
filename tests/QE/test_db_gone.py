@@ -1,13 +1,19 @@
 import asyncio
+from collections import namedtuple
 from json.decoder import JSONDecodeError
 from pathlib import Path
-from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload, SyncGateway
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DocumentUpdateEntry,
+    IndexConfig,
+    ScopeConfig,
+    SyncGateway,
+)
 
 
 @pytest.mark.sgw
@@ -83,12 +89,11 @@ class TestDbGone(CBLTestClass):
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure Sync Gateway database endpoint")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sg.put_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
@@ -135,27 +140,27 @@ class TestDbGone(CBLTestClass):
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 10
 
-        db_configs: list[list[Any]] = [
-            ["db1", "data-bucket-1", "ABC", "vipul", None],
-            ["db2", "data-bucket-2", "CBS", "lupiv", None],
-            ["db3", "data-bucket-3", "ABC", "vipul", None],
-            ["db4", "data-bucket-4", "CBS", "lupiv", None],
+        DbConfig = namedtuple(
+            "DbConfig", ["db_name", "bucket_name", "channel", "username"]
+        )
+        db_configs = [
+            DbConfig("db1", "data-bucket-1", "ABC", "vipul"),
+            DbConfig("db2", "data-bucket-2", "CBS", "lupiv"),
+            DbConfig("db3", "data-bucket-3", "ABC", "vipul"),
+            DbConfig("db4", "data-bucket-4", "CBS", "lupiv"),
         ]
 
         self.mark_test_step("Create buckets and configure databases")
-        for i, [db_name, bucket_name, channel, username, _] in enumerate(db_configs):
+        for db_name, bucket_name, channel, username in db_configs:
             cbs.create_bucket(bucket_name)
 
-            db_config = {
-                "bucket": bucket_name,
-                "index": {"num_replicas": 0},
-                "scopes": {"_default": {"collections": {"_default": {}}}},
-            }
-            db_payload = PutDatabasePayload(db_config)
-            await sg.put_database(db_name, db_payload)
-            db_configs[i][4] = await sg.create_user_client(
-                db_name, username, "pass", [channel]
+            db_payload = DatabaseConfig(
+                bucket=bucket_name,
+                index=IndexConfig(num_replicas=0),
+                scopes={"_default": ScopeConfig(collections={"_default": {}})},
             )
+            await sg.put_database(db_name, db_payload)
+            await sg.reset_user(db_name, username, "pass", [channel])
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
             sg_docs: list[DocumentUpdateEntry] = []
@@ -170,7 +175,8 @@ class TestDbGone(CBLTestClass):
             await sg.update_documents(db_name, sg_docs, "_default", "_default")
 
         self.mark_test_step("Verify all databases are online")
-        for [db_name, _, _, _, _] in db_configs:
+        for config in db_configs:
+            db_name = config.db_name
             status = await sg.get_database_status(db_name)
             assert status is not None, f"{db_name} database doesn't exist"
             assert status.state == "Online", (
@@ -207,7 +213,3 @@ class TestDbGone(CBLTestClass):
             assert errors_403 == endpoints_tested, (
                 f"{db_name}: Expected all {endpoints_tested} endpoints to return 403, got {errors_403}"
             )
-
-        for [_, _, _, _, user_client] in db_configs:
-            if user_client is not None:
-                await user_client.close()

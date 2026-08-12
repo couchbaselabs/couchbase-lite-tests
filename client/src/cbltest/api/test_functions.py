@@ -124,16 +124,16 @@ def compare_doc_results_p2p(
     local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
     remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
 
-    for id in local_dict:
+    for id, rev in local_dict.items():
         if id not in remote_dict:
             return DocsCompareResult(
                 False, f"Doc '{id}' present in {local_dict} but not {remote_dict}"
             )
 
-        if not _compare_revisions(local_dict[id], [remote_dict[id], None]):
+        if not _compare_revisions(rev, [remote_dict[id], None]):
             return DocsCompareResult(
                 False,
-                f"Doc '{id}' mismatched revid (local: {local_dict[id]}, remote: {remote_dict[id]})",
+                f"Doc '{id}' mismatched revid (local: {rev}, remote: {remote_dict[id]})",
             )
 
     return DocsCompareResult(True)

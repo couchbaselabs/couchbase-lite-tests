@@ -46,17 +46,17 @@
 - Always teardown using `environment/aws/stop_backend.py`.
 - For partial cleanup, use `--destroy-*` flags intentionally and document what was left running.
 
-### Docker backend inconsistencies
+### Local backend inconsistencies
 
-- Docker flow is secondary and less maintained; prefer AWS for authoritative failures.
-- If using Docker, confirm SGW/CBS containers are healthy before running tests.
+- `environment/local/` is secondary and less maintained; prefer AWS for authoritative failures.
+- If using `environment/local/`, confirm the Sync Gateway process and, for `--server cbs`, the Couchbase Server it points at are healthy before running tests.
 
 ## Logs and Evidence Locations
 
 - Root-level logs: `testserver.log`, `http_log/`
 - Test logs: `tests/session.log`, `tests/testserver.log`
 - CI definitions: `.github/workflows/*.yml`, `jenkins/pipelines/`
-- Environment scripts and templates: `environment/aws/*`, `environment/docker/*`
+- Environment scripts and templates: `environment/aws/*`, `environment/local/*`
 
 ## Retry and Escalation Guidance
 

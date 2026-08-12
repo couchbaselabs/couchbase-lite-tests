@@ -2,10 +2,9 @@
     "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
     "test_servers": [
 		{
-			"platform": "swift_ios",
+			"platform": "c_macos",
 			"cbl_version": "{{version}}",
-			"location": "00008101-000E0519020A001E",
-			"ip_hint": "10.100.150.115",
+			"location": "localhost",
 			"download": true
 		}
 	],

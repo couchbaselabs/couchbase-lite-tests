@@ -18,8 +18,7 @@ class _HttpLogWriter:
 
     def __init__(self, num: int):
         test_name = CBLPyTestGlobal.running_test_name
-        if test_name.startswith("test_"):
-            test_name = test_name[5:]
+        test_name = test_name.removeprefix("test_")
 
         mod_num = num % 100
         self.__num = num

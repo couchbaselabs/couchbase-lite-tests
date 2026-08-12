@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -6,11 +5,14 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -37,18 +39,17 @@ class TestBlobs(CBLTestClass):
             "Creating a database in Sync Gateway and adding a user and role."
         )
         sg_db_name = "db-1"
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}
@@ -61,11 +62,9 @@ class TestBlobs(CBLTestClass):
         )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
@@ -99,8 +98,7 @@ class TestBlobs(CBLTestClass):
 
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         response = await edge_server.put_sub_document(
@@ -220,18 +218,17 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
@@ -241,11 +238,9 @@ class TestBlobs(CBLTestClass):
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         self.mark_test_step(
             "Creating a database on Edge Server with replication to Sync Gateway."
         )
@@ -277,8 +272,7 @@ class TestBlobs(CBLTestClass):
         rev_id = document.revid
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
         response = await edge_server.put_sub_document(
             doc_id, rev_id, attachment_name, es_db_name, value=image_data
         )
@@ -411,8 +405,7 @@ class TestBlobs(CBLTestClass):
 
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
@@ -454,8 +447,7 @@ class TestBlobs(CBLTestClass):
         attachment_name = "test.png"
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(
@@ -488,8 +480,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Add first blob to document.")
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
@@ -509,8 +500,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Adding second blob to same document.")
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test2.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
@@ -553,8 +543,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Verify blob over max size returns 413.")
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "20mb.jpg"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         document = await edge_server.get_document(es_db_name, doc_id)
@@ -571,7 +560,7 @@ class TestBlobs(CBLTestClass):
                 doc_id, rev_id, attachment_name, es_db_name, value=image_data
             )
         assert "413" in str(excinfo.value), (
-            f"Expected HTTP 413 status code in error message but got '{str(excinfo.value)}'"
+            f"Expected HTTP 413 status code in error message but got '{excinfo.value!s}'"
         )
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -597,18 +586,17 @@ class TestBlobs(CBLTestClass):
             server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}
@@ -621,11 +609,9 @@ class TestBlobs(CBLTestClass):
         )
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )
@@ -654,8 +640,7 @@ class TestBlobs(CBLTestClass):
         rev_id = document.revid
 
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
-        with open(blob_path, "rb") as img_file:
-            image_data = img_file.read()
+        image_data = await read_binary_file(blob_path)
 
         # Add the image as an attachment to the document
         attachment_name = "im@g#e$%&*().png"

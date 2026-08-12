@@ -1,15 +1,16 @@
 import asyncio
-import json
 from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
 @pytest.mark.min_edge_servers(1)
+@pytest.mark.min_sync_gateways(1)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_sgw_replication(
@@ -17,17 +18,15 @@ class TestEdgeServerSync(CBLTestClass):
     ):
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
-        sgw = cloud.sync_gateway
-        source_db = sgw.replication_url("travel")
+        source_db = sync_gateway.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name="travel", config_file=config_path
         )
@@ -48,7 +47,7 @@ class TestEdgeServerSync(CBLTestClass):
             )
 
             # Get from SGW
-            sgw_docs = await sgw.get_all_documents(
+            sgw_docs = await sync_gateway.get_all_documents(
                 "travel", scope="travel", collection=collection.split(".")[1]
             )
 
@@ -71,7 +70,7 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
@@ -85,7 +84,7 @@ class TestEdgeServerSync(CBLTestClass):
         self.mark_test_step(
             "Verify TTL document purged on Edge server and not Sync Gateway"
         )
-        sgw_doc_new = await sgw.get_document(
+        sgw_doc_new = await sync_gateway.get_document(
             db_name="travel",
             scope="travel",
             collection="airlines",
@@ -120,11 +119,9 @@ class TestEdgeServerSync(CBLTestClass):
             db_name="travel", config_file=config_path1
         )
         source_db = edge_server1.replication_url("travel")
-        with open(config_path2) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path2)
         config["replications"][0]["source"] = source_db
-        with open(config_path2, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path2, config)
 
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(
             db_name="travel", config_file=config_path2

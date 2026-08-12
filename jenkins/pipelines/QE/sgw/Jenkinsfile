@@ -24,7 +24,7 @@ pipeline {
             steps {
                 build job: 'prebuild-test-server',
                 parameters: [
-                    string(name: 'TS_PLATFORM', value: 'swift_ios'),
+                    string(name: 'TS_PLATFORM', value: 'c_macos'),
                     string(name: 'CBL_VERSION', value: env.CBL_VERSION),
                 ],
                 wait: true,
@@ -42,7 +42,7 @@ pipeline {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
-                timeout(time: 90, unit: 'MINUTES') {
+                timeout(time: 120, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== SGW Tests Complete"
@@ -54,8 +54,8 @@ pipeline {
                     // surfaced in Jenkins even if teardown fails.
                     script {
                         try {
-                            junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
-                            archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                            junit testResults: '*/junit_result.xml', allowEmptyResults: true
+                            archiveArtifacts artifacts: '*/junit_result.xml', fingerprint: true, allowEmptyArchive: true
                         } catch (err) {
                             echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
                         }
@@ -66,8 +66,9 @@ pipeline {
                         sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
                     // Archived after teardown because teardown's move_artifacts
-                    // is what populates tests/QE/sgw/.
-                    archiveArtifacts artifacts: 'tests/QE/sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    // is what populates tests/sgw/ (the whole tests/ tree runs
+                    // in one session, so artifacts live at the tests/ root).
+                    archiveArtifacts artifacts: 'tests/sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Test Teardown Complete"
                 }
             }
@@ -76,6 +77,9 @@ pipeline {
     post {
         failure {
             mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+        fixed {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }

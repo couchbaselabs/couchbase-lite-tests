@@ -1,12 +1,13 @@
 # Infrastructure & Environment — `environment/`
 
-All infrastructure provisioning for the test harness. The AWS orchestrator is primary — Terraform creates EC2 instances, then Python scripts SSH in and configure Couchbase Server (CBS), Sync Gateway (SGW), Edge Server (ES), load balancers, and LogSlurp. A Docker Compose stack exists for local development.
+All infrastructure provisioning for the test harness. The AWS orchestrator is primary — Terraform creates EC2 instances, then Python scripts SSH in and configure Couchbase Server (CBS), Sync Gateway (SGW), Edge Server (ES), load balancers, and LogSlurp. For local development, `environment/local/` runs the test server and Sync Gateway as native processes (no Docker/AWS).
 
 ## Scope
 
 You own everything under `environment/`:
+
 - `environment/aws/` — AWS orchestrator (Terraform + Python SSH scripts, topology management)
-- `environment/docker/` — local Docker Compose environment (CBS + SGW + LogSlurp)
+- `environment/local/` — local test server + Sync Gateway runner (no Docker/AWS)
 - `environment/LogSlurp/` — C# log aggregation service
 - `environment/otel-collector/` — OpenTelemetry collector config
 
@@ -73,13 +74,11 @@ environment/
 │           ├── android_bridge.py       # ADB
 │           └── ios_bridge.py           # XHarness
 │
-├── docker/                             # Local Docker Compose (not actively maintained)
-│   ├── docker-compose.yml              # CBS + SGW + LogSlurp services
-│   ├── start_environment.py
-│   ├── sample-config.json
-│   ├── telemetry.yml
-│   ├── cbs/                            # CBS Dockerfile + init scripts
-│   └── sg/                             # SGW Dockerfile + config
+├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
+│   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
+│   ├── sync_gateway_config/             # basic_sync_gateway_{rosmar,cbs}.json
+│   ├── topology_configs/                # rosmar_config.json, cbs_config.json (TDK config output)
+│   └── sync_gateway_clone/              # Git checkout of sync-gateway, built by start_local.py
 │
 ├── LogSlurp/                           # C# log aggregation service
 │   ├── LogSlurp.sln
@@ -108,6 +107,7 @@ environment/
 Skip flags: `--no-terraform-apply`, `--no-cbs-provision`, `--no-sgw-provision`, `--no-es-provision`, `--no-lb-provision`, `--no-ls-provision`, `--no-ts-run`.
 
 Entry points:
+
 - CLI: `cli_entry()` (via `@click.command()`) — direct command line use
 - Programmatic: `script_entry(topology, config_in, config_out, steps)` — used by Jenkins
 
@@ -133,11 +133,12 @@ from environment.aws.common.io import sftp_progress_bar, get_ec2_hostname
 from environment.aws.common.output import header
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
+
 def main(topology: TopologyConfig) -> None:
-    hostname = get_ec2_hostname(...)            # Hostname from Terraform state
+    hostname = get_ec2_hostname(...)  # Hostname from Terraform state
     ssh = paramiko.SSHClient()
     ssh.connect(hostname, username="ec2-user", pkey=pkey)
-    sftp_progress_bar(sftp, local_path, remote_path)   # Upload via SFTP
+    sftp_progress_bar(sftp, local_path, remote_path)  # Upload via SFTP
     remote_exec(ssh, "install_command", "Installing…")
     start_container(name, image, hostname, pkey, ...)  # Docker / systemd
 ```
@@ -154,6 +155,7 @@ def main(topology: TopologyConfig) -> None:
 ### `TestServer` (`test_server.py`)
 
 Abstract base with registry pattern:
+
 - `TestServer.register(name)` — decorator
 - `TestServer.create(name, version)` — factory
 - `TestServer.initialize()` — imports all platform modules to trigger registration
@@ -165,13 +167,13 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 
 ### Platform Registrations
 
-| File | Platform Keys | Bridge Types |
-|---|---|---|
-| `c_register.py` | `c_macos`, `c_linux_x86_64`, `c_windows`, `c_ios`, `c_android` | `ExeBridge`, `iOSBridge`, `AndroidBridge` |
+| File                 | Platform Keys                                                    | Bridge Types                                             |
+| -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
+| `c_register.py`      | `c_macos`, `c_linux_x86_64`, `c_windows`, `c_ios`, `c_android`   | `ExeBridge`, `iOSBridge`, `AndroidBridge`                |
 | `dotnet_register.py` | `dotnet_macos`, `dotnet_windows`, `dotnet_ios`, `dotnet_android` | `ExeBridge`, `macOSBridge`, `iOSBridge`, `AndroidBridge` |
-| `swift_register.py` | `swift_ios` | `iOSBridge` |
-| `java_register.py` | `jak_android`, `jak_desktop`, `jak_webservice` | `AndroidBridge`, `ExeBridge` |
-| `js_register.py` | `js` | `ExeBridge` |
+| `swift_register.py`  | `swift_ios`                                                      | `iOSBridge`                                              |
+| `java_register.py`   | `jak_android`, `jak_desktop`, `jak_webservice`                   | `AndroidBridge`, `ExeBridge`                             |
+| `js_register.py`     | `js`                                                             | `ExeBridge`                                              |
 
 ### Topology JSON Shape
 
@@ -190,16 +192,26 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 }
 ```
 
-## Docker Environment
+## Local Environment
 
-⚠️ Not actively maintained — AWS is primary.
+No AWS — runs the test server and Sync Gateway as native processes. Docker is only needed for the optional `--start-cbs` path below. See [environment/local/README.md](local/README.md) for full usage.
+
+`--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write). For `--server cbs`, point at an existing Couchbase Server with `--connstr`, or have `start_local.py` start one for you locally with `--start-cbs` (drives `cbdinocluster` via the Sync Gateway checkout's `integration-test/start_cbs.py`; requires Docker + Go) — the two are mutually exclusive.
 
 ```bash
-cd environment/docker && python start_environment.py
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
+uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-gateway --connstr couchbase://127.0.0.1
+uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
-- Services: `cbl-test-cbs`, `cbl-test-sg`, `cbl-test-logslurp`
-- Env vars: `COUCHBASE_VERSION`, `SG_DEB`
+- Writes the TDK config path to `environment/local/topology_config` — `topology_config` holds a *path*, not the config itself, so run tests with:
+  ```bash
+  cd tests/dev_e2e
+  uv run pytest --config "$(cat ../../environment/local/topology_config)"
+  ```
+- `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
+- `--stop-sync-gateway` stops the background Sync Gateway process. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
+- `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 
 ## Prerequisites (AWS)
 
@@ -246,18 +258,21 @@ cd environment/aws && uv run python stop_backend.py \
 cd environment/aws && uv run python topology_setup/build_test_server.py \
   --platform swift_ios --version 4.0.0
 
-# Local Docker
-cd environment/docker && python start_environment.py
+# Local (no Docker/AWS): test server + Sync Gateway
+# Pick one: rosmar for fast in-memory iteration, cbs for real Couchbase Server coverage
+uv run environment/local/start_local.py --server rosmar --git-tag main
+uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
 ## Cross-References
 
-| What | Where | Relationship |
-|---|---|---|
-| Test server source | [servers/](../servers/) | Built and deployed by `topology_setup/` |
-| Platform bridges | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop |
-| Jenkins pipelines | [jenkins/pipelines/](../jenkins/pipelines/) | Call `start_backend.py`/`stop_backend.py` via `setup_test.py` |
-| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Consume the `config.json` this generates |
-| Config parser | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py) | Parses the config JSON this outputs |
-| Topology schema | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json) | Validates topology JSON |
-| Datasets | [dataset/](../dataset/) | Copied into test servers during build |
+| What               | Where                                                                                              | Relationship                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Test server source | [servers/](../servers/)                                                                            | Built and deployed by `topology_setup/`                               |
+| Platform bridges   | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop                                    |
+| Jenkins pipelines  | [jenkins/pipelines/](../jenkins/pipelines/)                                                        | Call `start_backend.py`/`stop_backend.py` via `setup_test.py`         |
+| Test suites        | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/)                                     | Consume the `config.json` this generates                              |
+| Config parser      | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py)                        | Parses the config JSON this outputs                                   |
+| Topology schema    | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json)                 | Validates topology JSON                                               |
+| Datasets           | [dataset/](../dataset/)                                                                            | Copied into test servers during build                                 |
+| Local runner       | [environment/local/](local/)                                                                       | Alternative to AWS for iterating locally against rosmar or CBS |

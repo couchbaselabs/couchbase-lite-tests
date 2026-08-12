@@ -38,8 +38,8 @@ v2_request_module = importlib.import_module("cbltest.v2.requests")
 # type of PostResetResponse.
 
 
-@register_response(getattr(v1_request_module, "PostResetRequest"), [1, 2])
-@register_response(getattr(v2_request_module, "PostResetRequest"), [1, 2])
+@register_response(v1_request_module.PostResetRequest, [1, 2])
+@register_response(v2_request_module.PostResetRequest, [1, 2])
 class PostResetResponse(TestServerResponse):
     """
     A POST /reset response as specified in version 1 of the
@@ -50,7 +50,7 @@ class PostResetResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "reset")
 
 
-@register_response(getattr(v1_request_module, "PostGetAllDocumentsRequest"), [1, 2])
+@register_response(v1_request_module.PostGetAllDocumentsRequest, [1, 2])
 class PostGetAllDocumentsResponse(
     TestServerResponse, PostGetAllDocumentsResponseMethods
 ):
@@ -102,20 +102,19 @@ class PostGetAllDocumentsResponse(
     def __init__(self, status_code: int, uuid: str, body: dict):
         super().__init__(status_code, uuid, body, "getAllDocuments")
         self.__payload: dict[str, list[PostGetAllDocumentsEntry]] = {}
-        for k in body:
+        for k, v in body.items():
             key = cast(str, k)
             if key.startswith("ts_"):
                 # Ignore any websocket metadata fields
                 continue
 
-            v = body[k]
             self.__payload[k] = []
             for entry in v:
                 self.__payload[k].append(PostGetAllDocumentsEntry(entry))
 
 
-@register_response(getattr(v1_request_module, "PostUpdateDatabaseRequest"), [1, 2])
-@register_response(getattr(v2_request_module, "PostUpdateDatabaseRequest"), [1, 2])
+@register_response(v1_request_module.PostUpdateDatabaseRequest, [1, 2])
+@register_response(v2_request_module.PostUpdateDatabaseRequest, [1, 2])
 class PostUpdateDatabaseResponse(TestServerResponse):
     """
     A POST /updateDatabase response as specified in version 1 of the
@@ -126,7 +125,7 @@ class PostUpdateDatabaseResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "updateDatabase")
 
 
-@register_response(getattr(v1_request_module, "PostSnapshotDocumentsRequest"), [1, 2])
+@register_response(v1_request_module.PostSnapshotDocumentsRequest, [1, 2])
 class PostSnapshotDocumentsResponse(
     TestServerResponse, PostSnapshotDocumentsResponseMethods
 ):
@@ -153,8 +152,8 @@ class PostSnapshotDocumentsResponse(
         self.__snapshot_id = cast(str, body.get(self.__id_key))
 
 
-@register_response(getattr(v1_request_module, "PostVerifyDocumentsRequest"), [1, 2])
-@register_response(getattr(v2_request_module, "PostVerifyDocumentsRequest"), [1, 2])
+@register_response(v1_request_module.PostVerifyDocumentsRequest, [1, 2])
+@register_response(v2_request_module.PostVerifyDocumentsRequest, [1, 2])
 class PostVerifyDocumentsResponse(
     TestServerResponse, PostVerifyDocumentsResponseMethods
 ):
@@ -221,7 +220,7 @@ class PostVerifyDocumentsResponse(
         self.__document = _get_typed(body, self.__document_key, dict[str, Any])
 
 
-@register_response(getattr(v1_request_module, "PostStartReplicatorRequest"), [1, 2])
+@register_response(v1_request_module.PostStartReplicatorRequest, [1, 2])
 class PostStartReplicatorResponse(
     TestServerResponse, PostStartReplicatorResponseMethods
 ):
@@ -248,7 +247,7 @@ class PostStartReplicatorResponse(
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
-@register_response(getattr(v1_request_module, "PostGetReplicatorStatusRequest"), [1, 2])
+@register_response(v1_request_module.PostGetReplicatorStatusRequest, [1, 2])
 class PostGetReplicatorStatusResponse(
     TestServerResponse, PostGetReplicatorStatusResponseMethods
 ):
@@ -311,7 +310,7 @@ class PostGetReplicatorStatusResponse(
         self.__status = ReplicatorStatusBody(body)
 
 
-@register_response(getattr(v1_request_module, "PostPerformMaintenanceRequest"), [1, 2])
+@register_response(v1_request_module.PostPerformMaintenanceRequest, [1, 2])
 class PostPerformMaintenanceResponse(TestServerResponse):
     """
     A POST /performMaintenance response as specified in version 1 of the
@@ -322,8 +321,8 @@ class PostPerformMaintenanceResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "performMaintenance")
 
 
-@register_response(getattr(v1_request_module, "PostNewSessionRequest"), [1, 2])
-@register_response(getattr(v2_request_module, "PostNewSessionRequest"), [1, 2])
+@register_response(v1_request_module.PostNewSessionRequest, [1, 2])
+@register_response(v2_request_module.PostNewSessionRequest, [1, 2])
 class PostNewSessionResponse(TestServerResponse):
     """
     A POST /newSession response as specified in version 1 of the
@@ -334,7 +333,7 @@ class PostNewSessionResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "newSession")
 
 
-@register_response(getattr(v1_request_module, "PostRunQueryRequest"), [1, 2])
+@register_response(v1_request_module.PostRunQueryRequest, [1, 2])
 class PostRunQueryResponse(TestServerResponse, PostRunQueryResponseMethods):
     """
     A POST /runQuery response as specified in version 1 of the
@@ -365,7 +364,7 @@ class PostRunQueryResponse(TestServerResponse, PostRunQueryResponseMethods):
         self.__results = [dict(e) for e in results] if results is not None else []
 
 
-@register_response(getattr(v1_request_module, "PostGetDocumentRequest"), [1, 2])
+@register_response(v1_request_module.PostGetDocumentRequest, [1, 2])
 class PostGetDocumentResponse(TestServerResponse, PostGetDocumentResponseMethods):
     """
     A POST /getDocument response as specified in version 1 of the
@@ -390,7 +389,7 @@ class PostGetDocumentResponse(TestServerResponse, PostGetDocumentResponseMethods
         self.__body = body
 
 
-@register_response(getattr(v1_request_module, "PostLogRequest"), [1, 2])
+@register_response(v1_request_module.PostLogRequest, [1, 2])
 class PostLogResponse(TestServerResponse):
     """
     A POST /log response as specified in version 1 of the
@@ -401,7 +400,7 @@ class PostLogResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "log")
 
 
-@register_response(getattr(v1_request_module, "PostStartListenerRequest"), [1, 2])
+@register_response(v1_request_module.PostStartListenerRequest, [1, 2])
 class PostStartListenerResponse(TestServerResponse, PostStartListenerResponseMethods):
     """
     A POST /startListener response as specified in version 1 of the
@@ -434,7 +433,7 @@ class PostStartListenerResponse(TestServerResponse, PostStartListenerResponseMet
         self.__port = cast(int, body.get(self.__port_key))
 
 
-@register_response(getattr(v1_request_module, "PostStopListenerRequest"), [1, 2])
+@register_response(v1_request_module.PostStopListenerRequest, [1, 2])
 class PostStopListenerResponse(TestServerResponse):
     """
     A POST /stopListener response as specified in version 1 of the
@@ -445,9 +444,7 @@ class PostStopListenerResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "stopListener")
 
 
-@register_response(
-    getattr(v1_request_module, "PostStartMultipeerReplicatorRequest"), [1, 2]
-)
+@register_response(v1_request_module.PostStartMultipeerReplicatorRequest, [1, 2])
 class PostStartMultipeerReplicatorResponse(
     TestServerResponse, PostStartMultipeerReplicatorResponseMethods
 ):
@@ -473,9 +470,7 @@ class PostStartMultipeerReplicatorResponse(
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
 
-@register_response(
-    getattr(v1_request_module, "PostStopMultipeerReplicatorRequest"), [1, 2]
-)
+@register_response(v1_request_module.PostStopMultipeerReplicatorRequest, [1, 2])
 class PostStopMultipeerReplicatorResponse(TestServerResponse):
     """
     A POST /stopMultipeerReplicator response as specified in version 1 of the
@@ -486,9 +481,7 @@ class PostStopMultipeerReplicatorResponse(TestServerResponse):
         super().__init__(status_code, uuid, body, "stopMultipeerReplicator")
 
 
-@register_response(
-    getattr(v1_request_module, "PostGetMultipeerReplicatorStatusRequest"), [1, 2]
-)
+@register_response(v1_request_module.PostGetMultipeerReplicatorStatusRequest, [1, 2])
 class PostGetMultipeerReplicatorStatusResponse(
     TestServerResponse, PostGetMultipeerReplicatorStatusResponseMethods
 ):

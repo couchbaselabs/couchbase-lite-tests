@@ -5,6 +5,9 @@ system tests (tests requiring more than one device, e.g., a
 Couchbase Lite instance and a Sync Gateway) needed to verify
 a Couchbase Lite release.
 
+> **New here?** Start with [ONBOARDING.md](ONBOARDING.md) for the mental model
+> and your first run, and [CONTEXT.md](CONTEXT.md) for the vocabulary.
+
 The system consists of 4 components:
 
 * An environment, built with docker compose, that contains one Couchbase Server and one Sync Gateway.

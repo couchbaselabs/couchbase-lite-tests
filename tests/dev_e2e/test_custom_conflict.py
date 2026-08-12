@@ -30,6 +30,7 @@ class TestCustomConflict(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
@@ -46,11 +47,11 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -63,7 +64,7 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "names",
             ["_default._default"],
@@ -82,11 +83,11 @@ class TestCustomConflict(CBLTestClass):
             b.upsert_document(update_coll, update_id, [{"name.last": "Smith"}])
 
         self.mark_test_step("Modify the remote name_101 document `name.last` = 'Jones'")
-        existing = await cloud.sync_gateway.get_document("names", "name_101")
+        existing = await sync_gateway.get_document("names", "name_101")
         assert existing is not None, "Missing name_101 on remote"
         newBody = existing.body
         newBody["name"]["last"] = "Jones"
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "names", [DocumentUpdateEntry("name_101", existing.revid, newBody)]
         )
 
@@ -106,7 +107,7 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[
                 ReplicatorCollectionEntry(
@@ -114,7 +115,7 @@ class TestCustomConflict(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -136,6 +137,7 @@ class TestCustomConflict(CBLTestClass):
     ):
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
@@ -152,11 +154,11 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -169,7 +171,7 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PULL,
             "names",
             ["_default._default"],
@@ -204,7 +206,7 @@ class TestCustomConflict(CBLTestClass):
         sgw_updates: list[DocumentUpdateEntry] = []
         for suffix in range(101, 104):
             existing_id = f"name_{suffix}"
-            existing = await cloud.sync_gateway.get_document("names", existing_id)
+            existing = await sync_gateway.get_document("names", existing_id)
             assert existing is not None, f"Missing {existing_id} on remote"
             newBody = existing.body
             newBody["name"]["last"] = "Jones"
@@ -212,7 +214,7 @@ class TestCustomConflict(CBLTestClass):
                 DocumentUpdateEntry(existing_id, existing.revid, newBody)
             )
 
-        await cloud.sync_gateway.update_documents("names", sgw_updates)
+        await sync_gateway.update_documents("names", sgw_updates)
 
         self.mark_test_step("""
             Start a replicator:
@@ -225,7 +227,7 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[
                 ReplicatorCollectionEntry(
@@ -234,7 +236,7 @@ class TestCustomConflict(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -263,7 +265,7 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[
                 ReplicatorCollectionEntry(
@@ -272,7 +274,7 @@ class TestCustomConflict(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -285,7 +287,7 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH,
             "names",
             ["_default._default"],
@@ -294,11 +296,11 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step(
             "Update name_101 document with `name.last` = 'Jackson' in SG"
         )
-        name_101_sg = await cloud.sync_gateway.get_document("names", "name_101")
+        name_101_sg = await sync_gateway.get_document("names", "name_101")
         assert name_101_sg is not None, "Missing name_101 on remote"
         newBody = name_101_sg.body
         newBody["name"]["last"] = "Jackson"
-        await cloud.sync_gateway.update_documents(
+        await sync_gateway.update_documents(
             "names", [DocumentUpdateEntry("name_101", name_101_sg.revid, newBody)]
         )
 
@@ -325,7 +327,7 @@ class TestCustomConflict(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             reset=True,
             collections=[
@@ -335,7 +337,7 @@ class TestCustomConflict(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -348,7 +350,7 @@ class TestCustomConflict(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
             db,
-            cloud.sync_gateway,
+            sync_gateway,
             ReplicatorType.PUSH_AND_PULL,
             "names",
             ["_default._default"],

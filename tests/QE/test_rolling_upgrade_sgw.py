@@ -11,15 +11,20 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry, PutDatabasePayload
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    DeltaSyncConfig,
+    DocumentUpdateEntry,
+    ScopeConfig,
+)
 
 SGW_BUCKET = "rolling_upg_bucket"
-SGW_CONFIG = {
-    "bucket": SGW_BUCKET,
-    "num_index_replicas": 0,
-    "scopes": {
-        "_default": {
-            "collections": {
+SGW_CONFIG = DatabaseConfig(
+    bucket=SGW_BUCKET,
+    num_index_replicas=0,
+    scopes={
+        "_default": ScopeConfig(
+            collections={
                 "_default": {
                     "sync": """
                         function(doc, oldDoc) {
@@ -28,16 +33,17 @@ SGW_CONFIG = {
                     """
                 }
             }
-        }
+        )
     },
-    "revs_limit": 1000,
-    "import_docs": True,
-    "enable_shared_bucket_access": True,
-    "delta_sync": {"enabled": True},
-}
+    revs_limit=1000,
+    import_docs=True,
+    enable_shared_bucket_access=True,
+    delta_sync=DeltaSyncConfig(enabled=True),
+)
 
 
 @pytest.mark.upg_sgw
+@pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(3)
 @pytest.mark.min_couchbase_servers(1)
 class TestSgwRollingUpgrade(CBLTestClass):
@@ -80,7 +86,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
 
         self.mark_test_step("Configure SGW database on all nodes")
-        db_payload = PutDatabasePayload(SGW_CONFIG)
+        db_payload = SGW_CONFIG
         for sg in sg_nodes:
             try:
                 await sg.put_database(sg_db, db_payload)
@@ -174,8 +180,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         for entry in changes.results:
             if not entry.deleted and entry.changes:
                 revs_after[entry.id] = entry.changes[-1]
-        for doc_id in revs_before:
-            before_rev = revs_before[doc_id]
+        for doc_id, before_rev in revs_before.items():
             after_rev = revs_after.get(doc_id)
             assert before_rev is not None, f"Doc {doc_id} missing before update"
             assert after_rev is not None, f"Doc {doc_id} missing after update"

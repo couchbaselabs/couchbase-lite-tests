@@ -48,7 +48,7 @@ async def retry_assert(
 
 def _try_n_times(
     num_times: int,
-    seconds_between: int | float,
+    seconds_between: float,
     wait_before_first_try: bool,
     func: Callable[..., T],
     *args: Any,

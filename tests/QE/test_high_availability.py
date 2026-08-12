@@ -4,8 +4,10 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import (
+    DatabaseConfig,
     DocumentUpdateEntry,
-    PutDatabasePayload,
+    IndexConfig,
+    ScopeConfig,
     SyncGatewayUserClient,
 )
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
@@ -37,20 +39,18 @@ class TestHighAvailability(CBLTestClass):
         cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure database on all SGW nodes")
-        db_config = {
-            "bucket": bucket_name,
-            "index": {"num_replicas": 0},
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-        }
-        db_payload = PutDatabasePayload(db_config)
+        db_payload = DatabaseConfig(
+            bucket=bucket_name,
+            index=IndexConfig(num_replicas=0),
+            scopes={"_default": ScopeConfig(collections={"_default": {}})},
+        )
         await sg1.put_database(sg_db, db_payload)
         await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step(
             f"Create user '{username}' with access to channels {channels}"
         )
-        await sgs[0].create_user_client(sg_db, username, password, channels)
-
+        await sgs[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
         lb_user = SyncGatewayUserClient(
             lb_url, username, password, port=4984, secure=False

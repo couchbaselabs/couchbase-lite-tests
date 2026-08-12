@@ -322,12 +322,12 @@ class TestSystemMultipeer(CBLTestClass):
 
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud_1 = CouchbaseCloud(
-            cblpytest.sync_gateways[0], cblpytest.couchbase_servers[0]
+            [cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0]
         )
         await cloud_1.configure_dataset(dataset_path, "names")
 
         cloud_2 = CouchbaseCloud(
-            cblpytest.sync_gateways[1], cblpytest.couchbase_servers[1]
+            [cblpytest.sync_gateways[1]], cblpytest.couchbase_servers[1]
         )
         await cloud_2.configure_dataset(dataset_path, "names")
 

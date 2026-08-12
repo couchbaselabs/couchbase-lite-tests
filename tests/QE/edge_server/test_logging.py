@@ -1,4 +1,3 @@
-import json
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
@@ -6,7 +5,8 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -71,6 +71,8 @@ AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
 }
 
 
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestLogging(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -99,18 +101,17 @@ class TestLogging(CBLTestClass):
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
-        sg_config = {
-            "bucket": "bucket-1",
-            "scopes": {
-                "_default": {
-                    "collections": {
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(
+                    collections={
                         "_default": {"sync": "function(doc){channel(doc.channels);}"}
                     }
-                }
+                )
             },
-            "num_index_replicas": 0,
-        }
-        payload = PutDatabasePayload(sg_config)
+            num_index_replicas=0,
+        )
         await sync_gateway.put_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
@@ -128,12 +129,10 @@ class TestLogging(CBLTestClass):
         self.mark_test_step(step_descriptions[audit_mode])
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
-        with open(config_path) as file:
-            config = json.load(file)
+        config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
-        with open(config_path, "w") as file:
-            json.dump(config, file, indent=4)
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name=es_db_name, config_file=config_path
         )

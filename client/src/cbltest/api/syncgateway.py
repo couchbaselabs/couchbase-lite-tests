@@ -1,26 +1,29 @@
 import asyncio
 import re
 import ssl
+import warnings
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
+import aiofiles
 import packaging.version
 import requests
 import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
-from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import assert_not_null, retry_assert
 from cbltest.version import VERSION
@@ -60,95 +63,138 @@ WCKJ0c94mrl9GwwBmcSIKJBvd6u7uAta2fREJeE=
 -----END CERTIFICATE-----
 """
 
+CADDY_PORT = 20000
+SHELL2HTTP_PORT = 20001
 
-class _CollectionMap(JSONSerializable):
-    @property
-    def scope_name(self) -> str:
-        return self.__scope_name
 
-    @property
-    def collections(self) -> list[str]:
-        return list(self.__collections.keys())
+def _is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
+    """Whether anything responds on hostname:port (any status counts)."""
+    try:
+        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
 
-    def __init__(self, scope_name: str) -> None:
-        _assert_not_null(scope_name, "scope_name")
-        self.__scope_name = scope_name
-        self.__collections: dict[str, dict] = {}
 
-    def add_collection(self, collection_name: str, payload: dict) -> None:
-        if collection_name in self.__collections:
-            raise ValueError(f"{collection_name} already exists in this map")
+class ScopeConfig(BaseModel):
+    collections: dict[str, Any] | list[str] | None = None
 
-        self.__collections[collection_name] = payload
+
+class IndexConfig(BaseModel):
+    num_replicas: int | None = None
+
+
+class JWK(BaseModel):
+    kty: str | None = None
+    n: str | None = None
+    e: str | None = None
+    alg: str | None = None
+    use: str | None = None
+    kid: str | None = None
+
+
+with warnings.catch_warnings():
+    # "register" is the field name Sync Gateway's wire format requires; it
+    # happens to shadow abc.ABCMeta.register (pydantic's metaclass subclasses
+    # ABCMeta), which pydantic warns about on class definition. Harmless here.
+    warnings.filterwarnings(
+        "ignore",
+        message='Field name "register" in "LocalJWT" shadows an attribute',
+        category=UserWarning,
+    )
+
+    class LocalJWT(BaseModel):
+        issuer: str | None = None
+        client_id: str | None = None
+        register: bool | None = None
+        algorithms: list[str] | None = None
+        keys: list[JWK] | None = None
+
+
+class DeltaSyncConfig(BaseModel):
+    enabled: bool | None = None
+    rev_max_age_seconds: int | None = None
+
+
+class UnsupportedSettings(BaseModel):
+    rosmar_bucket_management: bool | None = None
+    sgr_tls_skip_verify: bool | None = None
+
+
+class DatabaseConfig(BaseModel):
+    """
+    A Pydantic model containing configuration options for a Sync Gateway database endpoint
+    (PUT /{db}/), based on the OpenAPI Database schema spec:
+    https://github.com/couchbase/sync_gateway/blob/main/docs/api/components/schemas.yaml
+    """
+
+    allow_conflicts: bool | None = None
+    allow_empty_password: bool | None = None
+    bucket: str | None = Field(default=None)
+    bucket_op_timeout_ms: int | None = None
+    cacertpath: str | None = None
+    cache: dict[str, Any] | None = None
+    certpath: str | None = None
+    changes_request_plus: bool | None = None
+    client_partition_window_secs: int | None = None
+    compact_interval_days: float | None = None
+    cors: dict[str, Any] | None = None
+    delta_sync: DeltaSyncConfig | None = None
+    disable_password_auth: bool | None = None
+    disable_public_all_docs: bool | None = None
+    enable_shared_bucket_access: bool | None = None
+    event_handlers: dict[str, Any] | None = None
+    feed_type: str | None = None
+    guest: dict[str, Any] | None = None
+    import_backup_old_rev: bool | None = None
+    import_docs: bool | str | None = None
+    import_filter: str | None = None
+    import_partitions: int | None = None
+    index: IndexConfig | None = None
+    javascript_timeout_secs: int | None = None
+    keypath: str | None = None
+    kv_tls_port: int | None = None
+    local_doc_expiry_secs: int | None = None
+    local_jwt: dict[str, LocalJWT] | None = None
+    logging: dict[str, Any] | None = None
+    max_concurrent_query_ops: int | None = None
+    name: str | None = None
+    num_index_replicas: int | None = None
+    offline: bool | None = None
+    oidc: dict[str, Any] | None = None
+    old_rev_expiry_seconds: int | None = None
+    password: str | None = None
+    pool: str | None = None
+    query_pagination_limit: int | None = None
+    replications: dict[str, Any] | None = None
+    rev_cache_size: int | None = None
+    revs_limit: int | None = None
+    roles: dict[str, Any] | None = None
+    scopes: dict[str, ScopeConfig] | None = None
+    send_www_authenticate_header: bool | None = None
+    serve_insecure_attachment_types: bool | None = None
+    server: str | None = None
+    session_cookie_http_only: bool | None = None
+    session_cookie_name: str | None = None
+    session_cookie_secure: bool | None = None
+    sgreplicate_enabled: bool | None = None
+    sgreplicate_websocket_heartbeat_secs: int | None = None
+    slow_query_warning_threshold: int | None = None
+    store_legacy_revtree_data: bool | None = None
+    suspendable: bool | None = None
+    sync: str | None = None
+    unsupported: UnsupportedSettings | None = None
+    use_views: bool | None = None
+    user_xattr_key: str | None = None
+    username: str | None = None
+    users: dict[str, Any] | None = None
+    view_query_timeout_secs: int | None = None
 
     def to_json(self) -> Any:
-        return {"collections": self.__collections}
+        return self.model_dump(mode="json", exclude_none=True)
 
-
-class PutDatabasePayload(JSONSerializable):
-    """
-    A class containing configuration options for a Sync Gateway database endpoint
-    """
-
-    @property
-    def bucket(self) -> str:
-        return self.__bucket
-
-    def __init__(self, dataset_or_config: dict):
-        _assert_not_null(dataset_or_config, "dataset_or_config")
-        assert isinstance(dataset_or_config, dict), (
-            "Invalid dataset_or_config passed to PutDatabasePayload"
-        )
-        self.__config: dict = dataset_or_config
-        if "config" in dataset_or_config:
-            self.__config = _get_typed_required(dataset_or_config, "config", dict)
-
-        self.__bucket = _get_typed_required(self.__config, "bucket", str)
-        """The bucket name in the backing Couchbase Server"""
-
-        self.__scopes: dict[str, _CollectionMap] = {}
-        scopes = _get_typed_required(self.__config, "scopes", dict)
-        for scope in scopes:
-            scope_dict = _get_typed_required(scopes, scope, dict)
-            collections = _get_typed_required(scope_dict, "collections", dict)
-            for collection in collections:
-                collection_dict = _get_typed_required(collections, collection, dict)
-                self._add_collection(collection_dict, scope, collection)
-
-    def scopes(self) -> list[str]:
-        """Gets all the scopes contained in the payload"""
-        return list(self.__scopes.keys())
-
-    def collections(self, scope: str) -> list[str]:
-        """
-        Gets a list of collections specified for the given scope
-
-        :param scope: The name of the scope to check
-        """
-
-        map = self.__scopes.get(scope)
-        if not map:
-            raise KeyError(f"No collections present for {scope}")
-
-        return map.collections
-
-    def _add_collection(
-        self, payload: dict, scope_name: str, collection_name: str
-    ) -> None:
-        """
-        Adds a collection to the configuration of the database (must exist on Couchbase Server).
-        The scope name and collection name both default to "_default".
-
-        :param scope_name: The name of the scope in which the collection resides
-        :param collection_name: The name of the collection to retrieve data from
-        """
-        _assert_not_null(scope_name, "scope_name")
-        col_map = self.__scopes.get(scope_name, _CollectionMap(collection_name))
-        self.__scopes[scope_name] = col_map
-        col_map.add_collection(collection_name, payload)
-
-    def to_json(self) -> Any:
-        return self.__config
+    def serialize(self) -> str:
+        return dumps(self.to_json(), indent=2)
 
 
 class ISGRPayload(JSONSerializable):
@@ -297,7 +343,7 @@ class AllDocumentsResponse:
     def __init__(self, input: dict) -> None:
         self.__len = input["total_rows"]
         self.__rows: list[AllDocumentsResponseRow] = []
-        self.__revmap = dict()
+        self.__revmap = {}
         for row in cast(list[dict], input["rows"]):
             rev = cast(dict, row["value"])
             doc = cast(dict, row["doc"]) if "doc" in row else None
@@ -688,7 +734,7 @@ class _SyncGatewayBase:
         self,
         method: str,
         path: str,
-        payload: JSONSerializable | None = None,
+        payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
     ) -> Any:
@@ -824,32 +870,17 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _put_database(
-        self, db_name: str, payload: PutDatabasePayload, retry_count: int = 0
-    ) -> None:
-        with self._tracer.start_as_current_span(
-            "put_database", attributes={"cbl.database.name": db_name}
-        ) as current_span:
-            try:
-                await self._send_request("put", f"/{db_name}/", payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 3:
-                    cbl_warning(
-                        f"Sync gateway returned 500 from PUT database call, retrying ({retry_count + 1})..."
-                    )
-                    current_span.add_event("SGW returned 500, retry")
-                    await self._put_database(db_name, payload, retry_count + 1)
-                else:
-                    raise
-
-    async def put_database(self, db_name: str, payload: PutDatabasePayload) -> None:
+    async def put_database(self, db_name: str, payload: DatabaseConfig) -> None:
         """
         Attempts to create a database on the Sync Gateway instance
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
         """
-        await self._put_database(db_name, payload, 0)
+        with self._tracer.start_as_current_span(
+            "put_database", attributes={"sg.database.name": db_name}
+        ):
+            await self._send_request("put", f"/{db_name}/", payload)
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -859,7 +890,7 @@ class _SyncGatewayBase:
         :return: DatabaseStatusResponse with state, sequences, etc. Returns None if database doesn't exist (404/403)
         """
         with self._tracer.start_as_current_span(
-            "get_database_status", attributes={"cbl.database.name": db_name}
+            "get_database_status", attributes={"sg.database.name": db_name}
         ):
             try:
                 resp = await self._send_request("get", f"/{db_name}/")
@@ -872,7 +903,7 @@ class _SyncGatewayBase:
 
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
         with self._tracer.start_as_current_span(
-            "delete_database", attributes={"cbl.database.name": db_name}
+            "delete_database", attributes={"sg.database.name": db_name}
         ) as current_span:
             try:
                 await self._send_request("delete", f"/{db_name}")
@@ -951,36 +982,38 @@ class _SyncGatewayBase:
         """
         with self._tracer.start_as_current_span(
             "load_dataset",
-            attributes={"cbl.database.name": db_name, "cbl.dataset.path": str(path)},
+            attributes={"sg.database.name": db_name, "cbl.dataset.path": str(path)},
         ):
             last_scope: str = ""
             last_coll: str = ""
             collected: list[dict] = []
-            with open(path, encoding="utf8") as fin:
-                json_line = fin.readline()
-                while json_line:
+            async with aiofiles.open(path, encoding="utf8") as fin:
+                async for json_line in fin:
                     json = cast(dict, loads(json_line))
                     assert isinstance(json, dict), f"Invalid entry in {path}!"
                     scope = cast(str, json["scope"])
                     collection = cast(str, json["collection"])
                     if (
-                        last_scope != scope
-                        or last_coll != collection
-                        or len(collected) > 500
+                        (
+                            last_scope != scope
+                            or last_coll != collection
+                            or len(collected) > 500
+                        )
+                        and last_scope
+                        and last_coll
+                        and collected
                     ):
-                        if last_scope and last_coll and collected:
-                            resp = await self._send_request(
-                                "post",
-                                f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
-                                JSONDictionary({"docs": collected}),
-                            )
-                            self._analyze_dataset_response(resp)
-                            collected.clear()
+                        resp = await self._send_request(
+                            "post",
+                            f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
+                            JSONDictionary({"docs": collected}),
+                        )
+                        self._analyze_dataset_response(resp)
+                        collected.clear()
 
                     last_scope = scope
                     last_coll = collection
                     collected.append(json)
-                    json_line = fin.readline()
 
             if collected:
                 resp = await self._send_request(
@@ -1093,7 +1126,7 @@ class _SyncGatewayBase:
         scope: str,
         collection: str,
     ) -> None:
-        all_docs_body = list(u.id for u in updates if u.rev is not None)
+        all_docs_body = [u.id for u in updates if u.rev is not None]
         all_docs_response = await self._send_request(
             "post",
             f"/{db_name}.{scope}.{collection}/_all_docs",
@@ -1148,7 +1181,7 @@ class _SyncGatewayBase:
         ):
             await self._rewrite_rev_ids(db_name, updates, scope, collection)
 
-            body = {"docs": list(u.to_json() for u in updates)}
+            body = {"docs": [u.to_json() for u in updates]}
 
             await self._send_request(
                 "post",
@@ -1204,7 +1237,7 @@ class _SyncGatewayBase:
                 )
 
             await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
-            body = {"docs": list(u.to_json() for u in merged_updates)}
+            body = {"docs": [u.to_json() for u in merged_updates]}
             await self._send_request(
                 "post",
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
@@ -1464,7 +1497,7 @@ class _SyncGatewayBase:
         if not self.__session.closed:
             await self.__session.close()
 
-    async def get_database_config(self, db_name: str) -> dict[str, Any]:
+    async def get_database_config(self, db_name: str) -> DatabaseConfig:
         """
         Gets the configuration for a specific database from the admin API.
 
@@ -1472,13 +1505,14 @@ class _SyncGatewayBase:
             db_name: The name of the database to get configuration for
 
         Returns:
-            Dictionary containing the database configuration
+            DatabaseConfig containing the database configuration
         """
         _assert_not_null(db_name, "db_name")
         with self._tracer.start_as_current_span(
             "get_database_config", attributes={"cbl.database.name": db_name}
         ):
-            return await self._send_request("GET", f"/{db_name}/_config")
+            resp = await self._send_request("GET", f"/{db_name}/_config")
+            return DatabaseConfig.model_validate(resp)
 
     async def get_document_revision_public(
         self,
@@ -1542,21 +1576,23 @@ class _SyncGatewayBase:
         :raises Exception: For other HTTP or network errors
         """
         try:
-            async with ClientSession() as session:
-                async with session.get(
+            async with (
+                ClientSession() as session,
+                session.get(
                     url, timeout=ClientTimeout(total=timeout), headers=headers
-                ) as response:
-                    if response.status == 404:
-                        raise FileNotFoundError(f"{operation} not found at {url}")
-                    elif response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(
-                            f"{operation} failed: HTTP {response.status} - {error_text}"
-                        )
+                ) as response,
+            ):
+                if response.status == 404:
+                    raise FileNotFoundError(f"{operation} not found at {url}")
+                elif response.status != 200:
+                    error_text = await response.text()
+                    raise Exception(
+                        f"{operation} failed: HTTP {response.status} - {error_text}"
+                    )
 
-                    # Return content as bytes
-                    content = await response.read()
-                    return response.status, content
+                # Return content as bytes
+                content = await response.read()
+                return response.status, content
 
         except ClientError as e:
             raise Exception(f"Network error during {operation}: {e}") from e
@@ -1848,6 +1884,29 @@ class SyncGateway(_SyncGatewayBase):
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
 
+        # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
+        # failing on a connection error.
+        self.has_caddy_sidecar: bool = _is_sidecar_reachable(url, CADDY_PORT)
+        self.has_shell2http_sidecar: bool = _is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    async def is_using_views(self, db_name: str) -> bool:
+        """Determine whether the given Sync Gateway database is using views rather than GSI.
+
+        Rosmar has no GSI support, so it always behaves as though views are in use,
+        regardless of `enable_shared_bucket_access`.
+
+        Args:
+            db_name: The name of the database to check.
+
+        Returns:
+            True if using Rosmar, or if the database is configured with
+            enable_shared_bucket_access=false.
+        """
+        if self.using_rosmar:
+            return True
+        config = await self.get_database_config(db_name)
+        return config.enable_shared_bucket_access is False
+
     def create_collection_access_dict(self, input: dict[str, list[str]]) -> dict:
         """
         Creates a collection access dictionary in the format that Sync Gateway expects,
@@ -1857,13 +1916,12 @@ class SyncGateway(_SyncGatewayBase):
         """
 
         ret_val = {}
-        for c in input:
+        for c, channels in input.items():
             if not isinstance(c, str):
                 raise ValueError(
                     "Non-string key found in input dictionary to create_collection_access_dict"
                 )
 
-            channels = input[c]
             if not isinstance(channels, list):
                 raise ValueError(
                     f"Non-list found for value of collection {c} in create_collection_access_dict"
@@ -1886,7 +1944,7 @@ class SyncGateway(_SyncGatewayBase):
             else:
                 scope_dict = ret_val[spec[0]]
 
-            scope_dict[spec[1]] = {"admin_channels": input[c]}
+            scope_dict[spec[1]] = {"admin_channels": channels}
 
         return ret_val
 
@@ -1994,25 +2052,25 @@ class SyncGateway(_SyncGatewayBase):
             # Use simple line-based protocol: first line is name, rest is content
             body = f"{cert_name}\n{cert_content.decode('utf-8')}"
 
-            async with ClientSession() as session:
-                async with session.post(
+            async with (
+                ClientSession() as session,
+                session.post(
                     f"http://{self.hostname}:20001/upload-cert",
                     data=body,
                     headers={"Content-Type": "text/plain"},
                     timeout=ClientTimeout(total=30),
-                ) as resp:
-                    if resp.status != 200:
-                        resp_body = await resp.text()
-                        raise Exception(
-                            f"Failed to upload certificate: {resp.status} - {resp_body}"
-                        )
-
-                    # Return the path where certificate was stored
-                    cert_path = f"/home/ec2-user/cert/{cert_name}"
-                    print(
-                        f"Certificate '{cert_name}' uploaded successfully to {cert_path}"
+                ) as resp,
+            ):
+                if resp.status != 200:
+                    resp_body = await resp.text()
+                    raise Exception(
+                        f"Failed to upload certificate: {resp.status} - {resp_body}"
                     )
-                    return cert_path
+
+                # Return the path where certificate was stored
+                cert_path = f"/home/ec2-user/cert/{cert_name}"
+                print(f"Certificate '{cert_name}' uploaded successfully to {cert_path}")
+                return cert_path
 
     async def _wait_for_rest_api(self) -> None:
         """
@@ -2096,13 +2154,15 @@ class SyncGateway(_SyncGatewayBase):
         # Check if SGW is already running by probing the public endpoint (4984)
         try:
             # Use a short timeout to distinguish "not running" from "slow"
-            async with self._create_session(
-                self.secure, self.scheme, self.hostname, 4984, None
-            ) as session:
-                async with session.get("/", timeout=ClientTimeout(total=5)) as resp:
-                    if resp.status == 200:
-                        cbl_info("SGW is already running, skipping start")
-                        return
+            async with (
+                self._create_session(
+                    self.secure, self.scheme, self.hostname, 4984, None
+                ) as session,
+                session.get("/", timeout=ClientTimeout(total=5)) as resp,
+            ):
+                if resp.status == 200:
+                    cbl_info("SGW is already running, skipping start")
+                    return
         except (ClientConnectorError, asyncio.TimeoutError):
             # SGW is not reachable or slow, proceed with start
             pass
@@ -2130,7 +2190,7 @@ class SyncGateway(_SyncGatewayBase):
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def wait_for_no_databases(self, bucket_name: str):
+    async def _wait_for_no_databases(self, bucket_name: str):
         dbs = await self.get_all_databases_verbose()
         for db in dbs.values():
             assert db.bucket != bucket_name, (
@@ -2222,25 +2282,21 @@ class SyncGateway(_SyncGatewayBase):
         )
         return import_count
 
-    async def create_user_client(
+    async def reset_user(
         self,
         db_name: str,
         username: str,
         password: str,
         channels: list[str],
-    ) -> "SyncGatewayUserClient":
+    ) -> None:
         """
-        Helper method to create a user with channel access and return a user-specific SG client.
-
-        This is a convenience method for tests that need to verify user-level access control.
+        Helper method to delete a user if they exist and recreate them with specific channel access.
 
         :param db_name: The database name
-        :param username: The username to create
+        :param username: The username to reset
         :param password: The password for the user
         :param channels: List of channels the user should have access to
-        :return: A SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
-        # Clean up user if exists from previous run
         await self.delete_user(db_name, username)
         await self.add_user(
             db_name,
@@ -2249,14 +2305,40 @@ class SyncGateway(_SyncGatewayBase):
             collection_access={"_default": {"_default": {"admin_channels": channels}}},
         )
 
-        # Return user-specific SG client for public API access
-        return SyncGatewayUserClient(
+    @asynccontextmanager
+    async def create_user_client(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        channels: list[str],
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
+        """
+        Helper method to create a user with channel access and return a user-specific SG client
+        as an async context manager.
+
+        This is a convenience method for tests that need to verify user-level access control.
+        Upon exiting the context, the user client session is closed.
+
+        :param db_name: The database name
+        :param username: The username to create
+        :param password: The password for the user
+        :param channels: List of channels the user should have access to
+        :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        await self.reset_user(db_name, username, password, channels)
+
+        client = SyncGatewayUserClient(
             self.hostname,
             username,
             password,
             port=self.__public_port,
             secure=self.secure,
         )
+        try:
+            yield client
+        finally:
+            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """
@@ -2269,9 +2351,9 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "start_isgr",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": payload.replication_id,
-                "cbl.replication.direction": payload.direction,
+                "sg.database.name": db_name,
+                "sg.replication.id": payload.replication_id,
+                "sg.replication.direction": payload.direction,
             },
         ):
             await self._send_request(
@@ -2290,8 +2372,8 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "get_isgr_status",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
             },
         ):
             resp = await self._send_request(
@@ -2313,8 +2395,8 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "stop_isgr",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
             },
         ):
             try:
@@ -2325,7 +2407,7 @@ class SyncGateway(_SyncGatewayBase):
                 if e.code == 404 and continuous:
                     cbl_error(f"ISGR {replication_id} is continuous but does not exist")
                     raise
-            return None
+            return
 
     async def wait_for_isgr_status(
         self,
@@ -2349,9 +2431,9 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "wait_for_isgr_status",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.replication.id": replication_id,
-                "cbl.target.status": target_status,
+                "sg.database.name": db_name,
+                "sg.replication.id": replication_id,
+                "sg.target.status": target_status,
             },
         ):
             for _ in range(timeout // poll_interval):

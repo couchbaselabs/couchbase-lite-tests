@@ -32,6 +32,7 @@ class TestQueryConsistency(CBLTestClass):
         # These tests do not modify the data in the bucket, so set it up here to avoid
         # needless teardown and re-setup
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(
@@ -39,7 +40,7 @@ class TestQueryConsistency(CBLTestClass):
         )
         replicator = Replicator(
             dbs[0],
-            cloud.sync_gateway.replication_url("travel"),
+            sync_gateway.replication_url("travel"),
             collections=[
                 ReplicatorCollectionEntry(
                     [
@@ -53,7 +54,7 @@ class TestQueryConsistency(CBLTestClass):
             ],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 

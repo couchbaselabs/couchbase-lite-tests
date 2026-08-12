@@ -35,7 +35,7 @@ bash scripts/setup-hooks.sh
 |---|---|
 | Start AWS backend | `cd environment/aws && uv run python start_backend.py --topology topology_setup/topology.json --tdk-config-in <template.json> --tdk-config-out <output.json>` |
 | Stop AWS backend | `cd environment/aws && uv run python stop_backend.py --topology topology_setup/topology.json` |
-| Start local Docker backend | `cd environment/docker && python start_environment.py` |
+| Start local backend (no Docker/AWS) | `uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway` |
 
 ## CI Evidence
 
@@ -51,4 +51,4 @@ bash scripts/setup-hooks.sh
 ## Team Defaults
 
 - For doc-only edits, run basic checks.
-- Prefer AWS-backed validation flows over Docker for authoritative validation.
+- Prefer AWS-backed validation flows over the local environment for authoritative validation.

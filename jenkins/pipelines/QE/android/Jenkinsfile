@@ -2,7 +2,7 @@ pipeline {
     agent none
     parameters {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
-        string(name: 'SGW_VERSION', defaultValue: '3.3.0', description: "The version of Sync Gateway to download")
+        string(name: 'SGW_VERSION', defaultValue: '4', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
@@ -63,6 +63,14 @@ pipeline {
                     echo "=== Android Test Teardown Complete"
                 }
             }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "barkha.goyal@couchbase.com";
+        }
+        fixed {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "barkha.goyal@couchbase.com";
         }
     }
 }

@@ -20,6 +20,7 @@ class TestFest(CBLTestClass):
     async def setup_test_fest_cloud(
         self, cloud: CouchbaseCloud, dataset_path: Path, roles: dict[str, list[str]]
     ) -> CouchbaseCloud:
+        sync_gateway = cloud.sync_gateways[0]
         self.mark_test_step("Reset SG and load todo dataset")
         await cloud.configure_dataset(dataset_path, "todo")
 
@@ -28,7 +29,7 @@ class TestFest(CBLTestClass):
                 f"Assign roles '{', '.join(user_roles)}' to the user '{user}'"
             )
             for role in user_roles:
-                await cloud.sync_gateway.add_role(
+                await sync_gateway.add_role(
                     "todo",
                     role,
                     {
@@ -39,7 +40,7 @@ class TestFest(CBLTestClass):
                         }
                     },
                 )
-            await cloud.sync_gateway.add_user("todo", user, admin_roles=user_roles)
+            await sync_gateway.add_user("todo", user, admin_roles=user_roles)
 
         return cloud
 
@@ -55,6 +56,7 @@ class TestFest(CBLTestClass):
         dbs: tuple[Database, Database],
         users: tuple[str, str] = ("user1", "user1"),
     ) -> tuple[Replicator, Replicator]:
+        sync_gateway = cloud.sync_gateways[0]
         self.mark_test_step(f"""
                 Create a replicator
                     * endpoint: /todo
@@ -67,7 +69,7 @@ class TestFest(CBLTestClass):
             """)
         repl1 = Replicator(
             dbs[0],
-            cloud.sync_gateway.replication_url("todo"),
+            sync_gateway.replication_url("todo"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             collections=[
@@ -77,7 +79,7 @@ class TestFest(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator(users[0], "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
 
         self.mark_test_step(f"""
@@ -92,7 +94,7 @@ class TestFest(CBLTestClass):
             """)
         repl2 = Replicator(
             dbs[1],
-            cloud.sync_gateway.replication_url("todo"),
+            sync_gateway.replication_url("todo"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             collections=[
@@ -102,7 +104,7 @@ class TestFest(CBLTestClass):
             ],
             authenticator=ReplicatorBasicAuthenticator(users[1], "pass"),
             enable_document_listener=True,
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
 
         return repl1, repl2

@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import PutDatabasePayload
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 
 
 @pytest.mark.sgw
@@ -14,18 +14,24 @@ class TestServerSetup(CBLTestClass):
     async def test_sgw_server_alternative_address(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on this Sync Gateway host",
+        )
         sg_db = "db"
         bucket_name = "alternate-addr-bucket"
         num_docs = 5
 
         cbs.create_bucket(bucket_name)
-        db_config = {
-            "bucket": bucket_name,
-            "num_index_replicas": 0,
-            "scopes": {"_default": {"collections": {"_default": {}}}},
-            "import_docs": True,
-        }
-        await sg.put_database(sg_db, PutDatabasePayload(db_config))
+        await sg.put_database(
+            sg_db,
+            DatabaseConfig(
+                bucket=bucket_name,
+                num_index_replicas=0,
+                scopes={"_default": ScopeConfig(collections={"_default": {}})},
+                import_docs=True,
+            ),
+        )
 
         self.mark_test_step("Verify SGW is working with default config")
         sg_version = await sg.get_version()
@@ -60,6 +66,10 @@ class TestServerSetup(CBLTestClass):
     async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
+        self.skip_if_not(
+            sg.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on this Sync Gateway host",
+        )
         bucket_name = "data-bucket"
         sg_db = "db"
 
@@ -82,12 +92,10 @@ class TestServerSetup(CBLTestClass):
         self.mark_test_step("Verify SGW can connect to CBS via document sync")
         await sg.put_database(
             sg_db,
-            PutDatabasePayload(
-                {
-                    "bucket": bucket_name,
-                    "num_index_replicas": 0,
-                    "scopes": {"_default": {"collections": {"_default": {}}}},
-                }
+            DatabaseConfig(
+                bucket=bucket_name,
+                num_index_replicas=0,
+                scopes={"_default": ScopeConfig(collections={"_default": {}})},
             ),
         )
 

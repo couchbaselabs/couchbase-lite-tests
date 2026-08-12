@@ -25,6 +25,7 @@ class TestEncryptedProperties(CBLTestClass):
 
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset empty local database")
@@ -48,7 +49,7 @@ class TestEncryptedProperties(CBLTestClass):
         """)
         replicator = Replicator(
             db,
-            cloud.sync_gateway.replication_url("names"),
+            sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[
                 ReplicatorCollectionEntry(
@@ -56,7 +57,7 @@ class TestEncryptedProperties(CBLTestClass):
                 )
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            pinned_server_cert=cloud.sync_gateway.tls_cert(),
+            pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
 
@@ -67,7 +68,7 @@ class TestEncryptedProperties(CBLTestClass):
         )
 
         self.mark_test_step("Check that the document in SG is not in plaintext")
-        pushed_doc = await cloud.sync_gateway.get_document("names", "secret")
+        pushed_doc = await sync_gateway.get_document("names", "secret")
         assert pushed_doc is not None, "Document not found in SG"
         assert "password" not in pushed_doc.body, (
             "The document was pushed without encryption"
