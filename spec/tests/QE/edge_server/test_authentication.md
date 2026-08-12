@@ -12,9 +12,11 @@ Test basic authentication with valid, invalid, and anonymous credentials.
 4. Set invalid credentials and verify fetching active tasks fails.
 5. Disable auth (anonymous) and verify fetching active tasks fails.
 
-## test_valid_tls
+## test_valid_tls_mtls
 
-Test TLS configuration for Edge Server.
+Test TLS and MTLS configurations for Edge Server.
 
 1. Configure Edge Server with the `names` dataset using TLS config.
 2. Fetch server version information and verify the call succeeds.
+3. Re-configure Edge Server with the `names` dataset using MTLS config.
+4. Fetch server version information and verify the call succeeds.

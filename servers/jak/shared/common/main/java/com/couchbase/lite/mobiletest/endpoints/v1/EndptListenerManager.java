@@ -27,13 +27,16 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.Database;
+import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.URLEndpointListener;
 import com.couchbase.lite.URLEndpointListenerConfiguration;
+import com.couchbase.lite.internal.utils.PlatformUtils;
 import com.couchbase.lite.mobiletest.TestContext;
 import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.services.DatabaseService;
 import com.couchbase.lite.mobiletest.services.ListenerService;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
 import com.couchbase.lite.mobiletest.services.Log;
 import com.couchbase.lite.mobiletest.trees.TypedList;
 import com.couchbase.lite.mobiletest.trees.TypedMap;
@@ -48,6 +51,11 @@ public class EndptListenerManager {
     private static final String KEY_PORT = "port";
     private static final String KEY_DISABLE_TLS = "disableTLS";
     private static final String KEY_ID = "id";
+    private static final String KEY_IDENTITY = "identity";
+    private static final String KEY_ENCODING = "encoding";
+    private static final String KEY_DATA = "data";
+    private static final String KEY_PASSWORD = "password";
+
 
     private static final Set<String> LEGAL_CREATE_KEYS;
     static {
@@ -56,6 +64,7 @@ public class EndptListenerManager {
         l.add(KEY_COLLECTIONS);
         l.add(KEY_PORT);
         l.add(KEY_DISABLE_TLS);
+        l.add(KEY_IDENTITY);
         LEGAL_CREATE_KEYS = Collections.unmodifiableSet(l);
     }
 
@@ -71,10 +80,13 @@ public class EndptListenerManager {
     private final DatabaseService dbSvc;
     @NonNull
     private final ListenerService listenerSvc;
+    @NonNull
+    private final KeyStoreService keyStoreSvc;
 
-    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc) {
+    public EndptListenerManager(@NonNull DatabaseService dbSvc, @NonNull ListenerService listenerSvc, @NonNull KeyStoreService keyStoreSvc) {
         this.dbSvc = dbSvc;
         this.listenerSvc = listenerSvc;
+        this.keyStoreSvc = keyStoreSvc;
     }
 
     @NonNull
@@ -98,8 +110,28 @@ public class EndptListenerManager {
         final Integer port = req.getInt(KEY_PORT);
         if (port != null) { listenerConfig.setPort(port); }
 
-        final Boolean disableTls = req.getBoolean(KEY_DISABLE_TLS);
-        if (disableTls != null) { listenerConfig.setDisableTls(disableTls); }
+        final Boolean disableTLS = req.getBoolean(KEY_DISABLE_TLS);
+        if (disableTLS != null) { listenerConfig.setDisableTls(disableTLS); }
+        final String alias ="java-p2p-" + dbName;
+
+        if (!Boolean.TRUE.equals(disableTLS)) {
+            final TypedMap identityReq = req.getMap(KEY_IDENTITY);
+            TLSIdentity tlsId;
+            try {
+                if (identityReq != null) {
+                    final byte[] data = PlatformUtils.getDecoder().decodeString(identityReq.getString(KEY_DATA));
+                    final String encoding = identityReq.getString(KEY_ENCODING);
+                    final String password = identityReq.getString(KEY_PASSWORD);
+                    tlsId = keyStoreSvc.getTLSIdentity(alias, encoding, data, password.toCharArray());
+                } else {
+                    tlsId = keyStoreSvc.getTLSIdentity(alias, null, null, null);
+                }
+            }
+            catch (CouchbaseLiteException e){
+                throw new CblApiFailure("Failed to configure TLS identity", e);
+            }
+            listenerConfig.setTlsIdentity(tlsId);
+        }
 
         final URLEndpointListener listener = new URLEndpointListener(listenerConfig);
         try { listener.start(); }

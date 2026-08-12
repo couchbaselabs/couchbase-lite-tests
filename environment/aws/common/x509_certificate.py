@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 
 from cryptography.hazmat.primitives import hashes
@@ -9,13 +10,14 @@ from cryptography.hazmat.primitives.serialization import (
     pkcs12,
 )
 from cryptography.x509 import (
+    BasicConstraints,
     Certificate,
     CertificateBuilder,
     ExtendedKeyUsage,
-    ExtendedKeyUsageOID,
     Name,
     NameAttribute,
     NameOID,
+    ObjectIdentifier,
     random_serial_number,
 )
 
@@ -50,32 +52,47 @@ class CertKeyPair:
         )
 
 
-def create_self_signed_certificate(CN: str) -> CertKeyPair:
-    private_key = rsa.generate_private_key(
-        public_exponent=65537,
-        key_size=2048,
-    )
-    cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
-    not_valid_before = datetime.now(timezone.utc)
-    not_valid_after = not_valid_before + timedelta(days=1)
-    issuer_name = cn_attribute
-    signing_key = private_key
+def create_cert(
+    cn: str,
+    ca: CertKeyPair | None = None,
+    is_ca: bool = False,
+    usages: Sequence[ObjectIdentifier] = (),
+    valid_days: int = 365,
+) -> CertKeyPair:
+    """
+    Create an RSA 2048 certificate / key pair.
 
-    leaf_certificate = (
+    Args:
+        cn: The common name to use for the subject.
+        ca: The CA to sign with.  If None, the certificate is self-signed.
+        is_ca: If True, add a critical BasicConstraints(ca=True) extension.
+        usages: Extended key usage OIDs (e.g. ExtendedKeyUsageOID.SERVER_AUTH).
+                If empty, no EKU extension is added.
+        valid_days: How long the certificate is valid for, starting now.
+    """
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = Name([NameAttribute(NameOID.COMMON_NAME, cn)])
+
+    issuer = ca.certificate.subject if ca is not None else subject
+    signing_key = ca.private_key if ca is not None else key
+
+    not_valid_before = datetime.now(timezone.utc)
+    builder = (
         CertificateBuilder()
-        .subject_name(cn_attribute)
-        .issuer_name(issuer_name)
-        .public_key(private_key.public_key())
+        .subject_name(subject)
+        .issuer_name(issuer)
+        .public_key(key.public_key())
         .serial_number(random_serial_number())
         .not_valid_before(not_valid_before)
-        .not_valid_after(not_valid_after)
-        .add_extension(
-            ExtendedKeyUsage(
-                [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
-            ),
-            critical=False,
-        )
-        .sign(signing_key, hashes.SHA256())
+        .not_valid_after(not_valid_before + timedelta(days=valid_days))
     )
 
-    return CertKeyPair(leaf_certificate, private_key)
+    if is_ca:
+        builder = builder.add_extension(
+            BasicConstraints(ca=True, path_length=None), critical=True
+        )
+
+    if usages:
+        builder = builder.add_extension(ExtendedKeyUsage(list(usages)), critical=False)
+
+    return CertKeyPair(builder.sign(signing_key, hashes.SHA256()), key)
