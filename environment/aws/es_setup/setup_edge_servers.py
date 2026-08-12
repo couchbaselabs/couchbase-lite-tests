@@ -31,15 +31,12 @@ from typing import Final, cast
 import click
 import paramiko
 import requests
+from cryptography.x509 import ExtendedKeyUsageOID
 from tqdm import tqdm
 
 from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
-from environment.aws.common.x509_certificate import (
-    create_ca,
-    create_client_cert,
-    create_signed_cert,
-)
+from environment.aws.common.x509_certificate import create_cert
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -261,12 +258,12 @@ def setup_server(
         )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    ca = create_ca()
+    ca = create_cert("EdgeTestCA", is_ca=True)
+    cert = create_cert(hostname, ca, usages=[ExtendedKeyUsageOID.SERVER_AUTH])
+    client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
     ca_cert = ca.pem_bytes()
-    cert = create_signed_cert(hostname, ca)
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
-    client = create_client_cert("test-client", ca)
     client_cert = client.pem_bytes()
     client_key = client.private_pem_bytes()
 
