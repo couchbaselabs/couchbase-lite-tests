@@ -9,7 +9,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
-from cbltest.api.multipeer_replicator_types import MultipeerTransportType
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -20,6 +19,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
 from cbltest.responses import ServerVariant
+from shared.multipeer_test_helpers import build_group_transports
 
 
 @pytest.mark.cbl
@@ -27,23 +27,32 @@ from cbltest.responses import ServerVariant
 class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
-        "transport",
+        "transport, doc_count, test_duration, crud_interval, docs_per_crud",
         [
-            MultipeerTransportType.BLUETOOTH,
-            MultipeerTransportType.WIFI,
+            ("BLUETOOTH", 100, 6, 30, 20),
+            ("WIFI", 1000, 12, 300, 200),
+            ("MIXED_MODE", 500, 9, 150, 100),
         ],
     )
-    async def test_system(self, cblpytest: CBLPyTest, transport):
+    async def test_system(
+        self,
+        cblpytest: CBLPyTest,
+        transport,
+        doc_count,
+        test_duration,
+        crud_interval,
+        docs_per_crud,
+    ):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(
                 ts, ServerVariant.ANDROID | ServerVariant.IOS
             )
         NUM_DEVICES = len(cblpytest.test_servers)
-        TEST_DURATION = timedelta(hours=24)
-        CRUD_INTERVAL = timedelta(minutes=5)
-        NO_OF_DOCS = 1000
-        MAX_DOCS_PER_CRUD = 50
+        TEST_DURATION = timedelta(hours=test_duration)
+        CRUD_INTERVAL = timedelta(seconds=crud_interval)
+        NO_OF_DOCS = doc_count
+        MAX_DOCS_PER_CRUD = docs_per_crud
         MAX_STOP_TESTSERVERS = int(0.5 * NUM_DEVICES)
         docgen = JSONGenerator(1, NO_OF_DOCS, format="key-value")
 
@@ -66,8 +75,8 @@ class TestSystemMultipeer(CBLTestClass):
 
         for start in range(0, len(doc_ids), 10):
             await insert_each_batch(start)
-        # await asyncio.gather(*[insert_each_batch(start) for start in range(0,NO_OF_DOCS,100)])
 
+        transport_arr = build_group_transports(NUM_DEVICES, transport)
         self.mark_test_step("""
                             Start a multipeer replicator on all devices
                             * peerGroupID: “com.couchbase.testing”
@@ -80,9 +89,9 @@ class TestSystemMultipeer(CBLTestClass):
                 "couchtest",
                 db,
                 [ReplicatorCollectionEntry(["_default._default"])],
-                transports=transport,
+                transports=transport_arr[idx],
             )
-            for db in all_dbs
+            for idx, db in enumerate(all_dbs)
         ]
         await asyncio.gather(*[r.start() for r in multipeer_replicators])
 
@@ -159,7 +168,7 @@ class TestSystemMultipeer(CBLTestClass):
 
                 async def stop_and_restart(idx):
                     await multipeer_replicators[idx].stop()
-                    await asyncio.sleep(random.randint(100, 300))
+                    await asyncio.sleep(random.randint(60, 180))
                     await multipeer_replicators[idx].start()
 
                 await asyncio.gather(*(stop_and_restart(idx) for idx in stop_indices))
@@ -197,22 +206,19 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Stopping all multipeer replicators")
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
 
-    # simultaneously inserting 10000 documents and blobs different docs to each CBL and starting replication
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
-        "transport",
-        [
-            MultipeerTransportType.BLUETOOTH,
-            MultipeerTransportType.WIFI,
-        ],
+        "transport, doc_count",
+        [("BLUETOOTH", 10000), ("WIFI", 100000), ("MIXED_MODE", 50000)],
     )
-    async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport):
+    async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport, doc_count):
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(
                 ts, ServerVariant.ANDROID | ServerVariant.IOS
             )
-        NO_OF_DOCS = 100000
+        NO_OF_DOCS = doc_count
+        NUM_DEVICES = len(cblpytest.test_servers)
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
 
         self.mark_test_step("Reset local databases on all devices")
@@ -255,7 +261,7 @@ class TestSystemMultipeer(CBLTestClass):
 
         for start in range(0, len(doc_ids), 10):
             await insert_each_batch(start)
-
+        transport_arr = build_group_transports(NUM_DEVICES, transport)
         self.mark_test_step("""
                             Start a multipeer replicator on all devices
                             * peerGroupID: “com.couchbase.testing”
@@ -268,9 +274,9 @@ class TestSystemMultipeer(CBLTestClass):
                 "couchtest",
                 db,
                 [ReplicatorCollectionEntry(["_default._default"])],
-                transports=transport,
+                transports=transport_arr[idx],
             )
-            for db in all_dbs
+            for idx, db in enumerate(all_dbs)
         ]
         await asyncio.gather(*[r.start() for r in multipeer_replicators])
         # await asyncio.sleep(180)
@@ -300,14 +306,11 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.min_sync_gateways(2)
     @pytest.mark.min_couchbase_servers(2)
     @pytest.mark.parametrize(
-        "transport",
-        [
-            MultipeerTransportType.BLUETOOTH,
-            MultipeerTransportType.WIFI,
-        ],
+        "transport, doc_count",
+        [("BLUETOOTH", 300), ("WIFI", 1000), ("MIXED_MODE", 700)],
     )
     async def test_multipeer_end_to_end(
-        self, cblpytest: CBLPyTest, dataset_path: Path, transport
+        self, cblpytest: CBLPyTest, dataset_path: Path, transport, doc_count
     ):
         #  CB-server1           CB-server2
         #   SGW1                    SGW2 ----  CBL5
@@ -318,7 +321,7 @@ class TestSystemMultipeer(CBLTestClass):
             await self.skip_if_not_platform(
                 ts, ServerVariant.ANDROID | ServerVariant.IOS
             )
-        DOC_COUNT = 1000
+        DOC_COUNT = doc_count
 
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud_1 = CouchbaseCloud(
@@ -338,6 +341,8 @@ class TestSystemMultipeer(CBLTestClass):
 
         num_devices = len(cblpytest.test_servers)
         assert num_devices >= 5, "Need at least 5 devices for this test"
+
+        transport_arr = build_group_transports(num_devices, transport)
 
         self.mark_test_step("""
         Start push/pull replication with SGW1
@@ -411,9 +416,9 @@ class TestSystemMultipeer(CBLTestClass):
                 "couchtest",
                 db,
                 [ReplicatorCollectionEntry(["_default._default"])],
-                transports=transport,
+                transports=transport_arr[idx],
             )
-            for db in all_dbs[:-1]
+            for idx, db in enumerate(all_dbs[:-1])
         ]
         await asyncio.gather(*[mp.start() for mp in multipeer_replicators])
 
