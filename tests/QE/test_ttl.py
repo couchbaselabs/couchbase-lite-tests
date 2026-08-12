@@ -115,7 +115,6 @@ class TestTTL(CBLTestClass):
             )
             assert doc_still_valid is not None, "exp_years should still be accessible"
             assert doc_still_valid.id == "exp_years"
-            assert False, "To check for sgcollect"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_string_expiry_as_iso_8601_date(
