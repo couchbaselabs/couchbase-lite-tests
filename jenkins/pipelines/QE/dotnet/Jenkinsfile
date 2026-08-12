@@ -103,7 +103,7 @@ pipeline {
                                 jenkins/pipelines/QE/dotnet/run_test.sh \
                                     "${params.CBL_VERSION}" macos "${params.SGW_VERSION}" \
                                     --dataset-version "${params.TS_DATASET_VERSION}" \
-                                    --test-name "${env.TEST_NAME}"
+                                    --test-name "${params.TEST_NAME}"
                             """
                         }
                         echo "=== Dotnet macOS Tests Complete"
@@ -140,7 +140,7 @@ pipeline {
                                 jenkins/pipelines/QE/dotnet/run_test.sh \
                                     "${params.CBL_VERSION}" ios "${params.SGW_VERSION}" \
                                     --dataset-version "${params.TS_DATASET_VERSION}" \
-                                    --test-name "${env.TEST_NAME}"
+                                    --test-name "${params.TEST_NAME}"
                             """
                         }
                         echo "=== Dotnet iOS Tests Complete"
@@ -176,7 +176,7 @@ pipeline {
                                 jenkins/pipelines/QE/dotnet/run_test.sh \
                                     "${params.CBL_VERSION}" android "${params.SGW_VERSION}" \
                                     --dataset-version "${params.TS_DATASET_VERSION}" \
-                                    --test-name "${env.TEST_NAME}"
+                                    --test-name "${params.TEST_NAME}"
                             """
                         }
                         echo "=== Dotnet Android Tests Complete"
@@ -193,6 +193,14 @@ pipeline {
                     }
                 }
             }
+        }
+    }
+    post {
+        success {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> succeeded.", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} succeeded", to: "sanjivani.patra@couchbase.com";
+        }
+        regression {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> regressed (first failure after success).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} regressed", to: "sanjivani.patra@couchbase.com";
         }
     }
 }
