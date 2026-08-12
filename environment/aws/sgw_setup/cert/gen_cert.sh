@@ -7,19 +7,22 @@ CA_KEY="ca_key.pem"
 CA_CERT="../../../dataset/sg/ca_cert.pem"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-pushd "${SCRIPT_DIR}" > /dev/null
+pushd "${SCRIPT_DIR}" >/dev/null
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --create-ca)
-      CREATE_CA=1; shift ;;
+      CREATE_CA=1
+      shift
+      ;;
     *)
-      echo "Unknown option: $1" ;;
+      echo "Unknown option: $1"
+      ;;
   esac
 done
 
 # Create OpenSSL config with SAN + wildcard
-cat > internal-openssl.cnf <<'EOF'
+cat >internal-openssl.cnf <<'EOF'
 [ req ]
 default_bits       = 4096
 prompt             = no
@@ -57,5 +60,5 @@ openssl x509 -req -in server.csr -CA ca_cert.pem -CAkey ca_key.pem -CAcreateseri
   -out sg_cert.pem -days 365 -sha256 -extensions req_ext -extfile internal-openssl.cnf
 
 # Full chain
-cat sg_cert.pem ca_cert.pem > sg_fullchain.pem
+cat sg_cert.pem ca_cert.pem >sg_fullchain.pem
 rm internal-openssl.cnf server.csr

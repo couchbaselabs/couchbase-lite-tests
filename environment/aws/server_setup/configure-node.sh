@@ -6,8 +6,8 @@ CONFIG_DONE_FILE=/home/ec2-user/container-configured
 config_done() {
   touch ${CONFIG_DONE_FILE}
   echo "Couchbase Admin UI: http://localhost:8091" \
-     "\nLogin credentials: Administrator / password"
-     sleep infinity
+    "\nLogin credentials: Administrator / password"
+  sleep infinity
 }
 
 if [ -e ${CONFIG_DONE_FILE} ]; then
@@ -74,9 +74,9 @@ if [[ ! -z $E2E_PARENT_CLUSTER ]]; then
     --server-add-username Administrator --server-add-password password --services data,index,query
   echo
   echo "Rebalancing cluster"
-  couchbase_cli_check rebalance -c $E2E_PARENT_CLUSTER -u Administrator -p password 
+  couchbase_cli_check rebalance -c $E2E_PARENT_CLUSTER -u Administrator -p password
   echo
-else 
+else
   echo "Set up the cluster"
   couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
     --cluster-password password --services data,index,query --cluster-ramsize 8192 --cluster-index-ramsize 2048 --index-storage-setting default

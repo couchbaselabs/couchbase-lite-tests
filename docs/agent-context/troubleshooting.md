@@ -10,7 +10,7 @@
 
 ### Pre-commit hooks block commit
 
-- Run full hook suite manually: `uv run pre-commit run --all-files`.
+- Run full hook suite manually: `uvx pre-commit run --all-files`.
 - Fix reported lint/type/format issues.
 - If secrets are detected, rotate/remove secrets and update baseline only when appropriate.
 

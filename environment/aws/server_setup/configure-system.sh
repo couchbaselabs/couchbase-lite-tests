@@ -2,7 +2,7 @@
 
 set -x
 
-if ! command -v docker &> /dev/null; then
+if ! command -v docker &>/dev/null; then
   echo "Docker not found, installing and starting..."
   sudo dnf install -y docker
   sudo systemctl start docker
