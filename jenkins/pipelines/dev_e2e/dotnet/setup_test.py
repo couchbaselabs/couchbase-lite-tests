@@ -13,7 +13,7 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
-from jenkins.pipelines.shared.setup_test import setup_test
+from jenkins.pipelines.shared.setup_test import parse_versions, setup_test
 
 
 @click.command()
@@ -32,8 +32,8 @@ def cli_entry(
     cbs_version: str,
 ) -> None:
     setup_test(
-        cbl_version,
-        sgw_version,
+        parse_versions(cbl_version),
+        parse_versions(sgw_version),
         SCRIPT_DIR / "topologies" / f"topology_single_{platform}.json",
         SCRIPT_DIR / "config_aws.json",
         f"dotnet_{platform}",

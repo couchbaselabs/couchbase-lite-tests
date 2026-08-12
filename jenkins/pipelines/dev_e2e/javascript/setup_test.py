@@ -14,7 +14,7 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
-from jenkins.pipelines.shared.setup_test import setup_test
+from jenkins.pipelines.shared.setup_test import parse_versions, setup_test
 
 
 @click.command()
@@ -25,8 +25,8 @@ def cli_entry(
     sgw_version: str,
 ) -> None:
     setup_test(
-        cbl_version,
-        sgw_version,
+        parse_versions(cbl_version),
+        parse_versions(sgw_version),
         SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config.json",
         "js",
