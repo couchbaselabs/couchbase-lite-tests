@@ -1768,7 +1768,7 @@ class _SyncGatewayBase:
             return cast(dict, resp)
 
     async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 2
+        self, max_attempts: int = 100, wait_time: int = 5
     ) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
