@@ -35,7 +35,12 @@ function move_artifacts() {
     # which stalls the Jenkins artifact download behind the reverse proxy.
     # Compress it (text → ~10x smaller) so it stays downloadable; browsers and
     # curl fetch the .gz fine and it decompresses with gunzip/`zless`.
-    [ -f "$dst_dir/session.log" ] && gzip -f "$dst_dir/session.log"
+    # Compression must never abort teardown -- a failure here would skip
+    # stop_backend and leak EC2 instances -- so keep the raw log and continue.
+    if [ -f "$dst_dir/session.log" ]; then
+        gzip -f "$dst_dir/session.log" ||
+            echo "Warning: failed to gzip session.log; leaving it uncompressed"
+    fi
     mv "$src_dir/http_log" "$dst_dir/http_log" || true
     # Include the JUnit XML so each platform's results are preserved per
     # artifacts dir in a multi-pipeline (matrix) build.
