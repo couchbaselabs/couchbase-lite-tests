@@ -799,35 +799,24 @@ class TestMultipeer(CBLTestClass):
                 ), "Multipeer replicator should not have any errors"
         finally:
             self.mark_test_step("Check that all device databases have the same content")
-            retry = 5
-            success = False
-            while retry > 0 and not success:
-                try:
-                    all_docs_collection = [
-                        db.get_all_documents("_default._default") for db in all_dbs
-                    ]
-                    all_docs_results = await asyncio.gather(*all_docs_collection)
+            all_docs_collection = [
+                db.get_all_documents("_default._default") for db in all_dbs
+            ]
+            all_docs_results = await asyncio.gather(*all_docs_collection)
 
-                    # Verify document count on each device
-                    for device_idx, docs in enumerate(all_docs_results, 1):
-                        doc_count_per_device = len(docs["_default._default"])
-                        assert doc_count_per_device == doc_count, (
-                            f"Device {device_idx} should have {doc_count} docs, got {doc_count_per_device}"
-                        )
+            # Verify document count on each device
+            for device_idx, docs in enumerate(all_docs_results, 1):
+                doc_count_per_device = len(docs["_default._default"])
+                assert doc_count_per_device == doc_count, (
+                    f"Device {device_idx} should have {doc_count} docs, got {doc_count_per_device}"
+                )
 
-                    # Verify content matches across all devices
-                    for device_idx, docs in enumerate(all_docs_results[1:], 2):
-                        assert compare_doc_results_p2p(
-                            all_docs_results[0]["_default._default"],
-                            docs["_default._default"],
-                        ), f"Device {device_idx} content does not match device 1"
-                    success = True
-                except Exception as e:
-                    self.mark_test_step(f"Document validation failed: {e}")
-                    retry -= 1
-                    await asyncio.sleep(30)
-            if not success:
-                raise AssertionError("Document validation failed after 5 retries")
+            # Verify content matches across all devices
+            for device_idx, docs in enumerate(all_docs_results[1:], 2):
+                assert compare_doc_results_p2p(
+                    all_docs_results[0]["_default._default"],
+                    docs["_default._default"],
+                ), f"Device {device_idx} content does not match device 1"
             await asyncio.gather(
                 *[multipeer.stop() for multipeer in multipeer_replicators]
             )
