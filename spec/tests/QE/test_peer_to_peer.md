@@ -10,7 +10,6 @@ Test peer-to-peer replication between a listener and a client, including concurr
 2. Start listener on Device-1:
    * database: `db1`
    * collections: `["_default._default"]`
-   * port: 59840
 3. Add `num_of_docs` documents to `db1` on Device-2.
 4. Setup and start a replicator on Device-2:
    * endpoint: Device-1's listener URL
@@ -30,7 +29,7 @@ Test a peer-to-peer topology where a single client device replicates concurrentl
 
 1. Reset local databases and create `db1` on Device-1, Device-2, and Device-3.
 2. Add `num_of_docs` documents to `db1` on Device-1.
-3. Start listeners on Device-2 and Device-3 (database: `db1`, collections: `["_default._default"]`, port: 59840).
+3. Start listeners on Device-2 and Device-3 (database: `db1`, collections: `["_default._default"]`).
 4. Setup and start Replicator 1 on Device-1 pointing to Device-2's listener endpoint.
 5. Setup and start Replicator 2 on Device-1 pointing to Device-3's listener endpoint.
 6. Wait for both Replicator 1 and Replicator 2 to complete replication.
@@ -43,7 +42,7 @@ Test a peer-to-peer topology where multiple client devices replicate concurrentl
 
 1. Reset local databases and create `db1` on Device-1, Device-2, and Device-3.
 2. Add `num_of_docs` documents to `db1` on Device-1.
-3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`, port: 59840).
+3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`).
 4. Setup and start a Replicator on Device-2 pointing to Device-1's listener endpoint.
 5. Setup and start a Replicator on Device-3 pointing to Device-1's listener endpoint.
 6. Wait for both replicators on Device-2 and Device-3 to complete.
@@ -56,7 +55,7 @@ Test peer-to-peer replication behavior when multiple distinct replication sessio
 
 1. Reset local databases and create `db1` on Device-1 and Device-2.
 2. Add `num_of_docs` documents to `db1` on Device-1.
-3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`, port: 59840).
+3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`).
 4. Setup and start three separate replicator sessions on Device-2, all using Device-2's `db1` and pointing to Device-1's listener endpoint.
 5. Wait for replication to complete on all 3 sessions.
 6. Check that all documents are replicated correctly and both databases match.
@@ -69,9 +68,9 @@ Test concurrent peer-to-peer replication scaling across multiple databases (DB1,
 1. Create and reset 3 local databases (`db1`, `db2`, `db3`) on Device-1 and Device-2.
 2. Add `num_of_docs` documents to each of the 3 databases on Device-1.
 3. Start 3 listeners on Device-2, one for each database:
-   * `db1` on port 59840
-   * `db2` on port 59841
-   * `db3` on port 59842
+   * `db1` 
+   * `db2` 
+   * `db3` 
 4. Setup and start 3 separate replicators on Device-1 corresponding to each database, pointing to their respective listener endpoints on Device-2.
 5. Wait for replication to complete on all 3 replicator sessions.
 6. Check that all documents are replicated correctly across all database pairs (Device-1 DBs match Device-2 DBs).
@@ -83,7 +82,7 @@ Test the resilience of peer-to-peer replication when the listener server goes of
 
 1. Reset local databases and create `db1` on Device-1 and Device-2.
 2. Add `num_of_docs` documents to `db1` on Device-2.
-3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`, port: 59840).
+3. Start a listener on Device-1 (database: `db1`, collections: `["_default._default"]`).
 4. Setup and start a replicator on Device-2 pointing to Device-1's listener endpoint.
 5. Asynchronously execute the following actions concurrently:
    * Stop the listener on Device-1.

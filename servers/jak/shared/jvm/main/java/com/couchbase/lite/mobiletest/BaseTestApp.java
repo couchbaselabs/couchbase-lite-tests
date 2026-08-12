@@ -21,6 +21,8 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
+import com.couchbase.lite.mobiletest.services.KeyStoreService;
+import com.couchbase.lite.jvm.mobiletest.services.JavaDesktopKeyStoreService;
 
 
 /**
@@ -140,4 +142,10 @@ public abstract class BaseTestApp extends TestApp {
         if (identity == null) { throw new ServerError("Identity not found"); }
         return identity;
     }
+
+    private final KeyStoreService keyStoreService = new JavaDesktopKeyStoreService();
+
+    @NonNull
+    @Override
+    public KeyStoreService getKeyStoreService() { return keyStoreService; }
 }

@@ -17,6 +17,7 @@ from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
     GreenboardUploader,
     RunResult,
+    resolve_branch,
     resolve_job_url,
 )
 from cbltest.plugins import greenboard_fixture
@@ -44,6 +45,21 @@ def _clear_build_url(monkeypatch: pytest.MonkeyPatch) -> None:
     set it explicitly via ``monkeypatch.setenv``.
     """
     monkeypatch.delenv("BUILD_URL", raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _clear_branch_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Strip Jenkins' branch env vars so ``resolve_branch()`` is driven only by
+    what each test sets explicitly.
+
+    Same rationale as :func:`_clear_build_url`: a Jenkins agent exports
+    ``GIT_BRANCH``/``BRANCH_NAME``, which would otherwise leak a real branch
+    into the gate and mask the skip-path assertions. Tests that need a branch
+    pass it via ``--branch`` (see ``_make_pytestconfig``) or set the env var
+    explicitly with ``monkeypatch.setenv``.
+    """
+    monkeypatch.delenv("GIT_BRANCH", raising=False)
+    monkeypatch.delenv("BRANCH_NAME", raising=False)
 
 
 def make_report(
@@ -147,13 +163,21 @@ def _make_cblpytest(
     return cblpytest
 
 
-def _make_pytestconfig(*, no_upload: bool = False) -> pytest.Config:
+def _make_pytestconfig(
+    *, no_upload: bool = False, branch: str | None = "main"
+) -> pytest.Config:
     # Resolve relative to this test file so the helper works regardless of
     # pytest's cwd. A cwd-relative "tests/empty_config.json" only worked
     # when pytest was invoked from the client/ directory.
     args = ["--config", str(Path(__file__).with_name("empty_config.json"))]
     if no_upload:
         args.append("--no-result-upload")
+    # Default to the 'main' branch so the greenboard branch gate lets the
+    # upload proceed; the fixture only publishes results from main. Pass
+    # branch=None to simulate a local run (no --branch, and the autouse
+    # fixture strips GIT_BRANCH/BRANCH_NAME) and exercise the skip path.
+    if branch is not None:
+        args += ["--branch", branch]
     return pytest.Config.fromdictargs({}, args)
 
 
@@ -709,3 +733,144 @@ class TestJobUrlPropagation:
         doc = mock_upsert.call_args[0][0]
         assert doc["jobUrl"] == build_url
         assert doc["platform"] == "sgw-upgrade"
+
+
+class TestResolveBranch:
+    """Direct unit tests for :func:`resolve_branch`.
+
+    Documents the contract the greenboard branch gate depends on: an explicit
+    ``--branch`` override wins, otherwise Jenkins' ``GIT_BRANCH`` (with the
+    ``origin/`` prefix stripped) then ``BRANCH_NAME``; none set collapses to
+    ``None``, the local-run case the gate treats as non-main. GitPython is
+    deliberately not consulted — Jenkins checks out a detached HEAD where it
+    could not name the branch (see resolve_branch docstring).
+    """
+
+    def test_override_wins_over_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setenv("GIT_BRANCH", "origin/release/3.3")
+        assert resolve_branch("main") == "main"
+
+    def test_git_branch_used_when_no_override(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GIT_BRANCH", "main")
+        assert resolve_branch() == "main"
+        assert resolve_branch(None) == "main"
+
+    def test_git_branch_origin_prefix_stripped(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GIT_BRANCH", "origin/main")
+        assert resolve_branch() == "main"
+
+    def test_slashed_branch_preserved_after_origin_strip(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Only the leading "origin/" is removed; release/X.Y stays intact.
+        monkeypatch.setenv("GIT_BRANCH", "origin/release/3.3")
+        assert resolve_branch() == "release/3.3"
+
+    def test_branch_name_fallback_for_multibranch(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Multibranch pipelines set BRANCH_NAME (no origin/ prefix) instead.
+        monkeypatch.delenv("GIT_BRANCH", raising=False)
+        monkeypatch.setenv("BRANCH_NAME", "main")
+        assert resolve_branch() == "main"
+
+    def test_git_branch_precedes_branch_name(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("GIT_BRANCH", "origin/main")
+        monkeypatch.setenv("BRANCH_NAME", "some-feature")
+        assert resolve_branch() == "main"
+
+    def test_unset_returns_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.delenv("GIT_BRANCH", raising=False)
+        monkeypatch.delenv("BRANCH_NAME", raising=False)
+        assert resolve_branch() is None
+
+    def test_empty_values_collapse_to_none(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # An empty string is operationally indistinguishable from unset — the
+        # same reason resolve_job_url collapses "" to "local".
+        monkeypatch.setenv("GIT_BRANCH", "")
+        monkeypatch.setenv("BRANCH_NAME", "")
+        assert resolve_branch("") is None
+        assert resolve_branch(None) is None
+
+
+class TestBranchGate:
+    """The greenboard fixture uploads results only from the 'main' tests
+    branch. Feature-branch and local runs carry potentially-modified tests, so
+    their results must never be published; the upgrade path stays exempt.
+    """
+
+    @pytest.mark.asyncio
+    async def test_main_branch_uploads(self) -> None:
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch="main")
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_non_main_branch_skips_upload(self) -> None:
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch="my-feature-branch")
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_local_run_skips_upload(self) -> None:
+        """No --branch and GIT_BRANCH/BRANCH_NAME stripped => resolve_branch()
+        is None => treated as a local run => upload skipped."""
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch=None)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_git_branch_env_enables_upload(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """CI feeds the branch via Jenkins' GIT_BRANCH env var (not --branch);
+        'origin/main' there must strip to 'main' and enable the upload."""
+        monkeypatch.setenv("GIT_BRANCH", "origin/main")
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig(branch=None)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document"
+        ) as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_upload.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_upgrade_path_exempt_from_branch_gate(self) -> None:
+        """The upgrade path records regardless of branch. The upg-sgw pipeline
+        is deprecated and out of scope, so its per-step recording stays
+        unconditional even when the branch resolves non-main."""
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        # --upgrade-versions set, no --branch and GIT_BRANCH/BRANCH_NAME
+        # stripped => the branch resolves non-main, yet the upgrade path runs.
+        args = [
+            "--config",
+            str(Path(__file__).with_name("empty_config.json")),
+            "--upgrade-versions",
+            "3.3.0,4.0.0",
+        ]
+        config = pytest.Config.fromdictargs({}, args)
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader.record_upgrade_step"
+        ) as mock_record:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        mock_record.assert_called_once()
