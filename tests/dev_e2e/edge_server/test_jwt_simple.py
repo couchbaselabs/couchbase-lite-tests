@@ -24,7 +24,7 @@ from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
-
+@pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
