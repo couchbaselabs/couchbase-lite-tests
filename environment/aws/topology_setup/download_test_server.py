@@ -41,6 +41,4 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 else:
-    raise RuntimeError(
-        "This script is not intended to be imported as a module. Please run it directly."
-    )
+    raise RuntimeError("This script is not intended to be imported as a module. Please run it directly.")

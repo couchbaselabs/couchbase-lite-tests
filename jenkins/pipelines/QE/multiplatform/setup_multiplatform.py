@@ -88,9 +88,7 @@ def fetch_latest_build(platform: str, version: str) -> str:
         raise Exception(f"Failed to fetch latest build for {platform} v{version}: {e}")
 
 
-def parse_platform_versions(
-    platform_versions: str, auto_fetch_builds: bool = True
-) -> list[dict]:
+def parse_platform_versions(platform_versions: str, auto_fetch_builds: bool = True) -> list[dict]:
     """
     Parse platform version specifications.
 
@@ -157,9 +155,7 @@ def parse_platform_versions(
                     )
             else:
                 # When auto-fetch is disabled but no explicit build provided, error
-                raise click.BadParameter(
-                    f"Platform {platform} missing build number and auto-fetch is disabled"
-                )
+                raise click.BadParameter(f"Platform {platform} missing build number and auto-fetch is disabled")
 
         # Store the parsed platform info
         platform_key = f"{platform}_{target_os}" if target_os else platform
@@ -290,9 +286,7 @@ def compose_multiplatform_topology(
         click.echo(f"Loading topology for {platform_key}...")
 
         # Get topology files for this platform
-        topology_files = get_platform_topology_files(
-            platform_key, topology_file=topology_file
-        )
+        topology_files = get_platform_topology_files(platform_key, topology_file=topology_file)
         if not topology_files:
             click.secho(
                 f"Warning: No topology files found for {platform_key}, skipping...",
@@ -309,9 +303,7 @@ def compose_multiplatform_topology(
                 platform_topology = json.load(f)
 
                 # Get the expected server platform(s) for this platform
-                expected_server_platforms = platform_to_server_map.get(
-                    platform_key, [platform_key]
-                )
+                expected_server_platforms = platform_to_server_map.get(platform_key, [platform_key])
                 if isinstance(expected_server_platforms, str):
                     expected_server_platforms = [expected_server_platforms]
 
@@ -332,9 +324,7 @@ def compose_multiplatform_topology(
                 if "clusters" in platform_topology:
                     composed_topology["clusters"] = platform_topology["clusters"]
                 if "sync_gateways" in platform_topology:
-                    composed_topology["sync_gateways"] = platform_topology[
-                        "sync_gateways"
-                    ]
+                    composed_topology["sync_gateways"] = platform_topology["sync_gateways"]
 
         except Exception as e:
             click.secho(f"Error loading topology for {platform_key}: {e}", fg="red")
@@ -412,17 +402,9 @@ def setup_multiplatform_test(
     Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
     """
     config_file_out = SCRIPT_DIR.parents[3] / "tests" / setup_dir / "config.json"
-    topology_file_out = (
-        SCRIPT_DIR.parents[3]
-        / "environment"
-        / "aws"
-        / "topology_setup"
-        / "topology.json"
-    )
+    topology_file_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
 
-    assert config_file_in.exists() and config_file_in.is_file(), (
-        f"Config file {config_file_in} does not exist."
-    )
+    assert config_file_in.exists() and config_file_in.is_file(), f"Config file {config_file_in} does not exist."
 
     click.secho("🚀 MULTIPLATFORM CBL TEST SETUP", fg="green")
     click.secho("===============================", fg="green")
@@ -437,12 +419,8 @@ def setup_multiplatform_test(
     platform_versions_dict = {}
     for platform_info in platforms:
         platform_key = platform_info["platform_key"]
-        platform_versions_dict[platform_key] = {
-            "full_version": f"{platform_info['version']}-{platform_info['build']}"
-        }
-    topology = compose_multiplatform_topology(
-        platform_versions_dict, topology_file=topology_file
-    )
+        platform_versions_dict[platform_key] = {"full_version": f"{platform_info['version']}-{platform_info['build']}"}
+    topology = compose_multiplatform_topology(platform_versions_dict, topology_file=topology_file)
 
     # Set topology defaults (use versions as-is for local testing)
     topology["defaults"] = {
@@ -478,12 +456,8 @@ def setup_multiplatform_test(
 @click.argument("platform_versions")
 @click.argument("sgw_version")
 @click.argument("topology_file", required=False)
-@click.option(
-    "--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching"
-)
-@click.option(
-    "--setup-only", is_flag=True, help="Only setup platforms, do not run tests"
-)
+@click.option("--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching")
+@click.option("--setup-only", is_flag=True, help="Only setup platforms, do not run tests")
 def main(
     platform_versions: str,
     sgw_version: str,
@@ -519,9 +493,7 @@ def main(
             auto_fetch_builds=not no_auto_fetch,
             topology_file=topology_file,
         )
-        click.secho(
-            "🎉 Multiplatform setup completed successfully!", fg="green", bold=True
-        )
+        click.secho("🎉 Multiplatform setup completed successfully!", fg="green", bold=True)
     except Exception as e:
         click.secho(f"💥 Setup failed: {e}", fg="red", bold=True)
         sys.exit(1)

@@ -28,9 +28,7 @@ class FakeSyncGateway(SyncGateway):
         ):
             super().__init__(url=hostname, username="user", password="pass")
 
-        self.sent_requests: list[
-            tuple[str, str, JSONSerializable | DatabaseConfig | None]
-        ] = []
+        self.sent_requests: list[tuple[str, str, JSONSerializable | DatabaseConfig | None]] = []
         self.send_request_result: Any = {"status": "started"}
         # Each run_sgcollect() call pops the next snapshot off the front, so
         # tests configure [before, after] (or more, for run_sgcollects()).
@@ -48,17 +46,13 @@ class FakeSyncGateway(SyncGateway):
         self.sent_requests.append((method, path, payload))
         return self.send_request_result
 
-    async def wait_for_sgcollect_to_complete(
-        self, max_attempts: int = 60, wait_time: int = 2
-    ) -> None:
+    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 60, wait_time: int = 2) -> None:
         return None
 
     async def list_files_via_caddy(self, pattern: str | None = None) -> list[str]:
         return self.caddy_snapshots.pop(0)
 
-    async def download_file_via_caddy(
-        self, remote_filename: str, local_path: str
-    ) -> None:
+    async def download_file_via_caddy(self, remote_filename: str, local_path: str) -> None:
         self.downloaded.append((remote_filename, local_path))
 
 
@@ -145,9 +139,7 @@ class TestRunSGCollect:
         sg = FakeSyncGateway()
         sg.caddy_snapshots = [[], ["sgcollectinfo-a.zip", "sgcollectinfo-b.zip"]]
 
-        with pytest.raises(
-            CblTestError, match="Expected exactly one new sgcollect zip"
-        ):
+        with pytest.raises(CblTestError, match="Expected exactly one new sgcollect zip"):
             await sg.run_sgcollect(tmp_path)
 
         assert sg.downloaded == []
@@ -171,9 +163,7 @@ class TestRunSgcollects:
         assert output_dir.is_dir()
 
     @pytest.mark.asyncio
-    async def test_one_node_failing_does_not_stop_the_others(
-        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
-    ):
+    async def test_one_node_failing_does_not_stop_the_others(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
         sg1 = FakeSyncGateway("sg1.example.com")
         sg1.caddy_snapshots = [[], []]  # no new zip ever appears -> run_sgcollect fails
         sg2 = FakeSyncGateway("sg2.example.com")
@@ -186,9 +176,7 @@ class TestRunSgcollects:
         assert collected == [expected]
         assert sg1.downloaded == []
 
-        error_messages = [
-            r.getMessage() for r in caplog.records if r.levelname == "ERROR"
-        ]
+        error_messages = [r.getMessage() for r in caplog.records if r.levelname == "ERROR"]
         assert any("sg1.example.com" in m for m in error_messages)
         assert any("1/2 node(s) failed" in m for m in error_messages)
 

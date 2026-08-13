@@ -39,13 +39,7 @@ def setup_multiplatform_test(
     config_file_in = SCRIPT_DIR / "config_multiplatform.json"
 
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
-    topology_file_out = (
-        SCRIPT_DIR.parents[3]
-        / "environment"
-        / "aws"
-        / "topology_setup"
-        / "topology.json"
-    )
+    topology_file_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
 
     # Handle multiplatform case - if platform_versions is empty, topology is already composed
     if not platform_versions:
@@ -59,18 +53,14 @@ def setup_multiplatform_test(
             topology["$schema"] = "topology_schema.json"
 
             # Handle include path
-            if "include" in topology and str(topology["include"]).endswith(
-                "default_topology.json"
-            ):
+            if "include" in topology and str(topology["include"]).endswith("default_topology.json"):
                 old_include = Path(str(topology["include"]))
                 if not old_include.is_absolute():
                     absolute_include = (topology_file_in.parent / old_include).resolve()
                     if not absolute_include.is_relative_to(topology_file_out.parent):
                         topology["include"] = str(absolute_include)
                     else:
-                        new_include = absolute_include.relative_to(
-                            topology_file_out.parent
-                        )
+                        new_include = absolute_include.relative_to(topology_file_out.parent)
                         topology["include"] = str(new_include)
 
             # Set defaults for Couchbase Server and Sync Gateway
@@ -88,20 +78,11 @@ def setup_multiplatform_test(
             for ts in topology["test_servers"]:
                 # Replace platform-specific CBL version templates
                 platform = ts.get("platform", "")
-                if (
-                    platform == "swift_ios"
-                    and ts.get("cbl_version") == "{{ios_version}}"
-                ):
+                if platform == "swift_ios" and ts.get("cbl_version") == "{{ios_version}}":
                     ts["cbl_version"] = platform_versions.get("ios", "3.1.5")
-                elif (
-                    platform == "jak_android"
-                    and ts.get("cbl_version") == "{{android_version}}"
-                ):
+                elif platform == "jak_android" and ts.get("cbl_version") == "{{android_version}}":
                     ts["cbl_version"] = platform_versions.get("android", "3.2.3")
-                elif (
-                    platform == "dotnet"
-                    and ts.get("cbl_version") == "{{dotnet_version}}"
-                ):
+                elif platform == "dotnet" and ts.get("cbl_version") == "{{dotnet_version}}":
                     ts["cbl_version"] = platform_versions.get("dotnet", "3.2.3")
                 elif platform == "c" and ts.get("cbl_version") == "{{c_version}}":
                     ts["cbl_version"] = platform_versions.get("c", "3.2.3")

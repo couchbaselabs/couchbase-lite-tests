@@ -76,9 +76,7 @@ TEST_CONFIG = {
     "--build-testserver",
     help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
 )
-@click.option(
-    "--repo-path", help="Path to an existing sync_gateway repo to build from."
-)
+@click.option("--repo-path", help="Path to an existing sync_gateway repo to build from.")
 @click.option(
     "--git-tag",
     help="Sync Gateway git tag/branch to build from (clones to sync_gateway_clone if needed).",
@@ -140,29 +138,21 @@ def main(
         return
 
     if not server:
-        raise click.UsageError(
-            "--server is required unless --stop-sync-gateway is set."
-        )
+        raise click.UsageError("--server is required unless --stop-sync-gateway is set.")
 
     if connstr and server != "cbs":
         # --connstr defaults from $SG_TEST_COUCHBASE_SERVER_URL, so it may be set in the
         # environment without the user actually asking for it on this invocation. Only
         # treat it as a usage error if they passed --connstr explicitly.
-        if click.get_current_context().get_parameter_source("connstr") == (
-            ParameterSource.COMMANDLINE
-        ):
+        if click.get_current_context().get_parameter_source("connstr") == (ParameterSource.COMMANDLINE):
             raise click.UsageError("--connstr is only valid with --server cbs.")
         connstr = None
 
     if start_cbs:
         if server != "cbs":
             raise click.UsageError("--start-cbs is only valid with --server cbs.")
-        if connstr and click.get_current_context().get_parameter_source("connstr") == (
-            ParameterSource.COMMANDLINE
-        ):
-            raise click.UsageError(
-                "--start-cbs cannot be combined with --connstr; use one or the other."
-            )
+        if connstr and click.get_current_context().get_parameter_source("connstr") == (ParameterSource.COMMANDLINE):
+            raise click.UsageError("--start-cbs cannot be combined with --connstr; use one or the other.")
         # Ignore any env-var-sourced --connstr default; --start-cbs supplies its own.
         connstr = None
         # --start-cbs always uses these credentials; --admin-user/--admin-password are ignored.
@@ -203,13 +193,9 @@ def main(
     if not skip_sync_gateway_start:
         start_sync_gateway(server, connstr, admin_user, admin_password)
 
-    topology_config_path = resolve_topology_config(
-        server, connstr, admin_user, admin_password
-    )
+    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password)
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
-    click.echo(
-        f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}"
-    )
+    click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
 
 
 def _connstr_hosts(connstr: str) -> list[str]:
@@ -221,10 +207,7 @@ def _validate_single_node_connstr(connstr: str) -> None:
     """Raise if connstr specifies more than one node — this tool only supports a single CBS node."""
     hosts = _connstr_hosts(connstr)
     if len(hosts) > 1:
-        raise click.UsageError(
-            f"--connstr must specify exactly one Couchbase Server node; got {len(hosts)}: "
-            f"{connstr}"
-        )
+        raise click.UsageError(f"--connstr must specify exactly one Couchbase Server node; got {len(hosts)}: {connstr}")
 
 
 def run_test_server(build_testserver: str | None) -> None:
@@ -255,9 +238,7 @@ def _run(cmd: list[str], step: str, cwd: str | None = None) -> None:
     try:
         subprocess.check_call(cmd, cwd=cwd)
     except subprocess.CalledProcessError as e:
-        raise click.ClickException(
-            f"{step} failed (exit code {e.returncode}): {' '.join(cmd)}"
-        ) from e
+        raise click.ClickException(f"{step} failed (exit code {e.returncode}): {' '.join(cmd)}") from e
 
 
 def resolve_sync_gateway_repo_dir(repo_path: str | None, git_tag: str | None) -> str:
@@ -375,16 +356,12 @@ def _write_patched_json(
     patch_fn(config)
     for stale in dir.glob(f"{prefix}*.json"):
         stale.unlink()
-    with tempfile.NamedTemporaryFile(
-        mode="w", dir=dir, suffix=".json", delete=False, prefix=prefix
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", dir=dir, suffix=".json", delete=False, prefix=prefix) as f:
         json.dump(config, f)
         return f.name
 
 
-def resolve_sync_gateway_config(
-    server: str, connstr: str | None, admin_user: str, admin_password: str
-) -> str:
+def resolve_sync_gateway_config(server: str, connstr: str | None, admin_user: str, admin_password: str) -> str:
     """
     Resolve the sync_gateway config path to use for the given server type.
 
@@ -399,9 +376,7 @@ def resolve_sync_gateway_config(
         hostname = parse_hostname(connstr)
         cbs_user, cbs_password = admin_user, admin_password
     else:
-        cbs_info = CouchbaseServerInfo(
-            json.loads(TEST_CONFIG["cbs"].read_text())["couchbase-servers"][0]
-        )
+        cbs_info = CouchbaseServerInfo(json.loads(TEST_CONFIG["cbs"].read_text())["couchbase-servers"][0])
         hostname = cbs_info.hostname
         cbs_user, cbs_password = cbs_info.admin_user, cbs_info.admin_password
 
@@ -413,21 +388,15 @@ def resolve_sync_gateway_config(
             SYNC_GATEWAY_CONFIG["cbs"],
             SYNC_GATEWAY_CONFIG_DIR,
             "basic_sync_gateway_cbs_",
-            lambda c: c["bootstrap"].update(
-                {"server": connstr, "username": admin_user, "password": admin_password}
-            ),
+            lambda c: c["bootstrap"].update({"server": connstr, "username": admin_user, "password": admin_password}),
         )
 
     return config_path
 
 
-def start_sync_gateway(
-    server: str, connstr: str | None, admin_user: str, admin_password: str
-) -> None:
+def start_sync_gateway(server: str, connstr: str | None, admin_user: str, admin_password: str) -> None:
     """Stop any running sync_gateway process and start a new one for the given server type."""
-    config_path = resolve_sync_gateway_config(
-        server, connstr, admin_user, admin_password
-    )
+    config_path = resolve_sync_gateway_config(server, connstr, admin_user, admin_password)
     bridge = ExeBridge(
         exe_path=str(SYNC_GATEWAY_BIN),
         extra_args=[config_path],
@@ -437,9 +406,7 @@ def start_sync_gateway(
     bridge.run("localhost")
 
 
-def resolve_topology_config(
-    server: str, connstr: str | None, admin_user: str, admin_password: str
-) -> pathlib.Path:
+def resolve_topology_config(server: str, connstr: str | None, admin_user: str, admin_password: str) -> pathlib.Path:
     """Resolve the cbltest topology config to use, patching in a CBS connstr override if given."""
     config_path = TEST_CONFIG[server]
     if server != "cbs" or not connstr:
@@ -451,9 +418,7 @@ def resolve_topology_config(
         cbs["admin_user"] = admin_user
         cbs["admin_password"] = admin_password
 
-    return pathlib.Path(
-        _write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, "cbs_config_", patch)
-    )
+    return pathlib.Path(_write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, "cbs_config_", patch))
 
 
 def get_cbl_platform() -> str:
@@ -470,9 +435,7 @@ def get_cbl_platform() -> str:
 
 
 def get_latest_released_cbl_c_version() -> str:
-    r = requests.get(
-        "http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c"
-    )
+    r = requests.get("http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c")
     r.raise_for_status()
     return r.json()["version"]
 

@@ -17,9 +17,7 @@ from cbltest.websocket_router import WebSocketRouter
 
 class RequestTransport(ABC):
     @abstractmethod
-    async def send(
-        self, request: TestServerRequest, message_no: int
-    ) -> TestServerResponse:
+    async def send(self, request: TestServerRequest, message_no: int) -> TestServerResponse:
         pass
 
 
@@ -28,9 +26,7 @@ class _RequestHttpTransport(RequestTransport):
         self.__url = url
         self.__session = session
 
-    async def send(
-        self, request: TestServerRequest, message_no: int
-    ) -> TestServerResponse:
+    async def send(self, request: TestServerRequest, message_no: int) -> TestServerResponse:
         cbl_trace(f"Sending {request} to {self.__url}")
         headers = {}
         headers["Accept"] = "application/json"
@@ -59,32 +55,22 @@ class _RequestHttpTransport(RequestTransport):
         if uuid is None:
             raise CblTestError("Missing CBLTest-Server-ID header from response")
 
-        resp_version = (
-            int(resp_version_header) if resp_version_header is not None else 0
-        )
+        resp_version = int(resp_version_header) if resp_version_header is not None else 0
         if resp_version != request.version:
             if resp_version == 0:
-                cbl_warning(
-                    "Server did not set a response version, using request version..."
-                )
+                cbl_warning("Server did not set a response version, using request version...")
                 resp_version = request.version
             elif request.version != 0:
-                cbl_warning(
-                    f"Response version for {resp_version} does not match request version {request.version}!"
-                )
+                cbl_warning(f"Response version for {resp_version} does not match request version {request.version}!")
 
         if isinstance(request, GetRootRequest):
             ret_val = await request._create_response(cast(str, uuid), http=resp)
         else:
-            ret_val = await self._create_response(
-                type(request), resp, resp_version, cast(str, uuid)
-            )
+            ret_val = await self._create_response(type(request), resp, resp_version, cast(str, uuid))
 
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if not resp.ok:
-            raise CblTestServerBadResponseError(
-                resp.status, ret_val, f"returned {resp.status}"
-            )
+            raise CblTestServerBadResponseError(resp.status, ret_val, f"returned {resp.status}")
 
         return ret_val
 
@@ -92,18 +78,14 @@ class _RequestHttpTransport(RequestTransport):
         self, request_type: type, resp: ClientResponse, version: int, uuid: str
     ) -> TestServerResponse:
         if (request_type, version) not in _response_registry:
-            raise ValueError(
-                f"Response type for '{request_type}' not registered for version {version}"
-            )
+            raise ValueError(f"Response type for '{request_type}' not registered for version {version}")
 
         response_class = _response_registry[(request_type, version)]
         content: dict = {}
         if resp.content_length != 0:
             content_type = resp.headers["Content-Type"]
             if "application/json" not in content_type:
-                cbl_warning(
-                    f"Non-JSON response body received from server ({content_type}), ignoring..."
-                )
+                cbl_warning(f"Non-JSON response body received from server ({content_type}), ignoring...")
             else:
                 content = await resp.json()
 
@@ -115,9 +97,7 @@ class _RequestWebSocketTransport(RequestTransport):
         self.__url = url
         self.__ws_router = ws_router
 
-    async def send(
-        self, request: TestServerRequest, message_no: int
-    ) -> TestServerResponse:
+    async def send(self, request: TestServerRequest, message_no: int) -> TestServerResponse:
         if request.payload is not None:
             data = cast(dict, request.payload.to_json())
         else:
@@ -147,37 +127,25 @@ class _RequestWebSocketTransport(RequestTransport):
 
         if resp_version != request.version:
             if resp_version == 0:
-                cbl_warning(
-                    "Server did not set a response version, using request version..."
-                )
+                cbl_warning("Server did not set a response version, using request version...")
                 resp_version = request.version
             elif request.version != 0:
-                cbl_warning(
-                    f"Response version for {resp_version} does not match request version {request.version}!"
-                )
+                cbl_warning(f"Response version for {resp_version} does not match request version {request.version}!")
 
         if isinstance(request, GetRootRequest):
             ret_val = await request._create_response(cast(str, uuid), ws_payload=resp)
         else:
-            ret_val = self._create_response(
-                type(request), resp, resp_version, cast(str, uuid)
-            )
+            ret_val = self._create_response(type(request), resp, resp_version, cast(str, uuid))
 
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if ret_val.status_code != 200:
-            raise CblTestServerBadResponseError(
-                ret_val.status_code, ret_val, f"returned {ret_val.status_code}"
-            )
+            raise CblTestServerBadResponseError(ret_val.status_code, ret_val, f"returned {ret_val.status_code}")
 
         return ret_val
 
-    def _create_response(
-        self, request_type: type, ws_payload: dict, version: int, uuid: str
-    ) -> TestServerResponse:
+    def _create_response(self, request_type: type, ws_payload: dict, version: int, uuid: str) -> TestServerResponse:
         if (request_type, version) not in _response_registry:
-            raise ValueError(
-                f"Response type for '{request_type}' not registered for version {version}"
-            )
+            raise ValueError(f"Response type for '{request_type}' not registered for version {version}")
 
         response_class = _response_registry[(request_type, version)]
 
