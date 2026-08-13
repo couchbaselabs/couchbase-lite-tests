@@ -38,18 +38,14 @@ class _FakeConfigResponse:
 
 
 @pytest_asyncio.fixture(loop_scope="function")
-async def sync_gateway(
-    monkeypatch, tmp_path
-) -> AsyncIterator[tuple[SyncGateway, list[dict]]]:
+async def sync_gateway(monkeypatch, tmp_path) -> AsyncIterator[tuple[SyncGateway, list[dict]]]:
     """A SyncGateway backed by a real aiohttp test server, so _send_request and
     everything built on it (get_all_databases_verbose, wait_for_db_online, ...) runs
     against real ClientSession/ClientResponse objects. `specs` controls what the
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online)."""
-    monkeypatch.setattr(
-        _HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log"
-    )
+    monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
         lambda *args, **kwargs: _FakeConfigResponse(),
@@ -73,9 +69,7 @@ async def sync_gateway(
     await server.start_server()
     assert server.port is not None
 
-    sg = SyncGateway(
-        url=server.host, username="user", password="pass", port=server.port
-    )
+    sg = SyncGateway(url=server.host, username="user", password="pass", port=server.port)
 
     yield sg, specs
 
@@ -257,9 +251,7 @@ class TestWaitForDbUp:
             {"status": 201, "json": {"ok": True}},  # add_user
         ]
 
-        async with sg.create_user_client(
-            "db1", "test_user", "test_pass", ["channel1"]
-        ) as client:
+        async with sg.create_user_client("db1", "test_user", "test_pass", ["channel1"]) as client:
             assert client.hostname == sg.hostname
             assert client.secure == sg.secure
             assert not client._SyncGatewayBase__session.closed
@@ -271,23 +263,15 @@ class TestDatabaseConfig:
     def test_init_with_nested_config(self) -> None:
         payload = DatabaseConfig(
             bucket="travel-sample",
-            scopes={
-                "_default": ScopeConfig(
-                    collections={"_default": {"sync": "function(doc){}"}}
-                )
-            },
+            scopes={"_default": ScopeConfig(collections={"_default": {"sync": "function(doc){}"}})},
         )
         assert payload.bucket == "travel-sample"
         assert payload.scopes is not None
         assert list(payload.scopes.keys()) == ["_default"]
-        assert payload.scopes["_default"].collections == {
-            "_default": {"sync": "function(doc){}"}
-        }
+        assert payload.scopes["_default"].collections == {"_default": {"sync": "function(doc){}"}}
         assert payload.to_json() == {
             "bucket": "travel-sample",
-            "scopes": {
-                "_default": {"collections": {"_default": {"sync": "function(doc){}"}}}
-            },
+            "scopes": {"_default": {"collections": {"_default": {"sync": "function(doc){}"}}}},
         }
 
     def test_init_with_flat_config(self) -> None:

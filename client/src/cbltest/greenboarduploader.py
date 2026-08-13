@@ -17,6 +17,7 @@ from cbltest.logging import cbl_info, cbl_warning
 
 EDGE_SERVER_PLATFORM = "edge-server"
 
+
 def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
     """Return ``(passed, failed, errored)`` summed across every
     ``<testsuite>`` in a JUnit XML file at ``xml_path``.
@@ -251,24 +252,15 @@ class GreenboardUploader:
             # For SGW jobs, use the SGW version directly from the parsed object
             # to avoid the fragile serialize-then-reparse pattern.
             parsed_version = (
-                sgw_version.version
-                if sgw_version.version and sgw_version.version != "unknown"
-                else "0.0.0"
+                sgw_version.version if sgw_version.version and sgw_version.version != "unknown" else "0.0.0"
             )
             parsed_build = sgw_version.build_number
         elif platform == EDGE_SERVER_PLATFORM:
             # An ES run is keyed on the ES build, and may not involve CBL at all.
             if es_version is None:
-                cbl_warning(
-                    "Greenboard: platform is edge-server but no ES version was "
-                    "available; skipping upload"
-                )
+                cbl_warning("Greenboard: platform is edge-server but no ES version was available; skipping upload")
                 return
-            parsed_version = (
-                es_version.version
-                if es_version.version and es_version.version != "unknown"
-                else "0.0.0"
-            )
+            parsed_version = es_version.version if es_version.version and es_version.version != "unknown" else "0.0.0"
             parsed_build = es_version.build_number
         else:
             version_components = version.split("-")
@@ -338,21 +330,15 @@ class GreenboardUploader:
         if not junit_output.is_file():
             # Pytest didn't write an XML for this session; use the in-process
             # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version,es_version)
+            self.upload(platform, os_name, version, sgw_version, es_version)
             return
 
         junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
         if junit_pass + junit_fail + junit_error == 0:
-            cbl_info(
-                f"Greenboard: JUnit XML at {junit_output} reports no tests collected; "
-                "skipping upload"
-            )
+            cbl_info(f"Greenboard: JUnit XML at {junit_output} reports no tests collected; skipping upload")
             return
         if junit_pass == 0 and junit_fail == 0 and junit_error > 0:
-            cbl_info(
-                f"Greenboard: all {junit_error} tests errored before running "
-                "(harness failure); skipping upload"
-            )
+            cbl_info(f"Greenboard: all {junit_error} tests errored before running (harness failure); skipping upload")
             return
 
         self.upload(
@@ -393,10 +379,7 @@ class GreenboardUploader:
         # attempted (e.g. wrong marker filter). Don't record an iteration
         # — the chart shouldn't show a row for a run that never executed.
         if not self.__test_ran and not self.__overall_fail:
-            cbl_info(
-                f"No tests ran for phase={phase!r}; skipping iteration "
-                "record (no upload contribution)"
-            )
+            cbl_info(f"No tests ran for phase={phase!r}; skipping iteration record (no upload contribution)")
             return
 
         # Resolve the destination version of this iteration. Live SGW is
@@ -482,20 +465,14 @@ class GreenboardUploader:
 
         iterations = state.get("iterations", [])
         if not iterations:
-            cbl_warning(
-                f"Upgrade results file {path} has no iterations; skipping upload"
-            )
+            cbl_warning(f"Upgrade results file {path} has no iterations; skipping upload")
             return
 
         upgrade_path = state.get("upgradePath", [])
         # version is always the planned final target so the UI's
         # "filter by target version" picks up this run even when execution
         # stopped early at an intermediate version.
-        target_version = (
-            upgrade_path[-1]
-            if upgrade_path
-            else iterations[-1].get("upgradeTo", "0.0.0")
-        )
+        target_version = upgrade_path[-1] if upgrade_path else iterations[-1].get("upgradeTo", "0.0.0")
 
         failed_at = None
         for i in iterations:
@@ -545,9 +522,7 @@ class GreenboardUploader:
     def _upsert(self, doc: dict) -> None:
         """Add timestamp fields and write one document to the greenboard bucket."""
         now = datetime.now(timezone.utc)
-        unix_timestamp = (
-            now - datetime(1970, 1, 1, tzinfo=timezone.utc)
-        ).total_seconds()
+        unix_timestamp = (now - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
 
         # Do not add to RunResult since this code will go away shortly
         doc["uploaded"] = unix_timestamp

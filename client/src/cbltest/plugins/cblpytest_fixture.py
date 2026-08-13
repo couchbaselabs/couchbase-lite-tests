@@ -31,15 +31,11 @@ async def cblpytest(request: pytest.FixtureRequest):
         resource = Resource(attributes={SERVICE_NAME: "Python Test Client"})
 
         provider = TracerProvider(resource=resource)
-        processor = BatchSpanProcessor(
-            OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5)
-        )
+        processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=f"http://{otel_endpoint}:4317", timeout=5))
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
 
-    cblpytest = await CBLPyTest.create(
-        config, log_level, test_props, dataset_version=dataset_version
-    )
+    cblpytest = await CBLPyTest.create(config, log_level, test_props, dataset_version=dataset_version)
     yield cblpytest
     await cblpytest.close()
 
@@ -85,8 +81,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def pytest_configure(config: pytest.Config) -> None:
     config_path_raw = config.getoption("--config")
     if config_path_raw is None or not isinstance(config_path_raw, str):
-        raise pytest.UsageError(
-            "Unable to get --config option in cblpytest_fixture plugin"
-        )
+        raise pytest.UsageError("Unable to get --config option in cblpytest_fixture plugin")
 
     config.stash[parsed_config_key] = _parse_config(cast(str, config_path_raw))

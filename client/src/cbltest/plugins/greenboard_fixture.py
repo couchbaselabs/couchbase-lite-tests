@@ -69,9 +69,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             # the upgrade run by jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py.
             # Default matches the shell wrapper's path so direct pytest
             # invocations still record correctly.
-            results_file = os.environ.get(
-                "SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json"
-            )
+            results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
             # During rolling phases the SGW node under upgrade may be
             # destroyed/restarting and get_version() will raise. We must
             # still record the iteration (with sgw_version=None) so the
@@ -123,12 +121,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
                 uploader.upload_from_junit_file(
-                    Path(xmlpath),
-                    test_platform,
-                    os_name,
-                    library_version,
-                    sgw_version,
-                    es_version
+                    Path(xmlpath), test_platform, os_name, library_version, sgw_version, es_version
                 )
             else:
                 # No --junitxml configured. Normally our pytest_configure
@@ -137,7 +130,13 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
                 # pytest.Config.fromdictargs in unit tests). Fall back to
                 # the in-process counter — mirrors upload_from_junit_file's
                 # file-missing branch.
-                uploader.upload(test_platform, os_name, library_version, sgw_version,es_version=es_version,)
+                uploader.upload(
+                    test_platform,
+                    os_name,
+                    library_version,
+                    sgw_version,
+                    es_version=es_version,
+                )
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 

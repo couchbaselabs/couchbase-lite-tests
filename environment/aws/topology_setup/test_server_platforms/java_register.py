@@ -57,9 +57,7 @@ class JavaBridge(PlatformBridge):
         supportlib_dir.mkdir(0o755, exist_ok=True)
 
         if (supportlib_dir / "libstdc++.so.6").exists():
-            click.secho(
-                f"Support libraries already exist in {supportlib_dir}", fg="yellow"
-            )
+            click.secho(f"Support libraries already exist in {supportlib_dir}", fg="yellow")
             return
 
         download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
@@ -68,17 +66,11 @@ class JavaBridge(PlatformBridge):
             response = requests.get(download_url, stream=True)
             response.raise_for_status()
 
-            download_progress_bar(
-                response, JAK_TEST_SERVER_DIR / variant / "support.zip"
-            )
-            unzip_directory(
-                JAK_TEST_SERVER_DIR / variant / "support.zip", supportlib_dir
-            )
+            download_progress_bar(response, JAK_TEST_SERVER_DIR / variant / "support.zip")
+            unzip_directory(JAK_TEST_SERVER_DIR / variant / "support.zip", supportlib_dir)
             (JAK_TEST_SERVER_DIR / variant / "support.zip").unlink()
 
-            click.echo(
-                f"Support libraries downloaded and extracted to {supportlib_dir}"
-            )
+            click.echo(f"Support libraries downloaded and extracted to {supportlib_dir}")
         except requests.RequestException as e:
             click.secho(f"Failed to download support libraries: {e}", fg="red")
             raise
@@ -225,9 +217,7 @@ class JettyBridge(JavaBridge):
             f"-PcblVersion={self.__cbl_version}",
             "-PdatasetVersion=3.2",
         ]
-        subprocess.run(
-            args, cwd=self.__gradle_path.parent, check=check_result, capture_output=True
-        )
+        subprocess.run(args, cwd=self.__gradle_path.parent, check=check_result, capture_output=True)
 
 
 class JAKTestServer(TestServer):
@@ -316,11 +306,7 @@ class JAKTestServer_Android(JAKTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            TEST_SERVER_DIR
-            / "downloaded"
-            / self.platform
-            / self.version
-            / "testserver_android.apk"
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "testserver_android.apk"
             if self._downloaded
             else JAK_TEST_SERVER_DIR
             / self.test_server_path
@@ -367,9 +353,7 @@ class JAKTestServer_Android(JAKTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho(
-            "No uncompressing needed for Android test server package", fg="yellow"
-        )
+        click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
 class JAKTestServer_NonAndroid(JAKTestServer):
@@ -433,9 +417,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho(
-            f"No uncompressing needed for {self.__jar_name} server package", fg="yellow"
-        )
+        click.secho(f"No uncompressing needed for {self.__jar_name} server package", fg="yellow")
 
 
 @TestServer.register("jak_desktop")
@@ -445,13 +427,7 @@ class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
 
     def create_bridge(self, **kwargs):
         jar_path = (
-            str(
-                TEST_SERVER_DIR
-                / "downloaded"
-                / self.platform
-                / self.version
-                / "CBLTestServer-Java-Desktop.jar"
-            )
+            str(TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "CBLTestServer-Java-Desktop.jar")
             if self._downloaded
             else str(
                 JAK_TEST_SERVER_DIR
@@ -475,12 +451,6 @@ class JAKTestServer_WebService(JAKTestServer_NonAndroid):
             return JettyBridge(self.version)
 
         return JarBridge(
-            str(
-                TEST_SERVER_DIR
-                / "downloaded"
-                / self.platform
-                / self.version
-                / "CBLTestServer-Java-WebService.jar"
-            ),
+            str(TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "CBLTestServer-Java-WebService.jar"),
             self.version,
         )

@@ -68,11 +68,7 @@ def generate_jwt(private_key, subject="edge", expires_in=300, kid="test-key-1") 
             separators=(",", ":"),
         ).encode()
     )
-    sig = _b64url(
-        private_key.sign(
-            f"{header}.{payload}".encode(), padding.PKCS1v15(), hashes.SHA256()
-        )
-    )
+    sig = _b64url(private_key.sign(f"{header}.{payload}".encode(), padding.PKCS1v15(), hashes.SHA256()))
     return f"{header}.{payload}.{sig}"
 
 

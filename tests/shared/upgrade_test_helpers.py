@@ -45,9 +45,7 @@ async def setup_upgrade_env(
     await test_case.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
     dataset_ver = cblpytest.test_servers[0].dataset_version
-    test_case.skip_if_not(
-        dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver})."
-    )
+    test_case.skip_if_not(dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver}).")
 
     test_case.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
     # delete_database silently swallows 403 internally (config-managed DBs)
@@ -67,14 +65,10 @@ async def setup_upgrade_env(
 
     test_case.mark_test_step("Wait for SG to bring the restored database online.")
 
-    await SyncGatewayCluster(cblpytest.sync_gateways[:1]).wait_for_db_online(
-        "upgrade", max_retries=120, retry_delay=1
-    )
+    await SyncGatewayCluster(cblpytest.sync_gateways[:1]).wait_for_db_online("upgrade", max_retries=120, retry_delay=1)
 
     test_case.mark_test_step("Reset local database, and load `upgrade` dataset.")
-    dbs = await cblpytest.test_servers[0].create_and_reset_db(
-        ["db1"], dataset="upgrade"
-    )
+    dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="upgrade")
     return dbs[0]
 
 
@@ -102,9 +96,7 @@ async def do_upgrade_replication_test(
 
     wait_for_doc_events = bool(doc_events)
 
-    conflict_resolver_name = (
-        f"{conflict_resolver.name}" if conflict_resolver else "None"
-    )
+    conflict_resolver_name = f"{conflict_resolver.name}" if conflict_resolver else "None"
 
     test_case.mark_test_step(f"""
         Start a replicator:
@@ -149,9 +141,7 @@ async def do_upgrade_replication_test(
 
     if compare_docs:
         test_case.mark_test_step("Check that the doc is replicated correctly.")
-        await compare_local_and_remote(
-            db, sg, replicator_type, "upgrade", ["_default._default"], [doc_id]
-        )
+        await compare_local_and_remote(db, sg, replicator_type, "upgrade", ["_default._default"], [doc_id])
 
     local_doc = await db.get_document(DocumentEntry("_default._default", doc_id))
     remote_doc = await sg.get_document("upgrade", doc_id)

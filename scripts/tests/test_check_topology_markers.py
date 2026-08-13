@@ -67,14 +67,8 @@ def _unbacked_markers(path: Path) -> list[str]:
         if not isinstance(class_node, ast.ClassDef):
             continue
 
-        class_declared = {
-            m: n for m, n in ctm._min_markers(class_node.decorator_list).items() if n
-        }
-        methods = {
-            n.name: n
-            for n in class_node.body
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-        }
+        class_declared = {m: n for m, n in ctm._min_markers(class_node.decorator_list).items() if n}
+        methods = {n.name: n for n in class_node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
         autouse_required, autouse_dynamic = ctm._class_autouse_usage(methods, scope)
         class_backed: set[str] = set(autouse_required) | autouse_dynamic
@@ -82,11 +76,7 @@ def _unbacked_markers(path: Path) -> list[str]:
         for method_node in methods.values():
             if not method_node.name.startswith("test_"):
                 continue
-            method_only_declared = {
-                m: n
-                for m, n in ctm._min_markers(method_node.decorator_list).items()
-                if n
-            }
+            method_only_declared = {m: n for m, n in ctm._min_markers(method_node.decorator_list).items() if n}
             required, dynamic = ctm._scan_usage(method_node, methods, scope)
             backed = required.keys() | dynamic
             class_backed |= backed

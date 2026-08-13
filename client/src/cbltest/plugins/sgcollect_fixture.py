@@ -8,9 +8,7 @@ from cbltest.api.syncgateway import SyncGateway
 from cbltest.logging import cbl_error, cbl_info
 
 
-async def run_sgcollects(
-    sync_gateways: list[SyncGateway], output_dir: Path
-) -> list[Path]:
+async def run_sgcollects(sync_gateways: list[SyncGateway], output_dir: Path) -> list[Path]:
     """
     Runs SGCollect on every given Sync Gateway node in parallel, downloading each
     resulting zip into output_dir, and logs a summary of what was collected.
@@ -36,8 +34,7 @@ async def run_sgcollects(
     results = await asyncio.gather(*(_collect_one(sg) for sg in sync_gateways))
     collected = [path for path in results if path is not None]
     cbl_info(
-        f"sgcollect: collected {len(collected)}/{len(results)} node(s) to "
-        f"{output_dir}: {[str(p) for p in collected]}"
+        f"sgcollect: collected {len(collected)}/{len(results)} node(s) to {output_dir}: {[str(p) for p in collected]}"
     )
     if len(collected) < len(results):
         cbl_error(
@@ -51,10 +48,7 @@ async def run_sgcollects(
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def sgcollect_session(cblpytest, request: pytest.FixtureRequest):
     yield
-    if (
-        request.config.getoption("--sgcollect-on-test-failure")
-        and request.session.testsfailed
-    ):
+    if request.config.getoption("--sgcollect-on-test-failure") and request.session.testsfailed:
         await run_sgcollects(cblpytest.sync_gateways, pathlib.Path.cwd())
 
 

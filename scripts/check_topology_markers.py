@@ -57,9 +57,7 @@ TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
         "couchbase_server": "min_couchbase_servers",
     },
 }
-TOPOLOGY_MARKERS = {
-    marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()
-}
+TOPOLOGY_MARKERS = {marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()}
 
 # simple_cloud() always requires sync_gateways, but only conditionally
 # touches couchbase_servers (falls back to rosmar) -- so only the
@@ -77,11 +75,7 @@ FIXTURE_TYPES: dict[str, str] = {
 }
 
 # Every class this script can resolve a receiver to.
-KNOWN_TYPES = (
-    frozenset(TOPOLOGY_ATTRS)
-    | frozenset(INDIRECT_TOPOLOGY_CALLS)
-    | frozenset(FIXTURE_TYPES.values())
-)
+KNOWN_TYPES = frozenset(TOPOLOGY_ATTRS) | frozenset(INDIRECT_TOPOLOGY_CALLS) | frozenset(FIXTURE_TYPES.values())
 
 
 def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
@@ -109,9 +103,7 @@ def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
     return None
 
 
-def _member_marker(
-    table: dict[str, dict[str, str]], receiver_type: str | None, name: str
-) -> str | None:
+def _member_marker(table: dict[str, dict[str, str]], receiver_type: str | None, name: str) -> str | None:
     """Marker for ``receiver_type.name`` per ``table`` (class -> member -> marker)."""
     if receiver_type is None:
         return None
@@ -199,11 +191,7 @@ def _min_markers(decorator_list: list[ast.expr]) -> dict[str, int]:
         ):
             continue
 
-        if (
-            dec.args
-            and isinstance(dec.args[0], ast.Constant)
-            and type(dec.args[0].value) is int
-        ):
+        if dec.args and isinstance(dec.args[0], ast.Constant) and type(dec.args[0].value) is int:
             markers[marker_name] = dec.args[0].value
     return markers
 
@@ -221,11 +209,7 @@ def _is_autouse_fixture(decorator_list: list[ast.expr]) -> bool:
         if dec.func.attr != "fixture":
             continue
         for kw in dec.keywords:
-            if (
-                kw.arg == "autouse"
-                and isinstance(kw.value, ast.Constant)
-                and kw.value.value is True
-            ):
+            if kw.arg == "autouse" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
                 return True
     return False
 
@@ -269,9 +253,7 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
                 dynamic.add(marker)
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
             receiver_type = _infer_type(node.func.value, env)
-            marker = _member_marker(
-                INDIRECT_TOPOLOGY_CALLS, receiver_type, node.func.attr
-            )
+            marker = _member_marker(INDIRECT_TOPOLOGY_CALLS, receiver_type, node.func.attr)
             if marker is not None:
                 required[marker] = max(required.get(marker, 0), 1)
 
@@ -285,11 +267,7 @@ class _FileScope(NamedTuple):
 
 
 def _build_scope(tree: ast.Module, path: Path) -> _FileScope:
-    module_funcs = {
-        n.name: n
-        for n in tree.body
-        if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
+    module_funcs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
     imports: dict[str, tuple[str, str]] = {}
     for node in tree.body:
         if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -356,11 +334,7 @@ def _resolve_call(
     ``self./cls.`` call never passes it explicitly.
     """
     func = node.func
-    if (
-        isinstance(func, ast.Attribute)
-        and isinstance(func.value, ast.Name)
-        and func.value.id in ("self", "cls")
-    ):
+    if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) and func.value.id in ("self", "cls"):
         target = class_methods.get(func.attr)
         return (target, class_methods, scope, True) if target is not None else None
 
@@ -455,9 +429,7 @@ def _scan_usage(
             continue
         target, target_class_methods, target_scope, is_method_call = resolved
         call_env = _call_site_env(node, target, env, is_method_call)
-        sub_required, sub_dynamic = _scan_usage(
-            target, target_class_methods, target_scope, _visited, call_env
-        )
+        sub_required, sub_dynamic = _scan_usage(target, target_class_methods, target_scope, _visited, call_env)
         for marker, needed in sub_required.items():
             required[marker] = max(required.get(marker, 0), needed)
         dynamic |= sub_dynamic
@@ -465,9 +437,7 @@ def _scan_usage(
     return required, dynamic
 
 
-def _class_autouse_usage(
-    methods: dict[str, ast.AST], scope: _FileScope
-) -> tuple[dict[str, int], set[str]]:
+def _class_autouse_usage(methods: dict[str, ast.AST], scope: _FileScope) -> tuple[dict[str, int], set[str]]:
     """Usage from every autouse fixture among a class's own ``methods``.
 
     An autouse fixture runs for every test in its class automatically -- no
@@ -500,11 +470,7 @@ class _Checker(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._class_markers.append(_min_markers(node.decorator_list))
-        methods = {
-            n.name: n
-            for n in node.body
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
-        }
+        methods = {n.name: n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
         self._class_methods_stack.append(methods)
         self._class_autouse_stack.append(_class_autouse_usage(methods, self._scope))
 
@@ -522,9 +488,7 @@ class _Checker(ast.NodeVisitor):
             declared.update(markers)
         declared.update(_min_markers(node.decorator_list))
 
-        class_methods = (
-            self._class_methods_stack[-1] if self._class_methods_stack else {}
-        )
+        class_methods = self._class_methods_stack[-1] if self._class_methods_stack else {}
         required, dynamic = _scan_usage(node, class_methods, self._scope)
         if self._class_autouse_stack:
             autouse_required, autouse_dynamic = self._class_autouse_stack[-1]

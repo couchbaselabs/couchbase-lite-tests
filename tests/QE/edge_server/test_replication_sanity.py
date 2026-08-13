@@ -14,15 +14,14 @@ from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
+
 @pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_sanity(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -44,11 +43,7 @@ class TestReplicationSanity(CBLTestClass):
         payload = DatabaseConfig(
             bucket="bucket-1",
             scopes={
-                "_default": ScopeConfig(
-                    collections={
-                        "_default": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                )
+                "_default": ScopeConfig(collections={"_default": {"sync": "function(doc){channel(doc.channels);}"}})
             },
             num_index_replicas=0,
         )
@@ -60,35 +55,25 @@ class TestReplicationSanity(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
-        self.mark_test_step(
-            "Creating a database on Edge Server with replication to Sync Gateway."
-        )
+        self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         es_db_name = "db"
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         await write_json_file(config_path, config)
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name=es_db_name, config_file=config_path
-        )
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 
         self.mark_test_step("Verifying that Sync Gateway has 10 documents.")
-        response = await sync_gateway.get_all_documents(
-            sg_db_name, "_default", "_default"
-        )
-        assert len(response.rows) == 10, (
-            f"Expected 10 documents, but got {len(response.rows)} documents."
-        )
+        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
 
         self.mark_test_step("Waiting for replication to Edge Server to be idle.")
         await edge_server.wait_for_idle(timeout=5)
 
         self.mark_test_step("Verifying that Edge Server has 10 documents.")
         response = await edge_server.get_all_documents(es_db_name)
-        assert len(response.rows) == 10, (
-            f"Expected 10 documents, but got {len(response.rows)} documents."
-        )
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
 
         # Single replication cycle: SG → ES and ES → SG (create, update, delete both ways)
         doc_id_sg = "doc_11"  # Sync Gateway cycle: create on SG, update/delete via ES
@@ -102,21 +87,15 @@ class TestReplicationSanity(CBLTestClass):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
-        assert created_doc is not None, (
-            f"Failed to create document {doc_id_sg} via Sync Gateway."
-        )
+        assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
         # Allow replication to propagate before validating (eventual consistency).
         await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_sg)
 
-        assert remote_doc is not None, (
-            f"Document {doc_id_sg} does not exist on the edge server."
-        )
-        assert remote_doc.id == doc_id_sg, (
-            f"Document ID mismatch: expected {doc_id_sg}, got {remote_doc.id}"
-        )
+        assert remote_doc is not None, f"Document {doc_id_sg} does not exist on the edge server."
+        assert remote_doc.id == doc_id_sg, f"Document ID mismatch: expected {doc_id_sg}, got {remote_doc.id}"
 
         rev_id = remote_doc.revid
 
@@ -128,22 +107,16 @@ class TestReplicationSanity(CBLTestClass):
             "changed": "yes",
         }
 
-        updated_doc = await edge_server.put_document_with_id(
-            updated_doc_body, doc_id_sg, es_db_name, rev=rev_id
-        )
+        updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id_sg, es_db_name, rev=rev_id)
 
-        assert updated_doc is not None, (
-            f"Failed to update document {doc_id_sg} via Edge Server"
-        )
+        assert updated_doc is not None, f"Failed to update document {doc_id_sg} via Edge Server"
         # Allow replication to propagate before validating (eventual consistency).
         await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
         assert sg_doc is not None
-        assert rev_id != sg_doc.revid, (
-            f"Document {doc_id_sg} update not reflected on Sync Gateway"
-        )
+        assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
         rev_id = sg_doc.revid
 
         self.mark_test_step(f"Deleting document {doc_id_sg} via Sync Gateway.")
@@ -166,17 +139,13 @@ class TestReplicationSanity(CBLTestClass):
         }
 
         created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
-        assert created_doc is not None, (
-            f"Failed to create document {doc_id_es} via Edge Server."
-        )
+        assert created_doc is not None, f"Failed to create document {doc_id_es} via Edge Server."
         # Allow replication to propagate before validating (eventual consistency).
         await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
-        assert sg_doc is not None, (
-            f"Document {doc_id_es} does not exist on the sync gateway."
-        )
+        assert sg_doc is not None, f"Document {doc_id_es} does not exist on the sync gateway."
         assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
         rev_id = sg_doc.revid
@@ -189,21 +158,15 @@ class TestReplicationSanity(CBLTestClass):
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "changed": "yes",
         }
-        updated_doc = await sync_gateway.update_document(
-            sg_db_name, doc_id_es, updated_doc_body, rev_id
-        )
-        assert updated_doc is not None, (
-            f"Failed to update document {doc_id_es} via Sync Gateway."
-        )
+        updated_doc = await sync_gateway.update_document(sg_db_name, doc_id_es, updated_doc_body, rev_id)
+        assert updated_doc is not None, f"Failed to update document {doc_id_es} via Sync Gateway."
         # Allow replication to propagate before validating (eventual consistency).
         await asyncio.sleep(5)
 
         self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
         remote_doc = await edge_server.get_document(es_db_name, doc_id_es)
 
-        assert remote_doc is not None, (
-            f"Document {doc_id_es} does not exist on the edge server."
-        )
+        assert remote_doc is not None, f"Document {doc_id_es} does not exist on the edge server."
         assert remote_doc.id == doc_id_es, f"Document ID mismatch: {remote_doc.id}"
 
         rev_id = remote_doc.revid

@@ -22,32 +22,22 @@ from test_replication_filter_data import uk_and_france_doc_ids
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationFilter(CBLTestClass):
-    def validate_replicated_doc_ids(
-        self, expected: set[str], actual: list[ReplicatorDocumentEntry]
-    ) -> None:
+    def validate_replicated_doc_ids(self, expected: set[str], actual: list[ReplicatorDocumentEntry]) -> None:
         for update in actual:
-            assert update.document_id in expected, (
-                f"Unexpected document update not in filter: {update.document_id}"
-            )
+            assert update.document_id in expected, f"Unexpected document update not in filter: {update.document_id}"
             expected.remove(update.document_id)
 
-        assert len(expected) == 0, (
-            f"Not all document updates were found (e.g. {next(iter(expected))})"
-        )
+        assert len(expected) == 0, f"Not all document updates were found (e.g. {next(iter(expected))})"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_document_ids_filter(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_push_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step(
@@ -73,9 +63,7 @@ class TestReplicationFilter(CBLTestClass):
                     ["travel.airlines"],
                     document_ids=["airline_10", "airline_20", "airline_1000"],
                 ),
-                ReplicatorCollectionEntry(
-                    ["travel.routes"], document_ids=["route_10", "route_20"]
-                ),
+                ReplicatorCollectionEntry(["travel.routes"], document_ids=["route_10", "route_20"]),
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
@@ -116,27 +104,21 @@ class TestReplicationFilter(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only changes for docs in the specified documentIDs filters are replicated."
-        )
+        self.mark_test_step("Check that only changes for docs in the specified documentIDs filters are replicated.")
         expected_ids = {"airline_1000", "airline_10", "route_10"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_document_ids_filter(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_pull_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step(
@@ -162,9 +144,7 @@ class TestReplicationFilter(CBLTestClass):
                     ["travel.airports"],
                     document_ids=["airport_10", "airport_20", "airport_1000"],
                 ),
-                ReplicatorCollectionEntry(
-                    ["travel.landmarks"], document_ids=["landmark_10", "landmark_20"]
-                ),
+                ReplicatorCollectionEntry(["travel.landmarks"], document_ids=["landmark_10", "landmark_20"]),
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
@@ -192,27 +172,19 @@ class TestReplicationFilter(CBLTestClass):
                 * Remove `landmark_10`, in `travel.landmarks`
         """
         )
-        remote_airport_10 = await sync_gateway.get_document(
-            "travel", "airport_10", "travel", "airports"
-        )
+        remote_airport_10 = await sync_gateway.get_document("travel", "airport_10", "travel", "airports")
         assert remote_airport_10 is not None, "Missing airport_10 from sync gateway"
 
-        remote_landmark_10 = await sync_gateway.get_document(
-            "travel", "landmark_10", "travel", "landmarks"
-        )
+        remote_landmark_10 = await sync_gateway.get_document("travel", "landmark_10", "travel", "landmarks")
         assert remote_landmark_10 is not None, "Missing landmark_10 from sync gateway"
-        landmark_10_revid = assert_not_null(
-            remote_landmark_10.revid, "Missing landmark_10 revid"
-        )
+        landmark_10_revid = assert_not_null(remote_landmark_10.revid, "Missing landmark_10 revid")
 
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42}),
             DocumentUpdateEntry("airport_10", remote_airport_10.revid, {"answer": 42}),
         ]
         await sync_gateway.update_documents("travel", updates, "travel", "airports")
-        await sync_gateway.delete_document(
-            "landmark_10", landmark_10_revid, "travel", "travel", "landmarks"
-        )
+        await sync_gateway.delete_document("landmark_10", landmark_10_revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -222,27 +194,21 @@ class TestReplicationFilter(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only changes for docs in the specified documentIDs filters are replicated."
-        )
+        self.mark_test_step("Check that only changes for docs in the specified documentIDs filters are replicated.")
         expected_ids = {"airport_1000", "airport_10", "landmark_10"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_channels_filter(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_pull_channels_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step(
@@ -264,9 +230,7 @@ class TestReplicationFilter(CBLTestClass):
             sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PULL,
             collections=[
-                ReplicatorCollectionEntry(
-                    ["travel.airports"], channels=["United Kingdom", "France"]
-                ),
+                ReplicatorCollectionEntry(["travel.airports"], channels=["United Kingdom", "France"]),
                 ReplicatorCollectionEntry(["travel.landmarks"], channels=["France"]),
             ],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
@@ -295,47 +259,27 @@ class TestReplicationFilter(CBLTestClass):
                 * Remove `landmark_1` channels = ["United Kingdom"], `landmark_2001` channels = ["France"] in `travel.landmarks`
         """
         )
-        remote_airport_11 = await sync_gateway.get_document(
-            "travel", "airport_11", "travel", "airports"
-        )
+        remote_airport_11 = await sync_gateway.get_document("travel", "airport_11", "travel", "airports")
         assert remote_airport_11 is not None, "Missing airport_11 from sync gateway"
 
-        remote_airport_1 = await sync_gateway.get_document(
-            "travel", "airport_1", "travel", "airports"
-        )
+        remote_airport_1 = await sync_gateway.get_document("travel", "airport_1", "travel", "airports")
         assert remote_airport_1 is not None, "Missing airport_1 from sync gateway"
 
-        remote_airport_17 = await sync_gateway.get_document(
-            "travel", "airport_17", "travel", "airports"
-        )
+        remote_airport_17 = await sync_gateway.get_document("travel", "airport_17", "travel", "airports")
         assert remote_airport_17 is not None, "Missing airport_17 from sync gateway"
 
-        remote_landmark_1 = await sync_gateway.get_document(
-            "travel", "landmark_1", "travel", "landmarks"
-        )
+        remote_landmark_1 = await sync_gateway.get_document("travel", "landmark_1", "travel", "landmarks")
         assert remote_landmark_1 is not None, "Missing landmark_1 from sync gateway"
-        landmark_1_revid = assert_not_null(
-            remote_landmark_1.revid, "Missing landmark_1 revid"
-        )
+        landmark_1_revid = assert_not_null(remote_landmark_1.revid, "Missing landmark_1 revid")
 
-        remote_landmark_601 = await sync_gateway.get_document(
-            "travel", "landmark_601", "travel", "landmarks"
-        )
+        remote_landmark_601 = await sync_gateway.get_document("travel", "landmark_601", "travel", "landmarks")
         assert remote_landmark_601 is not None, "Missing landmark_601 from sync gateway"
-        landmark_601_revid = assert_not_null(
-            remote_landmark_601.revid, "Missing landmark_601 revid"
-        )
+        landmark_601_revid = assert_not_null(remote_landmark_601.revid, "Missing landmark_601 revid")
 
         updates = [
-            DocumentUpdateEntry(
-                "airport_1000", None, {"answer": 42, "channels": ["United Kingdom"]}
-            ),
-            DocumentUpdateEntry(
-                "airport_2000", None, {"answer": 42, "channels": ["France"]}
-            ),
-            DocumentUpdateEntry(
-                "airport_3000", None, {"answer": 42, "channels": ["United States"]}
-            ),
+            DocumentUpdateEntry("airport_1000", None, {"answer": 42, "channels": ["United Kingdom"]}),
+            DocumentUpdateEntry("airport_2000", None, {"answer": 42, "channels": ["France"]}),
+            DocumentUpdateEntry("airport_3000", None, {"answer": 42, "channels": ["United States"]}),
             DocumentUpdateEntry(
                 "airport_11",
                 remote_airport_11.revid,
@@ -354,12 +298,8 @@ class TestReplicationFilter(CBLTestClass):
         ]
 
         await sync_gateway.update_documents("travel", updates, "travel", "airports")
-        await sync_gateway.delete_document(
-            "landmark_1", landmark_1_revid, "travel", "travel", "landmarks"
-        )
-        await sync_gateway.delete_document(
-            "landmark_601", landmark_601_revid, "travel", "travel", "landmarks"
-        )
+        await sync_gateway.delete_document("landmark_1", landmark_1_revid, "travel", "travel", "landmarks")
+        await sync_gateway.delete_document("landmark_601", landmark_601_revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -369,9 +309,7 @@ class TestReplicationFilter(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only changes in the filtered channels are pulled."
-        )
+        self.mark_test_step("Check that only changes in the filtered channels are pulled.")
         expected_ids = {
             "airport_1000",
             "airport_2000",
@@ -384,9 +322,7 @@ class TestReplicationFilter(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replicate_public_channel(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_replicate_public_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
@@ -395,9 +331,7 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Reset local database, and load `empty` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
-        snapshot_id = await db.create_snapshot(
-            [DocumentEntry("_default._default", "test_public")]
-        )
+        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "test_public")])
         snapshot_updater = SnapshotUpdater(snapshot_id)
 
         self.mark_test_step(
@@ -410,11 +344,7 @@ class TestReplicationFilter(CBLTestClass):
         )
         await sync_gateway.update_documents(
             "names",
-            [
-                DocumentUpdateEntry(
-                    "test_public", None, {"hello": "world", "channels": ["!"]}
-                )
-            ],
+            [DocumentUpdateEntry("test_public", None, {"hello": "world", "channels": ["!"]})],
         )
         snapshot_updater.upsert_document(
             "_default._default",
@@ -449,9 +379,9 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Check that only test_public was pulled")
         all_docs = await db.get_all_documents("_default._default")
-        assert (
-            "_default._default" in all_docs and len(all_docs["_default._default"]) == 1
-        ), "Invalid number of documents after pull"
+        assert "_default._default" in all_docs and len(all_docs["_default._default"]) == 1, (
+            "Invalid number of documents after pull"
+        )
 
         self.mark_test_step("Verify test_public contents")
         await db.verify_documents(snapshot_updater)
@@ -463,9 +393,7 @@ class TestReplicationFilter(CBLTestClass):
         """
         )
         async with db.batch_updater() as b:
-            b.upsert_document(
-                "_default._default", "test_public", [{"see you later": "world"}]
-            )
+            b.upsert_document("_default._default", "test_public", [{"see you later": "world"}])
 
         self.mark_test_step(
             """
@@ -495,26 +423,18 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Verify that the document on Sync Gateway was updated")
         sgw_doc = await sync_gateway.get_document("names", "test_public")
         assert sgw_doc is not None, "test_public missing from SGW"
-        assert "see you later" in sgw_doc.body, (
-            "updated key missing from test_public in SGW"
-        )
-        assert sgw_doc.body["see you later"] == "world", (
-            "incorrect data in updated key from test_public in SGW"
-        )
+        assert "see you later" in sgw_doc.body, "updated key missing from test_public in SGW"
+        assert sgw_doc.body["see you later"] == "world", "incorrect data in updated key from test_public in SGW"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_custom_push_filter(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_custom_push_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step(
@@ -577,22 +497,16 @@ class TestReplicationFilter(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only changes passed the push filters are replicated."
-        )
+        self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = {"name_10", "name_20"}
         self.validate_replicated_doc_ids(expected_ids, replicator.document_updates)
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_custom_pull_filter(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_custom_pull_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         def repl_filter(x):
-            return (x.error is None) or (
-                (x.error.domain == "CouchbaseLite") and (x.error.code == 10403)
-            )
+            return (x.error is None) or ((x.error.domain == "CouchbaseLite") and (x.error.code == 10403))
 
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.simple_cloud()
@@ -600,9 +514,7 @@ class TestReplicationFilter(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset local database, and load `names` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="names"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
         self.mark_test_step(
@@ -642,9 +554,7 @@ class TestReplicationFilter(CBLTestClass):
         )
 
         self.mark_test_step("Check that no docs are replicated.")
-        successful_replications1 = list(
-            filter(repl_filter, replicator.document_updates)
-        )
+        successful_replications1 = list(filter(repl_filter, replicator.document_updates))
         assert len(successful_replications1) == 0, (
             f"{len(successful_replications1)} documents were replicated even though they should have been filtered"
         )
@@ -677,13 +587,9 @@ class TestReplicationFilter(CBLTestClass):
             f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that only changes passed the push filters are replicated."
-        )
+        self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = {"name_105", "name_193"}
-        successful_replications2 = list(
-            filter(repl_filter, replicator.document_updates)
-        )
+        successful_replications2 = list(filter(repl_filter, replicator.document_updates))
         self.validate_replicated_doc_ids(expected_ids, successful_replications2)
 
         await cblpytest.test_servers[0].cleanup()

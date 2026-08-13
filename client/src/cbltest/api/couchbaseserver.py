@@ -57,9 +57,7 @@ class CouchbaseServer:
             return
 
         try:
-            resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default"
-            )
+            resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default")
             resp.raise_for_status()
             cluster_data = resp.json()
         except Exception as e:
@@ -77,11 +75,7 @@ class CouchbaseServer:
 
             for cluster_node in nodes_in_cluster:
                 hostname = cluster_node.get("hostname", "").split(":")[0]
-                alt_hostname = (
-                    cluster_node.get("alternateAddresses", {})
-                    .get("external", {})
-                    .get("hostname", "")
-                )
+                alt_hostname = cluster_node.get("alternateAddresses", {}).get("external", {}).get("hostname", "")
 
                 if cbs_node.hostname in [hostname, alt_hostname]:
                     node_in_cluster = True
@@ -201,15 +195,11 @@ class CouchbaseServer:
                         success = True
                         break
                     except Exception:
-                        cbl_warning(
-                            f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second..."
-                        )
+                        cbl_warning(f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second...")
                         sleep(1.0)
 
                 if not success:
-                    raise CblTestError(
-                        f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server"
-                    )
+                    raise CblTestError(f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server")
 
     def create_bucket(
         self,
@@ -226,9 +216,7 @@ class CouchbaseServer:
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
         """
-        with self.__tracer.start_as_current_span(
-            "create_bucket", attributes={"cbl.bucket.name": name}
-        ):
+        with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
             mgr = self.__cluster.buckets()
             settings = CreateBucketSettings(
                 name=name,
@@ -244,11 +232,7 @@ class CouchbaseServer:
             # Bucket creation is asynchronous in the cluster. Wait until it is healthy
             # and responding before returning so callers can safely proceed.
             for _ in range(retries):
-                if (
-                    self.bucket_healthy(name)
-                    and self.bucket_kv_responding(name)
-                    and self.collections_ready(name)
-                ):
+                if self.bucket_healthy(name) and self.bucket_kv_responding(name) and self.collections_ready(name):
                     return
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
@@ -259,9 +243,7 @@ class CouchbaseServer:
 
         :param name: The name of the bucket to drop
         """
-        with self.__tracer.start_as_current_span(
-            "drop_bucket", attributes={"cbl.bucket.name": name}
-        ):
+        with self.__tracer.start_as_current_span("drop_bucket", attributes={"cbl.bucket.name": name}):
             try:
                 mgr = self.__cluster.buckets()
                 mgr.drop_bucket(name)
@@ -272,9 +254,7 @@ class CouchbaseServer:
         """
         Returns True only if the bucket is healthy on all nodes.
         """
-        resp = self.__http_session.get(
-            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}"
-        )
+        resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}")
         if resp.status_code != 200:
             return False
 
@@ -303,9 +283,7 @@ class CouchbaseServer:
         """
         Checks if the collections manifest is available.
         """
-        resp = self.__http_session.get(
-            f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/scopes"
-        )
+        resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/buckets/{bucket_name}/scopes")
         return resp.status_code == 200
 
     def get_bucket_names(self) -> list[str]:
@@ -315,9 +293,7 @@ class CouchbaseServer:
         :return: A list of bucket names
         """
         with self.__tracer.start_as_current_span("get_bucket_names"):
-            buckets_resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default/buckets"
-            )
+            buckets_resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/buckets")
             buckets_resp.raise_for_status()
             buckets_data = buckets_resp.json()
             return [bucket["name"] for bucket in buckets_data]
@@ -345,10 +321,7 @@ class CouchbaseServer:
                     return
                 await asyncio.sleep(retry_delay)
 
-            raise CblTestError(
-                f"Bucket '{bucket_name}' was not deleted after "
-                f"{max_retries * retry_delay} seconds"
-            )
+            raise CblTestError(f"Bucket '{bucket_name}' was not deleted after {max_retries * retry_delay} seconds")
 
     def restore_bucket(
         self,
@@ -373,9 +346,7 @@ class CouchbaseServer:
             "restore_bucket",
             attributes={"cbl.bucket.name": name, "cbl.backup.source": dataset_name},
         ):
-            bin_name = (
-                "cbbackupmgr.exe" if platform.system() == "Windows" else "cbbackupmgr"
-            )
+            bin_name = "cbbackupmgr.exe" if platform.system() == "Windows" else "cbbackupmgr"
             cbbackupmgr_path = tools_path / "cbbackupmgr" / bin_name
             if not cbbackupmgr_path.exists():
                 raise FileNotFoundError(
@@ -385,9 +356,7 @@ class CouchbaseServer:
             # For historical reasons, dataset_path is pointing to the Sync Gateway dataset
             # directory.  This should be changed in the future, but for now to avoid breakage
             # just find the neighboring couchbase-server directory.
-            data_filepath = (
-                dataset_path / ".." / "couchbase-server" / f"{dataset_name}.zip"
-            )
+            data_filepath = dataset_path / ".." / "couchbase-server" / f"{dataset_name}.zip"
             if not data_filepath.exists():
                 raise FileNotFoundError(f"Data file {dataset_name}.zip not found!")
 
@@ -397,9 +366,7 @@ class CouchbaseServer:
                     with zipfile.ZipFile(data_filepath, "r") as zf:
                         zf.extractall(extract_path)
                 except zipfile.BadZipFile as e:
-                    raise CblTestError(
-                        f"Backup zip '{data_filepath}' is invalid: {e}"
-                    ) from e
+                    raise CblTestError(f"Backup zip '{data_filepath}' is invalid: {e}") from e
 
                 restore_args = [
                     cbbackupmgr_path,
@@ -438,9 +405,7 @@ class CouchbaseServer:
 
         :param bucket: The bucket to check for indexes
         """
-        with self.__tracer.start_as_current_span(
-            "indexes_count", attributes={"cbl.bucket.name": bucket}
-        ):
+        with self.__tracer.start_as_current_span("indexes_count", attributes={"cbl.bucket.name": bucket}):
             index_mgr = self.__cluster.query_indexes()
             indexes = list(index_mgr.get_all_indexes(bucket))
             return len(indexes)
@@ -466,16 +431,12 @@ class CouchbaseServer:
             format at execution time.
         """
         actual_query = query.format(f"{bucket}.{scope}.{collection}")
-        with self.__tracer.start_as_current_span(
-            "run_query", attributes={"cbl.query.name": actual_query}
-        ):
+        with self.__tracer.start_as_current_span("run_query", attributes={"cbl.query.name": actual_query}):
             query_obj = self.__cluster.query(actual_query)
             try:
                 self.__cluster.query_indexes().create_primary_index(
                     bucket,
-                    CreatePrimaryQueryIndexOptions(
-                        scope_name=scope, collection_name=collection
-                    ),
+                    CreatePrimaryQueryIndexOptions(scope_name=scope, collection_name=collection),
                 )
             except QueryIndexAlreadyExistsException:
                 pass
@@ -513,9 +474,7 @@ class CouchbaseServer:
                 coll = bucket_obj.scope(scope).collection(collection)
                 coll.upsert(doc_id, document)
             except Exception as e:
-                raise CblTestError(
-                    f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}"
-                )
+                raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}")
 
     def delete_document(
         self,
@@ -543,9 +502,7 @@ class CouchbaseServer:
             except DocumentNotFoundException:
                 pass
             except Exception as e:
-                raise CblTestError(
-                    f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}: {e}"
-                )
+                raise CblTestError(f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}: {e}")
 
     def get_document(
         self,
@@ -580,9 +537,7 @@ class CouchbaseServer:
             except DocumentNotFoundException:
                 return None
             except Exception as e:
-                raise CblTestError(
-                    f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}: {e}"
-                )
+                raise CblTestError(f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}: {e}")
 
     def upsert_document_xattr(
         self,
@@ -678,17 +633,12 @@ class CouchbaseServer:
             },
         ):
             # Get the existing remote cluster, if any...
-            resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default/remoteClusters"
-            )
+            resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/remoteClusters")
             resp.raise_for_status()
             resp_body = resp.json()
             remote_cluster_uuid: str | None = None
             for cluster in resp_body:
-                if (
-                    "name" in cluster
-                    and cast(str, cluster["name"]) == target.__hostname
-                ):
+                if "name" in cluster and cast(str, cluster["name"]) == target.__hostname:
                     remote_cluster_uuid = cluster["uuid"]
                     break
 
@@ -728,17 +678,12 @@ class CouchbaseServer:
                 # If the remote cluster didn't exist, the replication could not have existed
                 # so skip the lookup.  Otherwise, check for a replication that is already
                 # going out to the remote cluster in question.
-                resp = self.__http_session.get(
-                    f"http://{self.__hostname}:8091/pools/default/tasks"
-                )
+                resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/tasks")
                 resp.raise_for_status()
                 for task in resp.json():
                     if isinstance(task, dict) and task.get("type") == "xdcr":
                         task_id = task.get("id")
-                        if (
-                            task_id
-                            == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}"
-                        ):
+                        if task_id == f"{remote_cluster_uuid}/{bucket_name}/{bucket_name}":
                             needs_replication = False
                             break
 
@@ -773,17 +718,12 @@ class CouchbaseServer:
             },
         ):
             # See if the remote cluster already exists
-            resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default/remoteClusters"
-            )
+            resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/remoteClusters")
             resp.raise_for_status()
             resp_body = resp.json()
             remote_cluster_uuid: str | None = None
             for cluster in resp_body:
-                if (
-                    "name" in cluster
-                    and cast(str, cluster["name"]) == target.__hostname
-                ):
+                if "name" in cluster and cast(str, cluster["name"]) == target.__hostname:
                     remote_cluster_uuid = cluster["uuid"]
                     break
 
@@ -791,9 +731,7 @@ class CouchbaseServer:
                 return
 
             # See if the XDCR already exists
-            resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default/tasks"
-            )
+            resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/tasks")
             resp.raise_for_status()
             xdcr_id: str | None = None
             for task in resp.json():
@@ -896,9 +834,7 @@ class CouchbaseServer:
                         f"Node added successfully, but external SDK connections (from TDK) may fail. "
                         f"Internal cluster communication will work normally."
                     )
-                    span.add_event(
-                        "alternate_address_failed", attributes={"error": str(e)}
-                    )
+                    span.add_event("alternate_address_failed", attributes={"error": str(e)})
 
     def rebalance(
         self,
@@ -941,11 +877,7 @@ class CouchbaseServer:
                 # If we need to eject a specific node, find its OTP ID
                 if eject_node:
                     hostname = node.get("hostname", "").split(":")[0]
-                    alt_hostname = (
-                        node.get("alternateAddresses", {})
-                        .get("external", {})
-                        .get("hostname", "")
-                    )
+                    alt_hostname = node.get("alternateAddresses", {}).get("external", {}).get("hostname", "")
 
                     if eject_node.hostname in [hostname, alt_hostname]:
                         ejected_nodes_list.append(otp_node)
@@ -973,9 +905,7 @@ class CouchbaseServer:
                 )
                 resp.raise_for_status()
 
-            self._retry(
-                do_rebalance, max_attempts=5, wait_seconds=1, operation_name="Rebalance"
-            )
+            self._retry(do_rebalance, max_attempts=5, wait_seconds=1, operation_name="Rebalance")
 
             # Wait for rebalance to complete
             self._wait_for_rebalance_completion()
@@ -1005,9 +935,7 @@ class CouchbaseServer:
             except Exception as e:
                 last_exception = e
                 if attempt < max_attempts - 1:
-                    cbl_warning(
-                        f"{operation_name} failed (attempt {attempt + 1}/{max_attempts}): {e}"
-                    )
+                    cbl_warning(f"{operation_name} failed (attempt {attempt + 1}/{max_attempts}): {e}")
                     time.sleep(wait_seconds)
 
         # All attempts failed - last_exception is guaranteed to be set
@@ -1024,9 +952,7 @@ class CouchbaseServer:
         resp.raise_for_status()
         return resp.json()
 
-    def _find_node_otp(
-        self, pool_data: dict, target_node: "CouchbaseServer", operation: str
-    ) -> str:
+    def _find_node_otp(self, pool_data: dict, target_node: "CouchbaseServer", operation: str) -> str:
         """
         Internal method to find the OTP node ID for a given CouchbaseServer instance.
         Checks both regular hostname and alternate address (for AWS VPC deployments).
@@ -1052,9 +978,7 @@ class CouchbaseServer:
                 return otp_node
 
         # Node not found
-        raise CblTestError(
-            f"Node {target_node.hostname} not found in cluster for {operation}"
-        )
+        raise CblTestError(f"Node {target_node.hostname} not found in cluster for {operation}")
 
     def failover(self, node_to_failover: "CouchbaseServer") -> None:
         """
@@ -1090,9 +1014,7 @@ class CouchbaseServer:
         )
         resp.raise_for_status()
 
-    def wait_for_cluster_healthy(
-        self, timeout: int = 60, check_interval: int = 2
-    ) -> bool:
+    def wait_for_cluster_healthy(self, timeout: int = 60, check_interval: int = 2) -> bool:
         """
         Waits for the cluster to become healthy after a failover or rebalance operation.
         Checks that all active nodes are healthy and vBuckets are available.
@@ -1106,9 +1028,7 @@ class CouchbaseServer:
         while (time.time() - start_time) < timeout:
             try:
                 # Check cluster status
-                resp = self.__http_session.get(
-                    f"http://{self.__hostname}:8091/pools/default"
-                )
+                resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default")
                 resp.raise_for_status()
                 pool_data = resp.json()
 
@@ -1129,25 +1049,18 @@ class CouchbaseServer:
                     continue
 
                 # Check bucket vBuckets
-                buckets_resp = self.__http_session.get(
-                    f"http://{self.__hostname}:8091/pools/default/buckets"
-                )
+                buckets_resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/buckets")
                 buckets_resp.raise_for_status()
 
                 all_buckets_healthy = True
                 for bucket in buckets_resp.json():
                     vbucket_map = bucket.get("vBucketServerMap", {})
-                    if not vbucket_map.get("serverList") or not vbucket_map.get(
-                        "vBucketMap"
-                    ):
+                    if not vbucket_map.get("serverList") or not vbucket_map.get("vBucketMap"):
                         all_buckets_healthy = False
                         break
 
                     # Check all vBuckets have active nodes
-                    if any(
-                        not vb or vb[0] == -1
-                        for vb in vbucket_map.get("vBucketMap", [])
-                    ):
+                    if any(not vb or vb[0] == -1 for vb in vbucket_map.get("vBucketMap", [])):
                         all_buckets_healthy = False
                         break
 
@@ -1170,9 +1083,7 @@ class CouchbaseServer:
         """
         start_time = time.time()
         while time.time() - start_time < timeout_seconds:
-            resp = self.__http_session.get(
-                f"http://{self.__hostname}:8091/pools/default/rebalanceProgress"
-            )
+            resp = self.__http_session.get(f"http://{self.__hostname}:8091/pools/default/rebalanceProgress")
             resp.raise_for_status()
             status = resp.json()
 
@@ -1181,9 +1092,7 @@ class CouchbaseServer:
             # wait for 5 seconds before calling the API again
             time.sleep(5)
 
-        raise CblTestError(
-            f"Rebalance did not complete within {timeout_seconds} seconds"
-        )
+        raise CblTestError(f"Rebalance did not complete within {timeout_seconds} seconds")
 
     async def stop_server(self) -> None:
         """

@@ -24,15 +24,14 @@ from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
+
 @pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_jwt_replication_reconnect_false(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_jwt_replication_reconnect_false(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """ES replicates with SGW using a static JWT token (reconnect_on_token_change=false)."""
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -85,13 +84,7 @@ class TestJWTSimple(CBLTestClass):
         sg_db_name = "travel"
         payload = DatabaseConfig(
             bucket="travel",
-            scopes={
-                "travel": ScopeConfig(
-                    collections={
-                        "airlines": {"sync": "function(doc){channel(doc.channels);}"}
-                    }
-                )
-            },
+            scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
             local_jwt={
                 "test-provider": LocalJWT(
@@ -115,9 +108,7 @@ class TestJWTSimple(CBLTestClass):
         self.mark_test_step("Adding JWT user with channel access.")
         input_data = {"travel.airlines": ["*"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
-        await sync_gateway.add_user(
-            sg_db_name, "test-provider_user1", "pass", access_dict
-        )
+        await sync_gateway.add_user(sg_db_name, "test-provider_user1", "pass", access_dict)
 
         # =====================================================================
         # STEP 5: Insert test documents into CBS.
@@ -134,9 +125,7 @@ class TestJWTSimple(CBLTestClass):
                 "type": "airline",
                 "name": f"JWT Test Airline {i}",
             }
-            server.upsert_document(
-                bucket_name, doc_id, doc, scope="travel", collection="airlines"
-            )
+            server.upsert_document(bucket_name, doc_id, doc, scope="travel", collection="airlines")
 
         # =====================================================================
         # STEP 6: Wait for SGW to import docs from CBS.
@@ -150,9 +139,7 @@ class TestJWTSimple(CBLTestClass):
         elapsed = 0
         docs_ready = False
         while elapsed < max_wait:
-            sgw_docs = await sync_gateway.get_all_documents(
-                sg_db_name, scope="travel", collection="airlines"
-            )
+            sgw_docs = await sync_gateway.get_all_documents(sg_db_name, scope="travel", collection="airlines")
             sgw_doc_ids = [row.id for row in sgw_docs.rows]
             if all(f"jwt_test_airline_{i}" in sgw_doc_ids for i in range(1, 6)):
                 docs_ready = True
@@ -160,8 +147,7 @@ class TestJWTSimple(CBLTestClass):
             await asyncio.sleep(poll_interval)
             elapsed += poll_interval
         assert docs_ready, (
-            f"SGW did not import all 5 docs within {max_wait}s. "
-            f"Found: {[d for d in sgw_doc_ids if 'jwt_test' in d]}"
+            f"SGW did not import all 5 docs within {max_wait}s. Found: {[d for d in sgw_doc_ids if 'jwt_test' in d]}"
         )
 
         # =====================================================================
@@ -180,9 +166,7 @@ class TestJWTSimple(CBLTestClass):
         ):
             status_code = resp.status
             resp_text = await resp.text()
-        assert status_code == 200, (
-            f"JWT verification against SGW failed: {status_code} {resp_text}"
-        )
+        assert status_code == 200, f"JWT verification against SGW failed: {status_code} {resp_text}"
 
         # =====================================================================
         # STEP 8: Configure and start Edge Server with inline JWT token.
@@ -219,9 +203,7 @@ class TestJWTSimple(CBLTestClass):
         await write_json_file(config_path, config)
 
         es_manager = cblpytest.edge_servers[0]
-        edge_server = await es_manager.configure_dataset(
-            db_name="travel", config_file=config_path
-        )
+        edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
         # =====================================================================
         # STEP 9: Wait for replication to complete.
@@ -256,9 +238,7 @@ class TestJWTSimple(CBLTestClass):
         expected_min = 150  # Pre-loaded travel dataset from zip
         final_count = 0
         while elapsed < max_wait:
-            response = await edge_server.get_all_documents(
-                "travel", collection="travel.airlines"
-            )
+            response = await edge_server.get_all_documents("travel", collection="travel.airlines")
             final_count = len(response.rows)
             if final_count >= expected_min:
                 break
@@ -274,17 +254,9 @@ class TestJWTSimple(CBLTestClass):
         # This confirms the database is accessible and replication populated it.
         # =====================================================================
         self.mark_test_step("Verifying document accessible on Edge Server.")
-        response = await edge_server.get_all_documents(
-            "travel", collection="travel.airlines"
-        )
+        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
         assert len(response.rows) > 0, "No documents found on Edge Server."
         first_doc_id = response.rows[0].id
-        edge_doc = await edge_server.get_document(
-            "travel", collection="travel.airlines", doc_id=first_doc_id
-        )
-        assert edge_doc is not None, (
-            f"Document {first_doc_id} not retrievable from Edge Server."
-        )
-        assert "name" in edge_doc.body, (
-            f"Document missing 'name' field: {edge_doc.body}"
-        )
+        edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id=first_doc_id)
+        assert edge_doc is not None, f"Document {first_doc_id} not retrievable from Edge Server."
+        assert "name" in edge_doc.body, f"Document missing 'name' field: {edge_doc.body}"
