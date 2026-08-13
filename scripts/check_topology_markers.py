@@ -43,6 +43,7 @@ TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
         "couchbase_servers": "min_couchbase_servers",
         "edge_servers": "min_edge_servers",
         "load_balancers": "min_load_balancers",
+        "clusters": "min_clusters",
     },
     "CouchbaseCluster": {
         "sync_gateways": "min_sync_gateways",
@@ -50,6 +51,12 @@ TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
     },
 }
 TOPOLOGY_MARKERS = {marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()}
+
+# A single cluster is the implicit default topology -- `clusters[0]` (or
+# unindexed iteration) needs no marker. Only accessing a second cluster or
+# higher requires declaring @pytest.mark.min_clusters(n >= 2).
+_MIN_CLUSTERS_MARKER: str = "min_clusters"
+_MIN_CLUSTERS_THRESHOLD = 2
 
 # Pytest fixture names bound to their type regardless of annotation: pytest
 # resolves fixtures by parameter name, so a "cblpytest" parameter is always
@@ -478,6 +485,8 @@ class _Checker(ast.NodeVisitor):
             dynamic |= autouse_dynamic
 
         for marker, needed in required.items():
+            if marker == _MIN_CLUSTERS_MARKER and needed < _MIN_CLUSTERS_THRESHOLD:
+                continue
             have = declared.get(marker)
             if have is None:
                 self.violations.append(
@@ -491,6 +500,8 @@ class _Checker(ast.NodeVisitor):
                 )
 
         for marker in dynamic - required.keys():
+            if marker == _MIN_CLUSTERS_MARKER:
+                continue
             if marker not in declared:
                 self.violations.append(
                     f"{self.filename}:{node.lineno}: {node.name} uses the "

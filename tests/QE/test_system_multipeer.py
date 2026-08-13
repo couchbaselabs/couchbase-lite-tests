@@ -284,6 +284,7 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.min_test_servers(5)
     @pytest.mark.min_sync_gateways(2)
     @pytest.mark.min_couchbase_servers(2)
+    @pytest.mark.min_clusters(2)
     @pytest.mark.parametrize(
         "transport, doc_count",
         [("BLUETOOTH", 300), ("WIFI", 1000), ("MIXED_MODE", 700)],

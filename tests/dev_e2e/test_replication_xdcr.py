@@ -19,6 +19,7 @@ from cbltest.utils import assert_not_null
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(2)
+@pytest.mark.min_clusters(2)
 @pytest.mark.min_load_balancers(1)
 class TestReplicationXdcr(CBLTestClass):
     async def setup_xdcr_clusters(
