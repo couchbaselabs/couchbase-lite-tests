@@ -46,6 +46,7 @@ class SyncGatewayInfo:
     __rbac_user_key: Final[str] = "rbac_user"
     __rbac_password_key: Final[str] = "rbac_password"
     __tls_key: Final[str] = "tls"
+    __cluster_index_key: Final[str] = "cluster_index"
 
     @property
     def hostname(self) -> str:
@@ -77,6 +78,11 @@ class SyncGatewayInfo:
         """Gets whether or not the Sync Gateway is running with TLS"""
         return self.__uses_tls
 
+    @property
+    def cluster_index(self) -> int:
+        """Gets the index of the cluster this SGW belongs to"""
+        return self.__cluster_index
+
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
@@ -84,6 +90,7 @@ class SyncGatewayInfo:
         self.__rbac_user: str = _get_str_or_default(data, self.__rbac_user_key, "admin")
         self.__rbac_password: str = _get_str_or_default(data, self.__rbac_password_key, "password")
         self.__uses_tls: bool = _get_bool_or_default(data, self.__tls_key, False)
+        self.cluster_index: int = _get_int_or_default(data, self.__cluster_index_key, 0)
 
 
 class CouchbaseServerInfo:
@@ -92,6 +99,7 @@ class CouchbaseServerInfo:
     __hostname_key: Final[str] = "hostname"
     __admin_user_key: Final[str] = "admin_user"
     __admin_password_key: Final[str] = "admin_password"
+    __cluster_index_key: Final[str] = "cluster_index"
 
     @property
     def hostname(self) -> str:
@@ -108,10 +116,22 @@ class CouchbaseServerInfo:
         """Gets the password to use when administrating a CBS cluster"""
         return self.__admin_password
 
+    @property
+    def cluster_index(self) -> int:
+        """Gets the index of the cluster that this CBS instance belongs to"""
+        return self.__cluster_index
+
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__admin_user: str = _get_str_or_default(data, self.__admin_user_key, "Administrator")
-        self.__admin_password: str = _get_str_or_default(data, self.__admin_password_key, "password")
+        self.__admin_user: str = _get_str_or_default(
+            data, self.__admin_user_key, "Administrator"
+        )
+        self.__admin_password: str = _get_str_or_default(
+            data, self.__admin_password_key, "password"
+        )
+        self.__cluster_index: int = _get_int_or_default(
+            data, self.__cluster_index_key, 0
+        )
 
 
 class EdgeServerInfo:

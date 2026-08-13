@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator import Replicator
@@ -300,11 +299,8 @@ class TestSystemMultipeer(CBLTestClass):
         DOC_COUNT = doc_count
 
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud_1 = CouchbaseCloud([cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0])
-        await cloud_1.configure_dataset(dataset_path, "names")
-
-        cloud_2 = CouchbaseCloud([cblpytest.sync_gateways[1]], cblpytest.couchbase_servers[1])
-        await cloud_2.configure_dataset(dataset_path, "names")
+        await cblpytest.clusters[0].configure_dataset(dataset_path, "names")
+        await cblpytest.clusters[1].configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset DBs on all CBL clients and SGWs")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]

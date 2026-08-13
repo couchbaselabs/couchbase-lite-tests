@@ -26,7 +26,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -135,7 +135,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_revoke_access_with_auto_purge_enabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -273,7 +273,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -417,7 +417,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_revoke_access_with_auto_purge_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -529,7 +529,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_filter_removed_access_documents(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -668,7 +668,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path, auto_purge_enabled: bool
     ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -770,7 +770,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.parametrize("auto_purge_enabled", [True, False])
     async def test_remove_role_from_channel(self, cblpytest: CBLPyTest, dataset_path: Path, auto_purge_enabled: bool):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -899,7 +899,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_after_restore_access(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -1025,7 +1025,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_after_remove_access(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -1138,7 +1138,7 @@ class TestReplicationAutoPurge(CBLTestClass):
     @pytest.mark.parametrize("remove_type", ["delete", "purge"])
     async def test_auto_purge_after_resurrection(self, cblpytest: CBLPyTest, dataset_path: Path, remove_type: str):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 

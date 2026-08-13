@@ -1,8 +1,9 @@
 from json import dumps
+from typing import Sequence
 
 from cbltest.api.error import CblTestError
 
-from .api.cloud import CouchbaseCloud
+from .api.cluster import CouchbaseCluster
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
@@ -19,6 +20,42 @@ from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
 from .version import available_api_version
+
+
+class _ClusterBuilder:
+    # These may come in from the config file out of order,
+    # so use dictionaries to collect them instead of hacking
+    # None or blank clusters into a list
+    __sgw: dict[int, list[SyncGateway]]
+    __cbs: dict[int, list[CouchbaseServer]]
+
+    def add_entry(self, entry: SyncGateway | CouchbaseServer, idx: int) -> None:
+        if isinstance(entry, SyncGateway):
+            self.__sgw.setdefault(idx, []).append(entry)
+        else:
+            self.__cbs.setdefault(idx, []).append(entry)
+
+    def build(self) -> Sequence[CouchbaseCluster]:
+        self._validate()
+        ret_val = []
+
+        # Sync Gateway is at least as long as CBS
+        for idx in range(len(self.__sgw)):
+            servers = [] if idx >= len(self.__cbs) else self.__cbs[idx]
+            sync_gateways = self.__sgw[idx]
+            ret_val.append(CouchbaseCluster(sync_gateways, servers))
+
+    def _validate(self) -> None:
+        if len(self.__sgw) < len(self.__cbs):
+            raise CblTestError("Every cluster should at least have one Sync Gateway")
+
+        for name, d in (("sgw", self.__sgw), ("cbs", self.__cbs)):
+            expected = set(range(len(d)))
+            missing = expected - d.keys()
+            if missing:
+                raise CblTestError(
+                    f"Cluster indices for {name} must start from 0 and be contiguous, missing: {sorted(missing)}"
+                )
 
 
 class CBLPyTest:
@@ -48,27 +85,32 @@ class CBLPyTest:
         return self.__request_factory
 
     @property
-    def test_servers(self) -> list[TestServer]:
+    def test_servers(self) -> Sequence[TestServer]:
         """Gets the list of Test Servers available"""
         return self.__test_servers
 
     @property
-    def sync_gateways(self) -> list[SyncGateway]:
-        """Gets the list of Sync Gateways available"""
-        return self.__sync_gateways
+    def clusters(self) -> Sequence[CouchbaseCluster]:
+        """Gets the list of Couchbase Cluster objects available"""
+        return self.__clusters
 
     @property
-    def couchbase_servers(self) -> list[CouchbaseServer]:
-        """Gets the list of Couchbase Servers available"""
-        return self.__couchbase_servers
+    def sync_gateways(self) -> Sequence[SyncGateway]:
+        """Gets the list of Sync Gateways available in the first cluster"""
+        return self.clusters[0].sync_gateways
 
     @property
-    def edge_servers(self) -> list[EdgeServer]:
+    def couchbase_servers(self) -> Sequence[CouchbaseServer]:
+        """Gets the list of Couchbase Servers available in the first cluster"""
+        return self.clusters[0].couchbase_servers
+
+    @property
+    def edge_servers(self) -> Sequence[EdgeServer]:
         """Gets the list of Edge Servers available"""
         return self.__edge_servers
 
     @property
-    def load_balancers(self) -> list[str]:
+    def load_balancers(self) -> Sequence[str]:
         """Gets the list of Load Balancers available"""
         return self.__config.load_balancers
 
@@ -119,29 +161,34 @@ class CBLPyTest:
             dataset_version = ts_info.dataset_version or dataset_version
             self.__test_servers.append(TestServer(self.__request_factory, index, ts_info.url, dataset_version))
 
-        self.__sync_gateways: list[SyncGateway] = []
+        cluster_builder = _ClusterBuilder()
         index = 0
         if not test_server_only:
             for sg in self.__config.sync_gateways:
                 sgw_info = SyncGatewayInfo(sg)
-                self.__sync_gateways.append(
+                cluster_builder.add_entry(
                     SyncGateway(
                         sgw_info.hostname,
                         sgw_info.rbac_user,
                         sgw_info.rbac_password,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
-                    )
+                    ),
+                    sgw_info.cluster_index,
                 )
                 index += 1
 
-        self.__couchbase_servers: list[CouchbaseServer] = []
         if not test_server_only:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
-                self.__couchbase_servers.append(
-                    CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password)
+                cluster_builder.add_entry(
+                    CouchbaseServer(
+                        cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
+                    ),
+                    cbs_info.cluster_index,
                 )
+
+        self.__clusters = cluster_builder.build()
 
         self.__edge_servers: list[EdgeServer] = []
         if not test_server_only:
@@ -173,11 +220,11 @@ class CBLPyTest:
 
     async def close(self) -> None:
         """
-        Closes all the test servers and sync gateways
+        Closes all the clusters
         """
         await self.request_factory.close()
-        for sg in self.__sync_gateways:
-            await sg.close()
+        for cluster in self.__clusters:
+            await cluster.close()
 
     def __str__(self) -> str:
         ret_val = "Configuration:" + "\n" + str(self.__config) + "\n\n" + "Log Level: " + str(self.__log_level)
@@ -186,18 +233,3 @@ class CBLPyTest:
             ret_val += "\n" + "Extra Properties:" + "\n" + dumps(self.__extra_props)
 
         return ret_val
-
-    def simple_cloud(self) -> CouchbaseCloud:
-        """
-        Creates a Couchbase Cloud configuration with the first Sync Gateway and Couchbase Server in the config. This is meant to be used for simple tests that only require a single Sync Gateway and Couchase Server instance.
-        """
-        if len(self.sync_gateways) == 0:
-            raise CblTestError("No Sync Gateways available in config")
-
-        if len(self.couchbase_servers) == 0:
-            if self.sync_gateways[0].using_rosmar:
-                return CouchbaseCloud([self.sync_gateways[0]], None)
-
-            raise CblTestError("No Couchbase Servers available in config")
-
-        return CouchbaseCloud([self.sync_gateways[0]], self.couchbase_servers[0])

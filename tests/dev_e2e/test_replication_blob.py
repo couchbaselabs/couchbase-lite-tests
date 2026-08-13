@@ -27,8 +27,10 @@ class TestReplicationBlob(CBLTestClass):
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
-        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
-        cloud = cblpytest.simple_cloud()
+        self.mark_test_step(
+            "Reset SG and load `travel` dataset with delta sync enabled."
+        )
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
@@ -191,7 +193,7 @@ class TestReplicationBlob(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 

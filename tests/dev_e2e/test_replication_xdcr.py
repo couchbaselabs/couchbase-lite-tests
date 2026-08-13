@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.replicator import (
     Replicator,
     ReplicatorActivityLevel,
@@ -39,14 +38,17 @@ class TestReplicationXdcr(CBLTestClass):
         cblpytest.couchbase_servers[1].stop_xcdr(cblpytest.couchbase_servers[0], dataset_name)
 
         self.mark_test_step("Reset SGs in cluster 1 and 2, and load dataset.")
-        cloud1 = CouchbaseCloud([cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0])
-        await cloud1.configure_dataset(dataset_path, dataset_name)
-        cloud2 = CouchbaseCloud([cblpytest.sync_gateways[1]], cblpytest.couchbase_servers[1])
-        await cloud2.configure_dataset(dataset_path, dataset_name)
+
+        await cblpytest.clusters[0].configure_dataset(dataset_path, dataset_name)
+        await cblpytest.clusters[1].configure_dataset(dataset_path, dataset_name)
 
         self.mark_test_step("Start XDCR between cluster 1 and cluster 2.")
-        cblpytest.couchbase_servers[0].start_xdcr(cblpytest.couchbase_servers[1], dataset_name)
-        cblpytest.couchbase_servers[1].start_xdcr(cblpytest.couchbase_servers[0], dataset_name)
+        cblpytest.clusters[0].couchbase_servers[0].start_xdcr(
+            cblpytest.clusters[1].couchbase_servers[0], dataset_name
+        )
+        cblpytest.clusters[1].couchbase_servers[0].start_xdcr(
+            cblpytest.clusters[0].couchbase_servers[0], dataset_name
+        )
 
         self.mark_test_step("Wait 5 secs to ensure that clusters are ready.")
         await asyncio.sleep(5)

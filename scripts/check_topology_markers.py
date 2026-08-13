@@ -24,11 +24,6 @@ Usage is traced through helper calls -- same-class methods, same-file
 functions, imported functions (``_resolve_import_path``) -- and through
 autouse fixtures (``_class_autouse_usage``), but not through inherited
 base-class methods or expressions ``_infer_type`` can't follow.
-
-``cblpytest.simple_cloud()`` is a special case: it returns a
-``CouchbaseCloud`` but only conditionally requires ``couchbase_servers``
-(falls back to rosmar), so only its always-true half (``min_sync_gateways``)
-is hand-listed in ``INDIRECT_TOPOLOGY_CALLS``.
 """
 
 import ast
@@ -49,23 +44,12 @@ TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
         "edge_servers": "min_edge_servers",
         "load_balancers": "min_load_balancers",
     },
-    "CouchbaseCloud": {
-        # Also exposes the SGW nodes it was constructed with.
+    "CouchbaseCluster": {
         "sync_gateways": "min_sync_gateways",
-        # Singular property; raises if no Couchbase Server was configured
-        # (no rosmar fallback), unlike CBLPyTest.couchbase_servers above.
-        "couchbase_server": "min_couchbase_servers",
+        "couchbase_servers": "min_couchbase_servers",
     },
 }
 TOPOLOGY_MARKERS = {marker for attrs in TOPOLOGY_ATTRS.values() for marker in attrs.values()}
-
-# simple_cloud() always requires sync_gateways, but only conditionally
-# touches couchbase_servers (falls back to rosmar) -- so only the
-# always-true half is listed. Same shape as TOPOLOGY_ATTRS: class -> method
-# name -> marker.
-INDIRECT_TOPOLOGY_CALLS: dict[str, dict[str, str]] = {
-    "CBLPyTest": {"simple_cloud": "min_sync_gateways"},
-}
 
 # Pytest fixture names bound to their type regardless of annotation: pytest
 # resolves fixtures by parameter name, so a "cblpytest" parameter is always
@@ -75,7 +59,7 @@ FIXTURE_TYPES: dict[str, str] = {
 }
 
 # Every class this script can resolve a receiver to.
-KNOWN_TYPES = frozenset(TOPOLOGY_ATTRS) | frozenset(INDIRECT_TOPOLOGY_CALLS) | frozenset(FIXTURE_TYPES.values())
+KNOWN_TYPES = frozenset(TOPOLOGY_ATTRS) | frozenset(FIXTURE_TYPES.values())
 
 
 def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
@@ -83,8 +67,8 @@ def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
 
     Recognizes:
     - a name already bound in ``env`` (see ``_seed_type_env``, ``_collect_assign_types``)
-    - a direct constructor call, e.g. ``CouchbaseCloud(...)``
-    - ``<CBLPyTest-typed-expr>.simple_cloud()``
+    - a subscript of a ``CBLPyTest.clusters`` access (e.g. ``cblpytest.clusters[0]``),
+      which yields a ``CouchbaseCluster``
 
     Anything else returns None rather than guessing.
     """
@@ -94,12 +78,14 @@ def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
         func = expr.func
         if isinstance(func, ast.Name) and func.id in KNOWN_TYPES:
             return func.id
+    if isinstance(expr, ast.Subscript):
+        value = expr.value
         if (
-            isinstance(func, ast.Attribute)
-            and func.attr == "simple_cloud"
-            and _infer_type(func.value, env) == "CBLPyTest"
+            isinstance(value, ast.Attribute)
+            and value.attr == "clusters"
+            and _infer_type(value.value, env) == "CBLPyTest"
         ):
-            return "CouchbaseCloud"
+            return "CouchbaseCluster"
     return None
 
 
@@ -220,7 +206,7 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
     Returns (marker -> min required by a constant index, markers accessed
     with no constant index). ``env`` maps names to inferred classes; an
     attribute or call only counts if its receiver's class actually owns
-    that member (``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS``).
+    that member (``TOPOLOGY_ATTRS``).
 
     One walk suffices for ``subscripted_attrs``: ``ast.walk`` visits a
     ``Subscript`` before its own ``.value`` child, so it's already recorded
@@ -251,11 +237,6 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
             marker = _member_marker(TOPOLOGY_ATTRS, receiver_type, node.attr)
             if marker is not None:
                 dynamic.add(marker)
-        elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
-            receiver_type = _infer_type(node.func.value, env)
-            marker = _member_marker(INDIRECT_TOPOLOGY_CALLS, receiver_type, node.func.attr)
-            if marker is not None:
-                required[marker] = max(required.get(marker, 0), 1)
 
     return required, dynamic
 

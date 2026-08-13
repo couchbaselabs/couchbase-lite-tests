@@ -32,7 +32,7 @@ class TestReplicationFilter(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
@@ -113,7 +113,7 @@ class TestReplicationFilter(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_document_ids_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
@@ -203,7 +203,7 @@ class TestReplicationFilter(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_channels_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 
@@ -324,7 +324,7 @@ class TestReplicationFilter(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_public_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
@@ -429,7 +429,7 @@ class TestReplicationFilter(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_push_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
@@ -509,7 +509,7 @@ class TestReplicationFilter(CBLTestClass):
             return (x.error is None) or ((x.error.domain == "CouchbaseLite") and (x.error.code == 10403))
 
         self.mark_test_step("Reset SG and load `names` dataset.")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
