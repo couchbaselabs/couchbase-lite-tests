@@ -225,20 +225,22 @@ class CouchbaseServer:
                 ram_quota_mb=512,
                 num_replicas=num_replicas,
             )
+            newly_created = True
             try:
                 mgr.create_bucket(settings)
             except BucketAlreadyExistsException:
-                pass
+                newly_created = False
 
             # Bucket creation is asynchronous in the cluster. Wait until it is healthy
             # and responding before returning so callers can safely proceed.
             for _ in range(retries):
                 if self.bucket_healthy(name) and self.bucket_kv_responding(name) and self.collections_ready(name):
-                    retry_assert(
-                        lambda: self._check_all_indexes_removed(name),
-                        tenacity.wait_fixed(2),
-                        tenacity.stop_after_attempt(10),
-                    )
+                    if newly_created:
+                        retry_assert(
+                            lambda: self._check_all_indexes_removed(name),
+                            tenacity.wait_fixed(2),
+                            tenacity.stop_after_attempt(10),
+                        )
                     return
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
