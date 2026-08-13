@@ -251,15 +251,9 @@ class EdgeServer:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            if "/" in raw_version:
-                version_part = raw_version.rsplit("/", 1)[1]
-            else:
-                cbl_warning(
-                    f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'"
-                )
-                version_part = raw_version
-            return EdgeServerVersion(version_part)
+            vendor = _get_typed_required(resp_dict, "vendor", dict)
+            raw_version = _get_typed_required(vendor, "version", str)
+            return EdgeServerVersion(raw_version)
 
     async def get_all_documents(
         self,
