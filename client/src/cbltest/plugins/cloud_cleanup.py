@@ -16,6 +16,18 @@ async def cleanup_buckets(cblpytest):
     clean slate even if a previous test run was interrupted and left behind a
     dirty environment.
 
+    Tests that reuse a shared database/bucket across multiple test functions
+    (e.g. `TestQueryConsistency`) can shadow this fixture with a class-scoped
+    override that calls `perform_cleanup` once for the whole class instead of
+    once per test.
+    """
+    await perform_cleanup(cblpytest)
+
+
+async def perform_cleanup(cblpytest) -> None:
+    """
+    Remove all Couchbase Server buckets and Sync Gateway databases.
+
     No-ops when no Sync Gateway is configured (e.g. framework unit/smoke tests),
     since there is nothing to clean up and `SyncGatewayCluster` requires at least
     one node.
