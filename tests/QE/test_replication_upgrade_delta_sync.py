@@ -88,8 +88,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         config = await sg.get_database_config("upgrade")
         assert config.delta_sync is not None
         assert config.delta_sync.enabled is True, (
-            "Prerequisite failed: SGW 'upgrade' database does not have "
-            f"delta_sync.enabled=True. Active config: {config!r}"
+            f"Prerequisite failed: SGW 'upgrade' database does not have delta_sync.enabled=True. Active config: {config!r}"
         )
 
         self.mark_test_step("Create user1 for replication")

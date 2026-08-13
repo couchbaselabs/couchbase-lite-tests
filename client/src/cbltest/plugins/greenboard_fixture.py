@@ -81,8 +81,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
                     sgw_version = await cblpytest.sync_gateways[0].get_version()
                 except Exception as e:
                     cbl_warning(
-                        f"Could not fetch SGW version for upgrade record: {e}; "
-                        "recording iteration with sgw_version=None"
+                        f"Could not fetch SGW version for upgrade record: {e}; recording iteration with sgw_version=None"
                     )
             uploader.record_upgrade_step(
                 results_file,

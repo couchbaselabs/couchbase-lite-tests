@@ -728,8 +728,7 @@ class TestJWTReplication(CBLTestClass):
         count_while_stopped = len(response.rows)
         self.mark_test_step(f"Docs on ES while stopped: {count_while_stopped} (should still be {initial_count})")
         assert count_while_stopped == initial_count, (
-            f"ES should NOT have new docs while replication is stopped: "
-            f"expected {initial_count}, got {count_while_stopped}"
+            f"ES should NOT have new docs while replication is stopped: expected {initial_count}, got {count_while_stopped}"
         )
 
         # --- Phase 3: Recover with valid Token-C ---
@@ -751,8 +750,7 @@ class TestJWTReplication(CBLTestClass):
         response = await edge_server.get_all_documents("travel", collection="travel.airlines")
         final_count = len(response.rows)
         assert final_count >= initial_count + 3, (
-            f"After recovery with Token-C and _replicate re-trigger, "
-            f"expected >= {initial_count + 3} docs, got {final_count}"
+            f"After recovery with Token-C and _replicate re-trigger, expected >= {initial_count + 3} docs, got {final_count}"
         )
         self.mark_test_step(
             f"PASSED — Valid→Invalid→Valid cycle complete: {final_count} docs. "

@@ -773,8 +773,7 @@ class TestXattrs(CBLTestClass):
             unique_user2_docs = {e.id for e in user2_changes.results if e.id in sdk_doc_ids}
             user2_count = len(unique_user2_docs)
             assert user2_count == num_docs, (
-                f"User '{username2}' should see {num_docs} docs after xattr change to channel '{sg_channel2}', "
-                f"got {user2_count}"
+                f"User '{username2}' should see {num_docs} docs after xattr change to channel '{sg_channel2}', got {user2_count}"
             )
 
             self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
@@ -782,6 +781,5 @@ class TestXattrs(CBLTestClass):
             unique_user1_after = {e.id for e in user1_changes_after.results if e.id in sdk_doc_ids}
             user1_count_after = len(unique_user1_after)
             assert user1_count_after == 0, (
-                f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', "
-                f"got {user1_count_after}"
+                f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', got {user1_count_after}"
             )

@@ -219,8 +219,7 @@ class TestJWTSimple(CBLTestClass):
         # rejected (e.g. invalid openid_token format) and no replication started
         repl_status = await edge_server.all_replication_status()
         assert len(repl_status) > 0, (
-            "No replicators found on Edge Server — the replication config "
-            "was likely rejected. Check openid_token format."
+            "No replicators found on Edge Server — the replication config was likely rejected. Check openid_token format."
         )
 
         await edge_server.wait_for_idle(timeout=15)

@@ -238,8 +238,7 @@ class TestLogRedaction(CBLTestClass):
 
             except Exception as e:
                 pytest.fail(
-                    f"Failed to list files via Caddy directory browsing: {e}. "
-                    "Ensure Caddyfile has 'file_server browse' enabled."
+                    f"Failed to list files via Caddy directory browsing: {e}. Ensure Caddyfile has 'file_server browse' enabled."
                 )
 
             self.mark_test_step(f"Download redacted zip: {redacted_zip_filename}")

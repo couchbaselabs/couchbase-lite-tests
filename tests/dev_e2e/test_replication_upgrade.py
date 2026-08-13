@@ -741,8 +741,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.local.cv and post.local.cv == pre.local.cv, (
-                f"Expected local doc's HLV to be unchanged after the merge, "
-                f"but got before={pre.local.cv}, after={post.local.cv}"
+                f"Expected local doc's HLV to be unchanged after the merge, but got before={pre.local.cv}, after={post.local.cv}"
             )
 
         await do_upgrade_replication_test(
@@ -819,8 +818,7 @@ class TestReplicationUpgrade(CBLTestClass):
             )
 
             assert post.local.cv and post.local.cv != pre.local.cv, (
-                f"Expected local doc's HLV to be differnt after the merge, "
-                f"but got before={pre.local.cv}, after={post.local.cv}"
+                f"Expected local doc's HLV to be differnt after the merge, but got before={pre.local.cv}, after={post.local.cv}"
             )
 
             assert post.local.cv.endswith("@Revision+Tree+Encoding"), (

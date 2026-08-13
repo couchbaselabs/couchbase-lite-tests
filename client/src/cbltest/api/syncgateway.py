@@ -1728,8 +1728,7 @@ class _SyncGatewayBase:
             new_files = after - before
             if not new_files:
                 raise CblTestError(
-                    f"No new sgcollect zip found on {self.hostname} after collection. "
-                    f"Files present: {sorted(after) or '(none)'}"
+                    f"No new sgcollect zip found on {self.hostname} after collection. Files present: {sorted(after) or '(none)'}"
                 )
             if len(new_files) > 1:
                 raise CblTestError(

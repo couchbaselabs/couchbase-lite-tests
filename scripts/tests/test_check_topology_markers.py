@@ -111,6 +111,6 @@ def test_declared_markers_are_backed_by_detected_usage() -> None:
         violations.extend(_unbacked_markers(path))
 
     assert not violations, (
-        f"{len(violations)} declared marker(s) have no usage the checker "
-        "can currently detect:\n" + "\n".join(violations)
+        f"{len(violations)} declared marker(s) have no usage the checker can currently detect:\n"
+        + "\n".join(violations)
     )

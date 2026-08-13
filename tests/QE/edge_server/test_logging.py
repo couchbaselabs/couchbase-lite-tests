@@ -181,4 +181,4 @@ class TestLogging(CBLTestClass):
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
                 log = await edge_server.check_log(event_id)
                 assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"
-            await sync_gateway.delete_database(sg_db)
+            await sync_gateway.delete_database(sg_db_name)

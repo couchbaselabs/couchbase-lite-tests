@@ -44,8 +44,7 @@ class TestSgwUpgrade(CBLTestClass):
         collection = "_default"
 
         self.mark_test_step(
-            f"Running upgrade test version {current_upgrade_ver} "
-            f"for SGW DB '{sg_db}' -> CBS '{bucket}.{scope}.{collection}'"
+            f"Running upgrade test version {current_upgrade_ver} for SGW DB '{sg_db}' -> CBS '{bucket}.{scope}.{collection}'"
         )
         doc_id_prefix = f"upg_test_{sg_db}_{current_upgrade_ver}"
 

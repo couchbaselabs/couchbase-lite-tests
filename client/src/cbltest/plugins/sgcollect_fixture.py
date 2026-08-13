@@ -38,8 +38,7 @@ async def run_sgcollects(sync_gateways: list[SyncGateway], output_dir: Path) -> 
     )
     if len(collected) < len(results):
         cbl_error(
-            f"sgcollect: {len(results) - len(collected)}/{len(results)} node(s) "
-            "failed to collect logs, see errors above",
+            f"sgcollect: {len(results) - len(collected)}/{len(results)} node(s) failed to collect logs, see errors above",
             include_stack=False,
         )
     return collected
