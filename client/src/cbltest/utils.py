@@ -25,14 +25,10 @@ def _on_retry_assert_exhausted(retry_state: tenacity.RetryCallState) -> NoReturn
     __tracebackhide__ = True
     exc = retry_state.outcome.exception() if retry_state.outcome else None
     elapsed = retry_state.seconds_since_start
-    raise TimeoutError(
-        f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)"
-    ) from exc
+    raise TimeoutError(f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)") from exc
 
 
-def _retry_assert_policy(
-    wait: tenacity.wait.wait_base, stop: tenacity.stop.stop_base
-) -> dict[str, Any]:
+def _retry_assert_policy(wait: tenacity.wait.wait_base, stop: tenacity.stop.stop_base) -> dict[str, Any]:
     return {
         "wait": wait,
         "stop": stop,
@@ -84,9 +80,7 @@ def _try_n_times(
             return ret
         except Exception as e:
             if i < num_times - 1:
-                print(
-                    f"Trying {function_name} failed (reason='{e}'), retry in {seconds_between} seconds ..."
-                )
+                print(f"Trying {function_name} failed (reason='{e}'), retry in {seconds_between} seconds ...")
                 time.sleep(seconds_between)
             else:
                 print(f"Trying {function_name} failed (reason='{e}')")
@@ -118,8 +112,7 @@ def verify_lfs_checkout() -> None:
         )
     except subprocess.CalledProcessError as e:
         raise RuntimeError(
-            f"Failed to run {e.cmd!r} (return code {e.returncode}). "
-            f"stdout: {e.stdout!r} stderr: {e.stderr!r}"
+            f"Failed to run {e.cmd!r} (return code {e.returncode}). stdout: {e.stdout!r} stderr: {e.stderr!r}"
         ) from e
     try:
         lfs = json.loads(process_output.stdout)

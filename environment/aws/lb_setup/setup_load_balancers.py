@@ -28,9 +28,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -60,11 +58,7 @@ def remote_exec(
 
 def _create_router(index: int, admin: bool) -> dict:
     name = "admin" if admin else "public"
-    rule = (
-        "PathPrefix(`/`)"
-        if index == 0
-        else f"Header(`X-Backend`, `sg-{index}`) && PathPrefix(`/`)"
-    )
+    rule = "PathPrefix(`/`)" if index == 0 else f"Header(`X-Backend`, `sg-{index}`) && PathPrefix(`/`)"
     return {
         "entryPoints": [name],
         "rule": rule,
@@ -126,15 +120,9 @@ def main(topology: TopologyConfig) -> None:
         global current_ssh
         current_ssh = lb.hostname
         sftp = ssh.open_sftp()
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "traefik.yml", "/home/ec2-user/traefik.yml"
-        )
-        sftp_progress_bar(
-            sftp, SCRIPT_DIR / "http_config.yml", "/home/ec2-user/http_config.yml"
-        )
+        sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
+        sftp_progress_bar(sftp, SCRIPT_DIR / "traefik.yml", "/home/ec2-user/traefik.yml")
+        sftp_progress_bar(sftp, SCRIPT_DIR / "http_config.yml", "/home/ec2-user/http_config.yml")
         remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
         sftp.close()
         ssh.close()
@@ -150,6 +138,4 @@ def main(topology: TopologyConfig) -> None:
             "/home/ec2-user/http_config.yml:/etc/traefik/http_config.yml:ro",
         ]
 
-        start_container(
-            "traefik", "traefik:v3", ec2_hostname, topology.ssh_key, docker_args
-        )
+        start_container("traefik", "traefik:v3", ec2_hostname, topology.ssh_key, docker_args)

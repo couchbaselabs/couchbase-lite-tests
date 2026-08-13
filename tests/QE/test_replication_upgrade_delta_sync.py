@@ -31,17 +31,11 @@ def _deltas_sent(stats: dict) -> int | None:
     return None
 
 
-async def _assert_delta_sync_participated(
-    sg: SyncGateway, db_name: str, deltas_sent_before: int | None
-) -> None:
+async def _assert_delta_sync_participated(sg: SyncGateway, db_name: str, deltas_sent_before: int | None) -> None:
     """Assert SGW sent the revision as a delta, not a full-body fallback."""
     deltas_sent_after = _deltas_sent(await sg.get_delta_sync_stats(db_name))
-    assert deltas_sent_after is not None, (
-        f"No per-rev delta counter in SGW expvar (tried {_DELTAS_SENT_KEYS})."
-    )
-    assert deltas_sent_after - (deltas_sent_before or 0) > 0, (
-        "SGW fell back to a full-body send instead of a delta."
-    )
+    assert deltas_sent_after is not None, f"No per-rev delta counter in SGW expvar (tried {_DELTAS_SENT_KEYS})."
+    assert deltas_sent_after - (deltas_sent_before or 0) > 0, "SGW fell back to a full-body send instead of a delta."
 
 
 _DELTA_SYNC_UPGRADE_CONFIG = DatabaseConfig(
@@ -76,25 +70,18 @@ class TestUpgradeDeltaSync(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         payload = _DELTA_SYNC_UPGRADE_CONFIG
 
-        self.mark_test_step(
-            "Create SG 'upgrade' database with delta_sync enabled and import from bucket"
-        )
+        self.mark_test_step("Create SG 'upgrade' database with delta_sync enabled and import from bucket")
         await sg.put_database("upgrade", payload)
 
-        self.mark_test_step(
-            "Verify delta_sync is actually enabled on SGW 'upgrade' database"
-        )
+        self.mark_test_step("Verify delta_sync is actually enabled on SGW 'upgrade' database")
         config = await sg.get_database_config("upgrade")
         assert config.delta_sync is not None
         assert config.delta_sync.enabled is True, (
-            "Prerequisite failed: SGW 'upgrade' database does not have "
-            f"delta_sync.enabled=True. Active config: {config!r}"
+            f"Prerequisite failed: SGW 'upgrade' database does not have delta_sync.enabled=True. Active config: {config!r}"
         )
 
         self.mark_test_step("Create user1 for replication")
-        collection_access = sg.create_collection_access_dict(
-            {"_default._default": ["*"]}
-        )
+        collection_access = sg.create_collection_access_dict({"_default._default": ["*"]})
         await sg.add_user("upgrade", "user1", "pass", collection_access)
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -102,15 +89,11 @@ class TestUpgradeDeltaSync(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         doc_id = "nonconflict_3"
-        db = await setup_upgrade_env(
-            self, cblpytest, dataset_path, reset_expired_ttl=True
-        )
+        db = await setup_upgrade_env(self, cblpytest, dataset_path, reset_expired_ttl=True)
         await self._prepare_sg_with_delta_sync(cblpytest)
         sg = cblpytest.sync_gateways[0]
 
-        self.mark_test_step(
-            f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV."
-        )
+        self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
         assert current is not None, f"Expected '{doc_id}' imported from bucket"
         assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
@@ -136,9 +119,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
             assert not pre.remote.cv.endswith("@Revision+Tree+Encoding"), (
                 f"Pre remote expected canonical HLV, got RTE-encoded: {pre.remote.cv}"
             )
-            assert post.local.revid is None, (
-                f"Post local expected HLV-only, got revid={post.local.revid}"
-            )
+            assert post.local.revid is None, f"Post local expected HLV-only, got revid={post.local.revid}"
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"Post HLV mismatch: local={post.local.cv}, remote={post.remote.cv}"
             )
@@ -161,9 +142,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
         doc_id = "nonconflict_2"
-        db = await setup_upgrade_env(
-            self, cblpytest, dataset_path, reset_expired_ttl=True
-        )
+        db = await setup_upgrade_env(self, cblpytest, dataset_path, reset_expired_ttl=True)
         await self._prepare_sg_with_delta_sync(cblpytest)
         sg = cblpytest.sync_gateways[0]
 
@@ -177,18 +156,13 @@ class TestUpgradeDeltaSync(CBLTestClass):
                 f"Pre remote expected revtree-only (no HLV): revid={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert pre.local.revid < pre.remote.revid, (
-                f"Pre expected local revid < remote revid: "
-                f"local={pre.local.revid}, remote={pre.remote.revid}"
+                f"Pre expected local revid < remote revid: local={pre.local.revid}, remote={pre.remote.revid}"
             )
             assert post.local.revid and post.local.revid == post.remote.revid, (
                 f"Post expected matching revtree revid: local={post.local.revid}, remote={post.remote.revid}"
             )
-            assert post.local.cv is None, (
-                f"Post local expected revtree-only (no HLV), got {post.local.cv}"
-            )
-            assert post.remote.cv is None, (
-                f"Post remote expected no HLV (PULL doesn't touch SGW), got {post.remote.cv}"
-            )
+            assert post.local.cv is None, f"Post local expected revtree-only (no HLV), got {post.local.cv}"
+            assert post.remote.cv is None, f"Post remote expected no HLV (PULL doesn't touch SGW), got {post.remote.cv}"
 
         await do_upgrade_replication_test(
             self,

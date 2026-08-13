@@ -31,9 +31,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 current_ssh = ""
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -97,9 +95,7 @@ def setup_node(
 
     sftp = ssh.open_sftp()
     sftp_progress_bar(sftp, SCRIPT_DIR / "configure-node.sh", "/tmp/configure-node.sh")
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
 
     global current_ssh
@@ -125,9 +121,7 @@ def setup_node(
     )
 
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting CBS log fileserver")
-    remote_exec_bg(
-        ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting CBS management server"
-    )
+    remote_exec_bg(ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting CBS management server")
     ssh.close()
 
     ec2_hostname = get_ec2_hostname(hostname)
@@ -180,7 +174,5 @@ def main(topology: TopologyConfig) -> None:
                 server,
                 topology.ssh_key,
                 cluster_config.version,
-                cluster_config.public_hostnames[
-                    0
-                ],  # Use public hostname for external access
+                cluster_config.public_hostnames[0],  # Use public hostname for external access
             )

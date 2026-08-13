@@ -27,9 +27,7 @@ async def cleanup_buckets(cblpytest):
 
     await asyncio.gather(*(delete_all_databases(sg) for sg in cblpytest.sync_gateways))
 
-    await asyncio.gather(
-        *(delete_all_buckets(cbs) for cbs in cblpytest.couchbase_servers)
-    )
+    await asyncio.gather(*(delete_all_buckets(cbs) for cbs in cblpytest.couchbase_servers))
 
     cbl_info("🧹 Waiting for Sync Gateway databases to be fully removed")
 
@@ -52,9 +50,7 @@ async def delete_all_databases(sg: SyncGateway) -> None:
     if sg.using_rosmar:
         bucket_names = {entry.bucket for entry in dbs.values()}
         cbl_trace(f"🧹 SGW {sg}: dropping Rosmar buckets {bucket_names}...")
-        await asyncio.gather(
-            *(sg.drop_rosmar_bucket(bucket_name) for bucket_name in bucket_names)
-        )
+        await asyncio.gather(*(sg.drop_rosmar_bucket(bucket_name) for bucket_name in bucket_names))
 
 
 async def delete_all_buckets(cbs: CouchbaseServer) -> None:

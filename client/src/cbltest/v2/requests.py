@@ -58,9 +58,7 @@ class PostResetRequestBody(JSONSerializable, PostResetRequestMethods):
         for db_name in result_db_names:
             self.__databases[db_name] = {"dataset": url}
 
-    def add_empty(
-        self, result_db_names: list[str], collections: list[str] | None = None
-    ):
+    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None):
         """
         Add an empty database entry to the :class`PostResetRequestBody`
 
@@ -157,9 +155,7 @@ class PostUpdateDatabaseRequestBody(JSONSerializable):
             for e in cast(list[DatabaseUpdateEntry], self.updates):
                 raw_entry = e.to_json()
                 if raw_entry is None:
-                    cbl_warning(
-                        "Skipping invalid DatabaseUpdateEntry in body serialization!"
-                    )
+                    cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")
                     continue
 
                 raw_entries.append(raw_entry)
@@ -224,9 +220,7 @@ class PostVerifyDocumentsRequestBody(JSONSerializable):
         return {
             "snapshot": self.__snapshot,
             "database": self.__database,
-            "changes": [c.to_json() for c in self.changes]
-            if self.changes is not None
-            else [],
+            "changes": [c.to_json() for c in self.changes] if self.changes is not None else [],
         }
 
 
@@ -251,9 +245,7 @@ class PostNewSessionRequest(TestServerRequest):
     """
 
     def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
-        super().__init__(
-            version, uuid, "newSession", PostNewSessionRequestBody, payload=payload
-        )
+        super().__init__(version, uuid, "newSession", PostNewSessionRequestBody, payload=payload)
 
 
 @register_request(TestServerRequestType.UPDATE_DB, 2)

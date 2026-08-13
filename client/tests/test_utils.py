@@ -13,9 +13,7 @@ class TestAsyncRetryAssert:
             assert calls["n"] >= 3, f"not ready yet (attempt {calls['n']})"
             return "ok"
 
-        result = await async_retry_assert(
-            poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5)
-        )
+        result = await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
 
         assert result == "ok"
         assert calls["n"] == 3
@@ -26,9 +24,7 @@ class TestAsyncRetryAssert:
             raise AssertionError("still not ready")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await async_retry_assert(
-                poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(3)
-            )
+            await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(3))
 
         assert str(exc_info.value).startswith("still not ready")
 
@@ -38,9 +34,7 @@ class TestAsyncRetryAssert:
             raise AssertionError("still not ready")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await async_retry_assert(
-                poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(1)
-            )
+            await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(1))
 
         assert isinstance(exc_info.value.__cause__, AssertionError)
         assert str(exc_info.value.__cause__) == "still not ready"
@@ -54,9 +48,7 @@ class TestAsyncRetryAssert:
             raise AssertionError(f"attempt {calls['n']}")
 
         with pytest.raises(TimeoutError) as exc_info:
-            await async_retry_assert(
-                poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(4)
-            )
+            await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(4))
 
         assert calls["n"] == 4
         assert str(exc_info.value).startswith("attempt 4")
@@ -70,8 +62,6 @@ class TestAsyncRetryAssert:
             raise ValueError("boom")
 
         with pytest.raises(ValueError):
-            await async_retry_assert(
-                poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5)
-            )
+            await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
 
         assert calls["n"] == 1

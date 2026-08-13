@@ -32,13 +32,7 @@ class ServerVariant(Flag):
     ALL = ANDROID | C | DOTNET | IOS | JVM | JS
 
     def __str__(self) -> str:
-        return "|".join(
-            [
-                member.name
-                for member in ServerVariant
-                if member in self and member.name is not None
-            ]
-        )
+        return "|".join([member.name for member in ServerVariant if member in self and member.name is not None])
 
 
 class TestServerResponse(JSONSerializable):

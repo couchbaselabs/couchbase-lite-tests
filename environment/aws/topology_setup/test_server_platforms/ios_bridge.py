@@ -36,13 +36,7 @@ from environment.aws.common.output import header
 from .platform_bridge import PlatformBridge
 
 if platform.system() == "Windows":
-    XHARNESS_PATH = (
-        Path(environ["LOCALAPPDATA"])
-        / "Microsoft"
-        / "dotnet"
-        / "tools"
-        / "xharness.exe"
-    )
+    XHARNESS_PATH = Path(environ["LOCALAPPDATA"]) / "Microsoft" / "dotnet" / "tools" / "xharness.exe"
 else:
     XHARNESS_PATH = Path.home() / ".dotnet" / "tools" / "xharness"
 
@@ -92,17 +86,13 @@ class iOSBridge(PlatformBridge):
             return
 
         if not self.__has_xharness:
-            raise RuntimeError(
-                f"devicectl cannot find device '{location}' and xharness not found, aborting..."
-            )
+            raise RuntimeError(f"devicectl cannot find device '{location}' and xharness not found, aborting...")
 
         if not self.__validate_libimobiledevice(location):
             raise RuntimeError(f"device '{location}' not found!")
 
         click.echo()
-        click.secho(
-            "Device not found with devicectl, falling back to xharness...", fg="yellow"
-        )
+        click.secho("Device not found with devicectl, falling back to xharness...", fg="yellow")
         click.echo()
         _xharness_devices.add(location)
 
@@ -161,9 +151,7 @@ class iOSBridge(PlatformBridge):
 
     def __validate_libimobiledevice(self, location: str) -> bool:
         self.__verify_libimobiledevice()
-        result = subprocess.run(
-            ["ideviceinfo", "-u", location], check=False, capture_output=True
-        )
+        result = subprocess.run(["ideviceinfo", "-u", location], check=False, capture_output=True)
 
         return result.returncode == 0
 
@@ -305,9 +293,7 @@ class iOSBridge(PlatformBridge):
 
         stdout = result.stdout.decode("utf-8").splitlines()
         if not stdout:
-            click.secho(
-                "App not found in device list. Skipping termination.", fg="yellow"
-            )
+            click.secho("App not found in device list. Skipping termination.", fg="yellow")
             return
 
         app_path = stdout[-1].strip()
@@ -328,9 +314,7 @@ class iOSBridge(PlatformBridge):
                 capture_output=True,
             )
         except subprocess.CalledProcessError as e:
-            click.echo(
-                f"Failed to get processes. Skipping termination. Error:\n{e.stderr.decode('utf-8')}"
-            )
+            click.echo(f"Failed to get processes. Skipping termination. Error:\n{e.stderr.decode('utf-8')}")
             return
 
         stdout = result.stdout.decode("utf-8").splitlines()
@@ -359,9 +343,7 @@ class iOSBridge(PlatformBridge):
                 capture_output=True,
             )
         except subprocess.CalledProcessError as e:
-            click.echo(
-                f"Failed to terminate process. Continuing. Error:\n{e.stderr.decode('utf-8')}"
-            )
+            click.echo(f"Failed to terminate process. Continuing. Error:\n{e.stderr.decode('utf-8')}")
 
     def __stop_xharness(self, location: str) -> None:
         pid_file = _ios_pid_file_path(location)
