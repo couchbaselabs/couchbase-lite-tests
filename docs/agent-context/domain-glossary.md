@@ -16,7 +16,7 @@
 - **`cblpytest` fixture:** Session fixture exposing `test_servers`, `sync_gateways`, `couchbase_servers`, and more.
 - **Topology markers:** Pytest markers such as `min_test_servers`, `min_sync_gateways`, `min_couchbase_servers`.
 - **`dataset_path` fixture:** Shared path to `dataset/sg` in each test suite.
-- **`cleanup_after_test`:** QE autouse fixture for SGW/CBS cleanup after SGW-marked tests.
+- **`cleanup_buckets`:** Framework-wide autouse fixture (`cbltest.plugins.cloud_cleanup`) that removes all SGW databases and CBS/Rosmar buckets before every test.
 
 ## Versioning and Protocol Terms
 
