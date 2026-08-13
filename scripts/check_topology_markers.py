@@ -29,6 +29,10 @@ base-class methods or expressions ``_infer_type`` can't follow.
 ``CouchbaseCloud`` but only conditionally requires ``couchbase_servers``
 (falls back to rosmar), so only its always-true half (``min_sync_gateways``)
 is hand-listed in ``INDIRECT_TOPOLOGY_CALLS``.
+
+``next(iter(<topology-list>), <default>)`` is exempt from any marker --
+unlike ``x[0]`` or bare iteration, it can't raise on an empty list, so it's
+safe for a genuinely optional list (see ``_next_iter_default_attr``).
 """
 
 import ast
@@ -107,6 +111,27 @@ def _infer_type(expr: ast.expr, env: dict[str, str]) -> str | None:
         ):
             return "CouchbaseCloud"
     return None
+
+
+def _next_iter_default_attr(node: ast.AST) -> ast.Attribute | None:
+    """If ``node`` is ``next(iter(<attr>), <default>)``, return ``<attr>``, else None."""
+    if not (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "next"
+        and len(node.args) == 2
+    ):
+        return None
+    inner = node.args[0]
+    if not (
+        isinstance(inner, ast.Call)
+        and isinstance(inner.func, ast.Name)
+        and inner.func.id == "iter"
+        and len(inner.args) == 1
+    ):
+        return None
+    attr = inner.args[0]
+    return attr if isinstance(attr, ast.Attribute) else None
 
 
 def _member_marker(
@@ -238,15 +263,20 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
     attribute or call only counts if its receiver's class actually owns
     that member (``TOPOLOGY_ATTRS`` / ``INDIRECT_TOPOLOGY_CALLS``).
 
-    One walk suffices for ``subscripted_attrs``: ``ast.walk`` visits a
-    ``Subscript`` before its own ``.value`` child, so it's already recorded
-    by the time that same ``Attribute`` node is visited on its own.
+    One walk suffices for ``subscripted_attrs``/``safe_attrs``: ``ast.walk``
+    is breadth-first, so a ``Subscript`` or ``next(iter(...), ...)`` is
+    recorded before its descendant ``Attribute`` node is visited.
     """
     required: dict[str, int] = {}
     dynamic: set[str] = set()
     subscripted_attrs: set[int] = set()
+    safe_attrs: set[int] = set()
 
     for node in ast.walk(func):
+        safe_attr = _next_iter_default_attr(node)
+        if safe_attr is not None:
+            safe_attrs.add(id(safe_attr))
+
         if isinstance(node, ast.Subscript) and isinstance(node.value, ast.Attribute):
             attr_node = node.value
             receiver_type = _infer_type(attr_node.value, env)
@@ -261,7 +291,7 @@ def _local_usage(func: ast.AST, env: dict[str, str]) -> tuple[dict[str, int], se
             else:
                 dynamic.add(marker)
         elif isinstance(node, ast.Attribute):
-            if id(node) in subscripted_attrs:
+            if id(node) in subscripted_attrs or id(node) in safe_attrs:
                 continue
             receiver_type = _infer_type(node.value, env)
             marker = _member_marker(TOPOLOGY_ATTRS, receiver_type, node.attr)

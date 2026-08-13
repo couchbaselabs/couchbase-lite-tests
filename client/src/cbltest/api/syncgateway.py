@@ -18,7 +18,7 @@ import tenacity
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, Field, RootModel, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
@@ -646,6 +646,42 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
+class ResyncAction(str, Enum):
+    """The action to perform via POST /{db}/_resync"""
+
+    START = "start"
+    STOP = "stop"
+
+
+class ResyncState(str, Enum):
+    """The state of a Sync Gateway resync process, as reported by /{db}/_resync"""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+class ResyncStatusResponse(BaseModel):
+    """
+    Output of GET /{db}/_resync (and POST /{db}/_resync) endpoints of Sync Gateway
+    """
+
+    class Collections(RootModel[dict[str, list[str]]]):
+        """Scope name to the names of collections in it currently being resynced."""
+
+    status: ResyncState
+    start_time: str = ""
+    last_error: str = ""
+    resync_id: str = ""
+    collections_processing: Collections | None = None
+    docs_changed: int = 0
+    docs_processed: int = 0
+    docs_errored: int = 0
+    docs_targeted: int = 0
+
+
 class SGCollectRedactLevel(str, Enum):
     """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
 
@@ -738,6 +774,19 @@ class _SyncGatewayBase:
         params: dict[str, str] | None = None,
         session: ClientSession | None = None,
     ) -> Any:
+        ret_val, _ = await self._send_request_with_headers(
+            method, path, payload, params=params, session=session
+        )
+        return ret_val
+
+    async def _send_request_with_headers(
+        self,
+        method: str,
+        path: str,
+        payload: JSONSerializable | DatabaseConfig | None = None,
+        params: dict[str, str] | None = None,
+        session: ClientSession | None = None,
+    ) -> tuple[Any, Any]:
         if session is None:
             session = self.__session
 
@@ -770,7 +819,7 @@ class _SyncGatewayBase:
                     resp.status, f"{method} {path} returned {resp.status}: {data}"
                 )
 
-            return ret_val
+            return ret_val, resp.headers
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -1162,6 +1211,7 @@ class _SyncGatewayBase:
         updates: list[DocumentUpdateEntry],
         scope: str = "_default",
         collection: str = "_default",
+        batch_size: int | None = None,
     ) -> None:
         """
         Sends a list of documents to be updated on Sync Gateway
@@ -1170,6 +1220,9 @@ class _SyncGatewayBase:
         :param updates: A list of updates to perform
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
+        :param batch_size: Maximum number of documents per _bulk_docs request; splits
+            `updates` into multiple requests if there are more than this many. Defaults
+            to sending all of `updates` in a single request.
         """
         with self._tracer.start_as_current_span(
             "update_documents",
@@ -1179,15 +1232,18 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            await self._rewrite_rev_ids(db_name, updates, scope, collection)
+            step = batch_size if batch_size is not None else max(len(updates), 1)
+            for start in range(0, len(updates), step):
+                batch = updates[start : start + step]
+                await self._rewrite_rev_ids(db_name, batch, scope, collection)
 
-            body = {"docs": [u.to_json() for u in updates]}
+                body = {"docs": [u.to_json() for u in batch]}
 
-            await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary(body),
-            )
+                await self._send_request(
+                    "post",
+                    f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                    JSONDictionary(body),
+                )
 
     async def upsert_documents(
         self,
@@ -2197,6 +2253,41 @@ class SyncGateway(_SyncGatewayBase):
                 f"Database {db=} is still backed by bucket {bucket_name}"
             )
 
+    async def _wait_for_db_state(
+        self,
+        db_name: str,
+        target_state: DatabaseState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> None:
+        """
+        Wait until the SGW node reports the database in the given state.
+
+        :param db_name: Database name to poll.
+        :param target_state: The state to wait for.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        state_name = target_state.value.lower()
+
+        async def _wait_for_db_state_poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            assert db_name in dbs, (
+                f"Database {db_name} is not {state_name} "
+                "(database not present in /_all_dbs?verbose=true)"
+            )
+            entry = dbs[db_name]
+            assert entry.state == target_state, (
+                f"Database {db_name} is not {state_name}: {entry}"
+            )
+
+        await retry_assert(
+            _wait_for_db_state_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
+
     async def _wait_for_db_online(
         self,
         db_name: str,
@@ -2211,22 +2302,152 @@ class SyncGateway(_SyncGatewayBase):
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
         """
+        await self._wait_for_db_state(
+            db_name,
+            DatabaseState.ONLINE,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
 
-        async def _wait_for_db_online_poll() -> None:
-            dbs = await self.get_all_databases_verbose()
-            assert db_name in dbs, (
-                f"Database {db_name} is not online "
-                "(database not present in /_all_dbs?verbose=true)"
-            )
-            entry = dbs[db_name]
-            assert entry.state == DatabaseState.ONLINE, (
-                f"Database {db_name} is not online: {entry}"
+    async def _post_database_config(
+        self, db_name: str, config: DatabaseConfig
+    ) -> str | None:
+        """
+        Merges the given fields into a database's existing config via POST to its
+        /_config endpoint. POST merges server-side; PUT replaces the config
+        wholesale and rejects a partial body (e.g. it errors with "cannot change
+        scopes after database creation" if scopes is omitted).
+
+        :param db_name: Database name to update.
+        :param config: The fields to merge into the existing config; unset fields
+            are omitted from the request body.
+        :return: The ETag of the resulting config, or None if the response didn't
+            include one.
+        """
+        _, headers = await self._send_request_with_headers(
+            "post", f"/{db_name}/_config", config
+        )
+        return headers.get("ETag")
+
+    async def _get_database_config_etag(self, db_name: str) -> str | None:
+        """
+        Gets the ETag of a database's current config (GET /{db}/_config), without
+        parsing the config body.
+
+        :param db_name: Database name to check.
+        :return: The current ETag, or None if the response didn't include one.
+        """
+        _, headers = await self._send_request_with_headers("get", f"/{db_name}/_config")
+        return headers.get("ETag")
+
+    async def _wait_for_config_etag(
+        self,
+        db_name: str,
+        expected_etag: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 2,
+    ) -> None:
+        """
+        Wait until the SGW node's config ETag for a database matches the given
+        value, i.e. it has converged on a specific config version.
+
+        :param db_name: Database name to poll.
+        :param expected_etag: The ETag to wait for.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+
+        async def _poll() -> None:
+            actual = await self._get_database_config_etag(db_name)
+            assert actual == expected_etag, (
+                f"Config for {db_name} on {self.hostname}:{self.port} is at ETag "
+                f"{actual!r}, expected {expected_etag!r}"
             )
 
         await retry_assert(
-            _wait_for_db_online_poll,
+            _poll,
             tenacity.wait_fixed(retry_delay),
             tenacity.stop_after_attempt(max_retries),
+        )
+
+    async def _set_database_offline(self, db_name: str) -> None:
+        """
+        Takes a database offline by POSTing {"offline": true} to its /_config endpoint.
+
+        :param db_name: Database name to take offline.
+        """
+        with self._tracer.start_as_current_span(
+            "set_database_offline", attributes={"sg.database.name": db_name}
+        ):
+            await self._post_database_config(db_name, DatabaseConfig(offline=True))
+
+    async def bring_database_online(self, db_name: str) -> None:
+        """
+        Brings a database back online by POSTing {"offline": false} to its /_config endpoint.
+
+        :param db_name: Database name to bring online.
+        """
+        with self._tracer.start_as_current_span(
+            "bring_database_online", attributes={"sg.database.name": db_name}
+        ):
+            await self._post_database_config(db_name, DatabaseConfig(offline=False))
+
+    async def update_sync_function(
+        self,
+        db_name: str,
+        sync_function: str,
+        *,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> str | None:
+        """
+        Updates the sync function for a collection by POSTing to the database's
+        /_config endpoint.
+
+        :param db_name: The name of the database to update.
+        :param sync_function: The new sync function body.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection to update the sync function for (default '_default').
+        :return: The ETag of the resulting config, or None if the response didn't
+            include one.
+        """
+        with self._tracer.start_as_current_span(
+            "update_sync_function",
+            attributes={
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+            },
+        ):
+            config = DatabaseConfig(
+                scopes={
+                    scope: ScopeConfig(
+                        collections={collection: {"sync": sync_function}}
+                    )
+                }
+            )
+            return await self._post_database_config(db_name, config)
+
+    async def _wait_for_db_offline(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until the SGW node reports the database as Offline.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        await self._wait_for_db_state(
+            db_name,
+            DatabaseState.OFFLINE,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
         )
 
     async def _wait_for_db_gone(
@@ -2252,6 +2473,161 @@ class SyncGateway(_SyncGatewayBase):
             _wait_for_db_gone_poll,
             tenacity.wait_fixed(retry_delay),
             tenacity.stop_after_attempt(max_retries),
+        )
+
+    async def _put_resync(
+        self,
+        db_name: str,
+        *,
+        action: ResyncAction = ResyncAction.START,
+        scopes: dict[str, list[str]] | None = None,
+        regenerate_sequences: bool = False,
+        reset: bool = False,
+    ) -> ResyncStatusResponse:
+        """
+        Starts or stops a resync operation via POST /{db}/_resync. The database
+        must be offline (see :func:`_set_database_offline`) before starting a resync.
+
+        :param db_name: The name of the database to resync.
+        :param action: Whether to start or stop the resync operation.
+        :param scopes: Optional scope-to-collections mapping to limit resync to.
+        :param regenerate_sequences: Whether to regenerate sequence numbers for
+            resynced documents.
+        :param reset: Whether to discard previous resync progress before starting.
+            Only meaningful when ``action`` is :attr:`ResyncAction.START`.
+        """
+        with self._tracer.start_as_current_span(
+            "put_resync",
+            attributes={"sg.database.name": db_name, "sg.resync.action": action.value},
+        ):
+            params = {"action": action.value, "reset": "true" if reset else "false"}
+            body: dict[str, Any] = {}
+            if scopes is not None:
+                body["scopes"] = scopes
+            if regenerate_sequences:
+                body["regenerate_sequences"] = regenerate_sequences
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}/_resync",
+                JSONDictionary(body) if body else None,
+                params=params,
+            )
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def start_resync(
+        self,
+        db_name: str,
+        *,
+        scopes: dict[str, list[str]] | None = None,
+        regenerate_sequences: bool = False,
+        reset: bool = False,
+    ) -> ResyncStatusResponse:
+        """
+        Starts a resync operation via POST /{db}/_resync. The database must be
+        offline (see :func:`_set_database_offline`) before starting a resync.
+
+        :param db_name: The name of the database to resync.
+        :param scopes: Optional scope-to-collections mapping to limit resync to.
+        :param regenerate_sequences: Whether to regenerate sequence numbers for
+            resynced documents.
+        :param reset: Whether to discard previous resync progress before starting.
+        """
+        return await self._put_resync(
+            db_name,
+            action=ResyncAction.START,
+            scopes=scopes,
+            regenerate_sequences=regenerate_sequences,
+            reset=reset,
+        )
+
+    async def stop_resync(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Stops a running resync operation via POST /{db}/_resync.
+
+        :param db_name: The name of the database whose resync operation to stop.
+        """
+        return await self._put_resync(db_name, action=ResyncAction.STOP)
+
+    async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Gets the current resync status via GET /{db}/_resync.
+
+        :param db_name: The name of the database to query.
+        """
+        with self._tracer.start_as_current_span(
+            "get_resync_status", attributes={"sg.database.name": db_name}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_resync")
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def _wait_for_resync_state(
+        self,
+        db_name: str,
+        target_state: ResyncState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> ResyncStatusResponse:
+        status_holder: list[ResyncStatusResponse] = []
+
+        async def _wait_for_resync_state_poll() -> None:
+            status = await self.get_resync_status(db_name)
+            assert status.status == target_state, (
+                f"Resync on database {db_name} is {status.status}, not {target_state}"
+            )
+            status_holder.append(status)
+
+        await retry_assert(
+            _wait_for_resync_state_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
+        return status_holder[-1]
+
+    async def wait_for_resync_completed(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 300,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Completed, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.COMPLETED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+    async def wait_for_resync_stopped(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Stopped, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.STOPPED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
         )
 
     @tenacity.retry(

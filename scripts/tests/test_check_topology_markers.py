@@ -34,6 +34,8 @@ import ast
 import importlib.util
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CHECKER_PATH = REPO_ROOT / "scripts" / "check_topology_markers.py"
 
@@ -43,6 +45,51 @@ ctm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ctm)
 
 TEST_DIRS = [REPO_ROOT / "tests" / "dev_e2e", REPO_ROOT / "tests" / "QE"]
+
+
+def test_next_iter_default_attr_recognizes_the_safe_shape() -> None:
+    node = ast.parse("next(iter(cblpytest.couchbase_servers), None)", mode="eval").body
+    attr = ctm._next_iter_default_attr(node)
+    assert attr is not None
+    assert ast.dump(attr) == ast.dump(
+        ast.parse("cblpytest.couchbase_servers", mode="eval").body
+    )
+
+
+@pytest.mark.parametrize(
+    "src",
+    [
+        "next(iter(cblpytest.couchbase_servers))",  # no default -- can raise StopIteration
+        "next(iter(x.y), None, extra)",  # wrong arg count to next()
+        "cblpytest.couchbase_servers[0]",  # not this shape at all
+        "next(iter(get_list()), None)",  # inner arg isn't an Attribute
+        "foo.next(iter(cblpytest.couchbase_servers), None)",  # next() is an attribute, not the builtin
+        "next(map(str, cblpytest.couchbase_servers), None)",  # not iter()
+        "next(iter(cblpytest.couchbase_servers, extra), None)",  # iter() takes 2 args
+    ],
+)
+def test_next_iter_default_attr_rejects_other_shapes(src: str) -> None:
+    node = ast.parse(src, mode="eval").body
+    assert ctm._next_iter_default_attr(node) is None
+
+
+def test_local_usage_exempts_the_safe_shape_but_not_bare_or_indexed_access() -> None:
+    src = """
+async def _initialize_database(self, cblpytest):
+    cbs = next(iter(cblpytest.couchbase_servers), None)
+    sg = cblpytest.sync_gateways[2]
+    for lb in cblpytest.load_balancers:
+        pass
+"""
+    func = ast.parse(src).body[0]
+    env = ctm._seed_type_env(func)
+    env["cblpytest"] = "CBLPyTest"
+    required, dynamic = ctm._local_usage(func, env)
+
+    assert "min_couchbase_servers" not in required
+    assert "min_couchbase_servers" not in dynamic
+    assert required.get("min_sync_gateways") == 3
+    assert "min_load_balancers" in dynamic
 
 
 def _iter_test_files():
