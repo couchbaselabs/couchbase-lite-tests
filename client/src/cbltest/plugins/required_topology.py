@@ -65,9 +65,7 @@ def pytest_runtest_setup(item: pytest.Item):
 
         minimum = mark.args[0]
         if len(value) < minimum:
-            cbl_info(
-                f"Test requires at least {minimum} {desc}, but only {len(value)} are available."
-            )
+            cbl_info(f"Test requires at least {minimum} {desc}, but only {len(value)} are available.")
             pytest.skip(f"Insufficient {desc}")
 
     check(min_test_servers_mark, config.test_servers, "Test Servers")

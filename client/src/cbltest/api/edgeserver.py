@@ -44,17 +44,13 @@ class EdgeServerVersion(CouchbaseVersion):
 
         version = input[0:first_lparen].strip()
         if not version:
-            cbl_warning(
-                f"Could not extract version from Edge Server version string: '{input}'"
-            )
+            cbl_warning(f"Could not extract version from Edge Server version string: '{input}'")
             version = "unknown"
 
         try:
             build = int(input[first_lparen + 1 : first_semicol])
         except ValueError:
-            cbl_warning(
-                f"Could not parse build number from Edge Server version string: '{input}'"
-            )
+            cbl_warning(f"Could not parse build number from Edge Server version string: '{input}'")
             build = 0
 
         return (version, build)
@@ -112,9 +108,7 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
-        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(
-            config_file
-        )
+        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__hostname: str = url
@@ -134,9 +128,7 @@ class EdgeServer:
             port,
             BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
         )
-        self.__shell_session: ClientSession = self._create_session(
-            "http://", url, 20001, None
-        )
+        self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
 
     @property
     def hostname(self) -> str:
@@ -165,9 +157,7 @@ class EdgeServer:
             enable_anonymous_users,
         )
 
-    def _create_session(
-        self, scheme: str, url: str, port: int, auth: BasicAuth | None
-    ) -> ClientSession:
+    def _create_session(self, scheme: str, url: str, port: int, auth: BasicAuth | None) -> ClientSession:
         if self.__secure:
             CERT_DIR = Path.home() / ".cbl_certs"
             ssl_context = ssl.create_default_context(cafile=CERT_DIR / "ca_cert.pem")
@@ -199,20 +189,12 @@ class EdgeServer:
             else:
                 session = self.__anonymous_session
 
-        with self.__tracer.start_as_current_span(
-            "send_request", attributes={"http.method": method, "http.path": path}
-        ):
-            headers = (
-                {"Content-Type": "application/json"} if payload is not None else None
-            )
+        with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
+            headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
-            writer.write_begin(
-                f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data
-            )
-            resp = await session.request(
-                method, path, data=data, headers=headers, params=params
-            )
+            writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
+            resp = await session.request(method, path, data=data, headers=headers, params=params)
 
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -233,9 +215,7 @@ class EdgeServer:
 
             return ret_val
 
-    def keyspace_builder(
-        self, db_name: str = "", scope: str = "", collection: str = ""
-    ):
+    def keyspace_builder(self, db_name: str = "", scope: str = "", collection: str = ""):
         keyspace = db_name
         if scope:
             keyspace += f".{scope}"
@@ -245,9 +225,7 @@ class EdgeServer:
 
     async def get_version(self) -> CouchbaseVersion:
         scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(
-            scheme, self.__hostname, self.__port, None
-        ) as s:
+        async with self._create_session(scheme, self.__hostname, self.__port, None) as s:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
@@ -255,9 +233,7 @@ class EdgeServer:
             if "/" in raw_version:
                 version_part = raw_version.rsplit("/", 1)[1]
             else:
-                cbl_warning(
-                    f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'"
-                )
+                cbl_warning(f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'")
                 version_part = raw_version
             return EdgeServerVersion(version_part)
 
@@ -295,9 +271,7 @@ class EdgeServer:
             if include_docs:
                 query_params.append("include_docs=true")
             request_url = f"?{'&'.join(query_params)}" if query_params else ""
-            resp = await self._send_request(
-                "get", f"/{keyspace}/_all_docs{request_url}"
-            )
+            resp = await self._send_request("get", f"/{keyspace}/_all_docs{request_url}")
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
@@ -350,18 +324,14 @@ class EdgeServer:
             qp = f"?rev={revid}" if revid else ""
             response = await self._send_request("get", f"/{keyspace}/{doc_id}{qp}")
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get /doc (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server get /doc (not JSON)")
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
                     return None
 
-                raise CblEdgeServerBadResponseError(
-                    500, f"Get doc from edge server had error '{cast_resp['reason']}'"
-                )
+                raise CblEdgeServerBadResponseError(500, f"Get doc from edge server had error '{cast_resp['reason']}'")
 
             return RemoteDocument(cast_resp)
 
@@ -408,9 +378,7 @@ class EdgeServer:
             keyspace = self.keyspace_builder(db_name, scope, collection)
             response = await self._send_request("get", f"/{keyspace}")
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get /  (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server get /  (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -474,13 +442,9 @@ class EdgeServer:
             if tls_client_cert_key:
                 payload["tls_client_cert_key"] = tls_client_cert_key
 
-            response = await self._send_request(
-                "post", "/_replicate", JSONDictionary(payload)
-            )
+            response = await self._send_request("post", "/_replicate", JSONDictionary(payload))
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server post /_replicate (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server post /_replicate (not JSON)")
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
@@ -497,9 +461,7 @@ class EdgeServer:
         ):
             response = await self._send_request("get", f"/_replicate/{replicator_id}")
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server get status  /_replicate (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server get status  /_replicate (not JSON)")
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
@@ -510,9 +472,7 @@ class EdgeServer:
             return cast_resp
 
     async def all_replication_status(self):
-        with self.__tracer.start_as_current_span(
-            "All Replication status with Edge Server"
-        ):
+        with self.__tracer.start_as_current_span("All Replication status with Edge Server"):
             response = await self._send_request("get", "/_replicate")
             if isinstance(response, list):
                 return response
@@ -531,14 +491,10 @@ class EdgeServer:
             "Stop Replication with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
         ):
-            response = await self._send_request(
-                "delete", f"/_replicate/{replicator_id}"
-            )
+            response = await self._send_request("delete", f"/_replicate/{replicator_id}")
 
             if response and not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server  stop  /_replicate (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server  stop  /_replicate (not JSON)")
 
             cast_resp = cast(dict, response) if response else {}
             if "error" in cast_resp:
@@ -590,14 +546,10 @@ class EdgeServer:
             }
             payload = {k: v for k, v in body.items() if v is not None}
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request(
-                "post", f"{keyspace}/_changes", payload=JSONDictionary(payload)
-            )
+            response = await self._send_request("post", f"{keyspace}/_changes", payload=JSONDictionary(payload))
 
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server post /_changes (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server post /_changes (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -627,9 +579,7 @@ class EdgeServer:
             if params:
                 for key, value in params.items():
                     payload[key] = value
-            response = await self._send_request(
-                "post", f"/{keyspace}/_query/{name}", payload=JSONDictionary(payload)
-            )
+            response = await self._send_request("post", f"/{keyspace}/_query/{name}", payload=JSONDictionary(payload))
 
             if isinstance(response, list):
                 return response
@@ -664,9 +614,7 @@ class EdgeServer:
             if params is not None:
                 payload["params"] = params
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request(
-                "post", f"/{keyspace}/_query", payload=JSONDictionary(payload)
-            )
+            response = await self._send_request("post", f"/{keyspace}/_query", payload=JSONDictionary(payload))
 
             if isinstance(response, list):
                 return response
@@ -706,14 +654,10 @@ class EdgeServer:
                 params.append(f"ttl={ttl}")
             qp = "?" + "&".join(params) if params else ""
 
-            response = await self._send_request(
-                "post", f"/{keyspace}/{qp}", payload=JSONDictionary(document)
-            )
+            response = await self._send_request("post", f"/{keyspace}/{qp}", payload=JSONDictionary(document))
 
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server add doc auto ID (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server add doc auto ID (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -756,14 +700,10 @@ class EdgeServer:
 
             qp = "?" + "&".join(params) if params else ""
 
-            response = await self._send_request(
-                "put", f"/{keyspace}/{id}{qp}", payload=JSONDictionary(document)
-            )
+            response = await self._send_request("put", f"/{keyspace}/{id}{qp}", payload=JSONDictionary(document))
 
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server add doc (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server add doc (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -791,14 +731,10 @@ class EdgeServer:
         ):
             # Perform the DELETE request to the edge server
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            response = await self._send_request(
-                "delete", f"{keyspace}/{id}/{key}?rev={revid}"
-            )
+            response = await self._send_request("delete", f"{keyspace}/{id}/{key}?rev={revid}")
 
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server delete sub-document (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server delete sub-document (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -833,9 +769,7 @@ class EdgeServer:
             )
 
             if not isinstance(response, dict):
-                raise ValueError(
-                    "Inappropriate response from edge server put sub-document (not JSON)"
-                )
+                raise ValueError("Inappropriate response from edge server put sub-document (not JSON)")
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
@@ -844,9 +778,7 @@ class EdgeServer:
                 )
             return cast_resp
 
-    async def get_sub_document(
-        self, id: str, key: str, db_name: str, scope: str = "", collection: str = ""
-    ):
+    async def get_sub_document(self, id: str, key: str, db_name: str, scope: str = "", collection: str = ""):
         with self.__tracer.start_as_current_span(
             "get sub-document",
             attributes={
@@ -887,9 +819,7 @@ class EdgeServer:
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
             body = {"docs": [u.body for u in docs], "new_edits": new_edits}
-            resp = await self._send_request(
-                "post", f"/{keyspace}/_bulk_docs", JSONDictionary(body)
-            )
+            resp = await self._send_request("post", f"/{keyspace}/_bulk_docs", JSONDictionary(body))
 
             if isinstance(resp, dict):
                 cast_resp = cast(dict, resp)
@@ -916,9 +846,7 @@ class EdgeServer:
 
     async def kill_server(self):
         with self.__tracer.start_as_current_span("kill edge server"):
-            await self._send_request(
-                "post", "/kill-edgeserver", session=self.__shell_session
-            )
+            await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
 
     async def _caddy_http_request(
         self,
@@ -939,9 +867,7 @@ class EdgeServer:
                         raise FileNotFoundError(f"{operation} not found at {url}")
                     if response.status != 200:
                         error_text = await response.text()
-                        raise Exception(
-                            f"{operation} failed: HTTP {response.status} - {error_text}"
-                        )
+                        raise Exception(f"{operation} failed: HTTP {response.status} - {error_text}")
                     return await response.read()
             except ClientError as e:
                 raise Exception(f"Network error during {operation}: {e}") from e
@@ -962,15 +888,9 @@ class EdgeServer:
         ):
             try:
                 prefix = "/home/ec2-user/"
-                path = (
-                    log_file[len(prefix) :].lstrip("/")
-                    if log_file.startswith(prefix)
-                    else log_file.lstrip("/")
-                )
+                path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
                 caddy_url = f"http://{self.hostname}:20000/{path}"
-                content = await self._caddy_http_request(
-                    caddy_url, f"Fetch {path}", timeout=30
-                )
+                content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
                 return content.decode("utf-8")
             except Exception:
                 return ""
@@ -1075,9 +995,7 @@ class EdgeServer:
         while not is_idle and retry > 0:
             status = await self.all_replication_status()
             if len(status) != 0:
-                assert "error" not in status[replicator_key], (
-                    f"Replication setup failure: {status}"
-                )
+                assert "error" not in status[replicator_key], f"Replication setup failure: {status}"
                 if status[replicator_key]["status"] == "Idle":
                     is_idle = True
                 else:

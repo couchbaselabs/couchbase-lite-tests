@@ -25,9 +25,7 @@ class TestFest(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "todo")
 
         for user, user_roles in roles.items():
-            self.mark_test_step(
-                f"Assign roles '{', '.join(user_roles)}' to the user '{user}'"
-            )
+            self.mark_test_step(f"Assign roles '{', '.join(user_roles)}' to the user '{user}'")
             for role in user_roles:
                 await sync_gateway.add_role(
                     "todo",
@@ -46,9 +44,7 @@ class TestFest(CBLTestClass):
 
     async def setup_test_fest_dbs(self, cblpytest: CBLPyTest) -> list[Database]:
         self.mark_test_step("Reset local databases load them with the todo dataset")
-        return await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1", "db2"], dataset="todo"
-        )
+        return await cblpytest.test_servers[0].create_and_reset_db(["db1", "db2"], dataset="todo")
 
     async def setup_test_fest_repls(
         self,
@@ -72,11 +68,7 @@ class TestFest(CBLTestClass):
             sync_gateway.replication_url("todo"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["_default.lists", "_default.tasks", "_default.users"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
             authenticator=ReplicatorBasicAuthenticator(users[0], "pass"),
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
@@ -97,11 +89,7 @@ class TestFest(CBLTestClass):
             sync_gateway.replication_url("todo"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
-            collections=[
-                ReplicatorCollectionEntry(
-                    ["_default.lists", "_default.tasks", "_default.users"]
-                )
-            ],
+            collections=[ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
             authenticator=ReplicatorBasicAuthenticator(users[1], "pass"),
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
@@ -219,9 +207,7 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Verify that the new docs are in db1")
         snapshot_updater = SnapshotUpdater(snap1)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db2-list1", [{"name": "db2 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db2-list1", [{"name": "db2 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db2-list1-task1",
@@ -233,15 +219,11 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "l2.jpg"},
         )
         verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
         self.mark_test_step("Verify that the new docs are in db2")
         snapshot_updater = SnapshotUpdater(snap2)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -253,22 +235,16 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "l1.jpg"},
         )
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cblpytest.simple_cloud(), (db1, db2)
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest.simple_cloud(), (db1, db2))
 
         self.mark_test_step("Snapshot db2")
         snap2 = await db2.create_snapshot(
@@ -345,9 +321,7 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Verify that the new docs are in db2")
         snapshot_updater = SnapshotUpdater(snap2)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -359,9 +333,7 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "l5.jpg"},
         )
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         self.mark_test_step("Update the db1-list1-task1 task in db2")
         async with db2.batch_updater() as b:
@@ -399,9 +371,7 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Verify that the doc has been updated in db1")
         snapshot_updater = SnapshotUpdater(snap1)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -409,18 +379,14 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "l10.jpg"},
         )
         verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
 
@@ -513,34 +479,24 @@ class TestFest(CBLTestClass):
             }
         )
 
-        self.mark_test_step(
-            "Verify that _default.tasks.db1-list1-task1 was deleted from db1"
-        )
+        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db1")
         snapshot_updater = SnapshotUpdater(snap1)
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
-        self.mark_test_step(
-            "Verify that _default.tasks.db1-list1-task1 was deleted from db2"
-        )
+        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
 
@@ -671,36 +627,26 @@ class TestFest(CBLTestClass):
             }
         )
 
-        self.mark_test_step(
-            "Verify that _default.tasks.db1-list1-task1 was deleted from db1"
-        )
+        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db1")
         snapshot_updater = SnapshotUpdater(snap1)
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
         verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
-        self.mark_test_step(
-            "Verify that _default.tasks.db1-list1-task1 was deleted from db2"
-        )
+        self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def _test_create_tasks_two_users(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def _test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
         await self.setup_test_fest_cloud(
             cloud,
@@ -711,9 +657,7 @@ class TestFest(CBLTestClass):
             },
         )
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cloud, (db1, db2), ("user1", "user2")
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
@@ -775,14 +719,10 @@ class TestFest(CBLTestClass):
         await repl1.start()
         await repl2.start()
 
-        self.mark_test_step(
-            "Verify that there are no document replication events in db1, for 10 seconds"
-        )
+        self.mark_test_step("Verify that there are no document replication events in db1, for 10 seconds")
         found = await repl1.wait_for_any_doc_event(
             {
-                WaitForDocumentEventEntry(
-                    "_default.lists", "db2-list1", ReplicatorType.PUSH_AND_PULL, None
-                ),
+                WaitForDocumentEventEntry("_default.lists", "db2-list1", ReplicatorType.PUSH_AND_PULL, None),
                 WaitForDocumentEventEntry(
                     "_default.tasks",
                     "db2-list1-task1",
@@ -797,14 +737,10 @@ class TestFest(CBLTestClass):
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
-        self.mark_test_step(
-            "Verify that there are no document replication events in db2, for 10 seconds"
-        )
+        self.mark_test_step("Verify that there are no document replication events in db2, for 10 seconds")
         found = await repl2.wait_for_any_doc_event(
             {
-                WaitForDocumentEventEntry(
-                    "_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None
-                ),
+                WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None),
                 WaitForDocumentEventEntry(
                     "_default.tasks",
                     "db1-list1-task1",
@@ -821,28 +757,20 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Verify that db1 has not changed")
         verify_result = await db1.verify_documents(SnapshotUpdater(snap1))
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
         self.mark_test_step("Verify that db2 has not changed")
         verify_result = await db2.verify_documents(SnapshotUpdater(snap2))
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_share_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cloud, (db1, db2), ("user1", "user2")
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap = await db2.create_snapshot(
@@ -885,14 +813,10 @@ class TestFest(CBLTestClass):
                 ],
             )
 
-        self.mark_test_step(
-            "Verify that there are no document replication events in db2, for 10 seconds"
-        )
+        self.mark_test_step("Verify that there are no document replication events in db2, for 10 seconds")
         found = await repl2.wait_for_any_doc_event(
             {
-                WaitForDocumentEventEntry(
-                    "_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None
-                ),
+                WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None),
                 WaitForDocumentEventEntry(
                     "_default.tasks",
                     "db1-list1-task1",
@@ -915,13 +839,9 @@ class TestFest(CBLTestClass):
 
         self.mark_test_step("Verify that there are no new documents in db2")
         verify_result = await db2.verify_documents(SnapshotUpdater(snap))
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
-        self.mark_test_step(
-            "Create a user document to share the _default.lists.db1-list1 from db1"
-        )
+        self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")
         async with db1.batch_updater() as b:
             b.upsert_document(
                 "_default.users",
@@ -932,9 +852,7 @@ class TestFest(CBLTestClass):
                 ],
             )
 
-        self.mark_test_step(
-            "Wait for the the newly visible documents to be pulled to db2"
-        )
+        self.mark_test_step("Wait for the the newly visible documents to be pulled to db2")
         await repl2.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -962,9 +880,7 @@ class TestFest(CBLTestClass):
             "Verify snapshot that the new docs are in db2 and that _default.users.db1-list1-user2 is not"
         )
         snapshot_updater = SnapshotUpdater(snap)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -985,24 +901,16 @@ class TestFest(CBLTestClass):
             ],
         )
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_update_shared_tasks(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_update_shared_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cloud, (db1, db2), ("user1", "user2")
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot(
@@ -1054,14 +962,10 @@ class TestFest(CBLTestClass):
         await repl1.start()
         await repl2.start()
 
-        self.mark_test_step(
-            "Verify that there are no document replication events in db2, for 10 seconds"
-        )
+        self.mark_test_step("Verify that there are no document replication events in db2, for 10 seconds")
         found = await repl2.wait_for_any_doc_event(
             {
-                WaitForDocumentEventEntry(
-                    "_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None
-                ),
+                WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None),
                 WaitForDocumentEventEntry(
                     "_default.tasks",
                     "db1-list1-task1",
@@ -1082,9 +986,7 @@ class TestFest(CBLTestClass):
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
-        self.mark_test_step(
-            "Create a user document to share the _default.lists.db1-list1 from db1"
-        )
+        self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")
         async with db1.batch_updater() as b:
             b.upsert_document(
                 "_default.users",
@@ -1123,9 +1025,7 @@ class TestFest(CBLTestClass):
             "Verify that the newly visible docs are in db2 and that _default.users.db1-list1-user2 is not"
         )
         snapshot_updater = SnapshotUpdater(snap2)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -1147,13 +1047,9 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "s1.jpg"},
         )
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
-        self.mark_test_step(
-            "Update _default.tasks.db1-list1-task1 and delete db1-list1-task2 in db2"
-        )
+        self.mark_test_step("Update _default.tasks.db1-list1-task1 and delete db1-list1-task2 in db2")
         async with db2.batch_updater() as b:
             b.upsert_document(
                 "_default.tasks",
@@ -1194,22 +1090,16 @@ class TestFest(CBLTestClass):
         )
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
         verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db1: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_unshare_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.simple_cloud()
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cloud, (db1, db2), ("user1", "user2")
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot(
@@ -1253,14 +1143,10 @@ class TestFest(CBLTestClass):
                 new_blobs={"image": "s1.jpg"},
             )
 
-        self.mark_test_step(
-            "Verify that there are no document replication events in db1, for 10 seconds"
-        )
+        self.mark_test_step("Verify that there are no document replication events in db1, for 10 seconds")
         found = await repl2.wait_for_any_doc_event(
             {
-                WaitForDocumentEventEntry(
-                    "_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None
-                ),
+                WaitForDocumentEventEntry("_default.lists", "db1-list1", ReplicatorType.PUSH_AND_PULL, None),
                 WaitForDocumentEventEntry(
                     "_default.tasks",
                     "db1-list1-task1",
@@ -1281,9 +1167,7 @@ class TestFest(CBLTestClass):
             "{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
-        self.mark_test_step(
-            "Create a user document to share the _default.lists.db1-list1 from db1"
-        )
+        self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")
         async with db1.batch_updater() as b:
             b.upsert_document(
                 "_default.users",
@@ -1322,9 +1206,7 @@ class TestFest(CBLTestClass):
             "Verify that the newly visible docs are in db2 and that _default.users.db1-list1-user2 is not"
         )
         snapshot_updater = SnapshotUpdater(snap2)
-        snapshot_updater.upsert_document(
-            "_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}]
-        )
+        snapshot_updater.upsert_document("_default.lists", "db1-list1", [{"name": "db1 list1"}, {"owner": "user1"}])
         snapshot_updater.upsert_document(
             "_default.tasks",
             "db1-list1-task1",
@@ -1346,13 +1228,9 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "s1.jpg"},
         )
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
-        self.mark_test_step(
-            "Unshare the db1-list1 list by deleting _default.users.db1-list1-user2 from db1"
-        )
+        self.mark_test_step("Unshare the db1-list1 list by deleting _default.users.db1-list1-user2 from db1")
         async with db1.batch_updater() as b:
             b.delete_document("_default.users", "db1-list1-user2")
 
@@ -1368,9 +1246,7 @@ class TestFest(CBLTestClass):
             }
         )
 
-        self.mark_test_step(
-            "Wait for the newly invisible documents to be removed from db2"
-        )
+        self.mark_test_step("Wait for the newly invisible documents to be removed from db2")
         await repl2.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -1394,16 +1270,12 @@ class TestFest(CBLTestClass):
             }
         )
 
-        self.mark_test_step(
-            "Verify that the shared list and its tasks do not exist in db2"
-        )
+        self.mark_test_step("Verify that the shared list and its tasks do not exist in db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.purge_document("_default.lists", "db1-list1")
         snapshot_updater.purge_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.purge_document("_default.tasks", "db1-list1-task2")
         verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"Unexpected docs in db2: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()

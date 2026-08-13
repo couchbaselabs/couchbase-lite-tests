@@ -9,9 +9,7 @@ class OutputType(Enum):
     JSON = "json"
 
 
-def get_terraform_output(
-    directory: str, *, name: str | None = None, type: OutputType | None = None
-) -> str:
+def get_terraform_output(directory: str, *, name: str | None = None, type: OutputType | None = None) -> str:
     """
     Get the output value from Terraform state.
 

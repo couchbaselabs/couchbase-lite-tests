@@ -88,9 +88,7 @@ def create_cert(
     )
 
     if is_ca:
-        builder = builder.add_extension(
-            BasicConstraints(ca=True, path_length=None), critical=True
-        )
+        builder = builder.add_extension(BasicConstraints(ca=True, path_length=None), critical=True)
 
     if usages:
         builder = builder.add_extension(ExtendedKeyUsage(list(usages)), critical=False)

@@ -24,24 +24,16 @@ from cbltest.utils import assert_not_null
 class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_non_blob_changes_with_delta_sync_and_compact(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        await self.skip_if_not_platform(
-            cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS
-        )
+    async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled."
-        )
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step(
@@ -111,9 +103,7 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await sync_gateway.update_documents(
-            "travel", hotels_updates, "travel", "hotels"
-        )
+        await sync_gateway.update_documents("travel", hotels_updates, "travel", "hotels")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
@@ -133,9 +123,7 @@ class TestReplicationBlob(CBLTestClass):
             ["travel.hotels"],
         )
 
-        self.mark_test_step(
-            "Update hotel_1 on SG again without changing the image key."
-        )
+        self.mark_test_step("Update hotel_1 on SG again without changing the image key.")
         hotel_1 = assert_not_null(
             await sync_gateway.get_document("travel", "hotel_1", "travel", "hotels"),
             "hotel_1 vanished from SGW",
@@ -166,14 +154,10 @@ class TestReplicationBlob(CBLTestClass):
                 },
             )
         )
-        await sync_gateway.update_documents(
-            "travel", hotels_updates, "travel", "hotels"
-        )
+        await sync_gateway.update_documents("travel", hotels_updates, "travel", "hotels")
 
         self.mark_test_step("Snapshot document hotel_1.")
-        snapshot_id = await db.create_snapshot(
-            [DocumentEntry("travel.hotels", "hotel_1")]
-        )
+        snapshot_id = await db.create_snapshot([DocumentEntry("travel.hotels", "hotel_1")])
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
@@ -198,13 +182,9 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Verify updates to the snapshot from the step 11.")
         snapshot_updater = SnapshotUpdater(snapshot_id)
-        snapshot_updater.upsert_document(
-            "travel.hotels", "hotel_1", removed_properties=["description"]
-        )
+        snapshot_updater.upsert_document("travel.hotels", "hotel_1", removed_properties=["description"])
         verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, (
-            f"The verification failed: {verify_result.description}"
-        )
+        assert verify_result.result is True, f"The verification failed: {verify_result.description}"
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -219,13 +199,9 @@ class TestReplicationBlob(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
-        self.mark_test_step(
-            "Create a document with a blob on the property `watermelon` with the contents of s10.jpg"
-        )
+        self.mark_test_step("Create a document with a blob on the property `watermelon` with the contents of s10.jpg")
         async with db.batch_updater() as b:
-            b.upsert_document(
-                "_default._default", "fruits", new_blobs={"watermelon": "s10.jpg"}
-            )
+            b.upsert_document("_default._default", "fruits", new_blobs={"watermelon": "s10.jpg"})
 
         self.mark_test_step("""
             Start a replicator:
@@ -251,9 +227,7 @@ class TestReplicationBlob(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step(
-            "Check that the document with the ID from step 3 contains a valid `watermelon` property"
-        )
+        self.mark_test_step("Check that the document with the ID from step 3 contains a valid `watermelon` property")
         remote_doc = await sync_gateway.get_document("names", "fruits")
         assert remote_doc is not None, "Document `fruits` not found in SGW"
 
@@ -263,25 +237,17 @@ class TestReplicationBlob(CBLTestClass):
                 f"Property `{prop}` is incorrect (expected: {expected_value}, actual: {d[prop]})"
             )
 
-        assert "watermelon" in remote_doc.body, (
-            "Property `watermelon` not found in the document"
-        )
+        assert "watermelon" in remote_doc.body, "Property `watermelon` not found in the document"
         check_blob_prop(remote_doc.body["watermelon"], "@type", "blob")
         check_blob_prop(remote_doc.body["watermelon"], "content_type", "image/jpeg")
-        check_blob_prop(
-            remote_doc.body["watermelon"], "digest", "sha1-8ArxA/yauDMWJrQsvVSzo8RKhtk="
-        )
+        check_blob_prop(remote_doc.body["watermelon"], "digest", "sha1-8ArxA/yauDMWJrQsvVSzo8RKhtk=")
         check_blob_prop(remote_doc.body["watermelon"], "length", 199095)
 
         self.mark_test_step(
             "Check that the blob in the `watermelon` property has a corresponding attachment entry in SGW"
         )
-        assert "_attachments" in remote_doc.body, (
-            "Property `_attachments` not found in the document"
-        )
-        assert isinstance(remote_doc.body["_attachments"], dict), (
-            "Property `_attachments` is not a dictionary"
-        )
+        assert "_attachments" in remote_doc.body, "Property `_attachments` not found in the document"
+        assert isinstance(remote_doc.body["_attachments"], dict), "Property `_attachments` is not a dictionary"
         assert "blob_/watermelon" in remote_doc.body["_attachments"], (
             "Attachment `blob_/watermelon` not found in the document"
         )
@@ -298,12 +264,6 @@ class TestReplicationBlob(CBLTestClass):
             "digest",
             "sha1-8ArxA/yauDMWJrQsvVSzo8RKhtk=",
         )
-        check_blob_prop(
-            remote_doc.body["_attachments"]["blob_/watermelon"], "length", 199095
-        )
-        check_blob_prop(
-            remote_doc.body["_attachments"]["blob_/watermelon"], "revpos", 1
-        )
-        check_blob_prop(
-            remote_doc.body["_attachments"]["blob_/watermelon"], "stub", True
-        )
+        check_blob_prop(remote_doc.body["_attachments"]["blob_/watermelon"], "length", 199095)
+        check_blob_prop(remote_doc.body["_attachments"]["blob_/watermelon"], "revpos", 1)
+        check_blob_prop(remote_doc.body["_attachments"]["blob_/watermelon"], "stub", True)

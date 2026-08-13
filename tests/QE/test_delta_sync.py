@@ -25,20 +25,14 @@ from cbltest.api.test_functions import compare_local_and_remote
 @pytest.mark.min_sync_gateways(1)
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_replication(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled"
-        )
+    async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -83,9 +77,7 @@ class TestDeltaSync(CBLTestClass):
         read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -126,17 +118,13 @@ class TestDeltaSync(CBLTestClass):
         read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
-        updated_cbl_doc = await db.get_document(
-            DocumentEntry("travel.hotels", "hotel_400")
-        )
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
         assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
         assert updated_cbl_doc.body.get("name") == "Updated Hotel", (
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
         )
 
-        self.mark_test_step(
-            "Verify delta sync worked - bytes transferred should be much smaller than full document"
-        )
+        self.mark_test_step("Verify delta sync worked - bytes transferred should be much smaller than full document")
         delta_bytes = read_pull_bytes_after - read_pull_bytes_before
         assert delta_bytes < original_doc_size, (
             f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (original doc size: {original_doc_size})"
@@ -145,20 +133,14 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_nested_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled"
-        )
+    async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -203,9 +185,7 @@ class TestDeltaSync(CBLTestClass):
         read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -243,26 +223,20 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
-        updated_cbl_doc = await db.get_document(
-            DocumentEntry("travel.hotels", "hotel_400")
-        )
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
         assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
         assert updated_cbl_doc.body.get("name") == "SGW", (
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
         )
         nested_data = updated_cbl_doc.body.get("nested")
-        assert (
-            nested_data is not None and nested_data.get("name") == "I am a nested field"
-        ), (
+        assert nested_data is not None and nested_data.get("name") == "I am a nested field", (
             f"Expected updated nested field, got: {nested_data.get('name') if nested_data else None}"
         )
 
         self.mark_test_step("Record the bytes transferred")
         read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
 
-        self.mark_test_step(
-            "Verify delta sync bytes transferred is less than doc size."
-        )
+        self.mark_test_step("Verify delta sync bytes transferred is less than doc size.")
         delta_bytes = read_pull_bytes_after - read_pull_bytes_before
         assert delta_bytes < original_doc_size, (
             f"Expected delta to be less than the full doc size, but got {delta_bytes} bytes (original doc size: {original_doc_size})"
@@ -271,20 +245,14 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_utf8_strings(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled"
-        )
+    async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -329,9 +297,7 @@ class TestDeltaSync(CBLTestClass):
         bytes_pull_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -370,9 +336,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
-        updated_cbl_doc = await db.get_document(
-            DocumentEntry("travel.hotels", "hotel_400")
-        )
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
         assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
         assert updated_cbl_doc.body.get("utf8") == utf8_body, (
             f"Expected updated UTF-8 content, got: {updated_cbl_doc.body.get('utf8')}"
@@ -381,9 +345,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Record the bytes transferred again this time.")
         bytes_pull_after, _ = await sync_gateway.bytes_transferred("travel")
 
-        self.mark_test_step(
-            "Verify only delta is updated while replicating UTF-8 content."
-        )
+        self.mark_test_step("Verify only delta is updated while replicating UTF-8 content.")
         delta_bytes_transferred = bytes_pull_after - bytes_pull_before
         assert delta_bytes_transferred < original_doc_size, (
             f"Expected delta to be less than the full doc size, but got {delta_bytes_transferred} bytes (original doc size: {original_doc_size})"
@@ -392,20 +354,14 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_enabled_disabled(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled"
-        )
+    async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -450,9 +406,7 @@ class TestDeltaSync(CBLTestClass):
         bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -460,9 +414,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify only the key `name`: `SGW`.
         """)
-        updates = [
-            DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": "SGW"})
-        ]
+        updates = [DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": "SGW"})]
         await sync_gateway.update_documents("travel", updates, "travel", "hotels")
 
         self.mark_test_step("Start the same replicator again.")
@@ -486,9 +438,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
-        updated_cbl_doc = await db.get_document(
-            DocumentEntry("travel.hotels", "hotel_400")
-        )
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
         assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
         assert updated_cbl_doc.body.get("name") == "SGW", (
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
@@ -503,17 +453,11 @@ class TestDeltaSync(CBLTestClass):
             f"Expected delta to be less than the full doc size, but got {delta_bytes_transferred} bytes (original doc size: {original_doc_size})"
         )
 
-        self.mark_test_step(
-            "Reset SG and load `posts` dataset with delta sync disabled"
-        )
+        self.mark_test_step("Reset SG and load `posts` dataset with delta sync disabled")
         await cloud.configure_dataset(dataset_path, "posts")
 
-        self.mark_test_step(
-            "Reset local database, and load `posts` dataset without delta sync."
-        )
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="posts"
-        )
+        self.mark_test_step("Reset local database, and load `posts` dataset without delta sync.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -554,9 +498,7 @@ class TestDeltaSync(CBLTestClass):
         bytes_read_before, _ = await sync_gateway.bytes_transferred("posts")
 
         self.mark_test_step("Get existing document size for comparison")
-        original_doc = await sync_gateway.get_document(
-            "posts", "post_1", collection="posts"
-        )
+        original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
         assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("""
@@ -596,9 +538,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
-        updated_cbl_doc = await db.get_document(
-            DocumentEntry("_default.posts", "post_1")
-        )
+        updated_cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1"))
         assert updated_cbl_doc is not None, "post_1 should exist in CBL"
         assert updated_cbl_doc.body.get("name") == "SGW", (
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
@@ -607,9 +547,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Record the bytes transferred")
         bytes_read_after, _ = await sync_gateway.bytes_transferred("posts")
 
-        self.mark_test_step(
-            "Verify delta transferred equivalent to doc size (full doc transfer)."
-        )
+        self.mark_test_step("Verify delta transferred equivalent to doc size (full doc transfer).")
         updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
         delta_bytes_transferred = bytes_read_after - bytes_read_before
         assert delta_bytes_transferred >= 0.8 * updated_doc_size, (
@@ -619,9 +557,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_within_expiry(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
@@ -639,9 +575,7 @@ class TestDeltaSync(CBLTestClass):
         )
         delta_sync_config = db_config.delta_sync
         assert delta_sync_config is not None
-        assert delta_sync_config.enabled is True, (
-            f"Expected delta sync to be enabled, got {delta_sync_config.enabled}"
-        )
+        assert delta_sync_config.enabled is True, f"Expected delta sync to be enabled, got {delta_sync_config.enabled}"
         assert delta_sync_config.rev_max_age_seconds == 10, (
             f"Expected rev_max_age_seconds to be 10, got {delta_sync_config.rev_max_age_seconds}"
         )
@@ -689,30 +623,20 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Record the bytes transferred.")
         read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("short_expiry")
 
-        self.mark_test_step(
-            "Get the current document state and revision before update."
-        )
+        self.mark_test_step("Get the current document state and revision before update.")
         sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
         assert sgw_doc_before_update is not None, "Document should exist in SGW"
-        assert sgw_doc_before_update.body.get("type") == "test", (
-            "Expected doc to have `type` as `test`"
-        )
+        assert sgw_doc_before_update.body.get("type") == "test", "Expected doc to have `type` as `test`"
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
 
-        self.mark_test_step(
-            "Verify old revision body is accessible before expiry through public API."
-        )
+        self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
         old_rev_doc = await sync_gateway.get_document_revision_public(
             "short_expiry", "doc1", old_revision, BasicAuth("user1", "pass", "ascii")
         )
 
-        assert old_rev_doc is not None, (
-            "Should be able to fetch old revision before expiry"
-        )
-        assert old_rev_doc.get("type") == "test", (
-            "Old revision should have correct content"
-        )
+        assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
+        assert old_rev_doc.get("type") == "test", "Old revision should have correct content"
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -744,9 +668,7 @@ class TestDeltaSync(CBLTestClass):
                 f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
             )
         except Exception as e:
-            assert "404" in str(e) or "not found" in str(e).lower(), (
-                f"Expected 404 error, got: {e}"
-            )
+            assert "404" in str(e) or "not found" in str(e).lower(), f"Expected 404 error, got: {e}"
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()
@@ -777,20 +699,14 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_with_no_deltas(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled."
-        )
+    async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -830,9 +746,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Update the same hotel document with identical content (no real change)
         """)
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document hotel_400 should exist"
         await sync_gateway.update_documents(
             "travel",
@@ -865,20 +779,14 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_larger_than_doc(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled."
-        )
+    async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.simple_cloud()
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
 
         self.mark_test_step("Reset local database, and load `travel` dataset.")
-        dbs = await cblpytest.test_servers[0].create_and_reset_db(
-            ["db1"], dataset="travel"
-        )
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
         self.mark_test_step("""
@@ -911,9 +819,7 @@ class TestDeltaSync(CBLTestClass):
         assert len(lite_all_docs["travel.hotels"]) == 700, (
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
-        original_doc = await sync_gateway.get_document(
-            "travel", "hotel_400", "travel", "hotels"
-        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("Get delta stats.")
@@ -926,11 +832,7 @@ class TestDeltaSync(CBLTestClass):
         large_doc_body = "X" * 2_000_000
         await sync_gateway.update_documents(
             "travel",
-            [
-                DocumentUpdateEntry(
-                    "hotel_400", original_doc.revid, {"name": large_doc_body}
-                )
-            ],
+            [DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": large_doc_body})],
             "travel",
             "hotels",
         )
@@ -961,9 +863,7 @@ class TestDeltaSync(CBLTestClass):
         self.mark_test_step("Verify document is replicated correctly.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
         assert cbl_doc is not None, "Document should exist in CBL"
-        assert cbl_doc.body.get("name") == large_doc_body, (
-            "Expected doc to have same content"
-        )
+        assert cbl_doc.body.get("name") == large_doc_body, "Expected doc to have same content"
 
         self.mark_test_step("Verify full doc is transferred.")
         large_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))

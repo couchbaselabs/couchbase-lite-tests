@@ -26,6 +26,7 @@ lint.ignore = [
     "B023",     # TODO: B023 (function-uses-loop-loopvar) - will fix later
     "LOG015",   # TODO: LOG015 (root-logger-calls) - will fix later
 ]
+line-length = 120
 target-version = "py310"
 exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 

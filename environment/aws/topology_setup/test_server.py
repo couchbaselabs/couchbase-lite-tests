@@ -127,9 +127,7 @@ class TestServer(ABC):
         if version in self.__build_no_cache[self.product]:
             build_no = self.__build_no_cache[self.product][version]
             if build_no == "0":
-                click.secho(
-                    f"Version {version} is a release version [CACHED]", fg="blue"
-                )
+                click.secho(f"Version {version} is a release version [CACHED]", fg="blue")
                 return version
 
             click.secho(f"Found latest good build: {build_no} [CACHED]", fg="blue")
@@ -163,14 +161,8 @@ class TestServer(ABC):
 
         platforms_path = SCRIPT_DIR / "test_server_platforms"
         for platform in platforms_path.iterdir():
-            if (
-                platform.is_file()
-                and platform.stem.endswith("_register")
-                and platform.suffix == ".py"
-            ):
-                importlib.import_module(
-                    f"environment.aws.topology_setup.test_server_platforms.{platform.stem}"
-                )
+            if platform.is_file() and platform.stem.endswith("_register") and platform.suffix == ".py":
+                importlib.import_module(f"environment.aws.topology_setup.test_server_platforms.{platform.stem}")
 
     @classmethod
     def register(cls, name: str) -> Callable[[type[TestServer]], type[TestServer]]:
@@ -209,9 +201,7 @@ class TestServer(ABC):
         cls.initialize()
 
         if name not in cls.__registry:
-            raise ValueError(
-                f"Unknown test server type: {name}. Valid names {cls.__registry.keys()}"
-            )
+            raise ValueError(f"Unknown test server type: {name}. Valid names {cls.__registry.keys()}")
 
         return cls.__registry[name](version)
 

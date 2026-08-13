@@ -87,9 +87,7 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
     return CertKeyPair(ca_certificate, private_key)
 
 
-def create_leaf_certificate(
-    CN: str, *, issuer_data: CertKeyPair | None = None
-) -> CertKeyPair:
+def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) -> CertKeyPair:
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
@@ -109,9 +107,7 @@ def create_leaf_certificate(
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
         .add_extension(
-            ExtendedKeyUsage(
-                [ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]
-            ),
+            ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]),
             critical=False,
         )
         .sign(signing_key, hashes.SHA256())

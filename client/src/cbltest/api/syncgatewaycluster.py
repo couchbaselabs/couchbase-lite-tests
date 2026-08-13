@@ -28,9 +28,7 @@ class SyncGatewayCluster:
         order across successive accesses.
         """
         node = self.__sync_gateways[self.__round_robin_index]
-        self.__round_robin_index = (self.__round_robin_index + 1) % len(
-            self.__sync_gateways
-        )
+        self.__round_robin_index = (self.__round_robin_index + 1) % len(self.__sync_gateways)
         return node
 
     @property
@@ -54,9 +52,7 @@ class SyncGatewayCluster:
         """
         await asyncio.gather(
             *(
-                sg._wait_for_db_online(
-                    db_name, max_retries=max_retries, retry_delay=retry_delay
-                )
+                sg._wait_for_db_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
                 for sg in self.__sync_gateways
             )
         )
@@ -77,9 +73,7 @@ class SyncGatewayCluster:
         """
         await asyncio.gather(
             *(
-                sg._wait_for_db_gone(
-                    db_name, max_retries=max_retries, retry_delay=retry_delay
-                )
+                sg._wait_for_db_gone(db_name, max_retries=max_retries, retry_delay=retry_delay)
                 for sg in self.__sync_gateways
             )
         )
@@ -91,6 +85,4 @@ class SyncGatewayCluster:
 
         :param bucket_name: Bucket name to check for.
         """
-        await asyncio.gather(
-            *(sg._wait_for_no_databases(bucket_name) for sg in self.__sync_gateways)
-        )
+        await asyncio.gather(*(sg._wait_for_no_databases(bucket_name) for sg in self.__sync_gateways))

@@ -27,11 +27,7 @@ class MultipeerTransportType(Flag):
     def to_json(self) -> list[str]:
         cls = type(self)
         # only single-bit members, and only those present in self
-        return [
-            cast(str, m.name)
-            for m in cls
-            if m.value != 0 and (m.value & (m.value - 1)) == 0 and (self & m) == m
-        ]
+        return [cast(str, m.name) for m in cls if m.value != 0 and (m.value & (m.value - 1)) == 0 and (self & m) == m]
 
 
 class MultipeerReplicatorAuthenticator(JSONSerializable):

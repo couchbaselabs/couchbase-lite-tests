@@ -122,9 +122,7 @@ class DotnetTestServer(TestServer):
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
-        csproj_path = (
-            DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
-        )
+        csproj_path = DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
         header(f"Modifying Couchbase Lite version to {cbl_version}")
         subprocess.run(
             [
@@ -195,9 +193,7 @@ class DotnetTestServerCli(TestServer):
         version_parts = self.version.split("-")
         build = version_parts[1]
         cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
-        csproj_path = (
-            DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
-        )
+        csproj_path = DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
         header(f"Modifying Couchbase Lite version to {cbl_version}")
         subprocess.run(
             [
@@ -214,9 +210,7 @@ class DotnetTestServerCli(TestServer):
             env=env,
         )
 
-        csproj_path = (
-            DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
-        )
+        csproj_path = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "testserver.cli.csproj"
         header(f"Building .NET test server for {self.platform}")
         args: list[str] = [
             dotnet,
@@ -304,9 +298,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
-        )
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -318,12 +310,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         prefix = (
             TEST_SERVER_DIR / "downloaded" / self.platform / self.version
             if self._downloaded
-            else DOTNET_TEST_SERVER_DIR
-            / "testserver"
-            / "bin"
-            / "Release"
-            / "net10.0-ios"
-            / "ios-arm64"
+            else DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net10.0-ios" / "ios-arm64"
         )
         return iOSBridge(
             str(prefix / "testserver.app"),
@@ -339,13 +326,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         """
         header(f"Compressing .NET test server for {self.platform}")
         publish_dir = (
-            DOTNET_TEST_SERVER_DIR
-            / "testserver"
-            / "bin"
-            / "Release"
-            / "net10.0-ios"
-            / "ios-arm64"
-            / "testserver.app"
+            DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net10.0-ios" / "ios-arm64" / "testserver.app"
         )
         zip_path = publish_dir.parents[5] / "testserver_ios.zip"
         zip_directory(publish_dir, zip_path)
@@ -423,11 +404,7 @@ class DotnetTestServer_Android(DotnetTestServer):
             PlatformBridge: The platform bridge.
         """
         path = (
-            TEST_SERVER_DIR
-            / "downloaded"
-            / self.platform
-            / self.version
-            / "testserver_android.apk"
+            TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "testserver_android.apk"
             if self._downloaded
             else DOTNET_TEST_SERVER_DIR
             / "testserver"
@@ -469,9 +446,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Args:
             path (Path): The path to the compressed package.
         """
-        click.secho(
-            "No uncompressing needed for Android test server package", fg="yellow"
-        )
+        click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
 @TestServer.register("dotnet_windows")
@@ -527,13 +502,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         prefix = (
             TEST_SERVER_DIR / "downloaded" / self.platform / self.version
             if self._downloaded
-            else DOTNET_TEST_SERVER_DIR
-            / "testserver.cli"
-            / "bin"
-            / "Release"
-            / "net8.0"
-            / "win-x64"
-            / "publish"
+            else DOTNET_TEST_SERVER_DIR / "testserver.cli" / "bin" / "Release" / "net8.0" / "win-x64" / "publish"
         )
         return ExeBridge(
             str(prefix / "testserver.cli.exe"),
@@ -548,15 +517,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
             str: The path to the compressed package.
         """
         header(f"Compressing .NET test server for {self.platform}")
-        publish_dir = (
-            DOTNET_TEST_SERVER_DIR
-            / "testserver.cli"
-            / "bin"
-            / "Release"
-            / "net8.0"
-            / "win-x64"
-            / "publish"
-        )
+        publish_dir = DOTNET_TEST_SERVER_DIR / "testserver.cli" / "bin" / "Release" / "net8.0" / "win-x64" / "publish"
         zip_path = publish_dir.parents[5] / "testserver_windows.zip"
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
@@ -635,9 +596,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
             str: The path for the latest builds.
         """
         version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
-        )
+        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -651,12 +610,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         prefix = (
             TEST_SERVER_DIR / "downloaded" / self.platform / self.version
             if self._downloaded
-            else DOTNET_TEST_SERVER_DIR
-            / "testserver"
-            / "bin"
-            / "Release"
-            / "net10.0-maccatalyst"
-            / "maccatalyst-x64"
+            else DOTNET_TEST_SERVER_DIR / "testserver" / "bin" / "Release" / "net10.0-maccatalyst" / "maccatalyst-x64"
         )
         return macOSBridge(str(prefix / "testserver.app"))
 

@@ -83,10 +83,10 @@ class SgwDownloadInfo:
     def _init_release(self, version: str):
         self.__version = version
         self.__build_no = 0
-        self.__local_filename = (
-            f"couchbase-sync-gateway-enterprise_{self.__version}_aarch64.rpm"
+        self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}_aarch64.rpm"
+        self.__url = (
+            f"https://packages.couchbase.com/releases/couchbase-sync-gateway/{self.__version}/{self.__local_filename}"
         )
-        self.__url = f"https://packages.couchbase.com/releases/couchbase-sync-gateway/{self.__version}/{self.__local_filename}"
 
     def _init_internal(self, version: str, build_no: int):
         self.__version = version
@@ -210,26 +210,20 @@ def setup_config(server_hostname: str) -> None:
 
     # 4. bootstrap-cbs-alternate.json (with custom CBS ports for CBS testing)
     cbs_alternate_config = copy.deepcopy(base_config)
-    cbs_alternate_config["bootstrap"]["server"] = (
-        f"couchbases://{server_hostname}:11207"
-    )
+    cbs_alternate_config["bootstrap"]["server"] = f"couchbases://{server_hostname}:11207"
     with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
         json.dump(cbs_alternate_config, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
 
-    start_sgw_content = "#!/bin/sh\n\n" + start_sgw_content.replace(
-        "{{server-ip}}", server_hostname
-    )
+    start_sgw_content = "#!/bin/sh\n\n" + start_sgw_content.replace("{{server-ip}}", server_hostname)
 
     with open(SCRIPT_DIR / "start-sgw.sh", "w", newline="\n") as file:
         file.write(start_sgw_content)
 
 
-def remote_exec(
-    ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True
-) -> None:
+def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
     """
     Execute a remote command via SSH with a description and optional error handling.
 
@@ -272,9 +266,7 @@ def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
     click.echo()
 
 
-def setup_server(
-    hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo
-) -> None:
+def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownloadInfo) -> None:
     """
     Set up a Sync Gateway server on an EC2 instance.
 
@@ -286,9 +278,7 @@ def setup_server(
     if sgw_info.is_release:
         click.echo(f"Setting up server {hostname} with SGW {sgw_info.version}")
     else:
-        click.echo(
-            f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}"
-        )
+        click.echo(f"Setting up server {hostname} with SGW {sgw_info.version}-{sgw_info.build_no}")
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -297,9 +287,7 @@ def setup_server(
     global current_ssh
     current_ssh = hostname
     sftp = ssh.open_sftp()
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
     if sgw_info.is_release:
@@ -328,9 +316,7 @@ def setup_server(
             )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "start-sgw.sh", "/home/ec2-user/start-sgw.sh")
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "bootstrap.json", "/home/ec2-user/config/bootstrap.json")
     sftp_progress_bar(
         sftp,
         SCRIPT_DIR / "bootstrap-alternate.json",
@@ -346,12 +332,8 @@ def setup_server(
         SCRIPT_DIR / "bootstrap-cbs-alternate.json",
         "/home/ec2-user/config/bootstrap-cbs-alternate.json",
     )
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem"
-    )
-    sftp_progress_bar(
-        sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem"
-    )
+    sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem")
+    sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem")
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
     for file in (SCRIPT_DIR / "shell2http").iterdir():
         sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
