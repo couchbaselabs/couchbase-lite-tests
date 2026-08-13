@@ -123,15 +123,9 @@ class CouchbaseServerInfo:
 
     def __init__(self, data: dict):
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
-        self.__admin_user: str = _get_str_or_default(
-            data, self.__admin_user_key, "Administrator"
-        )
-        self.__admin_password: str = _get_str_or_default(
-            data, self.__admin_password_key, "password"
-        )
-        self.__cluster_index: int = _get_int_or_default(
-            data, self.__cluster_index_key, 0
-        )
+        self.__admin_user: str = _get_str_or_default(data, self.__admin_user_key, "Administrator")
+        self.__admin_password: str = _get_str_or_default(data, self.__admin_password_key, "password")
+        self.__cluster_index: int = _get_int_or_default(data, self.__cluster_index_key, 0)
 
 
 class EdgeServerInfo:

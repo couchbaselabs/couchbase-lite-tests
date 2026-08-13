@@ -50,9 +50,7 @@ class CouchbaseCluster:
                 "At least one Couchbase Server must be provided when configuring multiple Sync Gateway nodes"
             )
         elif not sync_gateways[0].using_rosmar:
-            raise CblTestError(
-                "Couchbase Server must be provided if Sync Gateway is not using Rosmar"
-            )
+            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
 
         self.__tracer = get_tracer(__name__, VERSION)
 
@@ -73,9 +71,7 @@ class CouchbaseCluster:
                         collections = list(scope_config.collections.keys())
                     elif isinstance(scope_config.collections, list):
                         collections = scope_config.collections
-                self.couchbase_servers[0].create_collections(
-                    db_payload.bucket, scope, collections
-                )
+                self.couchbase_servers[0].create_collections(db_payload.bucket, scope, collections)
 
     def _check_all_indexes_removed(self, bucket: str) -> None:
         count = self.couchbase_servers[0].indexes_count(bucket)

@@ -182,9 +182,7 @@ class CBLPyTest:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
                 cluster_builder.add_entry(
-                    CouchbaseServer(
-                        cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password
-                    ),
+                    CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password),
                     cbs_info.cluster_index,
                 )
 

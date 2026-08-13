@@ -195,9 +195,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
     async def test_delta_sync_with_encryption(self, cblpytest: CBLPyTest, dataset_path: Path):
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
-        self.mark_test_step(
-            "Reset SG and load `travel` dataset with delta sync enabled"
-        )
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])

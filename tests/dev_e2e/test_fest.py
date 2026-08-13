@@ -242,13 +242,9 @@ class TestFest(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_update_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(
-            cblpytest.clusters[0], (db1, db2)
-        )
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest.clusters[0], (db1, db2))
 
         self.mark_test_step("Snapshot db2")
         snap2 = await db2.create_snapshot(
@@ -390,9 +386,7 @@ class TestFest(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_task(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
 
@@ -502,9 +496,7 @@ class TestFest(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delete_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
 
@@ -654,9 +646,7 @@ class TestFest(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def _test_create_tasks_two_users(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def _test_create_tasks_two_users(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cloud(
             cloud,
@@ -778,9 +768,7 @@ class TestFest(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_share_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
@@ -918,13 +906,9 @@ class TestFest(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_update_shared_tasks(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_update_shared_tasks(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 
@@ -1113,9 +1097,7 @@ class TestFest(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_unshare_list(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         cloud = cblpytest.clusters[0]
-        await self.setup_test_fest_cloud(
-            cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]}
-        )
+        await self.setup_test_fest_cloud(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
         repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
 

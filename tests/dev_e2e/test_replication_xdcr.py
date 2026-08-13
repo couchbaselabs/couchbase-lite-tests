@@ -44,12 +44,8 @@ class TestReplicationXdcr(CBLTestClass):
         await cblpytest.clusters[1].configure_dataset(dataset_path, dataset_name)
 
         self.mark_test_step("Start XDCR between cluster 1 and cluster 2.")
-        cblpytest.clusters[0].couchbase_servers[0].start_xdcr(
-            cblpytest.clusters[1].couchbase_servers[0], dataset_name
-        )
-        cblpytest.clusters[1].couchbase_servers[0].start_xdcr(
-            cblpytest.clusters[0].couchbase_servers[0], dataset_name
-        )
+        cblpytest.clusters[0].couchbase_servers[0].start_xdcr(cblpytest.clusters[1].couchbase_servers[0], dataset_name)
+        cblpytest.clusters[1].couchbase_servers[0].start_xdcr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
 
         self.mark_test_step("Wait 5 secs to ensure that clusters are ready.")
         await asyncio.sleep(5)

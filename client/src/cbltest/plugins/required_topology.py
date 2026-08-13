@@ -92,9 +92,7 @@ def pytest_runtest_setup(item: pytest.Item):
             if info.cluster_index >= minimum:
                 return
 
-        cbl_info(
-            f"Test requires at least {minimum} clusters, but only {max_found} are available."
-        )
+        cbl_info(f"Test requires at least {minimum} clusters, but only {max_found} are available.")
         pytest.skip("Insufficient clusters")
 
     check(min_test_servers_mark, config.test_servers, "Test Servers")
