@@ -29,11 +29,19 @@ else()
     if(NOT DEFINED CBL_VERSION)
         message(FATAL_ERROR "Please pass -DCBL_VERSION to indicate which version of Couchbase Lite you will use")
     endif()
+
+    # The Linux package's CMake config lives in lib/<triplet>/cmake/CouchbaseLite, which
+    # find_package only searches when CMAKE_LIBRARY_ARCHITECTURE is set - true on distros
+    # with a multiarch gcc (Debian/Ubuntu), but not on Arch, Fedora, ... - so glob for it.
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT CMAKE_LIBRARY_ARCHITECTURE)
+        file(GLOB CBL_TRIPLET_PATHS "${CMAKE_CURRENT_SOURCE_DIR}/lib/libcblite*/lib/*/cmake/CouchbaseLite")
+    endif()
+
     find_package(
             CouchbaseLite
             REQUIRED
             VERSION EXACT ${CBL_VERSION}
-            PATHS lib/libcblite-${CBL_VERSION} lib/libcblite
+            PATHS lib/libcblite-${CBL_VERSION} lib/libcblite ${CBL_TRIPLET_PATHS}
             NO_DEFAULT_PATH
     )
     set(CBL_FROM_SOURCE OFF)
