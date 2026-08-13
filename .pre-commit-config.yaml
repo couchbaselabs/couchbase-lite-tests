@@ -9,9 +9,9 @@ repos:
     rev: v0.16.0
     hooks:
       - id: ruff
-        types_or: [python, pyi]
+        types_or: [markdown, python, pyi]
       - id: ruff-format
-        types_or: [python, pyi]
+        types_or: [markdown, python, pyi]
   - repo: local
     hooks:
       - id: ty-check
