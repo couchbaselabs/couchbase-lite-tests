@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from json import dumps, loads
 from pathlib import Path
-from typing import Sequence, cast
+from typing import cast
 
 import aiofiles
 from opentelemetry.trace import get_tracer
@@ -54,10 +55,10 @@ class CouchbaseCluster:
 
         self.__tracer = get_tracer(__name__, VERSION)
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Closes all the resources in the cluster"""
         for sgw in self.sync_gateways:
-            sgw.close()
+            await sgw.close()
 
     def _create_collections(self, db_payload: DatabaseConfig) -> None:
         if self.sync_gateways[0].using_rosmar:

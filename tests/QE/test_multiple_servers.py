@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -42,7 +43,7 @@ def _recover_or_add_node(cbs_one, cbs_two):
     cbs_one.rebalance()
 
 
-def _set_alternate_addresses(cbs_servers: list) -> None:
+def _set_alternate_addresses(cbs_servers: Sequence) -> None:
     """Set alternate addresses with all service ports for all CBS nodes."""
     session = requests.Session()
     session.auth = ("Administrator", "password")

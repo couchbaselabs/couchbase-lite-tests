@@ -90,7 +90,7 @@ class SyncGatewayInfo:
         self.__rbac_user: str = _get_str_or_default(data, self.__rbac_user_key, "admin")
         self.__rbac_password: str = _get_str_or_default(data, self.__rbac_password_key, "password")
         self.__uses_tls: bool = _get_bool_or_default(data, self.__tls_key, False)
-        self.cluster_index: int = _get_int_or_default(data, self.__cluster_index_key, 0)
+        self.__cluster_index: int = _get_int_or_default(data, self.__cluster_index_key, 0)
 
 
 class CouchbaseServerInfo:

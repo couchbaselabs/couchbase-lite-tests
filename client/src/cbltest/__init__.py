@@ -1,5 +1,5 @@
+from collections.abc import Sequence
 from json import dumps
-from typing import Sequence
 
 from cbltest.api.error import CblTestError
 
@@ -23,11 +23,12 @@ from .version import available_api_version
 
 
 class _ClusterBuilder:
-    # These may come in from the config file out of order,
-    # so use dictionaries to collect them instead of hacking
-    # None or blank clusters into a list
-    __sgw: dict[int, list[SyncGateway]]
-    __cbs: dict[int, list[CouchbaseServer]]
+    def __init__(self):
+        # These may come in from the config file out of order,
+        # so use dictionaries to collect them instead of hacking
+        # None or blank clusters into a list
+        self.__sgw: dict[int, list[SyncGateway]] = {}
+        self.__cbs: dict[int, list[CouchbaseServer]] = {}
 
     def add_entry(self, entry: SyncGateway | CouchbaseServer, idx: int) -> None:
         if isinstance(entry, SyncGateway):
@@ -44,6 +45,8 @@ class _ClusterBuilder:
             servers = [] if idx >= len(self.__cbs) else self.__cbs[idx]
             sync_gateways = self.__sgw[idx]
             ret_val.append(CouchbaseCluster(sync_gateways, servers))
+
+        return ret_val
 
     def _validate(self) -> None:
         if len(self.__sgw) < len(self.__cbs):

@@ -52,7 +52,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Configure SGW travel database with local_jwt provider")
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         # Clean up any existing travel database from previous runs
         try:
@@ -194,7 +194,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Configure SGW with both JWK keys (A and B)")
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         # Clean up
         try:
@@ -335,7 +335,7 @@ class TestJWTReplication(CBLTestClass):
 
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         # Cleanup
         try:
@@ -466,7 +466,7 @@ class TestJWTReplication(CBLTestClass):
 
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         try:
             await sgw.delete_database("travel")
@@ -606,7 +606,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Configure SGW with valid keys A and C")
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         try:
             await sgw.delete_database("travel")

@@ -59,7 +59,7 @@ def _dotnet_env() -> tuple[str, dict]:
     Imported lazily: dotnetenv lives in the optional `dotnet-build` dependency
     group, not the default install, so only an actual .NET build requires it.
     """
-    import dotnetenv  # ty: ignore[unresolved-import]
+    import dotnetenv
 
     cfg = dotnetenv.load_config(dotnetenv.discover_config())
     dotnetenv.install(DOTNET_ENV_NAME, cfg)
