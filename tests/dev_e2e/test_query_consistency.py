@@ -16,7 +16,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.jsonhelper import json_equivalent
-from cbltest.plugins.cloud_cleanup import perform_cleanup
+from cbltest.plugins import cluster_cleanup
 
 
 @pytest.mark.min_test_servers(1)
@@ -27,13 +27,13 @@ class TestQueryConsistency(CBLTestClass):
 
     @pytest_asyncio.fixture(scope="class", autouse=True)
     @classmethod
-    async def cleanup_buckets(cls, cblpytest: CBLPyTest):
+    async def cluster_cleanup(cls, cblpytest: CBLPyTest):
         """
-        Overrides the function-scoped `cleanup_buckets` fixture: this class reuses
+        Overrides the function-scoped `cluster_cleanup` fixture: this class reuses
         one SGW database/CBS bucket across all its (read-only) tests, so cleanup
         only needs to happen once, before the class's tests run.
         """
-        await perform_cleanup(cblpytest)
+        await cluster_cleanup.perform_cleanup(cblpytest)
 
     @pytest_asyncio.fixture(autouse=True)
     async def setup_method_fixture(self, cblpytest: CBLPyTest, dataset_path: Path):

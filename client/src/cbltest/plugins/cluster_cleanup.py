@@ -8,7 +8,7 @@ from cbltest.logging import cbl_info, cbl_trace
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def cleanup_buckets(cblpytest):
+async def cluster_cleanup(cblpytest):
     """
     Remove all Couchbase Server buckets and Sync Gateway databases.
 

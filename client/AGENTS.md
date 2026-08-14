@@ -75,7 +75,7 @@ client/
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
-        └── cloud_cleanup.py            # cleanup_buckets (autouse) — wipes SGW DBs + CBS/Rosmar buckets
+        └── cluster_cleanup.py          # cluster_cleanup (autouse) — wipes SGW DBs + CBS/Rosmar buckets
 ```
 
 ## Core Concepts
@@ -126,7 +126,7 @@ cblpytest_fixture       = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture      = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture       = "cbltest.plugins.sgcollect_fixture"
-cloud_cleanup           = "cbltest.plugins.cloud_cleanup"
+cluster_cleanup         = "cbltest.plugins.cluster_cleanup"
 ```
 
 CLI options added by `cblpytest_fixture`:
