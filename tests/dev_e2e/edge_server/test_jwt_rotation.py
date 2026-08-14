@@ -49,9 +49,9 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 2: Setup SGW with travel dataset and local_jwt auth ---
         self.mark_test_step("Configure SGW travel database with local_jwt provider")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         # Build the SGW database config with local_jwt for JWT validation
         payload = DatabaseConfig(
@@ -175,9 +175,9 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 2: Setup SGW with local_jwt containing BOTH keys ---
         self.mark_test_step("Configure SGW with both JWK keys (A and B)")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
@@ -304,9 +304,9 @@ class TestJWTReplication(CBLTestClass):
         invalid_private_key, _ = generate_rsa_keypair()
         token_invalid = generate_jwt(invalid_private_key, subject="user1", expires_in=3600, kid="unknown-key")
 
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
@@ -429,9 +429,9 @@ class TestJWTReplication(CBLTestClass):
         token = generate_jwt(private_key, subject="user1", expires_in=3600)
         jwk = public_key_to_jwk(public_key)
 
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])
@@ -564,9 +564,9 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 2: Setup SGW with keys A and C (not the invalid one) ---
         self.mark_test_step("Configure SGW with valid keys A and C")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_server
+        cbs = cloud.couchbase_servers[0]
 
         cbs.create_bucket("travel")
         cbs.create_collections("travel", "travel", ["airlines"])

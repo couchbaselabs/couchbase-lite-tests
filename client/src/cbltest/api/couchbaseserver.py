@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import time
 import zipfile
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
 from time import sleep
@@ -47,7 +47,7 @@ class CouchbaseServer:
     A class that interacts with a Couchbase Server cluster
     """
 
-    def ensure_cluster_healthy(self, cbs_servers: list["CouchbaseServer"]) -> None:
+    def ensure_cluster_healthy(self, cbs_servers: Sequence["CouchbaseServer"]) -> None:
         """
         Ensures all CBS nodes are in the cluster and healthy.
         Uses credentials from this instance to manage the cluster.

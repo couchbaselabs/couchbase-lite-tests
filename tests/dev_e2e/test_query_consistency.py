@@ -42,7 +42,7 @@ class TestQueryConsistency(CBLTestClass):
 
         # These tests do not modify the data in the bucket, so set it up here to avoid
         # needless teardown and re-setup
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "travel")
 

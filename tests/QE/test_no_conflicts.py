@@ -28,7 +28,7 @@ class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_cbl_updates_concurrently_with_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -165,7 +165,7 @@ class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_push(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 
@@ -307,7 +307,7 @@ class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `posts` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "posts")
 

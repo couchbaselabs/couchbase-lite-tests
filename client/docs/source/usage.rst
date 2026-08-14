@@ -11,7 +11,7 @@ The best way to learn is to look at the existing tests, but some common classes 
 - :func:`cblpytest <cbltest.CBLPyTest>`: The top level class that is passed into each test function
 - :func:`syncgateway <cbltest.api.syncgateway>`: A class for interacting with the REST API of Sync Gateway
 - :func:`couchbaseserver <cbltest.api.couchbaseserver>`: A class for interacting with Couchbase Server (via the python SDK)
-- :func:`cloud <cbltest.api.cloud>`: A class for performing actions that involve multiple coordinated steps between the above
+- :func:`cluster <cbltest.api.cluster>`: A class for performing actions that involve multiple coordinated steps between the above
 - :func:`testserver <cbltest.api.testserver>`: A class for interacting with the test servers built from this repo
 
 Test Parameters

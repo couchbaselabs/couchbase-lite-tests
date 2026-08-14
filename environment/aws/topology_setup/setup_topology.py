@@ -280,11 +280,16 @@ class SyncGatewayConfig:
     def cluster_hostname(self) -> str:
         return self.__cluster_hostname
 
-    def __init__(self, version: str, hostname: str, internal_hostname: str, cluster_hostname: str):
+    @property
+    def cluster_index(self) -> int:
+        return self.__cluster_index
+
+    def __init__(self, version: str, hostname: str, internal_hostname: str, cluster_hostname: str, cluster_index: int):
         self.__version = version
         self.__hostname = hostname
         self.__internal_hostname = internal_hostname
         self.__cluster_hostname = cluster_hostname
+        self.__cluster_index = cluster_index
 
 
 class EdgeServerInput:
@@ -771,6 +776,7 @@ class TopologyConfig:
                 get_ec2_hostname(hostnames.pop(0)),
                 internal_hostnames.pop(0),
                 cluster.internal_hostnames[0],
+                sgw_input.cluster_index,
             )
             self.__sync_gateways.append(sgw)
 
