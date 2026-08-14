@@ -165,7 +165,6 @@ class CBLPyTest:
             self.__test_servers.append(TestServer(self.__request_factory, index, ts_info.url, dataset_version))
 
         cluster_builder = _ClusterBuilder()
-        index = 0
         if not test_server_only:
             for sg in self.__config.sync_gateways:
                 sgw_info = SyncGatewayInfo(sg)
@@ -179,7 +178,6 @@ class CBLPyTest:
                     ),
                     sgw_info.cluster_index,
                 )
-                index += 1
 
         if not test_server_only:
             for cbs in self.__config.couchbase_servers:
