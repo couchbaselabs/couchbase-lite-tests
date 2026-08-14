@@ -100,12 +100,12 @@ class CBLPyTest:
     @property
     def sync_gateways(self) -> Sequence[SyncGateway]:
         """Gets the list of Sync Gateways available in the first cluster"""
-        return self.clusters[0].sync_gateways
+        return self.clusters[0].sync_gateways if self.clusters else []
 
     @property
     def couchbase_servers(self) -> Sequence[CouchbaseServer]:
         """Gets the list of Couchbase Servers available in the first cluster"""
-        return self.clusters[0].couchbase_servers
+        return self.clusters[0].couchbase_servers if self.clusters else []
 
     @property
     def edge_servers(self) -> Sequence[EdgeServer]:
