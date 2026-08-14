@@ -148,16 +148,16 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
 
         if len(topology.clusters) > 0:
             cbs_instances = []
-            for cluster in topology.clusters:
+            for idx, cluster in enumerate(topology.clusters):
                 for public_hostname in cluster.public_hostnames:
-                    cbs_instances.append({"hostname": public_hostname})
+                    cbs_instances.append({"hostname": public_hostname, "cluster_index": idx})
 
             config_json["couchbase-servers"] = cbs_instances
 
         if len(topology.sync_gateways) > 0:
             sgw_instances = []
             for sgw in topology.sync_gateways:
-                sgw_instances.append({"hostname": sgw.hostname, "tls": True})
+                sgw_instances.append({"hostname": sgw.hostname, "tls": True, "cluster_index": sgw.cluster_index})
 
             config_json["sync-gateways"] = sgw_instances
 

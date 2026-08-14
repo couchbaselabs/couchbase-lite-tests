@@ -52,7 +52,7 @@ client/
     │   ├── syncgateway.py        # SyncGateway admin API
     │   ├── couchbaseserver.py    # CBS bucket/scope/collection mgmt (via SDK)
     │   ├── edgeserver.py
-    │   ├── cloud.py              # Cloud / Capella integration
+    │   ├── cluster.py            # CouchbaseCluster — SGW+CBS cluster grouping
     │   ├── error.py              # CblTestServerBadResponseError etc.
     │   ├── error_types.py
     │   ├── json_generator.py     # Test document generation
@@ -86,11 +86,13 @@ cblpytest = await CBLPyTest.create(parsed_config, ...)
 
 Takes an already-parsed `ParsedConfig` (the `cblpytest` pytest fixture parses the `--config` JSON once in `pytest_configure` and stashes it on `pytest.Config`; see `plugins/cblpytest_fixture.py`). It:
 1. Creates a `RequestFactory` (HTTP transport)
-2. Creates `TestServer[]`, `SyncGateway[]`, `CouchbaseServer[]`, `EdgeServer[]`, `LoadBalancer[]`
+2. Creates `TestServer[]` and `EdgeServer[]`, and groups `SyncGateway[]`/`CouchbaseServer[]` into `CouchbaseCluster[]` (via the internal `_ClusterBuilder`, keyed by each node's `cluster_index` in the config)
 3. Resolves the API version — queries every test server, requires consensus
 4. Starts a session on each test server
 
-Exposed properties: `.request_factory`, `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers`, `.load_balancers`, `.config`, `.log_level`, `.extra_props`.
+Exposed properties: `.request_factory`, `.test_servers`, `.clusters`, `.edge_servers`, `.load_balancers`, `.config`, `.log_level`, `.extra_props`. `.sync_gateways` and `.couchbase_servers` are shorthands for `.clusters[0].sync_gateways` / `.clusters[0].couchbase_servers` — use `.clusters[N]` directly for multi-cluster topologies (e.g. XDCR).
+
+`CouchbaseCluster` (`api/cluster.py`) groups the Sync Gateway + Couchbase Server nodes for one logical cluster and owns `configure_dataset()` / `drop_bucket()`; test methods take a `CouchbaseCluster` (e.g. `cloud = cblpytest.clusters[0]`) rather than the old, now-removed `CouchbaseCloud`.
 
 ### `RequestFactory` + versioned registry
 
