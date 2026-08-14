@@ -80,8 +80,9 @@ def pytest_runtest_setup(item: pytest.Item):
         if mark is None:
             return
 
-        minimum = mark.args[0] - 1  # We use a zero based index to check
-        max_found = 1
+        requested = mark.args[0]
+        minimum = requested - 1  # We use a zero based index to check
+        max_found = 0
 
         # For min clusters, check the ID of the sync gateway clusters.  It will always
         # be greater than or equal to the CBS cluster index since every cluster requires
@@ -92,7 +93,7 @@ def pytest_runtest_setup(item: pytest.Item):
             if info.cluster_index >= minimum:
                 return
 
-        cbl_info(f"Test requires at least {minimum} clusters, but only {max_found} are available.")
+        cbl_info(f"Test requires at least {requested} clusters, but only {max_found} are available.")
         pytest.skip("Insufficient clusters")
 
     check(min_test_servers_mark, config.test_servers, "Test Servers")

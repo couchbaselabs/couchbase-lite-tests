@@ -353,7 +353,7 @@ class TestSystemMultipeer(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
             continuous=True,
-            pinned_server_cert=cblpytest.clusters[0].sync_gateways[0].tls_cert(),
+            pinned_server_cert=cblpytest.clusters[1].sync_gateways[0].tls_cert(),
         )
         await replicator2.start()
 
@@ -374,7 +374,7 @@ class TestSystemMultipeer(CBLTestClass):
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
             continuous=True,
-            pinned_server_cert=cblpytest.clusters[0].sync_gateways[0].tls_cert(),
+            pinned_server_cert=cblpytest.clusters[1].sync_gateways[0].tls_cert(),
         )
         await replicator3.start()
 
@@ -426,7 +426,7 @@ class TestSystemMultipeer(CBLTestClass):
             insert_server(
                 cblpytest.couchbase_servers[0],
             ),
-            insert_server(cblpytest.couchbase_servers[1]),
+            insert_server(cblpytest.clusters[1].couchbase_servers[0]),
             insert_sgw(cblpytest.clusters[0].sync_gateways[0]),
             insert_sgw(cblpytest.clusters[1].sync_gateways[0]),
             insert_testserver(all_dbs[0]),
@@ -474,7 +474,7 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly in SGW2")
         await compare_local_and_remote(
             all_dbs[-1],
-            cblpytest.clusters[0].sync_gateways[0],
+            cblpytest.clusters[1].sync_gateways[0],
             ReplicatorType.PUSH_AND_PULL,
             "names",
             ["_default._default"],
