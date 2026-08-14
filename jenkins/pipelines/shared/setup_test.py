@@ -67,13 +67,11 @@ def get_platform_version(version_map: dict[str, str], platform: str) -> str:
 
 def parse_versions(value: str) -> list[str]:
     """
-    Splits a comma-separated CLI argument into a list of versions.
+    Splits a comma-separated CLI argument into a list of versions. An empty
+    (or whitespace-only) argument is valid and yields an empty list, meaning
+    "no version of this kind requested".
     """
-    versions = [v.strip() for v in value.split(",") if v.strip()]
-    if not versions:
-        raise ValueError(f"No versions found in '{value}'")
-
-    return versions
+    return [v.strip() for v in value.split(",") if v.strip()]
 
 
 def distribute_versions(versions: list[str], count: int) -> list[str]:
@@ -90,7 +88,7 @@ def distribute_versions(versions: list[str], count: int) -> list[str]:
 
 def setup_test(
     cbl_versions: list[str],
-    sgw_versions: list[str],
+    sgw_versions: list[str] | None,
     topology_file_in: Path,
     config_file_in: Path,
     topology_tag: str,
@@ -104,6 +102,10 @@ def setup_test(
     `sgw_versions` positionally to its sync_gateways (only meaningful when sync_gateways
     is defined directly in that file rather than pulled in via `include`). In both cases,
     once the version list is exhausted the last entry repeats (see `distribute_versions`).
+
+    Pass `None` for `sgw_versions` if the topology doesn't use Sync Gateway at all; a
+    throwaway version is substituted internally. An empty list is rejected, since that
+    usually means a version argument was mis-parsed rather than intentionally omitted.
     """
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
     topology_file_out = SCRIPT_DIR.parents[2] / "environment" / "aws" / "topology_setup" / "topology.json"
@@ -123,6 +125,11 @@ def setup_test(
     assert config_file_out.exists() is False or os.access(config_file_out, os.W_OK), (
         f"Output file {config_file_out} already exists and is not writeable."
     )
+
+    if sgw_versions is None:
+        sgw_versions = ["0.0.0"]  # throwaway; topology doesn't use Sync Gateway
+    elif not sgw_versions:
+        raise ValueError("At least one sgw version must be provided, or pass None if the topology does not use it.")
 
     couchbase_server_version = resolved_version("couchbase-server", couchbase_version)
     resolved_sgw_versions = [resolved_version("sync-gateway", version) for version in sgw_versions]

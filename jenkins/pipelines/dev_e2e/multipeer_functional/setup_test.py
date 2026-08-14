@@ -79,7 +79,7 @@ def main(
 
         setup_test(
             cbl_versions,
-            ["3.2.4"],  # Doesn't matter, we don't use SGW in these tests
+            None,  # This pipeline doesn't use Sync Gateway
             topology_file_in,
             config_file_in,
             "multipeer_functional",
