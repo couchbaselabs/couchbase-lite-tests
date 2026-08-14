@@ -1,0 +1,16 @@
+; https://editorconfig.org/
+root = true
+
+[*.sh]
+indent_style = space
+indent_size = 2
+shell_variant = bash
+binary_next_line = false
+ij_shell_binary_ops_start_line = false
+switch_case_indent = true
+ij_shell_switch_cases_indented = true
+space_redirects = false
+ij_shell_redirect_followed_by_space = false
+keep_padding = false
+ij_shell_minify_program = false
+function_next_line = false

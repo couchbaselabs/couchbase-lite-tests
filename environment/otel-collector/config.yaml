@@ -13,7 +13,7 @@ service:
   pipelines:
     traces:
       receivers: [otlp]
-      exporters: [logging,zipkin]
+      exporters: [logging, zipkin]
       processors: [batch]
     metrics:
       receivers: [otlp]

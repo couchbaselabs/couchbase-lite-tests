@@ -5,12 +5,10 @@
 # file, in accordance with the Business Source License, use of this software
 # will be governed by the Apache License, Version 2.0, included in the file
 # licenses/APL2.txt.
-
 name: openapi
 permissions:
   contents: read
   pull-requests: write
-
 on:
   pull_request:
     # Only run when we change an API spec
@@ -18,15 +16,13 @@ on:
       - 'spec/api/**'
   push:
     # Only run when we change an API spec
-    branches: 
+    branches:
       - 'main'
     paths:
       - 'spec/api/**'
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ !contains(github.ref, 'release/') && !contains(github.ref, 'main') }}
-
 jobs:
   redocly_preview_links:
     runs-on: ubuntu-latest

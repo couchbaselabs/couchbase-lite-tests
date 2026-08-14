@@ -6,15 +6,15 @@ set -eu # No pipefail because piping yes always "fails" with SIGPIPE
 
 BUILD_TOOLS_VERSION='34.0.0'
 SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <cbl_version> <sg version>"
-    exit 1
+  echo "Usage: $0 <cbl_version> <sg version>"
+  exit 1
 }
 
-if [ "$#" -lt 2 ] ; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION="$1"
 if [ -z "$CBL_VERSION" ]; then usage; fi
@@ -26,7 +26,7 @@ DATASET_VERSION=${3:-"4.0"}
 STATUS=0
 
 echo "Install Android SDK"
-yes | ${SDK_MGR} --channel=1 --licenses > /dev/null 2>&1
+yes | ${SDK_MGR} --channel=1 --licenses >/dev/null 2>&1
 ${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
@@ -35,9 +35,9 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 echo "Start logcat"
 pushd $SCRIPT_DIR
 python3 logcat.py &
-echo $! > logcat.pid
+echo $! >logcat.pid
 
-pushd $DEV_E2E_TESTS_DIR > /dev/null
+pushd $DEV_E2E_TESTS_DIR >/dev/null
 rm -rf http_log testserver.log
 
 echo "Run the tests"

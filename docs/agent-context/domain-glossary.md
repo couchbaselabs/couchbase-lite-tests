@@ -34,8 +34,9 @@
 
 ## CI/CD Terms
 
-- **`python_verify.yml`:** GitHub workflow for `ty`, `ruff`, and `client/tests`.
-- **Pre-commit hooks:** Local enforcement for lint/format/type/secrets/commit standards.
+- **`pre-commit.yml`:** GitHub workflow running the full pre-commit hook suite over all files.
+- **`python_verify.yml`:** GitHub workflow for `client/tests`.
+- **Pre-commit hooks:** Lint/format/type/commit standards, enforced locally and in CI.
 - **Jenkins `setup_test.py`:** Platform pipeline setup scripts following a shared template.
 
 ## Common Acronyms
