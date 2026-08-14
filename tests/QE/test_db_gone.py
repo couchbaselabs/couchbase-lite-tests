@@ -83,16 +83,13 @@ class TestDbGone(CBLTestClass):
         bucket_name = "data-bucket"
         channels = ["ABC"]
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
-        self.mark_test_step("Configure Sync Gateway database endpoint")
+        self.mark_test_step("Create backing bucket and database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -140,14 +137,12 @@ class TestDbGone(CBLTestClass):
 
         self.mark_test_step("Create buckets and configure databases")
         for db_name, bucket_name, channel, username in db_configs:
-            cbs.create_bucket(bucket_name)
-
             db_payload = DatabaseConfig(
                 bucket=bucket_name,
                 index=IndexConfig(num_replicas=0),
                 scopes={"_default": ScopeConfig(collections={"_default": {}})},
             )
-            await sg.put_database(db_name, db_payload)
+            await cblpytest.clusters[0].create_database(db_name, db_payload)
             await sg.reset_user(db_name, username, "pass", [channel])
 
             self.mark_test_step(f"Create {num_docs} docs via Sync Gateway")

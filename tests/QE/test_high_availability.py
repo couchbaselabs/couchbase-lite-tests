@@ -30,11 +30,8 @@ class TestHighAvailability(CBLTestClass):
         channels = ["*"]
         username = "vipul"
         password = "pass"
-        sg1, sg2, _ = sgs[0], sgs[1], sgs[2]
+        sg2 = sgs[1]
         await sg2.start()
-
-        self.mark_test_step("Create shared bucket for all SGW nodes")
-        cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
@@ -42,8 +39,7 @@ class TestHighAvailability(CBLTestClass):
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg1.put_database(sg_db, db_payload)
-        await sg_cluster.wait_for_db_online(sg_db)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
         await sgs[0].reset_user(sg_db, username, password, channels)

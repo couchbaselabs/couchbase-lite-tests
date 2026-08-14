@@ -79,7 +79,7 @@ class TestJWTSimple(CBLTestClass):
                 )
             },
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.clusters[0].sync_gateway_cluster.create_database(sg_db_name, payload)
 
         # =====================================================================
         # STEP 4: Pre-create JWT user with channel access.

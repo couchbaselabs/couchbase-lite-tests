@@ -22,7 +22,7 @@ Test that Sync Gateway handles Couchbase Server cluster rebalancing correctly du
 
 Test that Sync Gateway continues to function when a Couchbase Server node fails over.
 
-1. Clean up and setup test environment (bucket and database)
+1. Setup test environment (backing bucket and database)
 2. Create user with specific channels
 3. Add 50 docs to Sync Gateway before failover
 4. Verify all docs were created

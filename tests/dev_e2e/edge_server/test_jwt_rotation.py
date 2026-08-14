@@ -174,9 +174,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
-
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -191,7 +188,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         # Create JWT user with channel access
         collection_access_input = {"travel.airlines": ["*"]}
@@ -303,8 +300,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -319,7 +314,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
@@ -428,8 +423,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -444,7 +437,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
@@ -563,8 +556,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -579,7 +570,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)

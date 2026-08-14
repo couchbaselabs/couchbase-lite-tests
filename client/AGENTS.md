@@ -94,7 +94,7 @@ Takes an already-parsed `ParsedConfig` (the `cblpytest` pytest fixture parses th
 
 Exposed properties: `.request_factory`, `.test_servers`, `.clusters`, `.edge_servers`, `.load_balancers`, `.config`, `.log_level`, `.extra_props`. `.sync_gateways` and `.couchbase_servers` are shorthands for `.clusters[0].sync_gateways` / `.clusters[0].couchbase_servers` — use `.clusters[N]` directly for multi-cluster topologies (e.g. XDCR).
 
-`CouchbaseCluster` (`api/cluster.py`) groups the Sync Gateway + Couchbase Server nodes for one logical cluster and owns `configure_dataset()` / `drop_bucket()`; test methods take a `CouchbaseCluster` (e.g. `cloud = cblpytest.clusters[0]`) rather than the old, now-removed `CouchbaseCloud`.
+`CouchbaseCluster` (`api/cluster.py`) groups the Sync Gateway + Couchbase Server nodes for one logical cluster and owns `configure_dataset()` / `create_database()`; test methods take a `CouchbaseCluster` (e.g. `cloud = cblpytest.clusters[0]`) rather than the old, now-removed `CouchbaseCloud`.
 
 ### `RequestFactory` + versioned registry
 
