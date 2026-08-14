@@ -1,13 +1,15 @@
 import asyncio
 
 import pytest_asyncio
+from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
+from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info, cbl_trace
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def cluster_cleanup(cblpytest):
+async def cluster_cleanup(cblpytest: CBLPyTest):
     """
     Remove all Couchbase Server buckets and Sync Gateway databases.
 
@@ -23,7 +25,7 @@ async def cluster_cleanup(cblpytest):
     await perform_cleanup(cblpytest)
 
 
-async def perform_cleanup(cblpytest) -> None:
+async def perform_cleanup(cblpytest: CBLPyTest) -> None:
     """
     Remove all Couchbase Server buckets and Sync Gateway databases.
 
@@ -40,22 +42,26 @@ async def perform_cleanup(cblpytest) -> None:
 
     await asyncio.gather(*(delete_all_buckets(cluster) for cluster in cblpytest.clusters))
 
-    cbl_info("🧹 Waiting for Sync Gateway databases to be fully removed")
-
-    await asyncio.gather(*(cluster.sync_gateway_cluster.wait_for_no_databases() for cluster in cblpytest.clusters))
-
     cbl_info("🧹 Couchbase Server and Sync Gateway cleanup finished")
 
 
 async def delete_all_databases(cluster: SyncGatewayCluster) -> None:
     """
-    Delete every database in the given Sync Gateway cluster, along with its backing
-    Rosmar bucket if the cluster is using Rosmar (Rosmar bucket data is not deleted
-    by removing the database that uses it).
+    Delete every database on every node of the given Sync Gateway cluster, in parallel.
 
-    Databases are cluster-wide, so the deletes are issued against a single node.
+    A node that never learned about a database is not covered by deleting it elsewhere,
+    so each node is asked for its own database list.  DELETE is synchronous, so once
+    these return there is nothing left to wait for.
     """
-    sg = cluster.round_robin_node
+    await asyncio.gather(*(delete_all_databases_on_node(sg) for sg in cluster.sync_gateways))
+
+
+async def delete_all_databases_on_node(sg: SyncGateway) -> None:
+    """
+    Delete every database on a single Sync Gateway node, along with its backing Rosmar
+    bucket if the node is using Rosmar (Rosmar bucket data is not deleted by removing
+    the database that uses it).
+    """
     dbs = await sg.get_all_databases_verbose()
     cbl_trace(f"🧹 SGW {sg}: found databases {list(dbs)}, deleting...")
 

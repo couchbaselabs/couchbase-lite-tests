@@ -51,7 +51,6 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Configure SGW travel database with local_jwt provider")
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_servers[0]
 
         # Build the SGW database config with local_jwt for JWT validation
         payload = DatabaseConfig(
@@ -88,11 +87,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        if not sgw.using_rosmar:
-            cbs.create_bucket("travel")
-            cloud._create_collections(payload)
-
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         # Create user1 with channel access to all travel collections
         collection_access_input = {

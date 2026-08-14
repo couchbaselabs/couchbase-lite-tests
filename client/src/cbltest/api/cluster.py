@@ -59,7 +59,14 @@ class CouchbaseCluster:
         for sgw in self.sync_gateways:
             await sgw.close()
 
-    def _create_collections(self, db_payload: DatabaseConfig) -> None:
+    def create_collections(self, db_payload: DatabaseConfig) -> None:
+        """
+        Create every scope and collection that the given database config refers to.
+
+        No-ops when using Rosmar, where collections are created implicitly.
+
+        :param db_payload: The database config naming the bucket, scopes and collections
+        """
         if self.sync_gateways[0].using_rosmar:
             return
         assert db_payload.bucket is not None, "DatabaseConfig is missing required field 'bucket'"
@@ -129,12 +136,8 @@ class CouchbaseCluster:
             assert db_payload.bucket is not None, (
                 f"{dataset_name}-sg-config.json config is missing required field 'bucket'"
             )
+            await self.create_database(dataset_name, db_payload)
             sg = self.sync_gateways[0]
-            # buckets and collections are implicitly created when using Rosmar
-            if not sg.using_rosmar:
-                self.couchbase_servers[0].create_bucket(db_payload.bucket)
-                self._create_collections(db_payload)
-            await sg.put_database(dataset_name, db_payload)
 
             for user in users:
                 user_dict = _get_typed_required(users, user, dict)
@@ -146,6 +149,23 @@ class CouchbaseCluster:
                 )
 
             await sg.load_dataset(dataset_name, data_filepath)
+        await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
 
-            if len(self.sync_gateways) > 1:
-                await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
+    async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
+        """
+        Create the backing bucket and collections for a database, then create the
+        database itself on the Sync Gateway cluster.
+
+        :param db_name: The name of the database to create
+        :param config: The configuration of the database to create
+        """
+        # buckets and collections are implicitly created when using Rosmar
+        if not self.sync_gateways[0].using_rosmar:
+            assert config.bucket, "bucket needs to be specified in a database config"
+            bucket_created = self.couchbase_servers[0].create_bucket(config.bucket)
+            self.create_collections(config)
+            # Stale indexes only linger from a previous incarnation of the bucket, so
+            # this is only worth waiting on when we just recreated it.
+            if bucket_created:
+                self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
+        await self.sync_gateway_cluster.create_database(db_name, config)

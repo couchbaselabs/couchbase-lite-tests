@@ -208,7 +208,7 @@ class CouchbaseServer:
         num_replicas: int = 0,
         retries: int = 60,
         interval: float = 2.0,
-    ):
+    ) -> bool:
         """
         Creates a bucket with a given name that Sync Gateway can use
 
@@ -216,6 +216,7 @@ class CouchbaseServer:
         :param num_replicas: The number of replicas for the bucket (default 0)
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
+        :return: True if the bucket was created, False if it already existed
         """
         with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
             mgr = self.__cluster.buckets()
@@ -235,22 +236,31 @@ class CouchbaseServer:
             # and responding before returning so callers can safely proceed.
             for _ in range(retries):
                 if self.bucket_healthy(name) and self.bucket_kv_responding(name) and self.collections_ready(name):
-                    if newly_created:
-                        retry_assert(
-                            lambda: self._check_all_indexes_removed(name),
-                            tenacity.wait_fixed(2),
-                            tenacity.stop_after_attempt(10),
-                        )
-                    return
+                    return newly_created
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
 
+    def wait_for_indexes_removed(self, bucket: str) -> None:
+        """
+        CBL-4977: A bucket recreated with the same name can have stale indexes that are
+        still being deleted asynchronously.  Sync Gateway will then wrongly detect that
+        the indexes already exist, and querying later fails with index-not-available
+        once the deletion catches up.  Wait for them to be gone before Sync Gateway
+        gets a chance to look.
+
+        .. note:: Call this after the bucket's collections have been created, otherwise
+            QueryIndexManager will not return the pending-to-removed indexes that were
+            created for those collections.
+
+        :param bucket: The bucket to wait on
+        """
+        retry_assert(
+            lambda: self._check_all_indexes_removed(bucket),
+            tenacity.wait_fixed(2),
+            tenacity.stop_after_attempt(10),
+        )
+
     def _check_all_indexes_removed(self, bucket: str) -> None:
-        """
-        CBL-4977: Buckets recreated with the same name can have stale, asynchronously
-        deleting indexes. Check for remaining indexes so we can wait out their removal
-        before starting Sync Gateway.
-        """
         count = self.indexes_count(bucket)
         assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
 
