@@ -74,7 +74,7 @@ class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_resurrected_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
@@ -141,7 +141,7 @@ class TestReplicationBehavior(CBLTestClass):
             "collection": "_default",
             "scope": "_default",
         }
-        cloud.couchbase_server.upsert_document("names", loc_deleted, resurrected_body)
+        cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
 
         self.mark_test_step("""
             Start a replicator:
