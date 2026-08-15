@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
@@ -11,7 +12,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.utils import assert_not_null
+from cbltest.utils import assert_not_null, retry_assert
 
 
 @pytest.mark.min_test_servers(1)
@@ -142,6 +143,17 @@ class TestReplicationBehavior(CBLTestClass):
             "scope": "_default",
         }
         cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
+
+        self.mark_test_step(f"Wait until Sync Gateway has imported the resurrected `{loc_deleted}`")
+
+        async def _confirm_resurrected_on_sg() -> None:
+            remote_doc = await sync_gateway.get_document("names", loc_deleted)
+            assert remote_doc is not None, f"{loc_deleted} not yet visible on Sync Gateway"
+            assert remote_doc.body.get("name") == resurrected_body["name"], (
+                f"{loc_deleted} on Sync Gateway does not reflect the resurrected content yet"
+            )
+
+        await retry_assert(_confirm_resurrected_on_sg, tenacity.wait_fixed(1), tenacity.stop_after_attempt(15))
 
         self.mark_test_step("""
             Start a replicator:

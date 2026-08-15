@@ -55,12 +55,13 @@ pulls the resurrected document without generating a conflict.
     * enable_document_listener: true
 8. Wait until the replicator is stopped.
 9. Resurrect `name_50` in CBS
-10. Start a replicator:
+10. Wait until Sync Gateway has imported the resurrected `name_50`.
+11. Start a replicator:
     * endpoint: `/names`
     * collections : `_default._default`
     * type: pull
     * continuous: false
     * credentials: user1/pass
     * enable_document_listener: true
-11. Wait until the replicator is stopped.
-12. Check `name_50` is not `deleted`
+12. Wait until the replicator is stopped.
+13. Check `name_50` is not `deleted`
