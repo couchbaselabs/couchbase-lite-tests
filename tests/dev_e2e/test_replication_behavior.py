@@ -108,14 +108,14 @@ class TestReplicationBehavior(CBLTestClass):
             f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        loc_deleted = 'name_50'
+        loc_deleted = "name_50"
         self.mark_test_step(f"Delete `{loc_deleted}` in the local database.")
         async with db.batch_updater() as b:
             b.delete_document("_default._default", loc_deleted)
 
         self.mark_test_step(f"Assert `{loc_deleted}`,  is `deleted`")
         query_result = await db.run_query("SELECT META().id FROM _default WHERE META().deleted")
-        assert len(query_result) == 1 and query_result[0]['id'] == loc_deleted
+        assert len(query_result) == 1 and query_result[0]["id"] == loc_deleted
 
         self.mark_test_step("""
             Start a replicator:
