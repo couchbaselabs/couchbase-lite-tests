@@ -114,8 +114,8 @@ class TestReplicationBehavior(CBLTestClass):
             b.delete_document("_default._default", loc_deleted)
 
         self.mark_test_step(f"Assert `{loc_deleted}`,  is `deleted`")
-        queryResult = await db.run_query("SELECT META().id FROM _default WHERE META().deleted")
-        assert len(queryResult) == 1 and queryResult[0]['id'] == loc_deleted
+        query_result = await db.run_query("SELECT META().id FROM _default WHERE META().deleted")
+        assert len(query_result) == 1 and query_result[0]['id'] == loc_deleted
 
         self.mark_test_step("""
             Start a replicator:
