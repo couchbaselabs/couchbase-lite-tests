@@ -37,7 +37,7 @@ pulls the resurrected document without generating a conflict.
 1. Reset SG and load `names` dataset.
 2. Reset local database and load `names` dataset.
 3. Start a replicator:
-	* endpoint: `/names`
+    * endpoint: `/names`
     * collections : `_default._default`
     * type: push
     * continuous: false
