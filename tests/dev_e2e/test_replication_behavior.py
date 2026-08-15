@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -68,3 +69,108 @@ class TestReplicationBehavior(CBLTestClass):
             assert name_number > 150 and name_number <= 200, (
                 f"Unexpected document found in replication: {entry.document_id}"
             )
+
+    @pytest.mark.min_couchbase_servers(1)
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_pull_resurrected_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+        self.mark_test_step("Reset SG and load `names` dataset")
+        cloud = cblpytest.simple_cloud()
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "names")
+
+        self.mark_test_step("Reset local database and load `names` dataset")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/names`
+                * collections : `_default._default`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+                * enable_document_listener: true
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("names"),
+            collections=[ReplicatorCollectionEntry(["_default._default"])],
+            replicator_type=ReplicatorType.PUSH,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            enable_document_listener=True,
+            pinned_server_cert=sync_gateway.tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        loc_deleted = 'name_50'
+        self.mark_test_step(f"Delete `{loc_deleted}` in the local database.")
+        async with db.batch_updater() as b:
+            b.delete_document("_default._default", loc_deleted)
+
+        self.mark_test_step(f"Assert `{loc_deleted}`,  is `deleted`")
+        queryResult = await db.run_query("SELECT META().id FROM _default WHERE META().deleted")
+        assert len(queryResult) == 1 and queryResult[0]['id'] == loc_deleted
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/names`
+                * collections : `_default._default`
+                * type: push
+                * continuous: false
+                * credentials: user1/pass
+                * enable_document_listener: true
+        """)
+        replicator.clear_document_updates()
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator #2: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step(f"Resurrect `{loc_deleted}` in CBS")
+        resurrected_body = {
+            "name": {"first": "Resurrected", "last": "Fifty"},
+            "collection": "_default",
+            "scope": "_default",
+        }
+        cloud.couchbase_server.upsert_document("names", loc_deleted, resurrected_body)
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/names`
+                * collections : `_default._default`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+                * enable_document_listener: true
+        """)
+        pull_replicator = Replicator(
+            db,
+            sync_gateway.replication_url("names"),
+            collections=[ReplicatorCollectionEntry(["_default._default"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            enable_document_listener=True,
+            pinned_server_cert=sync_gateway.tls_cert(),
+        )
+        await pull_replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator #3: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step(f"Check `{loc_deleted}` is not `deleted`")
+        local_doc = await db.get_document(DocumentEntry("_default._default", loc_deleted))
+        assert local_doc.body.get("name") == resurrected_body["name"], (
+            f"{loc_deleted} was not resurrected locally as expected: {local_doc.body}"
+        )
