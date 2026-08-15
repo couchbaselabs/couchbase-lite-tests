@@ -21,3 +21,46 @@ local side database.  In otherwords, activeOnly should be activated in this scen
         * enable_document_listener: true
 5. Wait until the replicator is stopped.
 6. Check that only the 50 non deleted documents were replicated
+
+## test_pull_resurrected_doc
+
+### Description
+
+Pulling Resurrected Document from SGW Without Conflict.
+
+Test verifies that when a document is deleted locally (and synced as a tombstone) 
+and later resurrected directly in Couchbase Server (CBS), the client successfully
+pulls the resurrected document without generating a conflict.
+
+### Steps
+
+1. Reset SG and load `empty` dataset.
+2. Reset local database and load `names` dataset.
+3. Start a replicator:
+	* endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * enable_document_listener: true
+4. Wait until the replicator is stopped.
+5. Delete `name_50` in the local database.
+6. Assert `name_50` is `deleted`
+7. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: push
+    * continuous: false
+    * credentials: user1/pass
+    * enable_document_listener: true
+8. Wait until the replicator is stopped.
+9. Resurrect `name_50` in CBS
+10. Start a replicator:
+    * endpoint: `/names`
+    * collections : `_default._default`
+    * type: pull
+    * continuous: false
+    * credentials: user1/pass
+    * enable_document_listener: true
+11. Wait until the replicator is stopped.
+12. Check `name_50` is not `deleted`
