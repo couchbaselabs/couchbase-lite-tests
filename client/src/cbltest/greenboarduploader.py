@@ -119,7 +119,7 @@ class RunResult(BaseModel):
     build: int  # build number of CBL build
     version: str  # major.minor.patch version of CBL
     sgw_version: str = Field(alias="sgwVersion")  # Sync Gateway version, optional
-    es_version: str = Field(alias="esVersion")  # Edge Server version, optional
+    es_version: str = Field(alias="esVersion", default="n/a")  # Edge Server version, optional
     fail_count: int = Field(alias="failCount")  # number of failing tests
     pass_count: int = Field(alias="passCount")  # number of passing tests
     platform: str  # CBL platform
@@ -197,7 +197,7 @@ class GreenboardUploader:
 
     def has_es_marker(self) -> bool:
         """
-        Returns True if any test in the session has @pytest.mark.es or @pytest.mark.es marker
+        Returns True if any test in the session has @pytest.mark.es marker
         """
         return self.__has_es_marker
 
@@ -263,7 +263,8 @@ class GreenboardUploader:
             parsed_version = es_version.version if es_version.version and es_version.version != "unknown" else "0.0.0"
             parsed_build = es_version.build_number
         else:
-            version_components = version.split("-")
+            # version is Optional now that ES runs may not involve CBL at all;
+            version_components = (version or "").split("-")
 
             if len(version_components) > 0 and version_components[0]:
                 parsed_version = version_components[0]
