@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 import pytest
-from aiohttp import BasicAuth
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
@@ -632,7 +631,7 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
         old_rev_doc = await sync_gateway.get_document_revision_public(
-            "short_expiry", "doc1", old_revision, BasicAuth("user1", "pass", "ascii")
+            "short_expiry", "doc1", old_revision, username="user1", password="pass"
         )
 
         assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
@@ -662,7 +661,8 @@ class TestDeltaSync(CBLTestClass):
                 "short_expiry",
                 "doc1",
                 old_revision,
-                BasicAuth("user1", "pass", "ascii"),
+                username="user1",
+                password="pass",
             )
             assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
                 f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"

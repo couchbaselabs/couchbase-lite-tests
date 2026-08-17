@@ -15,7 +15,7 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
+from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
@@ -683,7 +683,7 @@ class _SyncGatewayBase:
             scheme,
             url,
             port,
-            BasicAuth(username, password, "ascii"),
+            encode_basic_auth(username, password, "ascii"),
         )
 
     @property
@@ -706,18 +706,21 @@ class _SyncGatewayBase:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None) -> ClientSession:
+    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+        """Create a session, where `auth_header` is an `Authorization` header value
+        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
+        headers = {"Authorization": auth_header} if auth_header is not None else None
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
             return ClientSession(
                 f"{scheme}{url}:{port}",
-                auth=auth,
+                headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
         else:
-            return ClientSession(f"{scheme}{url}:{port}", auth=auth)
+            return ClientSession(f"{scheme}{url}:{port}", headers=headers)
 
     async def _send_request(
         self,
@@ -1448,7 +1451,9 @@ class _SyncGatewayBase:
         db_name: str,
         doc_id: str,
         revision: str,
-        auth: BasicAuth,
+        *,
+        username: str,
+        password: str,
         scope: str = "_default",
         collection: str = "_default",
     ) -> dict[str, Any]:
@@ -1459,7 +1464,8 @@ class _SyncGatewayBase:
             db_name: The name of the database
             doc_id: The document ID
             revision: The specific revision to retrieve
-            auth: User authentication credentials
+            username: The username to authenticate as
+            password: The password for the user
             scope: The scope name (defaults to "_default")
             collection: The collection name (defaults to "_default")
 
@@ -1472,7 +1478,8 @@ class _SyncGatewayBase:
         _assert_not_null(db_name, "db_name")
         _assert_not_null(doc_id, "doc_id")
         _assert_not_null(revision, "revision")
-        _assert_not_null(auth, "auth")
+        _assert_not_null(username, "username")
+        _assert_not_null(password, "password")
 
         path = (
             f"/{db_name}/{scope}.{collection}/{doc_id}"
@@ -1481,7 +1488,8 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth) as session:
+        auth_header = encode_basic_auth(username, password, "ascii")
+        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth_header) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
