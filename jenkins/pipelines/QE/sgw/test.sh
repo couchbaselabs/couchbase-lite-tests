@@ -46,6 +46,10 @@ fi
 
 echo "Run tests..."
 pushd "$TESTS_DIR" >/dev/null
-uv run pytest -v --no-header --config QE/config.json \
-  --ignore=dev_e2e/test_replication_xdcr.py \
-  --sgcollect-on-test-failure
+# --session-timeout makes pytest stop gracefully BEFORE Jenkins' 120m step timeout, so junit, greenboard, and
+# sgcollect cleanup all get a runway:
+#   session-timeout = jenkins(120m) - per-test(5m) - setup(20m) = 95m = 5700s
+# --timeout bounds a single hung test (session-timeout is only checked between tests); method=signal raises in the
+# main thread so that test's teardown runs.
+uv run pytest -v --no-header --config QE/config.json --sgcollect-on-test-failure --timeout-method=signal \
+  --timeout=300 --session-timeout=5700 --ignore=dev_e2e/test_replication_xdcr.py
