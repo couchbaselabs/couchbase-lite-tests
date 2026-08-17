@@ -39,18 +39,15 @@ def pytest_configure(config: pytest.Config) -> None:
 
     # Only take over the DEFAULT disposition. If another runner/tool already installed a SIGTERM handler (or set it
     # to ignore, or it was installed from non-Python code), respect that instead of clobbering it.
-    current = signal.getsignal(signal.SIGTERM)
-    if current is not signal.SIG_DFL:
+    if signal.getsignal(signal.SIGTERM) is not signal.SIG_DFL:
         return
 
     try:
-        # signal.signal() only works on the main thread; pytest_configure runs there, but guard anyway in case
-        # pytest is driven off-thread by an embedding runner.
-        signal.signal(signal.SIGTERM, _sigterm_to_sigint)
+        # signal.signal() returns the handler it replaced and only works on the main thread; pytest_configure runs
+        # there, but guard anyway in case pytest is driven off-thread by an embedding runner.
+        _prev_sigterm_handler = signal.signal(signal.SIGTERM, _sigterm_to_sigint)
     except ValueError:
         return
-
-    _prev_sigterm_handler = current
 
 
 @pytest.hookimpl(trylast=True)
@@ -59,8 +56,11 @@ def pytest_unconfigure(config: pytest.Config) -> None:
     if _prev_sigterm_handler is _UNSET:
         return
 
-    try:
-        signal.signal(signal.SIGTERM, _prev_sigterm_handler)
-    except ValueError:
-        pass
+    # Only restore if OUR handler is still installed. If some other code replaced the SIGTERM handler after
+    # pytest_configure, leave that newer handler in place rather than clobbering it.
+    if signal.getsignal(signal.SIGTERM) is _sigterm_to_sigint:
+        try:
+            signal.signal(signal.SIGTERM, _prev_sigterm_handler)
+        except ValueError:
+            pass
     _prev_sigterm_handler = _UNSET

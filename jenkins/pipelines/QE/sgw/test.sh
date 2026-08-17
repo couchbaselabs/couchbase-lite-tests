@@ -4,7 +4,7 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [--setup-only | --skip-setup]"
+  echo "Usage: $0 <cbl_version> <sgw_version> [--setup-only | --skip-setup]"
   echo "  <cbl_version>: The Couchbase Lite version to run the test against."
   echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
@@ -13,18 +13,26 @@ function usage() {
   exit 1
 }
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
 SGW_VERSION=${2}
+shift 2
+
+# The two positionals must be versions, not flags (catches e.g. a flag placed
+# in the version position).
+case "$CBL_VERSION" in -*) usage ;; esac
+case "$SGW_VERSION" in -*) usage ;; esac
 SETUP_ONLY=false
 SKIP_SETUP=false
 
-# Check for optional flags
+# Parse only the optional flags that follow the versions; anything unrecognized
+# (a typo, or a stray positional) is an explicit error rather than silently ignored.
 for arg in "$@"; do
   case "$arg" in
     --setup-only) SETUP_ONLY=true ;;
     --skip-setup) SKIP_SETUP=true ;;
+    *) usage ;;
   esac
 done
 
