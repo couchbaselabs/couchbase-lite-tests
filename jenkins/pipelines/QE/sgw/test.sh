@@ -47,5 +47,4 @@ fi
 echo "Run tests..."
 pushd "$TESTS_DIR" > /dev/null
 uv run pytest -v --no-header --config QE/config.json \
-    --ignore=dev_e2e/test_replication_xdcr.py \
-    --sgcollect-on-test-failure
+    --ignore=dev_e2e/test_replication_xdcr.py

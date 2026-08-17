@@ -42,8 +42,17 @@ pipeline {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
-                timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
+                script {
+                    try {
+                        timeout(time: 120, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
+                        }
+                    } catch (org.jenkinsci.plugins.workflow.steps.FlowInterruptedException e) {
+                        if (e.getCauses().any { it.getClass().getName().contains('UserInterruption') }) {
+                            env.SGCOLLECT_MANUAL_ABORT = 'true'
+                        }
+                        throw e
+                    }
                 }
                 echo "=== SGW Tests Complete"
             }
@@ -58,6 +67,23 @@ pipeline {
                             archiveArtifacts artifacts: '*/junit_result.xml', fingerprint: true, allowEmptyArchive: true
                         } catch (err) {
                             echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                        }
+                    }
+
+                    // Collect SGW diagnostics BEFORE teardown. This covers test failures
+                    // AND timeouts, which the in-process pytest fixture can't.
+                    script {
+                        if (currentBuild.currentResult != 'SUCCESS' && env.SGCOLLECT_MANUAL_ABORT != 'true') {
+                            echo "=== Collecting SGW diagnostics (result=${currentBuild.currentResult})"
+                            try {
+                                timeout(time: 30, unit: 'MINUTES') {
+                                    sh(script: "jenkins/pipelines/QE/sgw/sgcollect.sh", returnStatus: true)
+                                }
+                            } catch (err) {
+                                echo "WARNING: sgcollect step interrupted/failed: ${err}; continuing to teardown"
+                            }
+                        } else {
+                            echo "=== Skipping SGW diagnostics (result=${currentBuild.currentResult}, manualAbort=${env.SGCOLLECT_MANUAL_ABORT ?: 'false'})"
                         }
                     }
 
