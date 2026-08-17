@@ -141,7 +141,6 @@ class TestPeerToPeer(CBLTestClass):
 
         self.mark_test_step("Stop listener")
         await listener.stop()
-        asyncio.sleep(2)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
@@ -225,7 +224,6 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Stop listener")
         await listener1.stop()
         await listener2.stop()
-        asyncio.sleep(2)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
@@ -304,7 +302,6 @@ class TestPeerToPeer(CBLTestClass):
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
-        asyncio.sleep(2)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
@@ -396,7 +393,6 @@ class TestPeerToPeer(CBLTestClass):
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
-        asyncio.sleep(2)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
@@ -502,7 +498,6 @@ class TestPeerToPeer(CBLTestClass):
         await listener1.stop()
         await listener2.stop()
         await listener3.stop()
-        asyncio.sleep(2)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
@@ -579,4 +574,3 @@ class TestPeerToPeer(CBLTestClass):
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
-        asyncio.sleep(2)
