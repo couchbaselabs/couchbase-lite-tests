@@ -41,6 +41,7 @@ class TestChangesFeed(CBLTestClass):
             },
             num_index_replicas=0,
         )
+        await sync_gateway.delete_database(sg_db_name)
         await sync_gateway.put_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
@@ -125,4 +126,3 @@ class TestChangesFeed(CBLTestClass):
             doc_ids=["doc_10", "doc_9"],
         )
         assert len(changes["results"]) == 2, f"Expected 2 changes, but got {len(changes['results'])} changes."
-        await sync_gateway.delete_database(sg_db_name)
