@@ -38,14 +38,29 @@ pipeline {
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'sgw'
             }
-            steps {
-                // Unlock keychain:
-                sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
-                echo "=== Run SGW Tests"
-                timeout(time: 120, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
+            // Nested stages so Stage View shows Infra Setup and Run Tests as
+            // separate columns while sharing this one agent + workspace (setup's
+            // generated config.json/topology.json must persist to the tests run).
+            stages {
+                stage('Infra Setup') {
+                    steps {
+                        // Unlock keychain:
+                        sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
+                        // Provision the backend under its own timeout so setup time
+                        // does NOT eat into the tests' 90m budget.
+                        timeout(time: 40, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --setup-only"
+                        }
+                    }
                 }
-                echo "=== SGW Tests Complete"
+                stage('Run Tests') {
+                    steps {
+                        // The 90m applies to the test run only (backend already up).
+                        timeout(time: 90, unit: 'MINUTES') {
+                            sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --skip-setup"
+                        }
+                    }
+                }
             }
             post {
                 always {
