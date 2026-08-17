@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import Flag, auto
 from typing import Any, Final
 
@@ -10,7 +11,7 @@ from cbltest.jsonhelper import _get_typed, _get_typed_required
 _response_registry: dict[tuple[type, int], type] = {}
 
 
-def register_response(request_type: type, version: int | list[int]):
+def register_response(request_type: type, version: int | list[int]) -> Callable[[type[TestServerResponse]], type]:
     def deco(cls: type[TestServerResponse]) -> type:
         if isinstance(version, list):
             for v in version:
@@ -58,7 +59,7 @@ class TestServerResponse(JSONSerializable):
         body: dict,
         http_name: str,
         http_method: str = "post",
-    ):
+    ) -> None:
         self.__status_code = status_code
         self.__uuid = uuid
         self.__error = ErrorResponseBody.create(body)
@@ -136,7 +137,7 @@ class GetRootResponse(TestServerResponse):
         """ "Gets any additional info that the server happens to send"""
         return self.__additional_info
 
-    def __init__(self, status_code: int, uuid: str, json: dict):
+    def __init__(self, status_code: int, uuid: str, json: dict) -> None:
         self.__lib_version = _get_typed_required(json, self.__version_key, str)
         self.__api_version = _get_typed_required(json, self.__api_version_key, int)
         self.__cbl = _get_typed_required(json, self.__cbl_key, str)

@@ -8,7 +8,7 @@ from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
 from cbltest.version import VERSION
 
 
-def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]):
+def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]) -> bool:
     """
     A CBL revision and a SG revision are the same iff the cbl_rev
     (an array of rev tree rev id and hlv cv) matches one of the sg_revs exactly
@@ -50,7 +50,7 @@ class DocsCompareResult:
         """Gets whether or not the two lists match"""
         return self.__success
 
-    def __init__(self, success: bool, message: str | None = None):
+    def __init__(self, success: bool, message: str | None = None) -> None:
         self.__success = success
         self.__message = message
 

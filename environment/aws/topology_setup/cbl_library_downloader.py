@@ -7,7 +7,7 @@ from environment.aws.common.io import download_progress_bar
 
 
 class CBLLibraryDownloader:
-    def __init__(self, project: str, file: str, version: str, build: int = 0):
+    def __init__(self, project: str, file: str, version: str, build: int = 0) -> None:
         self.__project = project
         self.__file = file
         self.__version = version

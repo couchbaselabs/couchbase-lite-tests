@@ -23,13 +23,15 @@ class TestPeerToPeerTopology(CBLTestClass):
         [(10, True, "push_pull"), (100, False, "push_pull")],
     )
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_peer_to_peer_topology_mesh(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
+    async def test_peer_to_peer_topology_mesh(
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: str
+    ) -> None:
         replicator_type_map = {
             "push_pull": ReplicatorType.PUSH_AND_PULL,
             "pull": ReplicatorType.PULL,
             "push": ReplicatorType.PUSH,
         }
-        replicator_type = replicator_type_map[replicator_type]
+        resolved_replicator_type = replicator_type_map[replicator_type]
 
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
@@ -72,7 +74,7 @@ class TestPeerToPeerTopology(CBLTestClass):
                 replicator = Replicator(
                     source_db,
                     endpoint=cblpytest.test_servers[target_idx].replication_url("db1", listener_port),
-                    replicator_type=replicator_type,
+                    replicator_type=resolved_replicator_type,
                     collections=[ReplicatorCollectionEntry(["_default._default"])],
                     continuous=continuous,
                 )
@@ -116,13 +118,15 @@ class TestPeerToPeerTopology(CBLTestClass):
         ],
     )
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_peer_to_peer_topology_loop(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
+    async def test_peer_to_peer_topology_loop(
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: str
+    ) -> None:
         replicator_type_map = {
             "push_pull": ReplicatorType.PUSH_AND_PULL,
             "pull": ReplicatorType.PULL,
             "push": ReplicatorType.PUSH,
         }
-        replicator_type = replicator_type_map[replicator_type]
+        resolved_replicator_type = replicator_type_map[replicator_type]
 
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
@@ -161,7 +165,7 @@ class TestPeerToPeerTopology(CBLTestClass):
             replicator = Replicator(
                 source_db,
                 endpoint=cblpytest.test_servers[target_peer_idx].replication_url("db1", listener_port),
-                replicator_type=replicator_type,
+                replicator_type=resolved_replicator_type,
                 collections=[ReplicatorCollectionEntry(["_default._default"])],
                 continuous=continuous,
             )

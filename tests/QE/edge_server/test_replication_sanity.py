@@ -169,6 +169,7 @@ class TestReplicationSanity(CBLTestClass):
         assert remote_doc.id == doc_id_es, f"Document ID mismatch: {remote_doc.id}"
 
         rev_id = remote_doc.revid
+        assert rev_id is not None, f"Document {doc_id_es} has no revision ID."
 
         self.mark_test_step(f"Deleting document {doc_id_es} via Edge Server.")
         delete_resp = await edge_server.delete_document(doc_id_es, rev_id, es_db_name)

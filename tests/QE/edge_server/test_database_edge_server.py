@@ -26,7 +26,7 @@ class TestDatabase(CBLTestClass):
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
         resp = await edge_server.get_db_info(db_name="db", collection="test")
-        assert "test" in resp.get("collection_name"), "Collection not found"
+        assert "test" in resp["collection_name"], "Collection not found"
         # REST API writes should fail
         try:
             response = await edge_server.add_document_auto_id({"readonly": {"key": "value"}}, "db", collection="test")

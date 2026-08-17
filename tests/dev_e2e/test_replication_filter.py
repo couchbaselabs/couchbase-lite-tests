@@ -505,7 +505,7 @@ class TestReplicationFilter(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_custom_pull_filter(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        def repl_filter(x):
+        def repl_filter(x: ReplicatorDocumentEntry) -> bool:
             return (x.error is None) or ((x.error.domain == "CouchbaseLite") and (x.error.code == 10403))
 
         self.mark_test_step("Reset SG and load `names` dataset.")

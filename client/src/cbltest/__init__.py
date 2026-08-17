@@ -23,7 +23,7 @@ from .version import available_api_version
 
 
 class _ClusterBuilder:
-    def __init__(self):
+    def __init__(self) -> None:
         # These may come in from the config file out of order,
         # so use dictionaries to collect them instead of hacking
         # None or blank clusters into a list
@@ -124,7 +124,7 @@ class CBLPyTest:
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
-    ):
+    ) -> "CBLPyTest":
         ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version)
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
@@ -149,7 +149,7 @@ class CBLPyTest:
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
-    ):
+    ) -> None:
         self.__config = config
         self.__log_level = LogLevel(log_level)
         cbl_setLogLevel(self.__log_level)

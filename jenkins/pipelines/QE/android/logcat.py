@@ -5,7 +5,7 @@ import subprocess
 import time
 
 
-def adb_logcat(adb_path, device_serial):
+def adb_logcat(adb_path: str, device_serial: str | None) -> None:
     test_start = re.compile(">>>>>>>>>> (\\w+)")
     test_name = None
     out_file = None

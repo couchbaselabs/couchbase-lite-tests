@@ -27,7 +27,7 @@ class CertKeyPair:
         private_key: pkcs12.PKCS12PrivateKeyTypes,
         *,
         password: str = "couchbase",
-    ):
+    ) -> None:
         self.certificate = certificate
         self.private_key = private_key
         self.password = password

@@ -2,10 +2,12 @@ import asyncio
 import random
 import uuid
 from pathlib import Path
+from typing import Any
 
 import pytest
+from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.edgeserver import BulkDocOperation
+from cbltest.api.edgeserver import BulkDocOperation, EdgeServer
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.asyncfile import read_json_file, write_json_file
 
@@ -17,7 +19,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(3)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
+    async def test_kill_sgw_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
@@ -70,6 +72,7 @@ class TestEdgeServerChaos(CBLTestClass):
             for id, doc in update_docs.items()
         ]
         result = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
+        assert result is not None, "Bulk doc operation returned no result"
 
         await edge_server.set_firewall_rules(deny=[sgw.hostname])
         revmap = {doc.get("id"): doc.get("rev") for doc in result}
@@ -92,7 +95,14 @@ class TestEdgeServerChaos(CBLTestClass):
         )
         await edge_server.reset_firewall()
 
-    async def kill_edge_perform_ops(self, kill_server: list, ops_server: list, docgen, revmap, docs_list):
+    async def kill_edge_perform_ops(
+        self,
+        kill_server: list[EdgeServer],
+        ops_server: list[EdgeServer],
+        docgen: JSONGenerator,
+        revmap: dict[str, str],
+        docs_list: dict[str, Any],
+    ) -> dict[str, Any]:
         for server in kill_server:
             await server.kill_server()
         self.mark_test_step(f"Edge servers in {kill_server} killed")
@@ -124,7 +134,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
     @pytest.mark.min_edge_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_3_edge_with_sync(self, cblpytest, dataset_path) -> None:
+    async def test_3_edge_with_sync(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_3_edge_with_sync")
         self.mark_test_step("Configure Edge Server1 with travel dataset")
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(
@@ -203,7 +213,7 @@ class TestEdgeServerChaos(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_server_offline_sync_and_recovery(self, cblpytest, dataset_path) -> None:
+    async def test_edge_server_offline_sync_and_recovery(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Edge Server Offline Sync and Recovery")
         cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
@@ -283,7 +293,17 @@ class TestEdgeServerChaos(CBLTestClass):
             f"Collection hotels count mismatch in len(edge1_docs.rows): {len(edge1_docs.rows)} ,  len(sgw_docs.rows): {len(sgw_docs.rows)}, len(edge2_docs.rows):  {len(edge2_docs.rows)} and {docgen.size}"
         )
 
-    async def perform_operation(self, client, optype, docs_dict, docgen, db_name, scope, collection, revmap):
+    async def perform_operation(
+        self,
+        client: EdgeServer,
+        optype: str,
+        docs_dict: dict[str, Any],
+        docgen: JSONGenerator,
+        db_name: str,
+        scope: str,
+        collection: str,
+        revmap: dict[str, str],
+    ) -> bool | None:
         """Perform async CRUD operation based on random optype"""
         doc_id = None
 
@@ -301,12 +321,12 @@ class TestEdgeServerChaos(CBLTestClass):
                     db_name=db_name,
                     scope=scope,
                     collection=collection,
-                    doc_id=doc_id,
+                    id=doc_id,
                 )
 
                 if response.get("ok"):
                     docs_dict[doc_id] = new_doc
-                    revmap[doc_id] = response.get("rev")
+                    revmap[doc_id] = response["rev"]
                 return response.get("ok", False)
 
             # Pick existing doc
@@ -316,7 +336,7 @@ class TestEdgeServerChaos(CBLTestClass):
                 updated_doc = docgen.update_document(docs_dict[doc_id], doc_id)
 
                 response = await client.put_document_with_id(
-                    doc_id=doc_id,
+                    id=doc_id,
                     document=updated_doc,
                     db_name=db_name,
                     scope=scope,
@@ -326,7 +346,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
                 if response.get("ok"):
                     docs_dict[doc_id] = updated_doc
-                    revmap[doc_id] = response.get("rev")
+                    revmap[doc_id] = response["rev"]
                 return response.get("ok", False)
 
             if optype == "delete" and doc_id in revmap:
@@ -351,6 +371,8 @@ class TestEdgeServerChaos(CBLTestClass):
                 if not local_doc:
                     return True  # deleted concurrently
 
+                assert remote_doc is not None, f"Document {doc_id} not found"
+
                 for key, value in remote_doc.body.items():
                     assert local_doc.get(key) == value
                 return True
@@ -359,7 +381,7 @@ class TestEdgeServerChaos(CBLTestClass):
             return False
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_server_with_concurrent_rest_requests(self, cblpytest, dataset_path) -> None:
+    async def test_edge_server_with_concurrent_rest_requests(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Edge Server with concurrent REST CRUD operations")
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(

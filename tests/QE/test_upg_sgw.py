@@ -25,7 +25,7 @@ from cbltest.api.syncgateway import (
 @pytest.mark.min_couchbase_servers(1)
 class TestSgwUpgrade(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_and_persistence_after_upgrade(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replication_and_persistence_after_upgrade(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         This test runs after each SGW upgrade. It performs two key checks:
         1. Ingests a new set of documents to verify that the newly upgraded

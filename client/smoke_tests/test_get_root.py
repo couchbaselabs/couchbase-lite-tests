@@ -1,10 +1,12 @@
+from types import FunctionType
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.globals import CBLPyTestGlobal
 
 
 class TestGetRoot:
-    def setup_method(self, method):
+    def setup_method(self, method: FunctionType) -> None:
         # If writing a new test do not forget this step or the test server
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__

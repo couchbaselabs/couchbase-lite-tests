@@ -25,7 +25,7 @@ from cbltest.api.test_functions import compare_local_and_remote
 @pytest.mark.min_sync_gateways(1)
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -133,7 +133,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -245,7 +245,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -354,7 +354,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -557,7 +557,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
@@ -699,7 +699,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -779,7 +779,7 @@ class TestDeltaSync(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

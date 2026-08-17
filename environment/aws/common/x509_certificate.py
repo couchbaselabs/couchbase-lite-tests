@@ -31,7 +31,7 @@ class CertKeyPair:
         self,
         certificate: Certificate,
         private_key: pkcs12.PKCS12PrivateKeyTypes,
-    ):
+    ) -> None:
         self.certificate = certificate
         self.private_key = private_key
 
