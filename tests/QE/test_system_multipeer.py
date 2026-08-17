@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.cloud import CouchbaseCloud
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator import Replicator
@@ -285,6 +284,7 @@ class TestSystemMultipeer(CBLTestClass):
     @pytest.mark.min_test_servers(5)
     @pytest.mark.min_sync_gateways(2)
     @pytest.mark.min_couchbase_servers(2)
+    @pytest.mark.min_clusters(2)
     @pytest.mark.parametrize(
         "transport, doc_count",
         [("BLUETOOTH", 300), ("WIFI", 1000), ("MIXED_MODE", 700)],
@@ -300,11 +300,8 @@ class TestSystemMultipeer(CBLTestClass):
         DOC_COUNT = doc_count
 
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud_1 = CouchbaseCloud([cblpytest.sync_gateways[0]], cblpytest.couchbase_servers[0])
-        await cloud_1.configure_dataset(dataset_path, "names")
-
-        cloud_2 = CouchbaseCloud([cblpytest.sync_gateways[1]], cblpytest.couchbase_servers[1])
-        await cloud_2.configure_dataset(dataset_path, "names")
+        await cblpytest.clusters[0].configure_dataset(dataset_path, "names")
+        await cblpytest.clusters[1].configure_dataset(dataset_path, "names")
 
         self.mark_test_step("Reset DBs on all CBL clients and SGWs")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -328,13 +325,13 @@ class TestSystemMultipeer(CBLTestClass):
                 """)
         replicator1 = Replicator(
             all_dbs[0],
-            cblpytest.sync_gateways[0].replication_url("names"),
+            cblpytest.clusters[0].sync_gateways[0].replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
             continuous=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cblpytest.clusters[0].sync_gateways[0].tls_cert(),
         )
         await replicator1.start()
 
@@ -350,13 +347,13 @@ class TestSystemMultipeer(CBLTestClass):
                         """)
         replicator2 = Replicator(
             all_dbs[-2],
-            cblpytest.sync_gateways[1].replication_url("names"),
+            cblpytest.clusters[1].sync_gateways[0].replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
             continuous=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cblpytest.clusters[1].sync_gateways[0].tls_cert(),
         )
         await replicator2.start()
 
@@ -371,13 +368,13 @@ class TestSystemMultipeer(CBLTestClass):
                         """)
         replicator3 = Replicator(
             all_dbs[-1],
-            cblpytest.sync_gateways[1].replication_url("names"),
+            cblpytest.clusters[1].sync_gateways[0].replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
             enable_document_listener=True,
             continuous=True,
-            pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
+            pinned_server_cert=cblpytest.clusters[1].sync_gateways[0].tls_cert(),
         )
         await replicator3.start()
 
@@ -429,9 +426,9 @@ class TestSystemMultipeer(CBLTestClass):
             insert_server(
                 cblpytest.couchbase_servers[0],
             ),
-            insert_server(cblpytest.couchbase_servers[1]),
-            insert_sgw(cblpytest.sync_gateways[0]),
-            insert_sgw(cblpytest.sync_gateways[1]),
+            insert_server(cblpytest.clusters[1].couchbase_servers[0]),
+            insert_sgw(cblpytest.clusters[0].sync_gateways[0]),
+            insert_sgw(cblpytest.clusters[1].sync_gateways[0]),
             insert_testserver(all_dbs[0]),
             insert_testserver(all_dbs[2]),
             insert_testserver(all_dbs[3]),
@@ -469,7 +466,7 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly in SGW1")
         await compare_local_and_remote(
             all_dbs[0],
-            cblpytest.sync_gateways[0],
+            cblpytest.clusters[0].sync_gateways[0],
             ReplicatorType.PUSH_AND_PULL,
             "names",
             ["_default._default"],
@@ -477,7 +474,7 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly in SGW2")
         await compare_local_and_remote(
             all_dbs[-1],
-            cblpytest.sync_gateways[0],
+            cblpytest.clusters[1].sync_gateways[0],
             ReplicatorType.PUSH_AND_PULL,
             "names",
             ["_default._default"],

@@ -3,19 +3,19 @@
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-    echo "Usage: $0 <version> <platform> <sgw_version> [private_key_path]"
-    echo "version: CBL version (e.g. 3.2.1-2)"
-    echo "platform: The C platform to build (e.g. ios)"
-    echo "sgw_version: Version of Sync Gateway to download and use"
+  echo "Usage: $0 <version> <platform> <sgw_version> [private_key_path]"
+  echo "version: CBL version (e.g. 3.2.1-2)"
+  echo "platform: The C platform to build (e.g. ios)"
+  echo "sgw_version: Version of Sync Gateway to download and use"
 }
 
 if [ $# -lt 3 ]; then
-    usage
-    exit 1
+  usage
+  exit 1
 fi
 
 cbl_version=$1

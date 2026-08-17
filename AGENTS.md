@@ -57,7 +57,7 @@ uv run ruff format .
 uv run --group lint ty check
 
 # Pre-commit suite
-uv run pre-commit run --all-files
+uvx pre-commit run --all-files
 
 # Framework tests (used in CI)
 uv run -- pytest --config client/tests/empty_config.json client/tests
@@ -136,7 +136,8 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## CI/CD
 
-- `.github/workflows/python_verify.yml` — runs `ty check`, `ruff format --check`, `ruff check` on Python changes.
+- `.github/workflows/pre-commit.yml` — runs the full `pre-commit` hook suite (`ruff`, `ruff-format`, `pyupgrade`, `ty`, `yamlfmt`, `taplo`, `shfmt`, editorconfig) against all files on every push/PR.
+- `.github/workflows/python_verify.yml` — runs `client/tests` on Python changes.
 - `.github/workflows/openapi.yml` — Redocly lint + yamllint on `spec/api/` changes; posts PR preview link.
 - `jenkins/pipelines/prebuild/` — builds test-server artifacts.
 - `jenkins/pipelines/{dev_e2e,QE}/{platform}/` — per-platform CI runs.
@@ -147,7 +148,7 @@ For every code change provide evidence from applicable validators:
 
 1. Lint/format: `uv run ruff check .` and `uv run ruff format .`
 2. Types: `uv run --group lint ty check`
-3. Hooks: `uv run pre-commit run --all-files`
+3. Hooks: `uvx pre-commit run --all-files`
 4. Tests scoped to the changed area:
    - `client/` → `client/tests` and/or `client/smoke_tests`
    - `tests/dev_e2e` or `tests/QE` → targeted pytest with `--config`

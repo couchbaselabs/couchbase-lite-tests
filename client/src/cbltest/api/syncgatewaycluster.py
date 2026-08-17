@@ -1,5 +1,6 @@
 import asyncio
 import random
+from collections.abc import Sequence
 
 from cbltest.api.syncgateway import SyncGateway
 
@@ -10,14 +11,14 @@ class SyncGatewayCluster:
     of them.
     """
 
-    def __init__(self, sync_gateways: list[SyncGateway]):
+    def __init__(self, sync_gateways: Sequence[SyncGateway]):
         if not sync_gateways:
             raise ValueError("At least one Sync Gateway must be provided")
         self.__sync_gateways = sync_gateways
         self.__round_robin_index = 0
 
     @property
-    def sync_gateways(self) -> list[SyncGateway]:
+    def sync_gateways(self) -> Sequence[SyncGateway]:
         """Gets the Sync Gateway nodes that make up this cluster"""
         return self.__sync_gateways
 

@@ -368,7 +368,6 @@ paths:
           (after it is unzipped, if necessary) according to the following rules:
             * "image/jpeg" for the .jpg
             * "application/octet-stream" for others
-
       operationId: updateDatabase
       requestBody:
         description: |-
@@ -641,7 +640,6 @@ paths:
                       Error Case 2 : The specified snapshot was not found.
 
                       Error Case 3 : The document in the collection to be verified didn't exist in the snapshot.
-
                     type: string
                     example: "Document 'doc-1' in 'scope.collection' has unexpected properties at key 'address.city'"
                   actual:
@@ -766,7 +764,7 @@ paths:
               type: object
               required: ['message']
               properties:
-                message::
+                'message:':
                   type: string
                   example: 'Client has caught fire'
       responses:
@@ -999,10 +997,7 @@ components:
       type: object
       additionalProperties:
         type: string
-      example: {
-        'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}],
-        'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice'}]
-      }
+      example: {'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}], 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice'}]}
     Document:
       description: |-
         Contains document's properties and the metadata.
@@ -1065,11 +1060,7 @@ components:
           items:
             type: object
             additionalProperties: {}
-            example:
-              [
-                {'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'}},
-                {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'}}
-              ]
+            example: [{'people[47].address': {'street': 'Oak St. ', 'city': 'Auburn'}}, {'people[3].address': {'street': 'Elm St. ', 'city': 'Sibley'}}]
         removedProperties:
           description: An array of the key paths which refer to ditionary keys or array elements to be removed.
           type: array
@@ -1077,8 +1068,7 @@ components:
             type: string
             example: ['people[22].address', 'people[3]']
         updatedBlobs:
-          description: A dictionary whose keys are the key paths into the document to be updated with the
-            blob objects and values are the urls from which to obtain the blob files.
+          description: A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are the urls from which to obtain the blob files.
           type: object
           additionalProperties: {}
           example: {'photo.thumbnail': 'https://media.githubusercontent.com/media/blob/s1.jpg'}
@@ -1409,10 +1399,7 @@ components:
                     description: 'Dataset url. Cannot be used together with collections.'
                     type: string
                     example: "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"
-          example: {
-            'db1': {},
-            'db2': {'collections': ["_default.employees"]},
-            'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"}}
+          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"}}
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
@@ -1497,7 +1484,6 @@ components:
         Response body: JSON object including domain, code, and message.
           * CouchbaseLite error: The domain (CBL,POSIX,SQLITE,FLEECE) and the code will be from CouchbaseLite error.
           * Non CouchbaseLite error:  The domain will be TESTSERVER and the code will be the same as the status code.
-
       content:
         application/json:
           schema:

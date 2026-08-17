@@ -21,6 +21,5 @@ if [[ -z "$CONTENT" || "$CONTENT" == "null" ]]; then
 fi
 
 mkdir -p "$(dirname "$PATH_VALUE")"
-printf '%s' "$CONTENT" > "$PATH_VALUE"
+printf '%s' "$CONTENT" >"$PATH_VALUE"
 echo '{"ok": true}'
-

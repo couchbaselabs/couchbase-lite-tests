@@ -4,6 +4,7 @@ import inspect
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
@@ -167,6 +168,11 @@ def _make_cblpytest(
     cblpytest._CBLPyTest__test_servers = test_servers if test_servers is not None else []
     cblpytest._CBLPyTest__sync_gateways = sync_gateways if sync_gateways is not None else []
     cblpytest._CBLPyTest__edge_servers = edge_servers if edge_servers is not None else []
+    cluster = SimpleNamespace(
+        sync_gateways=sync_gateways if sync_gateways is not None else [],
+        couchbase_servers=[],
+    )
+    cblpytest._CBLPyTest__clusters = [cluster]
     return cblpytest
 
 
@@ -419,7 +425,7 @@ class TestGreenboardFixture:
 
     @pytest.mark.asyncio
     async def test_no_servers_or_gateways_skips_upload(self):
-        """No test servers, sync gateways *or* edge servers means nothing to
+        """No test servers, sync gateways or edge servers means nothing to
         report; skip upload."""
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[])
         config = _make_pytestconfig()

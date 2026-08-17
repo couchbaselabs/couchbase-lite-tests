@@ -29,7 +29,7 @@ class TestCustomConflict(CBLTestClass):
         setup_snapshot: Callable[[SnapshotUpdater], str],
     ):
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
@@ -120,7 +120,7 @@ class TestCustomConflict(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
         self.mark_test_step("Reset SG and load `names` dataset")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 

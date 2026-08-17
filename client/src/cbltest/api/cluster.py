@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from json import dumps, loads
 from pathlib import Path
 from typing import cast
@@ -15,34 +16,13 @@ from cbltest.utils import _try_n_times
 from cbltest.version import VERSION
 
 
-class CouchbaseCloud:
+class CouchbaseCluster:
     """
-    A class that performs operations that require coordination between both Sync Gateway
-    and Couchbase Server.
+    A class that represents a logical grouping of Sync Gateways and Couchbase Server nodes
+    that function together as a cluster.  This requires optional information in the config
+    JSON file to describe, and if that information is absent every cloud node will be in the
+    same cluster.
     """
-
-    def __init__(
-        self,
-        sync_gateways: list[SyncGateway],
-        server: CouchbaseServer | None,
-    ):
-        if not sync_gateways:
-            raise CblTestError("At least one Sync Gateway must be provided")
-        self.__sync_gateways = sync_gateways
-        self.__sync_gateway_cluster = SyncGatewayCluster(sync_gateways)
-
-        if server:
-            self.__couchbase_server: CouchbaseServer = server
-        elif len(self.__sync_gateways) > 1:
-            raise CblTestError("Couchbase Server must be provided when configuring multiple Sync Gateway nodes")
-        elif not self.__sync_gateways[0].using_rosmar:
-            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
-        self.__tracer = get_tracer(__name__, VERSION)
-
-    @property
-    def sync_gateways(self) -> list[SyncGateway]:
-        """All Sync Gateway nodes managed by this Couchbase Cloud instance."""
-        return self.__sync_gateways
 
     @property
     def sync_gateway_cluster(self) -> SyncGatewayCluster:
@@ -50,15 +30,38 @@ class CouchbaseCloud:
         return self.__sync_gateway_cluster
 
     @property
-    def couchbase_server(self) -> CouchbaseServer:
-        if not hasattr(self, "_CouchbaseCloud__couchbase_server"):
+    def sync_gateways(self) -> Sequence[SyncGateway]:
+        return self.sync_gateway_cluster.sync_gateways
+
+    @property
+    def couchbase_servers(self) -> Sequence[CouchbaseServer]:
+        return self.__couchbase_servers
+
+    def __init__(
+        self,
+        sync_gateways: Sequence[SyncGateway],
+        servers: Sequence[CouchbaseServer],
+    ):
+        self.__sync_gateway_cluster = SyncGatewayCluster(sync_gateways)
+        self.__couchbase_servers: Sequence[CouchbaseServer] = []
+        if len(servers) > 0:
+            self.__couchbase_servers = servers
+        elif len(sync_gateways) > 1:
             raise CblTestError(
-                "Couchbase Server is not available for this Couchbase Cloud instance, configured using rosmar"
+                "At least one Couchbase Server must be provided when configuring multiple Sync Gateway nodes"
             )
-        return self.__couchbase_server
+        elif not sync_gateways[0].using_rosmar:
+            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
+
+        self.__tracer = get_tracer(__name__, VERSION)
+
+    async def close(self) -> None:
+        """Closes all the resources in the cluster"""
+        for sgw in self.sync_gateways:
+            await sgw.close()
 
     def _create_collections(self, db_payload: DatabaseConfig) -> None:
-        if self.__sync_gateways[0].using_rosmar:
+        if self.sync_gateways[0].using_rosmar:
             return
         assert db_payload.bucket is not None, "DatabaseConfig is missing required field 'bucket'"
         if db_payload.scopes:
@@ -69,10 +72,10 @@ class CouchbaseCloud:
                         collections = list(scope_config.collections.keys())
                     elif isinstance(scope_config.collections, list):
                         collections = scope_config.collections
-                self.__couchbase_server.create_collections(db_payload.bucket, scope, collections)
+                self.couchbase_servers[0].create_collections(db_payload.bucket, scope, collections)
 
     def _check_all_indexes_removed(self, bucket: str) -> None:
-        count = self.__couchbase_server.indexes_count(bucket)
+        count = self.couchbase_servers[0].indexes_count(bucket)
         if count > 0:
             raise ValueError(f"{count} indexes remain in '{bucket}' bucket")
 
@@ -93,11 +96,11 @@ class CouchbaseCloud:
         :param sg_config_options: An optional list of options to apply to the base SG config
 
         .. note:: The expected format is a file named <database_name>-sg-config.json
-                  containing a config and users key, for use with the PUT /<db> and
-                  PUT /<db>/<user> endpoints and a file named <database_name>-sg.json
-                  containing the actual data to populate.  Any config options that can
-                  be passed to sg_config_options will be in a key called "config_options"
-                  in <database_name>-sg-config.json
+                    containing a config and users key, for use with the PUT /<db> and
+                    PUT /<db>/<user> endpoints and a file named <database_name>-sg.json
+                    containing the actual data to populate.  Any config options that can
+                    be passed to sg_config_options will be in a key called "config_options"
+                    in <database_name>-sg-config.json
         """
         with self.__tracer.start_as_current_span(
             "configure_dataset", attributes={"cbl.dataset.name": dataset_name}
@@ -137,11 +140,11 @@ class CouchbaseCloud:
             assert db_payload.bucket is not None, (
                 f"{dataset_name}-sg-config.json config is missing required field 'bucket'"
             )
-            sg = self.__sync_gateways[0]
+            sg = self.sync_gateways[0]
             try:
                 # buckets and collections are implicitly created when using Rosmar
                 if not sg.using_rosmar:
-                    self.couchbase_server.create_bucket(db_payload.bucket)
+                    self.couchbase_servers[0].create_bucket(db_payload.bucket)
                     self._create_collections(db_payload)
                 await sg.put_database(dataset_name, db_payload)
             except CblSyncGatewayBadResponseError as e:
@@ -153,7 +156,7 @@ class CouchbaseCloud:
                 await self.drop_bucket(db_payload.bucket)
                 await self.sync_gateway_cluster.wait_for_no_databases(db_payload.bucket)
                 if not sg.using_rosmar:
-                    self.__couchbase_server.create_bucket(db_payload.bucket)
+                    self.couchbase_servers[0].create_bucket(db_payload.bucket)
                     self._create_collections(db_payload)
 
                     # CBL-4977 :
@@ -180,12 +183,12 @@ class CouchbaseCloud:
 
             await sg.load_dataset(dataset_name, data_filepath)
 
-            if len(self.__sync_gateways) > 1:
+            if len(self.sync_gateways) > 1:
                 await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
 
-    async def drop_bucket(self, bucket_name: str):
+    async def drop_bucket(self, bucket_name: str) -> None:
         """Drop the bucket from the backing cluster."""
-        sg = self.__sync_gateways[0]
+        sg = self.sync_gateways[0]
         if sg.using_rosmar:
             try:
                 await sg._send_request("delete", f"/_rosmar/{bucket_name}")
@@ -193,4 +196,4 @@ class CouchbaseCloud:
                 if e.code != 404:
                     raise
         else:
-            self.couchbase_server.drop_bucket(bucket_name)
+            self.couchbase_servers[0].drop_bucket(bucket_name)

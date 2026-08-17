@@ -20,7 +20,7 @@ class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
         sgw = cloud.sync_gateways[0]
         source_db = sgw.replication_url("travel")
@@ -206,7 +206,7 @@ class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_offline_sync_and_recovery(self, cblpytest, dataset_path) -> None:
         self.mark_test_step("Edge Server Offline Sync and Recovery")
-        cloud = cblpytest.simple_cloud()
+        cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
         sgw = cblpytest.sync_gateways[0]
         source_db = sgw.replication_url("travel")

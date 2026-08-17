@@ -8,9 +8,12 @@ NC='\033[0m'
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-info()  { echo -e "${GREEN}[OK]${NC} $1"; }
-warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
-fail()  { echo -e "${RED}[ERROR]${NC} $1"; exit 1; }
+info() { echo -e "${GREEN}[OK]${NC} $1"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+fail() {
+  echo -e "${RED}[ERROR]${NC} $1"
+  exit 1
+}
 
 # --- Python ---
 if ! command -v python3 &>/dev/null; then
@@ -73,7 +76,7 @@ info "Git hooks installed (pre-commit)"
 # --- Regenerate secrets baseline if missing ---
 if [ ! -f "$REPO_ROOT/.secrets.baseline" ]; then
   warn ".secrets.baseline not found. Generating..."
-  detect-secrets scan > "$REPO_ROOT/.secrets.baseline"
+  detect-secrets scan >"$REPO_ROOT/.secrets.baseline"
   info "Secrets baseline generated"
 else
   info "Secrets baseline exists"
