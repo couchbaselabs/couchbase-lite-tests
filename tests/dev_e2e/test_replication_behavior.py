@@ -4,6 +4,7 @@ import pytest
 import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
@@ -111,12 +112,15 @@ class TestReplicationBehavior(CBLTestClass):
 
         loc_deleted = "name_50"
         self.mark_test_step(f"Delete `{loc_deleted}` in the local database.")
+        snapshot = await db.create_snapshot([DocumentEntry("_default._default", loc_deleted)])
         async with db.batch_updater() as b:
             b.delete_document("_default._default", loc_deleted)
 
         self.mark_test_step(f"Assert `{loc_deleted}`,  is `deleted`")
-        query_result = await db.run_query("SELECT META().id FROM _default WHERE META().deleted")
-        assert len(query_result) == 1 and query_result[0]["id"] == loc_deleted
+        snapshot_updater = SnapshotUpdater(snapshot)
+        snapshot_updater.delete_document("_default._default", loc_deleted)
+        verify_result = await db.verify_documents(snapshot_updater)
+        assert verify_result.result, f"{loc_deleted} was not deleted locally: {verify_result.description}"
 
         self.mark_test_step("""
             Start a replicator:
@@ -182,6 +186,11 @@ class TestReplicationBehavior(CBLTestClass):
         )
 
         self.mark_test_step(f"Check `{loc_deleted}` is not `deleted`")
+        # Before the fix for CBL-7841, pulling the resurrected revision over a local tombstone was
+        # inappropriately treated as a conflict, and the default conflict resolver kept the local (deleted)
+        # revision -- silently discarding the resurrection. The assertion below would have failed in
+        # that case; its passing confirms the resurrected revision is applied directly, with no conflict
+        # resolver involved.
         local_doc = await db.get_document(DocumentEntry("_default._default", loc_deleted))
         assert local_doc.body.get("name") == resurrected_body["name"], (
             f"{loc_deleted} was not resurrected locally as expected: {local_doc.body}"
