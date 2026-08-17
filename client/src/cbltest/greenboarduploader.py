@@ -119,7 +119,7 @@ class RunResult(BaseModel):
     build: int  # build number of CBL build
     version: str  # major.minor.patch version of CBL
     sgw_version: str = Field(alias="sgwVersion")  # Sync Gateway version, optional
-    es_version: str = Field(alias="esVersion", default="n/a")  # Edge Server version, optional
+    es_version: str = Field(alias="esVersion")  # Edge Server version, optional
     fail_count: int = Field(alias="failCount")  # number of failing tests
     pass_count: int = Field(alias="passCount")  # number of passing tests
     platform: str  # CBL platform
