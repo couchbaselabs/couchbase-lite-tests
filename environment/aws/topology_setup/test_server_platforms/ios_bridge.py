@@ -56,7 +56,7 @@ class iOSBridge(PlatformBridge):
     A class to manage iOS applications on devices using either xharness or devicectl.
     """
 
-    def __init__(self, app_path: str, app_id: str):
+    def __init__(self, app_path: str, app_id: str) -> None:
         """
         Initialize the iOSBridge with the application path and whether to use devicectl.
 

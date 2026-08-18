@@ -223,7 +223,7 @@ class ISGRPayload(JSONSerializable):
         remote_password: str | None = None,
         collections_local: list[str] | None = None,
         collections_remote: list[str] | None = None,
-    ):
+    ) -> None:
         """
         Creates an ISGR configuration payload.
 
@@ -329,7 +329,7 @@ class AllDocumentsResponse:
         return self.__rows
 
     @property
-    def revmap(self):
+    def revmap(self) -> dict:
         return self.__revmap
 
     def __len__(self) -> int:
@@ -432,7 +432,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
         return cast(str, self.__body["_rev"])
 
-    def __init__(self, id: str, revid: str | None, body: dict):
+    def __init__(self, id: str, revid: str | None, body: dict) -> None:
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
@@ -524,7 +524,7 @@ class CouchbaseVersion(ABC):
     def parse(self, input: str) -> tuple[str, int]:
         pass
 
-    def __init__(self, input: str):
+    def __init__(self, input: str) -> None:
         self.__raw = input
         parsed = self.parse(input)
         self.__version = parsed[0]
@@ -668,7 +668,7 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
-    ):
+    ) -> None:
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
@@ -1761,7 +1761,7 @@ class SyncGateway(_SyncGatewayBase):
         port: int = 4985,
         secure: bool = False,
         public_port: int = 4984,
-    ):
+    ) -> None:
         """
         Initialize a SyncGateway admin client.
 
@@ -2072,7 +2072,7 @@ class SyncGateway(_SyncGatewayBase):
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def _wait_for_no_databases(self, bucket_name: str):
+    async def _wait_for_no_databases(self, bucket_name: str) -> None:
         dbs = await self.get_all_databases_verbose()
         for db in dbs.values():
             assert db.bucket != bucket_name, f"Database {db=} is still backed by bucket {bucket_name}"
@@ -2330,7 +2330,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         password: str,
         port: int = 4984,
         secure: bool = False,
-    ):
+    ) -> None:
         """
         Initialize a SyncGatewayUserClient for public API access.
 

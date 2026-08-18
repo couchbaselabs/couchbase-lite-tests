@@ -7,11 +7,12 @@ from typing import Any
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
 )
-from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -36,7 +37,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestSystem(CBLTestClass):
-    async def _setup_system_test(self, cblpytest: CBLPyTest):
+    async def _setup_system_test(self, cblpytest: CBLPyTest) -> tuple[SyncGateway, EdgeServer, str, str]:
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.
         Returns (sync_gateway, edge_server, sg_db_name, es_db_name).
         """
@@ -142,6 +143,7 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations:
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
+                    assert rev_id is not None, f"Document {doc_id} has no revision ID."
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -278,6 +280,7 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations and not edge_server_down:
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
+                    assert rev_id is not None, f"Document {doc_id} has no revision ID."
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -385,6 +388,7 @@ class TestSystem(CBLTestClass):
 
                     if "delete" in operations:
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
+                        assert rev_id is not None, f"Document {doc_id} has no revision ID."
                         delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                         assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                             f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
@@ -555,6 +559,7 @@ class TestSystem(CBLTestClass):
 
                     if "delete" in operations and not shared["edge_server_down"]:
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
+                        assert rev_id is not None, f"Document {doc_id} has no revision ID."
                         delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                         assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                             f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"

@@ -20,7 +20,7 @@ class Listener:
         port: int | None = None,
         disable_tls: bool = False,
         identity: CertKeyPair | None = None,
-    ):
+    ) -> None:
         self.database = database
         """The database that the listener will be serving"""
 
@@ -57,7 +57,7 @@ class Listener:
         assert self.__port is not None, "Listener port not set"
         return self.__port
 
-    def set_identity(self):
+    def set_identity(self) -> None:
         self.__identity = create_leaf_certificate(f"Test Server {self.__index}")
 
     async def start(self) -> None:

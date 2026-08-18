@@ -46,7 +46,7 @@ class PostResetResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "reset")
 
 
@@ -95,7 +95,7 @@ class PostGetAllDocumentsResponse(TestServerResponse, PostGetAllDocumentsRespons
         """
         return cast(list[PostGetAllDocumentsEntry], self.__payload.get(collection))
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "getAllDocuments")
         self.__payload: dict[str, list[PostGetAllDocumentsEntry]] = {}
         for k, v in body.items():
@@ -117,7 +117,7 @@ class PostUpdateDatabaseResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "updateDatabase")
 
 
@@ -141,7 +141,7 @@ class PostSnapshotDocumentsResponse(TestServerResponse, PostSnapshotDocumentsRes
         """Gets the ID of the snapshot that was created"""
         return self.__snapshot_id
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "snapshotDocuments")
         self.__snapshot_id = cast(str, body.get(self.__id_key))
 
@@ -192,7 +192,7 @@ class PostVerifyDocumentsResponse(TestServerResponse, PostVerifyDocumentsRespons
         """Gets the document body of the document with the faulty keypath, if applicable"""
         return self.__document
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "verifyDocuments")
         if self.__result_key not in body:
             return
@@ -232,7 +232,7 @@ class PostStartReplicatorResponse(TestServerResponse, PostStartReplicatorRespons
         """Gets the ID of the replicator that was started"""
         return self.__replicator_id
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "startReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
@@ -293,7 +293,7 @@ class PostGetReplicatorStatusResponse(TestServerResponse, PostGetReplicatorStatu
         that once viewed it will be cleared"""
         return self.__status.documents
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "getReplicatorStatus")
         self.__status = ReplicatorStatusBody(body)
 
@@ -305,7 +305,7 @@ class PostPerformMaintenanceResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "performMaintenance")
 
 
@@ -317,7 +317,7 @@ class PostNewSessionResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "newSession")
 
 
@@ -343,7 +343,7 @@ class PostRunQueryResponse(TestServerResponse, PostRunQueryResponseMethods):
     def results(self) -> list[dict]:
         return self.__results
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "runQuery")
         if self.__results_key not in body:
             return
@@ -372,7 +372,7 @@ class PostGetDocumentResponse(TestServerResponse, PostGetDocumentResponseMethods
         """The raw return value from the server (containing id, revs, and body)"""
         return self.__body
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "getDocument")
         self.__body = body
 
@@ -384,7 +384,7 @@ class PostLogResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "log")
 
 
@@ -415,7 +415,7 @@ class PostStartListenerResponse(TestServerResponse, PostStartListenerResponseMet
         """Gets the port of the listener that was started"""
         return self.__port
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "startListener")
         self.__listener_id = cast(str, body.get(self.__listener_id_key))
         self.__port = cast(int, body.get(self.__port_key))
@@ -428,7 +428,7 @@ class PostStopListenerResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "stopListener")
 
 
@@ -451,7 +451,7 @@ class PostStartMultipeerReplicatorResponse(TestServerResponse, PostStartMultipee
         """Gets the ID of the multipeer replicator that was started"""
         return self.__replicator_id
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "startMultipeerReplicator")
         self.__replicator_id = cast(str, body.get(self.__id_key))
 
@@ -463,7 +463,7 @@ class PostStopMultipeerReplicatorResponse(TestServerResponse):
     [spec](https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml)
     """
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "stopMultipeerReplicator")
 
 
@@ -491,7 +491,7 @@ class PostGetMultipeerReplicatorStatusResponse(TestServerResponse, PostGetMultip
         """Gets the list of multipeer replicator status entries"""
         return self.__replicators
 
-    def __init__(self, status_code: int, uuid: str, body: dict):
+    def __init__(self, status_code: int, uuid: str, body: dict) -> None:
         super().__init__(status_code, uuid, body, "getMultipeerReplicatorStatus")
         self.__replicators: list[MultipeerReplicatorStatusEntry] = []
         if self.__replicators_key in body:

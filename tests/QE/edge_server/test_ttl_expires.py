@@ -92,7 +92,7 @@ class TestTTLExpires(CBLTestClass):
         response = await edge_server.get_document(es_db_name, "ttl")
         assert response is not None, "Document is not present in the database"
 
-        rev_id = response.get("rev")
+        rev_id = response.revid
 
         self.mark_test_step("Updating the TTL of the document to 5 seconds")
 

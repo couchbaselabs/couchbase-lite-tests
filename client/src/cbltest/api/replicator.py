@@ -72,7 +72,7 @@ class Replicator:
         enable_auto_purge: bool = True,
         pinned_server_cert: str | None = None,
         headers: dict[str, str] | None = None,
-    ):
+    ) -> None:
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory

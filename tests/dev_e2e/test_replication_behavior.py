@@ -20,7 +20,7 @@ from cbltest.utils import assert_not_null, retry_assert
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

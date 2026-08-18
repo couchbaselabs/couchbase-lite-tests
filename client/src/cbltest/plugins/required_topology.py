@@ -47,7 +47,7 @@ def pytest_configure(config: pytest.Config) -> None:
 
 # This is run before each test to determine if there are enough backend
 # resources to run the test.  If not, the test is skipped.
-def pytest_runtest_setup(item: pytest.Item):
+def pytest_runtest_setup(item: pytest.Item) -> None:
     min_test_servers_mark = item.get_closest_marker(_min_test_servers_key)
     min_sync_gateways_mark = item.get_closest_marker(_min_sync_gateways_key)
     min_couchbase_servers_mark = item.get_closest_marker(_min_couchbase_servers_key)

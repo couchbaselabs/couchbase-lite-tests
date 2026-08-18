@@ -21,7 +21,7 @@ class ReplicatorFilter(JSONSerializable):
         """Gets the name of the filter"""
         return self.__name
 
-    def __init__(self, name: str, parameters: dict | None = None):
+    def __init__(self, name: str, parameters: dict | None = None) -> None:
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the filter"""
@@ -44,7 +44,7 @@ class ReplicatorConflictResolver(JSONSerializable):
         """Gets the name of the resolver"""
         return self.__name
 
-    def __init__(self, name: str, parameters: dict | None = None):
+    def __init__(self, name: str, parameters: dict | None = None) -> None:
         self.__name = name
         self.parameters = parameters
         """The parameters to be applied to the resolver"""
@@ -71,7 +71,7 @@ class ReplicatorCollectionEntry(JSONSerializable):
         push_filter: ReplicatorFilter | None = None,
         pull_filter: ReplicatorFilter | None = None,
         conflict_resolver: ReplicatorConflictResolver | None = None,
-    ):
+    ) -> None:
         if names is None:
             self.__names = ["_default._default"]
         else:
@@ -387,7 +387,7 @@ class WaitForDocumentEventEntry:
         flags: ReplicatorDocumentFlags | None,
         err_domain: str | None = None,
         err_code: int | None = None,
-    ):
+    ) -> None:
         assert isinstance(collection, str), "WaitForDocumentEventEntry: collection not a string"
         assert isinstance(id, str), "WaitForDocumentEventEntry: id not a string"
         self.__collection = collection
@@ -445,7 +445,7 @@ class ReplicatorStatus:
         progress: ReplicatorProgress,
         activity: ReplicatorActivityLevel,
         error: ErrorResponseBody | None,
-    ):
+    ) -> None:
         self.__progress = progress
         self.__activity = activity
         self.__error = error

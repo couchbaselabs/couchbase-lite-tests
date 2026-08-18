@@ -46,7 +46,7 @@ import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar, Final
+from typing import Any, ClassVar, Final
 
 import click
 import requests
@@ -299,7 +299,7 @@ class TestServer(ABC):
         """
 
     @abstractmethod
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a platform bridge for the test server.
 

@@ -42,7 +42,7 @@ class TestSyncGatewayVersionParse:
             ("Couchbase Sync Gateway/4.0.0(271;commit) EE", "4.0.0", 271),
         ],
     )
-    def test_parse(self, version_string, expected_version, expected_build):
+    def test_parse(self, version_string: str, expected_version: str, expected_build: int) -> None:
         v = SyncGatewayVersion(version_string)
         assert v.version == expected_version
         assert v.build_number == expected_build
@@ -63,7 +63,7 @@ class TestEdgeServerVersionParse:
             ("1.0.0", "unknown", 0),
         ],
     )
-    def test_parse(self, version_string, expected_version, expected_build):
+    def test_parse(self, version_string: str, expected_version: str, expected_build: int) -> None:
         v = EdgeServerVersion(version_string)
         assert v.version == expected_version
         assert v.build_number == expected_build

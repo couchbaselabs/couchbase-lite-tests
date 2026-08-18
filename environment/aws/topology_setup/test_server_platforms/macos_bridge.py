@@ -42,7 +42,7 @@ class macOSBridge(PlatformBridge):
         __app_path (str): The path to the application bundle.
     """
 
-    def __init__(self, app_path: str):
+    def __init__(self, app_path: str) -> None:
         """
         Initialize the macOSBridge with the application path.
 

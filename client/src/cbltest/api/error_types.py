@@ -70,7 +70,7 @@ class ErrorResponseBody:
 
         return None
 
-    def __init__(self, domain: str, code: int, message: str):
+    def __init__(self, domain: str, code: int, message: str) -> None:
         self.__domain = domain
         self.__code = code
         self.__message = message

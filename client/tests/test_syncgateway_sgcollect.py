@@ -57,7 +57,7 @@ class FakeSyncGateway(SyncGateway):
 
 
 class TestSGCollectRedactLevel:
-    def test_values(self):
+    def test_values(self) -> None:
         assert SGCollectRedactLevel.NONE.value == "none"
         assert SGCollectRedactLevel.PARTIAL.value == "partial"
         assert SGCollectRedactLevel.FULL.value == "full"
@@ -65,7 +65,7 @@ class TestSGCollectRedactLevel:
 
 class TestStartSGCollect:
     @pytest.mark.asyncio
-    async def test_defaults_to_no_redaction(self):
+    async def test_defaults_to_no_redaction(self) -> None:
         sg = FakeSyncGateway()
         resp = await sg.start_sgcollect()
 
@@ -76,7 +76,7 @@ class TestStartSGCollect:
         assert payload.to_json() == {"upload": False}
 
     @pytest.mark.asyncio
-    async def test_passes_through_redact_options(self):
+    async def test_passes_through_redact_options(self) -> None:
         sg = FakeSyncGateway()
         await sg.start_sgcollect(
             redact_level=SGCollectRedactLevel.PARTIAL,
@@ -96,7 +96,7 @@ class TestStartSGCollect:
 
 class TestRunSGCollect:
     @pytest.mark.asyncio
-    async def test_downloads_the_single_new_zip(self, tmp_path: Path):
+    async def test_downloads_the_single_new_zip(self, tmp_path: Path) -> None:
         sg = FakeSyncGateway()
         sg.caddy_snapshots = [[], ["sgcollectinfo-abc.zip"]]
 
@@ -112,7 +112,7 @@ class TestRunSGCollect:
         assert "redact_level" not in payload.to_json()
 
     @pytest.mark.asyncio
-    async def test_ignores_zip_that_already_existed(self, tmp_path: Path):
+    async def test_ignores_zip_that_already_existed(self, tmp_path: Path) -> None:
         sg = FakeSyncGateway()
         sg.caddy_snapshots = [
             ["sgcollectinfo-old.zip"],
@@ -125,7 +125,7 @@ class TestRunSGCollect:
         assert sg.downloaded[0][0] == "sgcollectinfo-new.zip"
 
     @pytest.mark.asyncio
-    async def test_raises_when_no_new_zip_appears(self, tmp_path: Path):
+    async def test_raises_when_no_new_zip_appears(self, tmp_path: Path) -> None:
         sg = FakeSyncGateway()
         sg.caddy_snapshots = [[], []]
 
@@ -135,7 +135,7 @@ class TestRunSGCollect:
         assert sg.downloaded == []
 
     @pytest.mark.asyncio
-    async def test_raises_when_more_than_one_new_zip_appears(self, tmp_path: Path):
+    async def test_raises_when_more_than_one_new_zip_appears(self, tmp_path: Path) -> None:
         sg = FakeSyncGateway()
         sg.caddy_snapshots = [[], ["sgcollectinfo-a.zip", "sgcollectinfo-b.zip"]]
 
@@ -147,7 +147,7 @@ class TestRunSGCollect:
 
 class TestRunSgcollects:
     @pytest.mark.asyncio
-    async def test_collects_from_every_node(self, tmp_path: Path):
+    async def test_collects_from_every_node(self, tmp_path: Path) -> None:
         sg1 = FakeSyncGateway("sg1.example.com")
         sg1.caddy_snapshots = [[], ["sgcollectinfo-a.zip"]]
         sg2 = FakeSyncGateway("sg2.example.com")
@@ -163,7 +163,9 @@ class TestRunSgcollects:
         assert output_dir.is_dir()
 
     @pytest.mark.asyncio
-    async def test_one_node_failing_does_not_stop_the_others(self, tmp_path: Path, caplog: pytest.LogCaptureFixture):
+    async def test_one_node_failing_does_not_stop_the_others(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         sg1 = FakeSyncGateway("sg1.example.com")
         sg1.caddy_snapshots = [[], []]  # no new zip ever appears -> run_sgcollect fails
         sg2 = FakeSyncGateway("sg2.example.com")
@@ -181,7 +183,7 @@ class TestRunSgcollects:
         assert any("1/2 node(s) failed" in m for m in error_messages)
 
     @pytest.mark.asyncio
-    async def test_empty_sync_gateway_list_collects_nothing(self, tmp_path: Path):
+    async def test_empty_sync_gateway_list_collects_nothing(self, tmp_path: Path) -> None:
         collected = await run_sgcollects([], tmp_path)
         assert collected == []
         assert tmp_path.is_dir()
