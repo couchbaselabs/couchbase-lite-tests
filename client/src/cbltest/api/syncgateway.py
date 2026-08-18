@@ -637,6 +637,24 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
+class CompactType(str, Enum):
+    """The type of compaction operation performed by POST/GET /{db}/_compact"""
+
+    TOMBSTONE = "tombstone"
+    ATTACHMENT = "attachment"
+
+
+class CompactStatus(BaseModel):
+    """Output of GET /{db}/_compact endpoint of Sync Gateway"""
+
+    status: str | None = None
+    start_time: str | None = None
+    last_error: str | None = None
+    docs_purged: str | None = None
+    marked_attachments: str | None = None
+    purged_attachments: str | None = None
+
+
 class SGCollectRedactLevel(str, Enum):
     """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
 
@@ -2313,6 +2331,166 @@ class SyncGateway(_SyncGatewayBase):
                 await asyncio.sleep(poll_interval)
 
             raise TimeoutError(f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds")
+
+    async def start_compact(
+        self,
+        db_name: str,
+        compact_type: CompactType = CompactType.TOMBSTONE,
+        reset: bool | None = None,
+        dry_run: bool | None = None,
+    ) -> None:
+        """
+        Starts a compaction operation on a Sync Gateway database.
+
+        :param db_name: The name of the database to compact
+        :param compact_type: The type of compaction to perform (default tombstone)
+        :param reset: Attachment compaction only: force a fresh compact instead of resuming a failed one
+        :param dry_run: Attachment compaction only: report what would be purged without purging anything
+        """
+        with self._tracer.start_as_current_span(
+            "start_compact", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
+        ):
+            params = {"action": "start", "type": compact_type.value}
+            if reset is not None:
+                params["reset"] = "true" if reset else "false"
+            if dry_run is not None:
+                params["dry_run"] = "true" if dry_run else "false"
+            await self._send_request("post", f"/{db_name}/_compact", params=params)
+
+    async def stop_compact(self, db_name: str, compact_type: CompactType = CompactType.TOMBSTONE) -> None:
+        """
+        Stops a running compaction operation on a Sync Gateway database.
+
+        :param db_name: The name of the database
+        :param compact_type: The type of compaction to stop (default tombstone)
+        """
+        with self._tracer.start_as_current_span(
+            "stop_compact", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
+        ):
+            await self._send_request(
+                "post", f"/{db_name}/_compact", params={"action": "stop", "type": compact_type.value}
+            )
+
+    async def get_compact_status(
+        self, db_name: str, compact_type: CompactType = CompactType.TOMBSTONE
+    ) -> CompactStatus:
+        """
+        Gets the status of the most recent compaction operation on a Sync Gateway database.
+
+        :param db_name: The name of the database
+        :param compact_type: The type of compaction to query (default tombstone)
+        """
+        with self._tracer.start_as_current_span(
+            "get_compact_status", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_compact", params={"type": compact_type.value})
+            assert isinstance(resp, dict)
+            return CompactStatus.model_validate(resp)
+
+    async def get_user_access_history(self, db_name: str, name: str) -> dict[str, dict[str, list[str]]]:
+        """
+        Gets the channel access history of a user, organized by scope and collection.
+
+        :param db_name: The name of the database
+        :param name: The username to query
+        :return: A dict of scope -> collection -> list of channel names
+        """
+        with self._tracer.start_as_current_span(
+            "get_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_user/{name}/_access_history")
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("channels", {})
+
+    async def compact_user_access_history(
+        self, db_name: str, name: str, channels: dict[str, dict[str, list[str]]]
+    ) -> dict[str, dict[str, list[str]]]:
+        """
+        Removes the specified channels from a user's channel access history.
+
+        :param db_name: The name of the database
+        :param name: The username whose history should be compacted
+        :param channels: The channels to remove, organized by scope and collection
+            (e.g. {"scope1": {"collection1": ["channel1"]}})
+        :return: The channels that were actually removed, organized by scope and collection
+        """
+        with self._tracer.start_as_current_span(
+            "compact_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            body = {"channels": channels}
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}/_user/{name}/_access_history/compact",
+                JSONDictionary(body),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", {})
+
+    async def get_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, list[int]]:
+        """
+        Gets the channel revocation history of a document.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to query
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: A dict of channel name -> sequences at which the document was removed from it
+        """
+        with self._tracer.start_as_current_span(
+            "get_document_channel_history",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def compact_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        seq: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> list[str]:
+        """
+        Compacts a document's channel history, removing revocation entries for channels the
+        document left before the given sequence.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to compact
+        :param seq: Channel history with end sequences earlier than this will be removed
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: The list of channels that were compacted
+        """
+        with self._tracer.start_as_current_span(
+            "compact_document_channel_history",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+                "sg.compact.seq": seq,
+            },
+        ):
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}/compact",
+                JSONDictionary({"seq": seq}),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", [])
 
 
 class SyncGatewayUserClient(_SyncGatewayBase):
