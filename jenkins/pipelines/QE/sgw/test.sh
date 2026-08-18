@@ -58,10 +58,9 @@ fi
 
 echo "Run tests..."
 pushd "$TESTS_DIR" >/dev/null
-# --session-timeout makes pytest stop gracefully BEFORE Jenkins' 90m tests-phase timeout, so junit, greenboard,
-# and sgcollect cleanup all get a runway, and infra-setup no longer eats the budget, ie:
-#   session-timeout = jenkins-tests(90m) - per-test(5m) - artifact-collection(10m) = 75m = 4500s
-# --timeout bounds a single hung test (session-timeout is only checked between tests); method=signal raises in the
-# main thread so that test's teardown runs.
-uv run pytest -v --no-header --config QE/config.json --sgcollect-on-test-failure --timeout-method=signal \
-  --timeout=300 --session-timeout=4500 --ignore=dev_e2e/test_replication_xdcr.py
+# pytest's graceful session timeout comes from the CBL_PYTEST_SESSION_TIMEOUT env var (seconds), applied by the
+# timeout_fixture plugin. The Jenkins Run Tests stage derives its hard timeout from the same var, so the two can
+# never drift out of order. It stops pytest gracefully so the session-end cleanup fixtures (junit, greenboard,
+# sgcollect) get a runway to finish -- the stage's hard SIGTERM would leave only ~60s, too little for sgcollect.
+uv run pytest -v --no-header --config QE/config.json --sgcollect-on-test-failure \
+  --ignore=dev_e2e/test_replication_xdcr.py
