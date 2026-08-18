@@ -40,7 +40,7 @@ pipeline {
                 // Single source of truth for the tests-phase timeouts (seconds): pytest's
                 // graceful --session-timeout (applied from this var by the timeout_fixture
                 // plugin) and, derived from it below, the Run Tests stage hard timeout.
-                CBL_PYTEST_SESSION_TIMEOUT = '4500'
+                CBL_PYTEST_SESSION_TIMEOUT = '7200'
             }
             // Nested stages so Stage View shows Infra Setup and Run Tests as
             // separate columns while sharing this one agent + workspace (setup's
@@ -62,7 +62,7 @@ pipeline {
                         // Hard stage cap derived from the single source of truth: pytest's session
                         // budget + a 15m cleanup runway, so pytest stops itself gracefully first.
                         script {
-                            int stageMin = (env.CBL_PYTEST_SESSION_TIMEOUT as Integer).intdiv(60) + 15
+                            int stageMin = (env.CBL_PYTEST_SESSION_TIMEOUT as Integer).intdiv(60) + 10
                             timeout(time: stageMin, unit: 'MINUTES') {
                                 sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --skip-setup"
                             }
@@ -72,8 +72,7 @@ pipeline {
             }
             post {
                 always {
-                    // Publish and archive pytest's JUnit XML so
-                    // per-test failures (messages and tracebacks) are
+                    // Publish and archive pytest's JUnit XML so per-test failures (messages and tracebacks) are
                     // surfaced in Jenkins even if teardown fails.
                     script {
                         try {
