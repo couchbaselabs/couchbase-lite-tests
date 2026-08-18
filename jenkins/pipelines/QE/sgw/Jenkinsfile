@@ -32,7 +32,7 @@ pipeline {
             }
         }
         stage('Start Execution') {
-            agent { label 'mac-mini-new' }å
+            agent { label 'mac-mini-new' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -42,9 +42,7 @@ pipeline {
                 // plugin) and, derived from it below, the Run Tests stage hard timeout.
                 CBL_PYTEST_SESSION_TIMEOUT = '7200'
             }
-            // Nested stages so Stage View shows Infra Setup and Run Tests as
-            // separate columns while sharing this one agent + workspace (setup's
-            // generated config.json/topology.json must persist to the tests run).
+            // Separate TDK-Setup and Testing stages for clarity and cleaner time-allocation
             stages {
                 stage('Infra Setup') {
                     steps {
