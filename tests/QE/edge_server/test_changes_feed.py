@@ -10,6 +10,7 @@ from cbltest.asyncfile import read_json_file, write_json_file
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
@@ -18,7 +19,6 @@ class TestChangesFeed(CBLTestClass):
     async def test_changes_feed_longpoll(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
-
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
         server.create_bucket(bucket_name)
@@ -41,6 +41,7 @@ class TestChangesFeed(CBLTestClass):
             },
             num_index_replicas=0,
         )
+        await sync_gateway.delete_database(sg_db_name)
         await sync_gateway.put_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")

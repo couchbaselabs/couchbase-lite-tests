@@ -10,6 +10,7 @@ from deepdiff import DeepDiff
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 class TestQueryEdgeServer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")

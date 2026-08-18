@@ -32,6 +32,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
     }
 
 
+@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)

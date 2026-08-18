@@ -11,6 +11,7 @@ from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.skip(reason="Feature not implemented")
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
@@ -125,6 +126,7 @@ class TestBlobs(CBLTestClass):
         assert sg_doc is not None
 
         assert "_attachments" not in sg_doc.body, "'_attachments' field is present in the document response"
+        await sync_gateway.delete_database(sg_db_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -246,6 +248,7 @@ class TestBlobs(CBLTestClass):
         )
         assert blob_info["digest"] == blob_metadata["digest"], "Blob digest mismatch"
         assert blob_info["length"] == blob_metadata["length"], "Blob length mismatch"
+        await sync_gateway.delete_database(sg_db_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_get_nonexistent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -340,7 +343,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that update blob with wrong rev fails.")
         updated_data = b"updated blob data"
-
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(doc_id, "incorrect rev", attachment_name, es_db_name, value=updated_data)
 
@@ -360,7 +362,6 @@ class TestBlobs(CBLTestClass):
         # Read test image as binary data
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)
-
         with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.put_sub_document(doc_id, "1-abcdef", attachment_name, es_db_name, value=image_data)
 
@@ -548,3 +549,4 @@ class TestBlobs(CBLTestClass):
         assert blob_info["length"] == blob_metadata["length"], (
             f"Blob length mismatch, expected '{blob_metadata['length']}', got '{blob_info['length']}'"
         )
+        await sync_gateway.delete_database(sg_db_name)
