@@ -23,6 +23,7 @@
             }
         }
     ],
+    "users": "/home/ec2-user/user/users.json",
     "logging": {
         "console": false,
         "file": {
