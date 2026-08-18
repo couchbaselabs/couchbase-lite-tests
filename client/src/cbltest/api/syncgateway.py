@@ -933,7 +933,7 @@ class _SyncGatewayBase:
             if "error" in info:
                 raise CblSyncGatewayBadResponseError(
                     info["status"],
-                    f"At least one bulk docs insert failed ({info['error']})",
+                    f"At least one bulk docs insert failed ({info})",
                 )
 
     async def load_dataset(self, db_name: str, path: Path) -> None:
@@ -1293,12 +1293,10 @@ class _SyncGatewayBase:
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
-                if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
+                if cast_resp.get("reason") == "missing" or cast_resp.get("reason") == "deleted":
                     return None
 
-                raise CblSyncGatewayBadResponseError(
-                    500, f"Get doc from sync gateway had error '{cast_resp['reason']}'"
-                )
+                raise CblSyncGatewayBadResponseError(500, f"Get doc from sync gateway had error {cast_resp}")
 
             return RemoteDocument(cast_resp)
 
@@ -1343,7 +1341,7 @@ class _SyncGatewayBase:
                     500, f"Failed to create document {doc_id}: unexpected response type"
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}: {response}")
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
@@ -1406,7 +1404,10 @@ class _SyncGatewayBase:
                     f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
+                raise CblSyncGatewayBadResponseError(
+                    500,
+                    f"Failed to update document {doc_id} with rev {rev}: {response}",
+                )
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)

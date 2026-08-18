@@ -1,3 +1,5 @@
+from json import dumps
+
 from cbltest.responses import TestServerResponse
 
 
@@ -24,8 +26,9 @@ class CblTestServerBadResponseError(Exception):
     def __init__(self, code: int, response: TestServerResponse, message: str):
         self.__code = code
         self.__response = response
-        self.__message = message
-        super().__init__(message)
+        body = response.to_json() if response is not None else None
+        self.__message = f"{message}: {dumps(body)}" if body else message
+        super().__init__(self.__message)
 
     def __str__(self) -> str:
         return self.__message
