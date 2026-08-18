@@ -25,7 +25,7 @@ class JSONSerializable(ABC):
 class JSONDictionary(JSONSerializable):
     """A helper class to wrap a literal dictionary into JSONSerializable"""
 
-    def __init__(self, d: dict):
+    def __init__(self, d: dict) -> None:
         self.__dict = d
 
     def to_json(self) -> Any:

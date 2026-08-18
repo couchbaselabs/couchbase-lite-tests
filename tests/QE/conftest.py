@@ -1,9 +1,11 @@
 import asyncio
 import os
+from collections.abc import AsyncGenerator, Sequence
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
@@ -20,7 +22,7 @@ def dataset_path() -> Path:
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def cleanup_after_test(cblpytest, request):
+async def cleanup_after_test(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
     """
     Automatically clean up all test resources after each SGW test function completes.
     This fixture only runs for tests marked with @pytest.mark.sgw.
@@ -45,8 +47,8 @@ async def cleanup_after_test(cblpytest, request):
 
 
 async def cleanup_all_test_resources(
-    sync_gateways: list[SyncGateway],
-    couchbase_servers: list[CouchbaseServer],
+    sync_gateways: Sequence[SyncGateway],
+    couchbase_servers: Sequence[CouchbaseServer],
 ) -> None:
     """
     Clean up ALL databases from ALL SGW instances and test buckets from ALL CBS instances.

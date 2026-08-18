@@ -22,7 +22,7 @@ from cbltest.logging import cbl_info
 
 
 class DocSnapshot:
-    def __init__(self, local: GetDocumentResult, remote: RemoteDocument):
+    def __init__(self, local: GetDocumentResult, remote: RemoteDocument) -> None:
         self.local = local
         self.remote = remote
 

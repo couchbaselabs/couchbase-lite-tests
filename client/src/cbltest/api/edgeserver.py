@@ -64,7 +64,7 @@ class BulkDocOperation(JSONSerializable):
         _id: str | None = None,
         rev: str | None = None,
         optype: str = "create",
-    ):
+    ) -> None:
         if _id is None:
             _id = body.get("_id")
         if optype == "update":
@@ -89,7 +89,7 @@ class BulkDocOperation(JSONSerializable):
     def body(self) -> dict:
         return self._body
 
-    def to_json(self):
+    def to_json(self) -> Any:
         return self._body
 
 
@@ -103,8 +103,8 @@ class EdgeServer:
         url: str,
         admin_user: str = "admin_user",
         admin_password: str = "password",
-        config_file=None,
-    ):
+        config_file: str | None = None,
+    ) -> None:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
@@ -134,13 +134,13 @@ class EdgeServer:
     def hostname(self) -> str:
         return self.__hostname
 
-    def _decode_config_file(self, config_file: str):
+    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool, bool]:
         with open(config_file, encoding="utf-8") as file:
             config_content = file.read()
         config = json5.loads(config_content)
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
-        port = interface.split(":")[1]
+        port = int(interface.split(":")[1])
         enable_anonymous_users = config.get("enable_anonymous_users", False)
         mtls = False
         if https:
@@ -218,7 +218,7 @@ class EdgeServer:
 
             return ret_val
 
-    def keyspace_builder(self, db_name: str = "", scope: str = "", collection: str = ""):
+    def keyspace_builder(self, db_name: str = "", scope: str = "", collection: str = "") -> str:
         keyspace = db_name
         if scope:
             keyspace += f".{scope}"
@@ -245,12 +245,12 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        descending=False,
-        endkey=None,
-        keys=None,
-        startkey=None,
-        include_docs=False,
-    ):
+        descending: bool = False,
+        endkey: str | None = None,
+        keys: list[str] | None = None,
+        startkey: str | None = None,
+        include_docs: bool = False,
+    ) -> AllDocumentsResponse:
         with self.__tracer.start_as_current_span(
             "get_all_documents",
             attributes={
@@ -287,7 +287,7 @@ class EdgeServer:
         collection: str = "",
         expires: int = 0,
         ttl: int = 0,
-    ):
+    ) -> Any:
         with self.__tracer.start_as_current_span(
             "delete_document",
             attributes={
@@ -313,7 +313,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         revid: str | None = None,
-    ):
+    ) -> RemoteDocument | None:
         with self.__tracer.start_as_current_span(
             "get_document",
             attributes={
@@ -353,7 +353,7 @@ class EdgeServer:
                 f"Unexpected response type from adhoc query: {type(response)}",
             )
 
-    async def get_active_tasks(self):
+    async def get_active_tasks(self) -> list:
         with self.__tracer.start_as_current_span("get all active tasks"):
             response = await self._send_request("get", "/_active_tasks")
             if isinstance(response, list):
@@ -369,7 +369,7 @@ class EdgeServer:
                 f"Unexpected response type from get_active_tasks: {type(response)}",
             )
 
-    async def get_db_info(self, db_name: str, scope: str = "", collection: str = ""):
+    async def get_db_info(self, db_name: str, scope: str = "", collection: str = "") -> dict:
         with self.__tracer.start_as_current_span(
             "get database info",
             attributes={
@@ -408,7 +408,7 @@ class EdgeServer:
         openid_token: str | None = None,
         tls_client_cert: str | None = None,
         tls_client_cert_key: str | None = None,
-    ):
+    ) -> Any:
         with self.__tracer.start_as_current_span(
             "Start Replication with Edge Server",
             attributes={
@@ -457,7 +457,7 @@ class EdgeServer:
                 )
             return cast_resp.get("session_id")
 
-    async def replication_status(self, replicator_id: str):
+    async def replication_status(self, replicator_id: str) -> dict:
         with self.__tracer.start_as_current_span(
             "get replication status with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
@@ -474,7 +474,7 @@ class EdgeServer:
                 )
             return cast_resp
 
-    async def all_replication_status(self):
+    async def all_replication_status(self) -> list:
         with self.__tracer.start_as_current_span("All Replication status with Edge Server"):
             response = await self._send_request("get", "/_replicate")
             if isinstance(response, list):
@@ -489,7 +489,7 @@ class EdgeServer:
                 f"Unexpected response type from all_replication_status: {type(response)}",
             )
 
-    async def stop_replication(self, replicator_id: int):
+    async def stop_replication(self, replicator_id: int) -> None:
         with self.__tracer.start_as_current_span(
             "Stop Replication with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
@@ -506,7 +506,7 @@ class EdgeServer:
                     f"stop replication  with Edge Server had error '{cast_resp['reason']}'",
                 )
 
-    def replication_url(self, db_name: str):
+    def replication_url(self, db_name: str) -> str:
         _assert_not_null(db_name, "db_name")
         return urljoin(self.__replication_url, db_name)
 
@@ -525,7 +525,7 @@ class EdgeServer:
         descending: bool | None = False,
         heartbeat: int | None = None,
         timeout: int | None = None,
-    ):
+    ) -> dict:
         with self.__tracer.start_as_current_span(
             "Changes feed",
             attributes={
@@ -568,7 +568,7 @@ class EdgeServer:
         collection: str = "",
         name: str | None = None,
         params: dict | None = None,
-    ):
+    ) -> list:
         with self.__tracer.start_as_current_span(
             "Named query",
             attributes={
@@ -604,7 +604,7 @@ class EdgeServer:
         collection: str = "",
         query: str | None = None,
         params: dict[str, Any] | None = None,
-    ):
+    ) -> list:
         with self.__tracer.start_as_current_span(
             "Adhoc query",
             attributes={
@@ -640,7 +640,7 @@ class EdgeServer:
         collection: str = "",
         expires: int = 0,
         ttl: int = 0,
-    ):
+    ) -> dict:
         with self.__tracer.start_as_current_span(
             "add document with auto ID",
             attributes={
@@ -754,7 +754,7 @@ class EdgeServer:
         db_name: str,
         scope: str = "",
         collection: str = "",
-        value=None,
+        value: Any = None,
     ) -> dict:
         with self.__tracer.start_as_current_span(
             "put sub-document",
@@ -781,7 +781,7 @@ class EdgeServer:
                 )
             return cast_resp
 
-    async def get_sub_document(self, id: str, key: str, db_name: str, scope: str = "", collection: str = ""):
+    async def get_sub_document(self, id: str, key: str, db_name: str, scope: str = "", collection: str = "") -> Any:
         with self.__tracer.start_as_current_span(
             "get sub-document",
             attributes={
@@ -811,7 +811,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         new_edits: bool = True,
-    ):
+    ) -> list | None:
         with self.__tracer.start_as_current_span(
             "bulk_documents_operation",
             attributes={
@@ -834,7 +834,7 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def set_auth(self, auth: bool = True, name="admin_user", password="password"):
+    async def set_auth(self, auth: bool = True, name: str = "admin_user", password: str = "password") -> None:
         if not auth:
             self.__auth = False
         else:
@@ -847,7 +847,7 @@ class EdgeServer:
                 encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
             )
 
-    async def kill_server(self):
+    async def kill_server(self) -> None:
         with self.__tracer.start_as_current_span("kill edge server"):
             await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
 
@@ -921,7 +921,7 @@ class EdgeServer:
             content = await self.get_log_content(log_file)
             return [line for line in content.splitlines() if search_string in line]
 
-    async def start_server(self, config: dict | None = None):
+    async def start_server(self, config: dict | None = None) -> None:
         if config is None:
             config = {}
         with self.__tracer.start_as_current_span("start edge server"):
@@ -932,7 +932,7 @@ class EdgeServer:
                 session=self.__shell_session,
             )
 
-    async def configure_dataset(self, db_name="db", config_file: str | None = None):
+    async def configure_dataset(self, db_name: str = "db", config_file: str | None = None) -> "EdgeServer":
         if not config_file:
             repo_root = next(
                 p
@@ -956,7 +956,7 @@ class EdgeServer:
         self,
         allow: list[Any] | None = None,
         deny: list[Any] | None = None,
-    ):
+    ) -> None:
         """
         Add firewall rules to the edge server host. Can be used to block SGW connection to ES.
 
@@ -976,11 +976,11 @@ class EdgeServer:
                 session=self.__shell_session,
             )
 
-    async def reset_firewall(self):
+    async def reset_firewall(self) -> None:
         with self.__tracer.start_as_current_span("reset firewall"):
             await self._send_request("post", "firewall", session=self.__shell_session)
 
-    async def add_user(self, name, password, role="admin"):
+    async def add_user(self, name: str, password: str, role: str = "admin") -> None:
         with self.__tracer.start_as_current_span("Add user"):
             await self.kill_server()
             payload = {"name": name, "password": password, "role": role}
@@ -992,7 +992,7 @@ class EdgeServer:
             )
             await self.start_server()
 
-    async def wait_for_idle(self, replicator_key=0, timeout=30):
+    async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
         retry = 6
         while not is_idle and retry > 0:

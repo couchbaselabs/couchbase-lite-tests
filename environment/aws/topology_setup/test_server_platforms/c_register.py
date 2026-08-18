@@ -31,6 +31,7 @@ import shutil
 import subprocess
 from abc import abstractmethod
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -67,7 +68,7 @@ class CTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @abstractmethod
@@ -172,7 +173,7 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -188,7 +189,7 @@ class CTestServer_iOS(CTestServer):
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-ios.zip"
 
-    def _download_cbl(self):
+    def _download_cbl(self) -> None:
         header(f"Downloading CBL library {self.version}")
         build = 0
         version_parts = self.version.split("-")
@@ -220,7 +221,7 @@ class CTestServer_iOS(CTestServer):
         )
         self._mark_downloaded(IOS_FRAMEWORKS_DIR)
 
-    def build(self):
+    def build(self) -> None:
         self._download_cbl()
         header("Building")
         env = os.environ.copy()
@@ -273,7 +274,7 @@ class CTestServer_iOS(CTestServer):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -324,7 +325,7 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -340,7 +341,7 @@ class CTestServer_Android(CTestServer):
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-android.zip"
 
-    def _download_cbl(self):
+    def _download_cbl(self) -> None:
         android_lib_dir = C_TEST_SERVER_DIR / "platforms" / "android" / "app" / "src" / "main" / "cpp" / "lib"
         header(f"Downloading CBL library {self.version}")
         build = 0
@@ -397,7 +398,7 @@ class CTestServer_Android(CTestServer):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -467,7 +468,7 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -494,7 +495,7 @@ class CTestServer_Windows(CTestServer_Desktop):
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-windows-x86_64.zip"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -531,7 +532,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     def cbl_filename(self, version: str) -> str:
@@ -558,7 +559,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -594,7 +595,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, arch: str):
+    def __init__(self, version: str, arch: str) -> None:
         super().__init__(version)
         self.__arch = arch
 
@@ -622,7 +623,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the C test server to be able to install, run, etc.
 
@@ -670,5 +671,5 @@ class CTestServer_Linux_x86_64(CTestServer_Linux):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version, "x86_64")

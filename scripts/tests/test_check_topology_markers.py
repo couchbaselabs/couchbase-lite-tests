@@ -32,6 +32,7 @@ the point.
 
 import ast
 import importlib.util
+from collections.abc import Iterator
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -45,7 +46,7 @@ _spec.loader.exec_module(ctm)
 TEST_DIRS = [REPO_ROOT / "tests" / "dev_e2e", REPO_ROOT / "tests" / "QE"]
 
 
-def _iter_test_files():
+def _iter_test_files() -> Iterator[Path]:
     for directory in TEST_DIRS:
         yield from sorted(directory.rglob("test_*.py"))
 

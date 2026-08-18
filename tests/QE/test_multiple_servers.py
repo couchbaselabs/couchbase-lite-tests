@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Sequence
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -7,12 +7,15 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
     IndexConfig,
     ISGRPayload,
     ScopeConfig,
+    SyncGateway,
+    SyncGatewayUserClient,
     UnsupportedSettings,
 )
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
@@ -28,7 +31,7 @@ def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool
     return False, False
 
 
-def _recover_or_add_node(cbs_one, cbs_two):
+def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> None:
     """Recover or add CBS node based on its cluster state."""
     session = requests.Session()
     session.auth = ("Administrator", "password")
@@ -66,14 +69,14 @@ def _set_alternate_addresses(cbs_servers: Sequence) -> None:
 
 @asynccontextmanager
 async def _setup_database_and_user(
-    sg,
-    cbs,
+    sg: SyncGateway,
+    cbs: CouchbaseServer,
     sg_db: str,
     bucket_name: str,
     user_name: str,
     user_password: str,
     channels: list,
-):
+) -> AsyncIterator[SyncGatewayUserClient]:
     """Setup bucket, database, and user."""
     cbs.create_bucket(bucket_name, num_replicas=1)
     await sg.put_database(

@@ -9,7 +9,7 @@ class DocumentEntry(JSONSerializable):
     A class for recording the fully qualified name of a document in any database
     """
 
-    def __init__(self, collection: str, id: str):
+    def __init__(self, collection: str, id: str) -> None:
         self.collection: str = collection
         """The collection that the snapshotted document belongs to"""
 
@@ -49,7 +49,7 @@ class EncryptedValue(JSONSerializable):
         """The value of the property"""
         return self.__value
 
-    def __init__(self, value: str):
+    def __init__(self, value: str) -> None:
         self.__value: str = value
 
     def to_json(self) -> Any:

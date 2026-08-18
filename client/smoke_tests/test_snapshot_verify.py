@@ -1,3 +1,4 @@
+from types import FunctionType
 from typing import Any
 
 import pytest
@@ -9,7 +10,7 @@ from cbltest.globals import CBLPyTestGlobal
 
 
 class TestSnapshotVerify:
-    def setup_method(self, method):
+    def setup_method(self, method: FunctionType) -> None:
         # If writing a new test do not forget this step or the test server
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
@@ -86,7 +87,8 @@ class TestSnapshotVerify:
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.delete_document([b, snapshot_updater], "_default._default", "name_1")
+            b.delete_document("_default._default", "name_1")
+        snapshot_updater.delete_document("_default._default", "name_1")
 
         snapshot_updater.delete_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)
@@ -118,7 +120,8 @@ class TestSnapshotVerify:
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
-            b.purge_document([b, snapshot_updater], "_default._default", "name_1")
+            b.purge_document("_default._default", "name_1")
+        snapshot_updater.purge_document("_default._default", "name_1")
 
         snapshot_updater.purge_document("_default._default", "name_2")
         verify_result = await db.verify_documents(snapshot_updater)

@@ -128,7 +128,7 @@ def main(
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
     stop_sync_gateway: bool,
-):
+) -> None:
     if stop_sync_gateway:
         ExeBridge(
             exe_path=str(SYNC_GATEWAY_BIN),

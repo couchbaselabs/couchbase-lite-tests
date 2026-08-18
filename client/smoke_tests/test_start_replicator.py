@@ -1,3 +1,5 @@
+from types import FunctionType
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.database import Database
@@ -12,7 +14,7 @@ from cbltest.globals import CBLPyTestGlobal
 
 
 class TestStartReplicator:
-    def setup_method(self, method):
+    def setup_method(self, method: FunctionType) -> None:
         # If writing a new test do not forget this step or the test server
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__
@@ -44,7 +46,7 @@ class TestStartReplicator:
             ("delete", None),
         ],
     )
-    async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: dict | None):
+    async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: dict | None) -> None:
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
@@ -64,7 +66,7 @@ class TestStartReplicator:
         await repl.start()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_bad_conflict_resolver(self, cblpytest: CBLPyTest):
+    async def test_bad_conflict_resolver(self, cblpytest: CBLPyTest) -> None:
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 

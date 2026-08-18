@@ -464,7 +464,7 @@ def main(
     topology_file: str = "",
     no_auto_fetch: bool = False,
     setup_only: bool = False,
-):
+) -> None:
     """
     Setup multiplatform CBL testing environment.
 

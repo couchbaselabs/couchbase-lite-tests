@@ -10,6 +10,7 @@ async helpers under test here.
 """
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import pytest
 import pytest_asyncio
@@ -25,6 +26,9 @@ from cbltest.api.syncgateway import (
 from cbltest.httplog import _HttpLogWriter
 from pydantic import ValidationError
 
+# (SyncGateway, response specs the test server serves, headers the server saw)
+SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
+
 
 class _FakeConfigResponse:
     """Stands in for requests.Response from the sync GET /_config bootstrap
@@ -38,7 +42,7 @@ class _FakeConfigResponse:
 
 
 @pytest_asyncio.fixture(loop_scope="function")
-async def sync_gateway(monkeypatch, tmp_path) -> AsyncIterator[tuple[SyncGateway, list[dict], list[dict[str, str]]]]:
+async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AsyncIterator[SyncGatewayFixture]:
     """A SyncGateway backed by a real aiohttp test server, so _send_request and
     everything built on it (get_all_databases_verbose, wait_for_db_online, ...) runs
     against real ClientSession/ClientResponse objects. `specs` controls what the
@@ -85,7 +89,7 @@ class TestSessionAuth:
     wire alongside the per-request headers _send_request sets."""
 
     @pytest.mark.asyncio
-    async def test_admin_session_sends_auth_header(self, sync_gateway):
+    async def test_admin_session_sends_auth_header(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, received = sync_gateway
         specs[:] = [{"status": 200, "json": {"ok": True}}]
 
@@ -95,7 +99,7 @@ class TestSessionAuth:
         assert received[0].get("Content-Type") == "application/json"
 
     @pytest.mark.asyncio
-    async def test_anonymous_session_sends_no_auth_header(self, sync_gateway):
+    async def test_anonymous_session_sends_no_auth_header(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, received = sync_gateway
         specs[:] = [{"status": 200, "json": {"ok": True}}]
 
@@ -105,7 +109,9 @@ class TestSessionAuth:
         assert "Authorization" not in received[0]
 
     @pytest.mark.asyncio
-    async def test_get_document_revision_public_authenticates_as_given_user(self, sync_gateway, monkeypatch):
+    async def test_get_document_revision_public_authenticates_as_given_user(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         sg, specs, received = sync_gateway
         specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}}]
 
@@ -127,7 +133,7 @@ class TestSessionAuth:
 
 class TestSendRequest:
     @pytest.mark.asyncio
-    async def test_returns_parsed_json_on_success(self, sync_gateway):
+    async def test_returns_parsed_json_on_success(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [{"status": 200, "json": {"ok": True}}]
 
@@ -136,7 +142,7 @@ class TestSendRequest:
         assert result == {"ok": True}
 
     @pytest.mark.asyncio
-    async def test_error_includes_json_response_body(self, sync_gateway):
+    async def test_error_includes_json_response_body(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -154,7 +160,7 @@ class TestSendRequest:
         assert "db offline" in message
 
     @pytest.mark.asyncio
-    async def test_error_includes_non_json_response_body(self, sync_gateway):
+    async def test_error_includes_non_json_response_body(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -172,7 +178,7 @@ class TestSendRequest:
 
 class TestGetAllDatabasesVerbose:
     @pytest.mark.asyncio
-    async def test_parses_valid_entries(self, sync_gateway):
+    async def test_parses_valid_entries(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -192,7 +198,7 @@ class TestGetAllDatabasesVerbose:
         assert entries["db2"].state == DatabaseState.STARTING
 
     @pytest.mark.asyncio
-    async def test_validates_whole_list_in_one_pass(self, sync_gateway):
+    async def test_validates_whole_list_in_one_pass(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -218,7 +224,7 @@ class TestGetAllDatabasesVerbose:
 
 class TestWaitForDbUp:
     @pytest.mark.asyncio
-    async def test_succeeds_when_database_is_online(self, sync_gateway):
+    async def test_succeeds_when_database_is_online(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -230,7 +236,7 @@ class TestWaitForDbUp:
         await sg._wait_for_db_online("db1", max_retries=1, retry_delay=0)
 
     @pytest.mark.asyncio
-    async def test_timeout_reports_last_seen_state(self, sync_gateway):
+    async def test_timeout_reports_last_seen_state(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -245,7 +251,7 @@ class TestWaitForDbUp:
         assert "state=<DatabaseState.STARTING" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_timeout_reports_database_error(self, sync_gateway):
+    async def test_timeout_reports_database_error(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {
@@ -272,7 +278,7 @@ class TestWaitForDbUp:
         assert "vBucket UUID mismatch" in message
 
     @pytest.mark.asyncio
-    async def test_timeout_reports_database_never_seen(self, sync_gateway):
+    async def test_timeout_reports_database_never_seen(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [{"status": 200, "json": []}]
 
@@ -282,7 +288,7 @@ class TestWaitForDbUp:
         assert "database not present in /_all_dbs?verbose=true" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_reset_user(self, sync_gateway):
+    async def test_reset_user(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {"status": 200, "json": {"ok": True}},  # delete_user
@@ -291,7 +297,7 @@ class TestWaitForDbUp:
         await sg.reset_user("db1", "test_user", "test_pass", ["channel1"])
 
     @pytest.mark.asyncio
-    async def test_create_user_client_context_manager(self, sync_gateway):
+    async def test_create_user_client_context_manager(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         # Specs for delete_user and add_user (via reset_user) during context enter
         specs[:] = [
@@ -302,9 +308,9 @@ class TestWaitForDbUp:
         async with sg.create_user_client("db1", "test_user", "test_pass", ["channel1"]) as client:
             assert client.hostname == sg.hostname
             assert client.secure == sg.secure
-            assert not client._SyncGatewayBase__session.closed
+            assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
-        assert client._SyncGatewayBase__session.closed
+        assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
 
 class TestDatabaseConfig:

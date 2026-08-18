@@ -99,7 +99,7 @@ class CouchbaseServer:
         if not self.wait_for_cluster_healthy(timeout=120):
             raise CblTestError("CBS cluster did not become healthy")
 
-    def __init__(self, url: str, username: str, password: str):
+    def __init__(self, url: str, username: str, password: str) -> None:
         self.__tracer = get_tracer(__name__, VERSION)
         with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
             if "://" not in url:
@@ -207,7 +207,7 @@ class CouchbaseServer:
         num_replicas: int = 0,
         retries: int = 60,
         interval: float = 2.0,
-    ):
+    ) -> None:
         """
         Creates a bucket with a given name that Sync Gateway can use
 
@@ -237,7 +237,7 @@ class CouchbaseServer:
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
 
-    def drop_bucket(self, name: str):
+    def drop_bucket(self, name: str) -> None:
         """
         Drops a bucket from the Couchbase cluster
 

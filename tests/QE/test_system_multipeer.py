@@ -6,6 +6,8 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.database import Database
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator import Replicator
@@ -15,7 +17,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
 from cbltest.responses import ServerVariant
 from shared.multipeer_test_helpers import build_group_transports
@@ -36,12 +38,12 @@ class TestSystemMultipeer(CBLTestClass):
     async def test_system(
         self,
         cblpytest: CBLPyTest,
-        transport,
-        doc_count,
-        test_duration,
-        crud_interval,
-        docs_per_crud,
-    ):
+        transport: str,
+        doc_count: int,
+        test_duration: int,
+        crud_interval: int,
+        docs_per_crud: int,
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
@@ -65,7 +67,7 @@ class TestSystemMultipeer(CBLTestClass):
                     Add docs to the database on device 1
                 """)
 
-        async def insert_each_batch(start, value=10):
+        async def insert_each_batch(start: int, value: int = 10) -> None:
             async with db1.batch_updater() as b:
                 for i in doc_ids[start : start + value]:
                     b.upsert_document("_default._default", i, documents[i])
@@ -123,7 +125,7 @@ class TestSystemMultipeer(CBLTestClass):
             docs_to_update = {k: documents[k] for k in to_update}
 
             # Insert new docs
-            async def insert_task():
+            async def insert_task() -> None:
                 for start in range(0, len(new_doc_ids), 10):
                     end = min(start + 10, len(new_doc_ids))
                     async with all_dbs[insert_testserver].batch_updater() as b:
@@ -131,7 +133,7 @@ class TestSystemMultipeer(CBLTestClass):
                             b.upsert_document("_default._default", i, new_docs[i])
 
             # Delete random existing docs
-            async def delete_task():
+            async def delete_task() -> None:
                 for start in range(0, len(to_delete), 20):
                     end = min(start + 20, len(to_delete))
                     async with all_dbs[delete_testserver].batch_updater() as b:
@@ -140,7 +142,7 @@ class TestSystemMultipeer(CBLTestClass):
                             documents.pop(doc_id)
 
             # Update existing documents
-            async def update_task():
+            async def update_task() -> None:
                 nonlocal docs_to_update
                 for i in range(num_updates):
                     updated_docs = docgen.update_all_documents(docs_to_update)
@@ -152,12 +154,12 @@ class TestSystemMultipeer(CBLTestClass):
                                 b.upsert_document("_default._default", doc_id, updated_docs[doc_id])
                         docs_to_update = updated_docs
 
-            async def stop_restart_task():
+            async def stop_restart_task() -> None:
                 stop_testserver_count = random.randint(1, MAX_STOP_TESTSERVERS)
                 stop_indices = random.sample(range(NUM_DEVICES), stop_testserver_count)
                 self.mark_test_step(f"Stopping testservers {stop_indices}")
 
-                async def stop_and_restart(idx):
+                async def stop_and_restart(idx: int) -> None:
                     await multipeer_replicators[idx].stop()
                     await asyncio.sleep(random.randint(60, 180))
                     await multipeer_replicators[idx].start()
@@ -196,7 +198,7 @@ class TestSystemMultipeer(CBLTestClass):
         "transport, doc_count",
         [("BLUETOOTH", 10000), ("WIFI", 100000), ("MIXED_MODE", 50000)],
     )
-    async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport, doc_count):
+    async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport: str, doc_count: int) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 3.3.0")
             await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
@@ -232,7 +234,7 @@ class TestSystemMultipeer(CBLTestClass):
             "l3.jpg",
         ]
 
-        async def insert_each_batch(start, value=10):
+        async def insert_each_batch(start: int, value: int = 10) -> None:
             async with db1.batch_updater() as b:
                 for i in doc_ids_list[start : start + value]:
                     b.upsert_document(
@@ -289,7 +291,9 @@ class TestSystemMultipeer(CBLTestClass):
         "transport, doc_count",
         [("BLUETOOTH", 300), ("WIFI", 1000), ("MIXED_MODE", 700)],
     )
-    async def test_multipeer_end_to_end(self, cblpytest: CBLPyTest, dataset_path: Path, transport, doc_count):
+    async def test_multipeer_end_to_end(
+        self, cblpytest: CBLPyTest, dataset_path: Path, transport: str, doc_count: int
+    ) -> None:
         #  CB-server1           CB-server2
         #   SGW1                    SGW2 ----  CBL5
         #    /                       \
@@ -393,13 +397,13 @@ class TestSystemMultipeer(CBLTestClass):
 
         # === STEP 5: Create doc at Server & push via SGW ===
 
-        async def insert_server(server, bucket="names"):
+        async def insert_server(server: CouchbaseServer, bucket: str = "names") -> None:
             docgen = JSONGenerator(random.randint(1, 10), size=DOC_COUNT)
             server_docs = docgen.generate_all_documents()
             for key, value in server_docs.items():
                 server.upsert_document(bucket, key, value)
 
-        async def insert_sgw(sgw, db_name="names"):
+        async def insert_sgw(sgw: SyncGateway, db_name: str = "names") -> None:
             docgen = JSONGenerator(random.randint(11, 20), size=DOC_COUNT)
             sgw_docs = docgen.generate_all_documents()
             docs_list = []
@@ -407,7 +411,7 @@ class TestSystemMultipeer(CBLTestClass):
                 docs_list.append(DocumentUpdateEntry(key, revid=None, body=value))
             await sgw.upsert_documents(db_name, docs_list)
 
-        async def insert_testserver(testserver_db):
+        async def insert_testserver(testserver_db: Database) -> None:
             docgen = JSONGenerator(random.randint(21, 50), size=DOC_COUNT, format="key-value")
             testserver_docs = docgen.generate_all_documents()
             testserver_keys = list(testserver_docs.keys())
@@ -417,7 +421,7 @@ class TestSystemMultipeer(CBLTestClass):
                     for key in testserver_keys[start:end]:
                         b.upsert_document("_default._default", key, testserver_docs[key])
 
-        async def stop_and_restart_testserver(idx):
+        async def stop_and_restart_testserver(idx: int) -> None:
             await multipeer_replicators[idx].stop()
             await asyncio.sleep(random.randint(10, 30))
             await multipeer_replicators[idx].start()
