@@ -650,9 +650,12 @@ class CompactStatus(BaseModel):
     status: str | None = None
     start_time: str | None = None
     last_error: str | None = None
-    docs_purged: str | None = None
-    marked_attachments: str | None = None
-    purged_attachments: str | None = None
+    docs_purged: str | None = None  # tombstone compaction only
+    marked_attachments: str | None = None  # attachment compaction only
+    purged_attachments: str | None = None  # attachment compaction only
+    compact_id: str | None = None  # attachment compaction only
+    phase: str | None = None  # attachment compaction only
+    dry_run: str | None = None  # attachment compaction only; not the request's boolean dry_run flag
 
 
 class SGCollectRedactLevel(str, Enum):
@@ -2346,7 +2349,11 @@ class SyncGateway(_SyncGatewayBase):
         :param compact_type: The type of compaction to perform (default tombstone)
         :param reset: Attachment compaction only: force a fresh compact instead of resuming a failed one
         :param dry_run: Attachment compaction only: report what would be purged without purging anything
+        :raises ValueError: If reset or dry_run is passed for a non-attachment compaction
         """
+        if compact_type != CompactType.ATTACHMENT and (reset is not None or dry_run is not None):
+            raise ValueError("reset and dry_run only apply to attachment compaction")
+
         with self._tracer.start_as_current_span(
             "start_compact", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
         ):
@@ -2445,7 +2452,7 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "get_document_channel_history",
             attributes={
-                "cbl.database.name": db_name,
+                "sg.database.name": db_name,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
                 "cbl.document.id": doc_id,
@@ -2477,7 +2484,7 @@ class SyncGateway(_SyncGatewayBase):
         with self._tracer.start_as_current_span(
             "compact_document_channel_history",
             attributes={
-                "cbl.database.name": db_name,
+                "sg.database.name": db_name,
                 "cbl.scope.name": scope,
                 "cbl.collection.name": collection,
                 "cbl.document.id": doc_id,
