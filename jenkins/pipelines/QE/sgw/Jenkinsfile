@@ -32,7 +32,7 @@ pipeline {
             }
         }
         stage('Start Execution') {
-            agent { label 'mac-mini-new' }
+            agent { label 'mac-mini-new' }å
             environment {
                 KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -46,21 +46,20 @@ pipeline {
             // separate columns while sharing this one agent + workspace (setup's
             // generated config.json/topology.json must persist to the tests run).
             stages {
-                stage('==== Infra Setup ====') {
+                stage('Infra Setup') {
                     steps {
                         // Unlock keychain:
                         sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
-                        // Provision the backend under its own timeout so setup time
-                        // does NOT eat into the tests' 90m budget.
-                        timeout(time: 30, unit: 'MINUTES') {
+                        // Provision INFRA under its own 10 min timeout and keep Test Run as a separate section
+                        timeout(time: 10, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --setup-only"
                         }
                     }
                 }
-                stage('==== Run Tests ====') {
+                stage('Run Tests') {
                     steps {
                         // Hard stage cap derived from the single source of truth: pytest's session
-                        // budget + a 15m cleanup runway, so pytest stops itself gracefully first.
+                        // budget + a 10m cleanup runway, so pytest stops itself gracefully first.
                         script {
                             int stageMin = (env.CBL_PYTEST_SESSION_TIMEOUT as Integer).intdiv(60) + 10
                             timeout(time: stageMin, unit: 'MINUTES') {
