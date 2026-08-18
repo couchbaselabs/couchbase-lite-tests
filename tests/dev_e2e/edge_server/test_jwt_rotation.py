@@ -66,7 +66,7 @@ class TestJWTReplication(CBLTestClass):
             aiohttp.ClientSession() as session,
             session.post(
                 f"http://{cbs.hostname}:8091/pools/default/buckets/travel/controller/doFlush",
-                auth=aiohttp.BasicAuth("Administrator", "password"),
+                headers={"Authorization": aiohttp.encode_basic_auth("Administrator", "password")},
             ) as resp,
         ):
             await resp.read()
