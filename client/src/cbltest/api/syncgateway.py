@@ -2453,9 +2453,9 @@ class SyncGateway(_SyncGatewayBase):
             "get_document_channel_history",
             attributes={
                 "sg.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
             },
         ):
             resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}")
@@ -2485,9 +2485,9 @@ class SyncGateway(_SyncGatewayBase):
             "compact_document_channel_history",
             attributes={
                 "sg.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
                 "sg.compact.seq": seq,
             },
         ):
