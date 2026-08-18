@@ -31,6 +31,7 @@ import subprocess
 import zipfile
 from abc import abstractmethod
 from pathlib import Path
+from typing import Any
 
 import click
 import psutil
@@ -91,7 +92,7 @@ class JavaBridge(PlatformBridge):
 
 
 class JarBridge(JavaBridge):
-    def __init__(self, path: str, cbl_version: str):
+    def __init__(self, path: str, cbl_version: str) -> None:
         self.__cbl_version = cbl_version
         if not (JAK_TEST_SERVER_DIR / "version.txt").exists():
             raise ValueError("Server version.txt not found")
@@ -107,13 +108,13 @@ class JarBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def _get_ip(self, location) -> str | None:
+    def _get_ip(self, location: str) -> str | None:
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
         return location
 
-    def validate(self, location):
+    def validate(self, location: str) -> None:
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
@@ -140,7 +141,7 @@ class JarBridge(JavaBridge):
         with open(info_dir / "server.pid", "w") as pid_file:
             pid_file.write(str(process.pid))
 
-    def stop(self, location):
+    def stop(self, location: str) -> None:
         if location != "localhost":
             raise ValueError("JarBridge only supports running on localhost")
 
@@ -150,7 +151,7 @@ class JarBridge(JavaBridge):
 
 
 class JettyBridge(JavaBridge):
-    def __init__(self, cbl_version: str):
+    def __init__(self, cbl_version: str) -> None:
         super().__init__()
 
         self.__cbl_version = cbl_version
@@ -167,13 +168,13 @@ class JettyBridge(JavaBridge):
     def uninstall(self, location: str) -> None:
         pass
 
-    def _get_ip(self, location) -> str | None:
+    def _get_ip(self, location: str) -> str | None:
         if location != "localhost":
             raise ValueError("JettyBridge only supports running on localhost")
 
         return location
 
-    def validate(self, location):
+    def validate(self, location: str) -> None:
         if location != "localhost":
             raise ValueError("JettyBridge only supports running on localhost")
 
@@ -233,7 +234,7 @@ class JAKTestServer(TestServer):
     def test_server_path(self) -> str:
         pass
 
-    def __init__(self, version: str, gradle_target: str = "jar"):
+    def __init__(self, version: str, gradle_target: str = "jar") -> None:
         super().__init__(version)
         self.__gradle_target = gradle_target
 
@@ -266,7 +267,7 @@ class JAKTestServer_Android(JAKTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version, "assembleRelease")
 
     @property
@@ -298,7 +299,7 @@ class JAKTestServer_Android(JAKTestServer):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the Android test server to be able to install, run, etc.
 
@@ -357,7 +358,7 @@ class JAKTestServer_Android(JAKTestServer):
 
 
 class JAKTestServer_NonAndroid(JAKTestServer):
-    def __init__(self, version: str, jar_name: str):
+    def __init__(self, version: str, jar_name: str) -> None:
         super().__init__(version)
         self.__jar_name = jar_name
         with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
@@ -386,7 +387,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         version_parts = self.version.split("-")
         return f"{self.product}/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-{self.__jar_name}.jar"
 
-    def compress_package(self):
+    def compress_package(self) -> str:
         """
         Compress the Java test server package.
 
@@ -422,10 +423,10 @@ class JAKTestServer_NonAndroid(JAKTestServer):
 
 @TestServer.register("jak_desktop")
 class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version, "Desktop")
 
-    def create_bridge(self, **kwargs):
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         jar_path = (
             str(TEST_SERVER_DIR / "downloaded" / self.platform / self.version / "CBLTestServer-Java-Desktop.jar")
             if self._downloaded
@@ -443,10 +444,10 @@ class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
 
 @TestServer.register("jak_webservice")
 class JAKTestServer_WebService(JAKTestServer_NonAndroid):
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version, "WebService")
 
-    def create_bridge(self, **kwargs):
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         if not self._downloaded and not kwargs.get("downloaded", False):
             return JettyBridge(self.version)
 

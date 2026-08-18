@@ -43,7 +43,7 @@ class PostResetRequestBody(JSONSerializable, PostResetRequestMethods):
         }
     """
 
-    def __init__(self, *, name: str | None = None):
+    def __init__(self, *, name: str | None = None) -> None:
         super().__init__()
         self.__test_name = name
         self.__databases: dict[str, dict[str, Any]] = {}
@@ -58,7 +58,7 @@ class PostResetRequestBody(JSONSerializable, PostResetRequestMethods):
         for db_name in result_db_names:
             self.__databases[db_name] = {"dataset": url}
 
-    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None):
+    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None) -> None:
         """
         Add an empty database entry to the :class`PostResetRequestBody`
 
@@ -109,7 +109,7 @@ class PostNewSessionRequestBody(JSONSerializable):
         """Returns the tag to use to print in log statements from this particular remote"""
         return self.__tag
 
-    def __init__(self, *, id: str, url: str | None, tag: str | None, **kwargs):
+    def __init__(self, *, id: str, url: str | None, tag: str | None, **kwargs: Any) -> None:
         super().__init__()
         self.__url = url
         self.__id = id
@@ -135,7 +135,7 @@ class PostUpdateDatabaseRequestBody(JSONSerializable):
         *,
         database: str | None = None,
         updates: list[DatabaseUpdateEntry] | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self.database = database
         """The database that the updates will be applied to once executed"""
@@ -209,7 +209,7 @@ class PostVerifyDocumentsRequestBody(JSONSerializable):
         database: str,
         snapshot: str,
         changes: list[DatabaseUpdateEntry] | None = None,
-    ):
+    ) -> None:
         super().__init__()
         self.__snapshot = snapshot
         self.__database = database
@@ -233,7 +233,7 @@ class PostResetRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
+    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable) -> None:
         super().__init__(version, uuid, "reset", PostResetRequestBody, payload=payload)
 
 
@@ -244,7 +244,7 @@ class PostNewSessionRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
+    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable) -> None:
         super().__init__(version, uuid, "newSession", PostNewSessionRequestBody, payload=payload)
 
 
@@ -255,7 +255,7 @@ class PostUpdateDatabaseRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
+    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable) -> None:
         super().__init__(
             version,
             uuid,
@@ -272,7 +272,7 @@ class PostVerifyDocumentsRequest(TestServerRequest):
     `spec <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/api.yaml>`_
     """
 
-    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable):
+    def __init__(self, version: int, uuid: UUID, payload: JSONSerializable) -> None:
         super().__init__(
             version,
             uuid,

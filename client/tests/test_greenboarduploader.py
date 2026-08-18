@@ -1,7 +1,7 @@
 """Tests for GreenboardUploader and the greenboard fixture."""
 
 import inspect
-from collections.abc import Callable, Sequence
+from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, cast
@@ -12,7 +12,7 @@ import pytest
 from _pytest.reports import TestReport
 from cbltest import CBLPyTest
 from cbltest.api import testserver
-from cbltest.api.syncgateway import SyncGateway, SyncGatewayVersion
+from cbltest.api.syncgateway import CouchbaseVersion, SyncGateway, SyncGatewayVersion
 from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
     GreenboardUploader,
@@ -215,7 +215,7 @@ def _make_server(
     )
 
 
-async def _run_fixture(gen) -> None:
+async def _run_fixture(gen: AsyncGenerator) -> None:
     """Drive an async generator fixture through setup and teardown."""
     await gen.__anext__()
     try:
@@ -225,7 +225,7 @@ async def _run_fixture(gen) -> None:
 
 
 class TestGreenboardUploaderDocument:
-    def test_pass_and_fail_counts_in_document(self):
+    def test_pass_and_fail_counts_in_document(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=True))
@@ -246,7 +246,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_document_platform_and_os(self):
+    def test_document_platform_and_os(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
@@ -264,7 +264,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_version_and_build_parsed_from_version_string(self):
+    def test_version_and_build_parsed_from_version_string(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
@@ -282,7 +282,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_sgw_version_field_with_sgw(self):
+    def test_sgw_version_field_with_sgw(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("3.3.3(271;abc)")
@@ -301,7 +301,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_sgw_platform_uses_sgw_version_for_build(self):
+    def test_sgw_platform_uses_sgw_version_for_build(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("4.0.0(350;def)")
@@ -320,7 +320,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_no_sgw_version_sets_na(self):
+    def test_no_sgw_version_sets_na(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
@@ -338,7 +338,7 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_setup_failure_skips_upload(self):
+    def test_setup_failure_skips_upload(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("setup", passed=False))
 
@@ -350,7 +350,7 @@ class TestGreenboardUploaderDocument:
 
 class TestGreenboardFixture:
     @pytest.mark.asyncio
-    async def test_no_greenboard_config_skips_upload(self):
+    async def test_no_greenboard_config_skips_upload(self) -> None:
         """All three credentials must be set; any None means no upload."""
         cblpytest = _make_cblpytest(url=None, username=None, password=None)
         config = _make_pytestconfig()
@@ -359,7 +359,7 @@ class TestGreenboardFixture:
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_no_result_upload_flag_skips_upload(self):
+    async def test_no_result_upload_flag_skips_upload(self) -> None:
         """--no-result-upload flag suppresses the upload even when config is present."""
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(no_upload=True)
@@ -368,7 +368,7 @@ class TestGreenboardFixture:
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_no_servers_or_gateways_skips_upload(self):
+    async def test_no_servers_or_gateways_skips_upload(self) -> None:
         """Empty test_servers and sync_gateways means nothing to report; skip upload."""
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[])
         config = _make_pytestconfig()
@@ -377,7 +377,7 @@ class TestGreenboardFixture:
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_cbl_platform_and_os_from_test_server(self):
+    async def test_cbl_platform_and_os_from_test_server(self) -> None:
         """Platform and OS come from test server info when no SGW markers are present."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001", os_name="iOS")
         cblpytest = _make_cblpytest(test_servers=[server])
@@ -396,7 +396,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_sgw_marker_keeps_sync_gateway_platform(self):
+    async def test_sgw_marker_keeps_sync_gateway_platform(self) -> None:
         """When a test carries @pytest.mark.sgw the platform stays 'sync-gateway'."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
         cblpytest = _make_cblpytest(test_servers=[server])
@@ -422,7 +422,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_upg_sgw_marker_keeps_sync_gateway_platform(self):
+    async def test_upg_sgw_marker_keeps_sync_gateway_platform(self) -> None:
         """@pytest.mark.upg_sgw also forces platform to 'sync-gateway'."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
         cblpytest = _make_cblpytest(test_servers=[server])
@@ -452,7 +452,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_os_name_defaults_to_na_without_system_name(self):
+    async def test_os_name_defaults_to_na_without_system_name(self) -> None:
         """If the device dict has no 'systemName' key, os stays 'n/a'."""
         server = FakeTestServer(
             lambda: GetRootResponse(
@@ -482,7 +482,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_sgw_version_populated_from_gateway(self):
+    async def test_sgw_version_populated_from_gateway(self) -> None:
         """SGW version is fetched from sync_gateways[0] and appears in the document."""
         sgw = FakeSyncGateway("3.3.3(271;abc)")
         server = _make_server()
@@ -502,7 +502,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_only_sync_gateway_no_test_server(self):
+    async def test_only_sync_gateway_no_test_server(self) -> None:
         """Only sync_gateways present (no test servers) still triggers upload with sync-gateway platform."""
         sgw = FakeSyncGateway("4.0.0(350;def)")
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw])
@@ -521,7 +521,7 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_upload_exception_propagates_and_plugin_unregistered(self):
+    async def test_upload_exception_propagates_and_plugin_unregistered(self) -> None:
         """An exception from _upload_document propagates (fail-loud policy);
         the finally block still unregisters the plugin so the next session
         starts clean."""
@@ -539,7 +539,7 @@ class TestGreenboardFixture:
         assert not any(isinstance(p, GreenboardUploader) for p in config.pluginmanager.get_plugins())
 
     @pytest.mark.asyncio
-    async def test_uploader_registered_before_yield_unregistered_after(self):
+    async def test_uploader_registered_before_yield_unregistered_after(self) -> None:
         """The uploader is a registered plugin during the session and cleaned up afterward."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
@@ -569,7 +569,7 @@ class TestRunResultFullDocument:
         platform: str,
         os_name: str,
         version: str,
-        sgw=None,
+        sgw: CouchbaseVersion | None = None,
     ) -> dict:
         mock_collection = MagicMock(spec=Collection)
         mock_cluster = MagicMock(spec=Cluster)
@@ -586,7 +586,7 @@ class TestRunResultFullDocument:
         _, doc = mock_collection.upsert.call_args[0]
         return doc
 
-    def test_all_fields_standard_run(self):
+    def test_all_fields_standard_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=True))
@@ -609,7 +609,7 @@ class TestRunResultFullDocument:
             "date": "2024-03-15",
         }
 
-    def test_all_fields_sgw_run(self):
+    def test_all_fields_sgw_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("4.0.0(350;def)")

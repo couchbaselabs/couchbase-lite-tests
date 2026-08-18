@@ -116,7 +116,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -162,7 +162,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -349,7 +349,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_continuous_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_continuous_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -937,7 +937,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_collection_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_default_collection_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -982,7 +982,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_collection_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_default_collection_push_and_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -1027,7 +1027,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_reset_checkpoint_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -1121,7 +1121,7 @@ class TestBasicReplication(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_reset_checkpoint_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `travel` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

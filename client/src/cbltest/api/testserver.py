@@ -37,7 +37,7 @@ class TestServer:
         index: int,
         url: str,
         dataset_version: str,
-    ):
+    ) -> None:
         self.__index = index
         self.__url = url
         self.__request_factory = request_factory
@@ -96,7 +96,7 @@ class TestServer:
 
             return ret_val
 
-    async def new_session(self, id: str, url: str | None, tag: str | None):
+    async def new_session(self, id: str, url: str | None, tag: str | None) -> None:
         """
         Instructs this test server to log to the given LogSlurp instance
 
@@ -134,7 +134,7 @@ class TestServer:
         )
         await self.__request_factory.send_request(self.__index, request)
 
-    def replication_url(self, db_name: str, port: int, tls: bool = False):
+    def replication_url(self, db_name: str, port: int, tls: bool = False) -> str:
         """
         Returns the URL of the replication endpoint for this test server
         """

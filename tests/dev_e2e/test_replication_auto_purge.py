@@ -768,7 +768,9 @@ class TestReplicationAutoPurge(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("auto_purge_enabled", [True, False])
-    async def test_remove_role_from_channel(self, cblpytest: CBLPyTest, dataset_path: Path, auto_purge_enabled: bool):
+    async def test_remove_role_from_channel(
+        self, cblpytest: CBLPyTest, dataset_path: Path, auto_purge_enabled: bool
+    ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -897,7 +899,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_after_restore_access(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_pull_after_restore_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -1023,7 +1025,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         assert local_doc.body["channels"] == ["group1"], "post_1 incorrect locally at end"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_after_remove_access(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_push_after_remove_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -1136,7 +1138,9 @@ class TestReplicationAutoPurge(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("remove_type", ["delete", "purge"])
-    async def test_auto_purge_after_resurrection(self, cblpytest: CBLPyTest, dataset_path: Path, remove_type: str):
+    async def test_auto_purge_after_resurrection(
+        self, cblpytest: CBLPyTest, dataset_path: Path, remove_type: str
+    ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

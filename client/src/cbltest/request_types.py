@@ -50,7 +50,7 @@ class TestServerRequest:
         payload_type: type | None = None,
         method: str = "post",
         payload: JSONSerializable | None = None,
-    ):
+    ) -> None:
         # For those subclassing this, usually all you need to do is call this constructor
         # filling out the appropriate information via args
         if payload is not None and payload_type is not None:
@@ -75,7 +75,7 @@ class GetRootRequest(TestServerRequest):
     verify the API version of the server, among other things
     """
 
-    def __init__(self, uuid: UUID):
+    def __init__(self, uuid: UUID) -> None:
         super().__init__(0, uuid, "", method="get")
 
     async def _create_response(
@@ -105,7 +105,7 @@ class PostResetRequestMethods(ABC):
         pass
 
     @abstractmethod
-    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None):
+    def add_empty(self, result_db_names: list[str], collections: list[str] | None = None) -> None:
         pass
 
 

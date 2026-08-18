@@ -1,8 +1,10 @@
 import os
+from collections.abc import Generator
 
 import pytest
 from cbltest.version import VERSION
 from opentelemetry import trace
+from opentelemetry.trace import Span
 
 # This plugin provides an automatic (i.e. not used directly by tests)
 # fixture that will automatically start Open Telemetry spans for each
@@ -10,7 +12,7 @@ from opentelemetry import trace
 
 
 @pytest.fixture(scope="function", autouse=True)
-def span_generation(request: pytest.FixtureRequest):
+def span_generation(request: pytest.FixtureRequest) -> Generator[Span | None, None, None]:
     otel_endpoint = request.config.getoption("--otel-endpoint")
     if otel_endpoint is not None:
         tracer = trace.get_tracer("cbltest", VERSION)

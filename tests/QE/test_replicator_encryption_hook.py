@@ -22,7 +22,7 @@ from cbltest.responses import ServerVariant
 @pytest.mark.min_sync_gateways(1)
 class TestReplicatorEncryptionHook(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_complex_doc_encryption(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replication_complex_doc_encryption(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -192,7 +192,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_delta_sync_with_encryption(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_delta_sync_with_encryption(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
 
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")

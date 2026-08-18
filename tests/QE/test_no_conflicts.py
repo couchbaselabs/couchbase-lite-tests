@@ -1,9 +1,11 @@
 import asyncio
 from pathlib import Path
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database import Database
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.listener import Listener
 from cbltest.api.replicator import Replicator
@@ -16,7 +18,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 
 
-async def update_cbl(cbl_db, doc_id, data):
+async def update_cbl(cbl_db: Database, doc_id: str, data: list[dict[str, Any]]) -> None:
     async with cbl_db.batch_updater() as b:
         b.upsert_document("_default.posts", doc_id, data)
 
@@ -26,7 +28,7 @@ async def update_cbl(cbl_db, doc_id, data):
 @pytest.mark.min_sync_gateways(1)
 class TestNoConflicts(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sg_cbl_updates_concurrently_with_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_sg_cbl_updates_concurrently_with_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -163,7 +165,7 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_cbls_updates_concurrently_with_push(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_multiple_cbls_updates_concurrently_with_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -305,7 +307,7 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[2].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_cbls_updates_concurrently_with_pull(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_multiple_cbls_updates_concurrently_with_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

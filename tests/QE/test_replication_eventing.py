@@ -18,7 +18,7 @@ from cbltest.api.replicator_types import (
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationEventing(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_replication_for_20mb_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_push_replication_for_20mb_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

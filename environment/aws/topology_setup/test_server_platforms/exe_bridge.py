@@ -62,7 +62,7 @@ class ExeBridge(PlatformBridge):
         extra_args: list[str] | None = None,
         *,
         log_filename: str = "server.log",
-    ):
+    ) -> None:
         """
         Initialize the ExeBridge with the executable path and optional extra arguments.
 

@@ -1,10 +1,13 @@
 import asyncio
 from datetime import timedelta
 from pathlib import Path
+from types import FunctionType
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database import Database
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.listener import Listener
 from cbltest.api.replicator import Replicator
@@ -19,15 +22,21 @@ from cbltest.responses import ServerVariant
 
 @pytest.mark.min_test_servers(3)
 class TestPeerToPeer(CBLTestClass):
-    def setup_method(self, method):
+    def setup_method(self, method: FunctionType) -> None:
         super().setup_method(method)
         self.doc_ids = None
         self.docgen = None
 
-    async def _testserver_crud(self, db, num_of_docs, optype="insert", documents=None):
+    async def _testserver_crud(
+        self,
+        db: Database,
+        num_of_docs: int,
+        optype: str = "insert",
+        documents: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         assert db is not None, "db cannot be None"
 
-        async def insert_each_batch(start: int, value: int = 10):
+        async def insert_each_batch(start: int, value: int = 10) -> None:
             async with db.batch_updater() as b:
                 assert self.doc_ids is not None, "doc_ids not initialized"
                 for i in self.doc_ids[start : start + value]:
@@ -62,10 +71,10 @@ class TestPeerToPeer(CBLTestClass):
         self,
         cblpytest: CBLPyTest,
         dataset_path: Path,
-        num_of_docs,
-        continuous,
-        replicator_type,
-    ):
+        num_of_docs: int,
+        continuous: bool,
+        replicator_type: ReplicatorType,
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -153,8 +162,8 @@ class TestPeerToPeer(CBLTestClass):
         ],
     )
     async def test_peer_to_peer_oneClient_toManyServers(
-        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
-    ):
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -236,8 +245,8 @@ class TestPeerToPeer(CBLTestClass):
         ],
     )
     async def test_peer_to_peer_oneServer_toManyClients(
-        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
-    ):
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -314,8 +323,8 @@ class TestPeerToPeer(CBLTestClass):
         ],
     )
     async def test_peer_to_peer_oneServer_twoClients_on_single_db(
-        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
-    ):
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -405,8 +414,8 @@ class TestPeerToPeer(CBLTestClass):
         ],
     )
     async def test_peer_to_peer_replication_with_multiple_dbs(
-        self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type
-    ):
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -509,7 +518,9 @@ class TestPeerToPeer(CBLTestClass):
             (100, True, ReplicatorType.PUSH),
         ],
     )
-    async def test_peer_to_peer_with_server_down(self, cblpytest: CBLPyTest, num_of_docs, continuous, replicator_type):
+    async def test_peer_to_peer_with_server_down(
+        self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
+    ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
@@ -537,7 +548,7 @@ class TestPeerToPeer(CBLTestClass):
         )
         await replicator1.start()
 
-        async def stop_restart_task():
+        async def stop_restart_task() -> Listener:
             port = listener1.port
             await listener1.stop()
             variant = (await cblpytest.test_servers[0].get_info()).variant

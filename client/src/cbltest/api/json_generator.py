@@ -29,7 +29,7 @@ class JSONGenerator:
         seed: int = random.randint(0, sys.maxsize),
         size: int = 60000,
         format: str = "json",
-    ):
+    ) -> None:
         self.seed = seed
         self.size = size
         self.format = format
@@ -103,7 +103,7 @@ class JSONGenerator:
         """Generic batch processing function with threading"""
         results = {}
 
-        def process_batch(batch):
+        def process_batch(batch: list[Any]) -> dict[Any, Any]:
             result = {}
             for item in batch:
                 output = process_fn(items_doc[item], item) if items_doc is not None else process_fn(item)
@@ -120,7 +120,7 @@ class JSONGenerator:
 
         return results
 
-    def generate_all_documents(self, size=None) -> dict[str, Any]:
+    def generate_all_documents(self, size: int | None = None) -> dict[str, Any]:
         """Generate all documents using parallel processing"""
         if size is None:
             size = self.size

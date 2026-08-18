@@ -24,7 +24,9 @@ from cbltest.utils import assert_not_null
 class TestReplicationBlob(CBLTestClass):
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_pull_non_blob_changes_with_delta_sync_and_compact(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_pull_non_blob_changes_with_delta_sync_and_compact(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
@@ -189,7 +191,7 @@ class TestReplicationBlob(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_blob_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -231,7 +233,7 @@ class TestReplicationBlob(CBLTestClass):
         remote_doc = await sync_gateway.get_document("names", "fruits")
         assert remote_doc is not None, "Document `fruits` not found in SGW"
 
-        def check_blob_prop(d: dict, prop: str, expected_value: Any):
+        def check_blob_prop(d: dict, prop: str, expected_value: Any) -> None:
             assert prop in d, f"Property `{prop}` not found in the blob"
             assert d[prop] == expected_value, (
                 f"Property `{prop}` is incorrect (expected: {expected_value}, actual: {d[prop]})"

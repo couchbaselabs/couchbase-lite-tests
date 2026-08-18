@@ -27,7 +27,7 @@ class TestReplicationXdcr(CBLTestClass):
         cblpytest: CBLPyTest,
         dataset_path: Path,
         dataset_name: str,
-    ):
+    ) -> None:
         """
         Prepare two Couchbase clusters for XDCR testing:
         - Stop any existing XDCR replications.
@@ -51,7 +51,7 @@ class TestReplicationXdcr(CBLTestClass):
         await asyncio.sleep(5)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
         self.mark_test_step("Prepare clusters and start XDCR.")
@@ -189,7 +189,7 @@ class TestReplicationXdcr(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
 
         self.mark_test_step("Prepare clusters and start XDCR.")

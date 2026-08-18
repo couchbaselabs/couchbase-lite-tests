@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import importlib
 import traceback
+from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from shutil import rmtree
-from typing import cast
+from typing import Any, TypeVar, cast
 from uuid import UUID, uuid4
 
 from aiohttp import ClientSession
@@ -48,9 +49,12 @@ class TestServerRequestType(Enum):
 _request_registry: dict[tuple[TestServerRequestType, int], type] = {}
 _body_registry: dict[tuple[TestServerRequestType, int], type] = {}
 
+_RequestT = TypeVar("_RequestT", bound=type["TestServerRequest"])
+_BodyT = TypeVar("_BodyT", bound=type["JSONSerializable"])
 
-def register_request(request_type: TestServerRequestType, version: int | list[int]):
-    def deco(cls: type[TestServerRequest]) -> type:
+
+def register_request(request_type: TestServerRequestType, version: int | list[int]) -> Callable[[_RequestT], _RequestT]:
+    def deco(cls: _RequestT) -> _RequestT:
         if isinstance(version, list):
             for v in version:
                 _request_registry[(request_type, v)] = cls
@@ -61,8 +65,8 @@ def register_request(request_type: TestServerRequestType, version: int | list[in
     return deco
 
 
-def register_body(request_type: TestServerRequestType, version: int | list[int]):
-    def deco(cls: type[JSONSerializable]) -> type:
+def register_body(request_type: TestServerRequestType, version: int | list[int]) -> Callable[[_BodyT], _BodyT]:
+    def deco(cls: _BodyT) -> _BodyT:
         if isinstance(version, list):
             for v in version:
                 _body_registry[(request_type, v)] = cls
@@ -84,7 +88,7 @@ class RequestFactory:
 
     __first_run: bool = True
 
-    def __init__(self, config: ParsedConfig):
+    def __init__(self, config: ParsedConfig) -> None:
         self.__record_path = Path("http_log")
         self.__version = 0
         if RequestFactory.__first_run and self.__record_path.exists():
@@ -142,7 +146,7 @@ class RequestFactory:
     async def start(self) -> None:
         await self.__ws_router.start()
 
-    def _create_request(self, type: TestServerRequestType, **kwargs) -> TestServerRequest:
+    def _create_request(self, type: TestServerRequestType, **kwargs: Any) -> TestServerRequest:
         if (type, self.__version) not in _request_registry:
             raise ValueError(f"Request type '{type}' not registered for version {self.__version}")
 
@@ -150,7 +154,7 @@ class RequestFactory:
         payload = self._create_body(type, **kwargs)
         return cast(TestServerRequest, request_class(self.__version, self.__uuid, payload))
 
-    def create_request(self, type: TestServerRequestType, **kwargs) -> TestServerRequest:
+    def create_request(self, type: TestServerRequestType, **kwargs: Any) -> TestServerRequest:
         """
         Creates a request to send.
 
@@ -161,7 +165,7 @@ class RequestFactory:
             GetRootRequest(self.__uuid) if type == TestServerRequestType.ROOT else self._create_request(type, **kwargs)
         )
 
-    def _create_body(self, type: TestServerRequestType, **kwargs) -> JSONSerializable | None:
+    def _create_body(self, type: TestServerRequestType, **kwargs: Any) -> JSONSerializable | None:
         if type == TestServerRequestType.ROOT:
             return None
 

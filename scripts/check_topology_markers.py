@@ -450,7 +450,7 @@ def _class_autouse_usage(methods: dict[str, ast.AST], scope: _FileScope) -> tupl
 
 
 class _Checker(ast.NodeVisitor):
-    def __init__(self, filename: str, scope: _FileScope):
+    def __init__(self, filename: str, scope: _FileScope) -> None:
         self.filename = filename
         self.violations: list[str] = []
         self._class_markers: list[dict[str, int]] = []

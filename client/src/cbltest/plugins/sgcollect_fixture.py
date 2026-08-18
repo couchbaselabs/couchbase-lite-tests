@@ -1,14 +1,16 @@
 import asyncio
 import pathlib
+from collections.abc import AsyncGenerator, Sequence
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.logging import cbl_error, cbl_info
 
 
-async def run_sgcollects(sync_gateways: list[SyncGateway], output_dir: Path) -> list[Path]:
+async def run_sgcollects(sync_gateways: Sequence[SyncGateway], output_dir: Path) -> list[Path]:
     """
     Runs SGCollect on every given Sync Gateway node in parallel, downloading each
     resulting zip into output_dir, and logs a summary of what was collected.
@@ -45,7 +47,7 @@ async def run_sgcollects(sync_gateways: list[SyncGateway], output_dir: Path) -> 
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def sgcollect_session(cblpytest, request: pytest.FixtureRequest):
+async def sgcollect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
     yield
     if request.config.getoption("--sgcollect-on-test-failure") and request.session.testsfailed:
         await run_sgcollects(cblpytest.sync_gateways, pathlib.Path.cwd())
