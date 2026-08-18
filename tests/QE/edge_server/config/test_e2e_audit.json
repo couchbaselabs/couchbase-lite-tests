@@ -20,7 +20,8 @@
             "auth": {
                 "user": "sync_gateway",
                 "password": "password"
-            }
+            },
+            "pinned_cert": "/home/ec2-user/cert/sg_cert.pem"
         }
     ],
     "users": "/home/ec2-user/user/users.json",
