@@ -4,35 +4,47 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [--setup-only]"
+  echo "Usage: $0 <cbl_version> <sgw_version> [--setup-only | --skip-setup]"
   echo "  <cbl_version>: The Couchbase Lite version to run the test against."
   echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
+  echo "  --skip-setup: Skip setup, only run the tests against an already-provisioned backend"
   echo "  Build number will be auto-fetched for the specified version"
   exit 1
 }
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
 SGW_VERSION=${2}
-SETUP_ONLY=false
+shift 2
 
-# Check for --setup-only flag
+# The two positionals must be versions, not flags (catches e.g. a flag placed
+# in the version position).
+case "$CBL_VERSION" in -*) usage ;; esac
+case "$SGW_VERSION" in -*) usage ;; esac
+SETUP_ONLY=false
+SKIP_SETUP=false
+
+# Parse only the optional flags that follow the versions; anything unrecognized
+# (a typo, or a stray positional) is an explicit error rather than silently ignored.
 for arg in "$@"; do
-  if [ "$arg" = "--setup-only" ]; then
-    SETUP_ONLY=true
-    break
-  fi
+  case "$arg" in
+    --setup-only) SETUP_ONLY=true ;;
+    --skip-setup) SKIP_SETUP=true ;;
+    *) usage ;;
+  esac
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "$SCRIPT_DIR"/../../shared/config.sh
 
-echo "Setup backend..."
-pushd "$AWS_ENVIRONMENT_DIR" >/dev/null
-uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
-popd >/dev/null
+if [ "$SKIP_SETUP" != true ]; then
+  echo "Setup backend..."
+  pushd "$AWS_ENVIRONMENT_DIR" >/dev/null
+  uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
+  popd >/dev/null
+fi
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
@@ -46,10 +58,9 @@ fi
 
 echo "Run tests..."
 pushd "$TESTS_DIR" >/dev/null
-# --session-timeout makes pytest stop gracefully BEFORE Jenkins' 120m step timeout, so junit, greenboard, and
-# sgcollect cleanup all get a runway:
-#   session-timeout = jenkins(120m) - per-test(5m) - setup(20m) = 95m = 5700s
-# --timeout bounds a single hung test (session-timeout is only checked between tests); method=signal raises in the
-# main thread so that test's teardown runs.
-uv run pytest -v --no-header --config QE/config.json --sgcollect-on-test-failure --timeout-method=signal \
-  --timeout=300 --session-timeout=5700 --ignore=dev_e2e/test_replication_xdcr.py
+# pytest's graceful session timeout comes from the CBL_PYTEST_SESSION_TIMEOUT env var (seconds), applied by the
+# timeout_fixture plugin. The Jenkins Run Tests stage derives its hard timeout from the same var, so the two can
+# never drift out of order. It stops pytest gracefully so the session-end cleanup fixtures (junit, greenboard,
+# sgcollect) get a runway to finish -- the stage's hard SIGTERM would leave only ~60s, too little for sgcollect.
+uv run pytest -v --no-header --config QE/config.json --sgcollect-on-test-failure \
+  --ignore=dev_e2e/test_replication_xdcr.py

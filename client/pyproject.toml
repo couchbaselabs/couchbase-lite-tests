@@ -56,6 +56,7 @@ greenboard_fixture = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
+timeout_fixture = "cbltest.plugins.timeout_fixture"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"
