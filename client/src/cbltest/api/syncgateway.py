@@ -637,27 +637,6 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
-class CompactType(str, Enum):
-    """The type of compaction operation performed by POST/GET /{db}/_compact"""
-
-    TOMBSTONE = "tombstone"
-    ATTACHMENT = "attachment"
-
-
-class CompactStatus(BaseModel):
-    """Output of GET /{db}/_compact endpoint of Sync Gateway"""
-
-    status: str | None = None
-    start_time: str | None = None
-    last_error: str | None = None
-    docs_purged: str | None = None  # tombstone compaction only
-    marked_attachments: str | None = None  # attachment compaction only
-    purged_attachments: str | None = None  # attachment compaction only
-    compact_id: str | None = None  # attachment compaction only
-    phase: str | None = None  # attachment compaction only
-    dry_run: str | None = None  # attachment compaction only; not the request's boolean dry_run flag
-
-
 class SGCollectRedactLevel(str, Enum):
     """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
 
@@ -2334,65 +2313,6 @@ class SyncGateway(_SyncGatewayBase):
                 await asyncio.sleep(poll_interval)
 
             raise TimeoutError(f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds")
-
-    async def start_compact(
-        self,
-        db_name: str,
-        compact_type: CompactType = CompactType.TOMBSTONE,
-        reset: bool | None = None,
-        dry_run: bool | None = None,
-    ) -> None:
-        """
-        Starts a compaction operation on a Sync Gateway database.
-
-        :param db_name: The name of the database to compact
-        :param compact_type: The type of compaction to perform (default tombstone)
-        :param reset: Attachment compaction only: force a fresh compact instead of resuming a failed one
-        :param dry_run: Attachment compaction only: report what would be purged without purging anything
-        :raises ValueError: If reset or dry_run is passed for a non-attachment compaction
-        """
-        if compact_type != CompactType.ATTACHMENT and (reset is not None or dry_run is not None):
-            raise ValueError("reset and dry_run only apply to attachment compaction")
-
-        with self._tracer.start_as_current_span(
-            "start_compact", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
-        ):
-            params = {"action": "start", "type": compact_type.value}
-            if reset is not None:
-                params["reset"] = "true" if reset else "false"
-            if dry_run is not None:
-                params["dry_run"] = "true" if dry_run else "false"
-            await self._send_request("post", f"/{db_name}/_compact", params=params)
-
-    async def stop_compact(self, db_name: str, compact_type: CompactType = CompactType.TOMBSTONE) -> None:
-        """
-        Stops a running compaction operation on a Sync Gateway database.
-
-        :param db_name: The name of the database
-        :param compact_type: The type of compaction to stop (default tombstone)
-        """
-        with self._tracer.start_as_current_span(
-            "stop_compact", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
-        ):
-            await self._send_request(
-                "post", f"/{db_name}/_compact", params={"action": "stop", "type": compact_type.value}
-            )
-
-    async def get_compact_status(
-        self, db_name: str, compact_type: CompactType = CompactType.TOMBSTONE
-    ) -> CompactStatus:
-        """
-        Gets the status of the most recent compaction operation on a Sync Gateway database.
-
-        :param db_name: The name of the database
-        :param compact_type: The type of compaction to query (default tombstone)
-        """
-        with self._tracer.start_as_current_span(
-            "get_compact_status", attributes={"sg.database.name": db_name, "sg.compact.type": compact_type.value}
-        ):
-            resp = await self._send_request("get", f"/{db_name}/_compact", params={"type": compact_type.value})
-            assert isinstance(resp, dict)
-            return CompactStatus.model_validate(resp)
 
     async def get_user_access_history(self, db_name: str, name: str) -> dict[str, dict[str, list[str]]]:
         """
