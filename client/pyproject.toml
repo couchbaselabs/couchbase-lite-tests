@@ -39,6 +39,7 @@ dependencies = [
   "pyjson5==1.6.8",
   "pytest==9.0.2",
   "pytest-asyncio==1.3.0",
+  "pytest-timeout==2.5.0",
   "requests==2.32.3",
   "websocket-client==1.8.0",
 ]
@@ -54,6 +55,8 @@ cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
+sigterm_handler = "cbltest.plugins.sigterm_handler"
+timeout_fixture = "cbltest.plugins.timeout_fixture"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"
