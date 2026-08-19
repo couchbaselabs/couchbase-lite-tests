@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-import json
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -131,7 +131,6 @@ class TestLogging(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
         await write_json_file(config_path, config)
-        run_start = datetime.now(timezone.utc)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 
@@ -145,13 +144,7 @@ class TestLogging(CBLTestClass):
 
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
-            raw = await edge_server.check_log(event_id)
-            log = [
-                entry for entry in raw
-                if datetime.fromisoformat(
-                    json.loads(entry)["timestamp"].replace("Z", "+00:00")
-                ) >= run_start
-            ]
+            log = await edge_server.check_log(event_id)
             if expected_non_empty:
                 assert len(log) > 0, f"Audit log for {step_name} event not found"
             else:

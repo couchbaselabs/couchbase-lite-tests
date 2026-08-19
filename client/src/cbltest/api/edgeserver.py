@@ -943,7 +943,7 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
-        self.close()
+        await self.close()
         return EdgeServer(self.__hostname, config_file=config_file)
 
     async def set_firewall_rules(
@@ -1013,3 +1013,47 @@ class EdgeServer:
         if self.__shell_session is not None and not self.__shell_session.closed:
             await self.__shell_session.close()
             self.__shell_session = None
+
+    async def collect_logs(self, output_dir: Path, label: str | None = None) -> Path:
+        """
+        Ask the Edge Server host to bundle its logs, audit logs, config and
+        system info into a tarball, then download it into output_dir.
+
+        Uses short-lived sessions rather than the instance's own sessions so
+        that this still works on an instance whose sessions were closed by a
+        prior configure_dataset() call.
+
+        :param output_dir: Local directory to download the archive into
+        :param label: Optional suffix (e.g. test name) for the archive filename
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span(
+                "collect_logs", attributes={"cbl.edge_server.host": self.__hostname}
+        ):
+            ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.__hostname.replace(".", "-").replace(":", "-")
+            safe_label = (
+                "-" + "".join(c if c.isalnum() or c in "-_" else "_" for c in label)
+                if label
+                else ""
+            )
+            filename = f"es-collect-{safe_host}-{ts}{safe_label}.tar.gz"
+
+            async with ClientSession(f"http://{self.__hostname}:20001") as s:
+                await self._send_request(
+                    "post",
+                    "/collect-logs",
+                    JSONDictionary({"filename": filename}),
+                    session=s,
+                )
+
+            caddy_url = f"http://{self.__hostname}:20000/collect/{filename}"
+            content = await self._caddy_http_request(
+                caddy_url, f"Download {filename}", timeout=300
+            )
+
+            output_dir.mkdir(parents=True, exist_ok=True)
+            local_path = output_dir / filename
+            async with aiofiles.open(local_path, "wb") as f:
+                await f.write(content)
+            return local_path
