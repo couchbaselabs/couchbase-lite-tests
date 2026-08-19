@@ -82,7 +82,7 @@ class TestSgwUpgrade(CBLTestClass):
             delta_sync=DeltaSyncConfig(enabled=True),
         )
         try:
-            await sg.put_database(sg_db, db_payload)
+            await cblpytest.sync_gateway_cluster.create_database(sg_db, db_payload)
         except CblSyncGatewayBadResponseError as e:
             if e.code != 412:
                 raise e

@@ -887,9 +887,12 @@ class _SyncGatewayBase:
             _, headers = await self._send_request_with_headers("post", f"/{db_name}/_config", payload)
             return _config_version(headers)
 
-    async def put_database(self, db_name: str, payload: DatabaseConfig) -> str | None:
+    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> str | None:
         """
         Attempts to create a database on the Sync Gateway instance
+
+        Private: use `SyncGatewayCluster.create_database` instead
+        of calling this directly, so that all nodes in the cluster stay in sync.
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create

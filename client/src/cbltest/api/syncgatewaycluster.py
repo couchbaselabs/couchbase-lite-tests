@@ -68,7 +68,7 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        version = await self.random_node.put_database(db_name, config)
+        version = await self.random_node._put_database(db_name, config)
         await self.wait_for_db_online(db_name, version)
 
     async def update_database_config(self, db_name: str, config: DatabaseConfig) -> None:

@@ -108,7 +108,7 @@ class TestLogging(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await cblpytest.clusters[0].sync_gateway_cluster.create_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
         input_data = {"_default._default": ["public"]}

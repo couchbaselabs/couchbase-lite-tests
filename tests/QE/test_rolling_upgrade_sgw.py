@@ -85,12 +85,11 @@ class TestSgwRollingUpgrade(CBLTestClass):
 
         self.mark_test_step("Configure SGW database on all nodes")
         db_payload = SGW_CONFIG
-        for sg in sg_nodes:
-            try:
-                await sg.put_database(sg_db, db_payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code != 412:
-                    raise e
+        try:
+            await cblpytest.sync_gateway_cluster.create_database(sg_db, db_payload)
+        except CblSyncGatewayBadResponseError as e:
+            if e.code != 412:
+                raise e
 
         self.mark_test_step("Ensure user exists on all SGW nodes")
         for sg in sg_nodes:

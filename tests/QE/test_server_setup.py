@@ -85,7 +85,7 @@ class TestServerSetup(CBLTestClass):
         assert sg_version is not None, "SGW should start with ca_cert_path x509 config"
 
         self.mark_test_step("Verify SGW can connect to CBS via document sync")
-        await cblpytest.clusters[0].sync_gateway_cluster.create_database(
+        await cblpytest.sync_gateway_cluster.create_database(
             sg_db,
             DatabaseConfig(
                 bucket=bucket_name,
