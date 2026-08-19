@@ -2322,6 +2322,111 @@ class SyncGateway(_SyncGatewayBase):
 
             raise TimeoutError(f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds")
 
+    async def get_user_access_history(self, db_name: str, name: str) -> dict[str, dict[str, list[str]]]:
+        """
+        Gets the channel access history of a user, organized by scope and collection.
+
+        :param db_name: The name of the database
+        :param name: The username to query
+        :return: A dict of scope -> collection -> list of channel names
+        """
+        with self._tracer.start_as_current_span(
+            "get_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_user/{name}/_access_history")
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("channels", {})
+
+    async def compact_user_access_history(
+        self, db_name: str, name: str, channels: dict[str, dict[str, list[str]]]
+    ) -> dict[str, dict[str, list[str]]]:
+        """
+        Removes the specified channels from a user's channel access history.
+
+        :param db_name: The name of the database
+        :param name: The username whose history should be compacted
+        :param channels: The channels to remove, organized by scope and collection
+            (e.g. {"scope1": {"collection1": ["channel1"]}})
+        :return: The channels that were actually removed, organized by scope and collection
+        """
+        with self._tracer.start_as_current_span(
+            "compact_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            body = {"channels": channels}
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}/_user/{name}/_access_history/compact",
+                JSONDictionary(body),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", {})
+
+    async def get_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, list[int]]:
+        """
+        Gets the channel revocation history of a document.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to query
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: A dict of channel name -> sequences at which the document was removed from it
+        """
+        with self._tracer.start_as_current_span(
+            "get_document_channel_history",
+            attributes={
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
+            },
+        ):
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def compact_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        seq: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> list[str]:
+        """
+        Compacts a document's channel history, removing revocation entries for channels the
+        document left before the given sequence.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to compact
+        :param seq: Channel history with end sequences earlier than this will be removed
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: The list of channels that were compacted
+        """
+        with self._tracer.start_as_current_span(
+            "compact_document_channel_history",
+            attributes={
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
+                "sg.compact.seq": seq,
+            },
+        ):
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}/compact",
+                JSONDictionary({"seq": seq}),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", [])
+
 
 class SyncGatewayUserClient(_SyncGatewayBase):
     """
