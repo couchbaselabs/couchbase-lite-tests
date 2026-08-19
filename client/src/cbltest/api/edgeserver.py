@@ -857,7 +857,7 @@ class EdgeServer:
             try:
                 async with (
                     ClientSession() as session,
-                    session.get(url, timeout=ClientTimeout(total=timeout)) as response,
+                    session.get(url, timeout=ClientTimeout(total=timeout),headers={"Cache-Control": "no-cache", "Pragma": "no-cache"} ) as response,
                 ):
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
@@ -888,8 +888,8 @@ class EdgeServer:
                 caddy_url = f"http://{self.hostname}:20000/{path}"
                 content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
                 return content.decode("utf-8")
-            except Exception:
-                return ""
+            except Exception as e:
+                raise Exception("Failed to fetch log content from %s: %s", caddy_url, e)
 
     async def check_log(
         self,
