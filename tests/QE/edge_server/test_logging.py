@@ -89,6 +89,7 @@ class TestLogging(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
+        server.drop_bucket(bucket_name)
         server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
@@ -118,6 +119,10 @@ class TestLogging(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
+        self.mark_test_step("Empty the audit logging file")
+        await cblpytest.edge_servers[0].write_file_on_es("/home/ec2-user/audit/EdgeServerAuditLog.txt",
+                                                         "_____________\n")
+
         self.mark_test_step("Creating a database on Edge Server with audit config.")
         step_descriptions = {
             "default": "Creating a database on Edge Server with default audit config.",
@@ -131,6 +136,7 @@ class TestLogging(CBLTestClass):
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
         await write_json_file(config_path, config)
+
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 
@@ -171,7 +177,7 @@ class TestLogging(CBLTestClass):
             }
             updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id, es_db_name, rev=rev_id)
             assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
-            rev_id = updated_doc.revid
+            rev_id = updated_doc["rev"]
             delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
             assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
                 f"Failed to delete document {doc_id} via Edge Server."

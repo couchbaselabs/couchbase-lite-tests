@@ -1056,3 +1056,12 @@ class EdgeServer:
             async with aiofiles.open(local_path, "wb") as f:
                 await f.write(content)
             return local_path
+
+    async def write_file_on_es(self, path: str, content: str):
+        """Write content to a file on the ES host via shell2http."""
+        await self._send_request(
+            "post",
+            "write-file",
+            JSONDictionary({"path": path, "content": content}),
+            session=self.__shell_session,
+        )

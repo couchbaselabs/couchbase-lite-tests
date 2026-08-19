@@ -9,12 +9,8 @@ set -uo pipefail
 OUT_DIR="/home/ec2-user/collect"
 LOG_DIR="/home/ec2-user/log"
 AUDIT_DIR="/home/ec2-user/audit"
-ES_ETC="/opt/couchbase-edge-server/etc"
-ES_BIN="/opt/couchbase-edge-server/bin/couchbase-edge-server"
 
-FILENAME=$(echo "$REQUEST_BODY" | python3 -c \
-  'import json,sys; print(json.load(sys.stdin).get("filename",""))' 2>/dev/null)
-[ -z "$FILENAME" ] && FILENAME="es-collect-$(date -u +%Y%m%d-%H%M%S).tar.gz"
+FILENAME="es-collect-$(date -u +%Y%m%d-%H%M%S).tar.gz"
 
 # Reject path traversal - filename is attacker-controllable in principle
 FILENAME=$(basename "$FILENAME")
@@ -31,14 +27,6 @@ mkdir -p "$STAGE/logs" "$STAGE/audit" "$STAGE/config" "$STAGE/system"
 
 cp -a "$LOG_DIR/." "$STAGE/logs/" 2>/dev/null || true
 cp -a "$AUDIT_DIR/." "$STAGE/audit/" 2>/dev/null || true
-cp -a "$ES_ETC"/*.json  "$STAGE/config/" 2>/dev/null || true
-cp -a "$ES_ETC"/*.json5 "$STAGE/config/" 2>/dev/null || true
-
-# Redact password hashes from users.json before it leaves the host
-if [ -f "$STAGE/config/users.json" ]; then
-  sed -i 's/"password"[[:space:]]*:[[:space:]]*"[^"]*"/"password":"<redacted>"/g' \
-    "$STAGE/config/users.json" 2>/dev/null || true
-fi
 
 {
   echo "=== collected $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
