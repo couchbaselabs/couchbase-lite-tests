@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
@@ -19,6 +20,7 @@ from cbltest.api.syncgateway import RemoteDocument
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
+from cbltest.plugins.cluster_cleanup import perform_cleanup
 
 
 class DocSnapshot:
@@ -33,6 +35,30 @@ DocValidator: TypeAlias = Callable[[DocSnapshot, DocSnapshot], None]
 def tools_path() -> Path:
     # tests/shared/upgrade_test_helpers.py -> parents[1] is tests/
     return Path(__file__).resolve().parents[1] / ".tools"
+
+
+def is_initial_upgrade_phase() -> bool:
+    """
+    True when this is the first phase of an SGW upgrade run, which is the only phase
+    with no state to inherit from the phase before it.
+
+    `SGW_UPGRADE_PHASE` is set per pytest invocation by the upgrade pipelines
+    (`jenkins/pipelines/QE/upg-sgw/test{,_rolling}.sh`); unset means no pipeline is
+    driving the test, which is treated the same as the first phase.
+    """
+    return os.environ.get("SGW_UPGRADE_PHASE", "") in ("", "initial")
+
+
+async def cleanup_unless_mid_upgrade(cblpytest: CBLPyTest) -> None:
+    """
+    Body for a `cluster_cleanup` fixture override on an SGW upgrade test class: clean
+    only in the initial phase, since later phases assert that earlier docs survived.
+    """
+    if not is_initial_upgrade_phase():
+        cbl_info(f"🧹 Skipping cleanup: phase '{os.environ['SGW_UPGRADE_PHASE']}' inherits the previous state")
+        return
+
+    await perform_cleanup(cblpytest)
 
 
 async def setup_upgrade_env(
