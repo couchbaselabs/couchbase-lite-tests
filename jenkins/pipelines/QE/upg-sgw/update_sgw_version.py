@@ -25,7 +25,8 @@ def update_sgw_version(topology_file: Path, sgw_version: str, sgw_index: int | N
     """Update the SGW version in the topology file.
 
     If sgw_index is provided, only that specific node's version is updated
-    (per-node override). Otherwise, the global default is updated for all nodes.
+    (per-node override). Otherwise, every node in `sync_gateways` is pinned to
+    the new version directly.
     """
     if not topology_file.exists():
         raise FileNotFoundError(f"Topology file not found: {topology_file}")
@@ -42,12 +43,9 @@ def update_sgw_version(topology_file: Path, sgw_version: str, sgw_index: int | N
         sgw_list[sgw_index]["version"] = sgw_version_resolved
         print(f"Updated SGW node {sgw_index} version to: {sgw_version_resolved}")
     else:
-        if "defaults" not in topology:
-            topology["defaults"] = {}
-        if "sgw" not in topology["defaults"]:
-            topology["defaults"]["sgw"] = {}
-        topology["defaults"]["sgw"]["version"] = sgw_version_resolved
-        print(f"Updated topology default SGW version to: {sgw_version_resolved}")
+        for i, sgw in enumerate(topology.get("sync_gateways", [])):
+            sgw["version"] = sgw_version_resolved
+            print(f"Updated SGW node {i} version to: {sgw_version_resolved}")
 
     with open(topology_file, "w") as f:
         json.dump(topology, f, indent=4)

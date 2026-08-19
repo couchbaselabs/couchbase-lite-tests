@@ -74,6 +74,22 @@ def parse_versions(value: str) -> list[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
+class VersionType(click.ParamType):
+    """
+    A click parameter that accepts a comma-separated list of versions
+    (e.g. "4.0.0,4.1.0") and hands the command a list[str] via `parse_versions`.
+    """
+
+    name = "versions"
+
+    def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> list[str]:
+        # click applies conversion to defaults as well, which may already be a list.
+        if isinstance(value, list):
+            return cast(list[str], value)
+
+        return parse_versions(str(value))
+
+
 def distribute_versions(versions: list[str], count: int) -> list[str]:
     """
     Assigns one version per index up to `count`, positionally: index 0 gets

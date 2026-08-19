@@ -27,7 +27,7 @@ The matching topology file MUST provision **at least** those resources:
 {
   "clusters":      [{"server_count": 1}, {"server_count": 1}],
   "sync_gateways": [{"cluster": 0},      {"cluster": 1}],
-  "test_servers":  [{"platform": "swift_ios", "cbl_version": "{{version}}"}]
+  "test_servers":  [{"platform": "swift_ios", "cbl_versions": "{{version}}"}]
 }
 ```
 
@@ -63,7 +63,7 @@ Every `{platform}/` directory under `dev_e2e/` or `QE/` contains:
 | **Multi-file topology** | `c/`, `dotnet/` use `topologies/topology_single_{platform}.json` per-target. |
 | **Programmatic topology** | `QE/es/` builds topology via `generate_topology()` instead of a JSON template. |
 
-Common placeholders: `{{version}}`, `{{cbl_version}}`, `{{cbs_version}}`, per-platform variants like `{{swift_ios}}`, `{{jak_android}}`, `{{jak_desktop}}`.
+Common placeholders: `{{version}}`, `{{cbl_versions}}`, `{{cbs_version}}`, per-platform variants like `{{swift_ios}}`, `{{jak_android}}`, `{{jak_desktop}}`.
 
 ## Special Pipelines
 
@@ -92,7 +92,7 @@ Does not call the shared `setup_test()` — has its own inline topology-composit
 ## `shared/setup_test.py` Recap
 
 - `setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="dev_e2e")` — reads the topology template, resolves versions via `proget`, assigns `cbl_versions` positionally to `test_servers` and `sgw_versions` positionally to `sync_gateways` (repeating the last entry once a list is exhausted — see `distribute_versions`; `sgw_versions` only applies per-instance when `sync_gateways` is defined directly in `topology_file_in` rather than via `include`), sets defaults + tag, writes the final topology to `environment/aws/topology_setup/topology.json`, downloads `cbbackupmgr`, then calls `start_backend()`.
-- `parse_versions(value)` splits a comma-separated CLI argument (e.g. `"4.0.0,4.1.0"`) into a list — every `setup_test.py` CLI wrapper uses this before calling `setup_test()`.
+- `VersionType` is a `click.ParamType` that converts a comma-separated CLI argument (e.g. `"4.0.0,4.1.0"`) into a `list[str]` (via `parse_versions()`) — every `setup_test.py` CLI wrapper declares its version arguments with `type=VersionType()` so `cli_entry` receives lists directly.
 - `ts_to_topology()` maps platform tags: `swift_* → ios`, `jak_android → android`, `jak_* → java`, `dotnet_* → dotnet`, `c_* → c`.
 
 ## Rules

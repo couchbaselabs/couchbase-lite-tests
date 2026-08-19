@@ -66,16 +66,16 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
-from jenkins.pipelines.shared.setup_test import parse_versions, setup_test
+from jenkins.pipelines.shared.setup_test import VersionType, setup_test
 
 
 @click.command()
-@click.argument("cbl_version")
-@click.argument("sgw_version")
-def cli_entry(cbl_version: str, sgw_version: str) -> None:
+@click.argument("cbl_versions", type=VersionType())
+@click.argument("sgw_versions", type=VersionType())
+def cli_entry(cbl_versions: list[str], sgw_versions: list[str]) -> None:
     setup_test(
-        parse_versions(cbl_version),
-        parse_versions(sgw_version),
+        cbl_versions,
+        sgw_versions,
         SCRIPT_DIR / "TOPOLOGY_FILE",  # ← varies per platform
         SCRIPT_DIR / "CONFIG_FILE",  # ← varies per platform
         "PLATFORM_TAG",  # ← varies per platform
@@ -133,7 +133,7 @@ if __name__ == "__main__":
 7. Downloads `cbbackupmgr` for the CBS version
 8. Creates `TopologyConfig` → calls `start_backend()`
 
-CLI wrappers accept comma-separated versions (`"4.0.0,4.1.0"`) and split them with `parse_versions()` before calling `setup_test()`.
+CLI wrappers accept comma-separated versions (`"4.0.0,4.1.0"`) via the `VersionType` click param type, which converts the argument to a `list[str]` (using `parse_versions()`) before `cli_entry` ever sees it.
 
 **`ts_to_topology(ts_platform)`** — Maps platform tags to topology names: `swift_* → ios`, `jak_android → android`, `jak_* → java`, `dotnet_* → dotnet`, `c_* → c`.
 
