@@ -2,14 +2,15 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/common.sh"
-
 set -uo pipefail
 
 OUT_DIR="/home/ec2-user/collect"
 LOG_DIR="/home/ec2-user/log"
 AUDIT_DIR="/home/ec2-user/audit"
 
-FILENAME="es-collect-$(date -u +%Y%m%d-%H%M%S).tar.gz"
+REQ=$(read_http_body | jq -r '.filename')
+FILENAME="${REQ:-es-collect-$(date -u +%Y%m%d-%H%M%S).tar.gz}"
+FILENAME=$(basename "$FILENAME")
 
 # Reject path traversal - filename is attacker-controllable in principle
 FILENAME=$(basename "$FILENAME")
