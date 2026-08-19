@@ -943,6 +943,7 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
+        self.close()
         return EdgeServer(self.__hostname, config_file=config_file)
 
     async def set_firewall_rules(
@@ -1001,3 +1002,14 @@ class EdgeServer:
                 is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def close(self) -> None:
+        if self.__admin_session is not None and not self.__admin_session.closed:
+            await self.__admin_session.close()
+            self.__admin_session = None
+        if self.__anonymous_session is not None and not self.__anonymous_session.closed:
+            await self.__anonymous_session.close()
+            self.__anonymous_session = None
+        if self.__shell_session is not None and not self.__shell_session.closed:
+            await self.__shell_session.close()
+            self.__shell_session = None
