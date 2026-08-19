@@ -1,7 +1,7 @@
+import asyncio
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -147,7 +147,7 @@ class TestLogging(CBLTestClass):
         response = await edge_server.get_all_documents(es_db_name)
         self.mark_test_step("Checking that Edge Server has 5 documents.")
         assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
-
+        await asyncio.sleep(5)
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
             log = await edge_server.check_log(event_id)
