@@ -6,7 +6,7 @@ repos:
       - id: check-shebang-scripts-are-executable
       - id: check-merge-conflict
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.0
+    rev: v0.16.3
     hooks:
       - id: ruff
         types_or: [markdown, python, pyi]
@@ -18,7 +18,7 @@ repos:
         name: ty check
         language: unsupported
         types_or: [python, pyi]
-        entry: uv run ty check
+        entry: uv run --group lint ty check
       - id: topology-markers
         name: check topology markers
         language: unsupported
@@ -30,4 +30,20 @@ repos:
       - id: pyupgrade
         args: [--py310-plus]
         types_or: [python, pyi]
-  
+  - repo: https://github.com/google/yamlfmt
+    rev: v0.19.0
+    hooks:
+      - id: yamlfmt
+  - repo: https://github.com/ComPWA/mirrors-taplo
+    rev: v0.9.3
+    hooks:
+      - id: taplo-format
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.13.1-1
+    hooks:
+      - id: shfmt
+        exclude: /gradlew$
+  - repo: https://github.com/editorconfig-checker/editorconfig-checker.python
+    rev: '3.11.1'
+    hooks:
+      - id: editorconfig-checker

@@ -169,7 +169,7 @@ class TestLogging(CBLTestClass):
             }
             updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id, es_db_name, rev=rev_id)
             assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
-            rev_id = updated_doc.revid
+            rev_id = updated_doc["rev"]
             delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
             assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
                 f"Failed to delete document {doc_id} via Edge Server."

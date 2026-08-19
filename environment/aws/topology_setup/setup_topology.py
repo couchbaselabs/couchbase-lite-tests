@@ -48,11 +48,11 @@ class DefaultProperty:
     def is_set(self) -> bool:
         return self.__value is not None
 
-    def __init__(self, default_value: str):
+    def __init__(self, default_value: str) -> None:
         self.__default_value = default_value
         self.__value: str | None = None
 
-    def set_value(self, value: str):
+    def set_value(self, value: str) -> None:
         self.__value = value
 
     def __str__(self) -> str:
@@ -68,7 +68,7 @@ class CouchbaseServerDefaults:
     def version(self) -> DefaultProperty:
         return self.__version
 
-    def __init__(self, parent: dict):
+    def __init__(self, parent: dict) -> None:
         self.__version = DefaultProperty(self.__default_version)
         if self.__cbs_key not in parent:
             return
@@ -89,7 +89,7 @@ class SyncGatewayDefaults:
     def version(self) -> DefaultProperty:
         return self.__version
 
-    def __init__(self, parent: dict):
+    def __init__(self, parent: dict) -> None:
         self.__version = DefaultProperty(self.__default_version)
         if self.__sgw_key not in parent:
             return
@@ -110,7 +110,7 @@ class EdgeServerDefaults:
     def version(self) -> DefaultProperty:
         return self.__version
 
-    def __init__(self, parent: dict):
+    def __init__(self, parent: dict) -> None:
         self.__version = DefaultProperty(self.__default_version)
         if self.__es_key not in parent:
             return
@@ -137,7 +137,7 @@ class ConfigDefaults:
     def EdgeServer(self) -> EdgeServerDefaults:
         return self.__es_default
 
-    def __init__(self, parent: dict):
+    def __init__(self, parent: dict) -> None:
         defaults = {}
         if self.__defaults_key in parent:
             defaults = cast(dict, parent[self.__defaults_key])
@@ -146,7 +146,7 @@ class ConfigDefaults:
         self.__sgw_defaults = SyncGatewayDefaults(defaults)
         self.__es_default = EdgeServerDefaults(defaults)
 
-    def extend(self, other: "ConfigDefaults"):
+    def extend(self, other: "ConfigDefaults") -> None:
         if other.CouchbaseServer.version.is_set:
             if self.CouchbaseServer.version.is_set:
                 raise Exception("Both main and included file are setting default CBS version")
@@ -184,7 +184,7 @@ class ClusterConfig:
     def version(self) -> str:
         return self.__version
 
-    def __init__(self, version: str, public_hostnames: list[str], internal_hostnames: list[str]):
+    def __init__(self, version: str, public_hostnames: list[str], internal_hostnames: list[str]) -> None:
         self.__version = version
         self.__public_hostnames = public_hostnames
         self.__internal_hostnames = internal_hostnames
@@ -208,7 +208,7 @@ class ClusterInput:
     def version(self) -> str:
         return self.__version
 
-    def __init__(self, version: str, config: dict | None = None):
+    def __init__(self, version: str, config: dict | None = None) -> None:
         if config is not None:
             if self.__server_count_key not in config:
                 raise ValueError(f"Missing required key '{self.__server_count_key}' in cluster configuration")
@@ -248,7 +248,7 @@ class SyncGatewayInput:
     def version(self) -> str:
         return self.__version
 
-    def __init__(self, cluster_index: int, version: str):
+    def __init__(self, cluster_index: int, version: str) -> None:
         self.__cluster_index = cluster_index
         self.__version = version
 
@@ -284,7 +284,9 @@ class SyncGatewayConfig:
     def cluster_index(self) -> int:
         return self.__cluster_index
 
-    def __init__(self, version: str, hostname: str, internal_hostname: str, cluster_hostname: str, cluster_index: int):
+    def __init__(
+        self, version: str, hostname: str, internal_hostname: str, cluster_hostname: str, cluster_index: int
+    ) -> None:
         self.__version = version
         self.__hostname = hostname
         self.__internal_hostname = internal_hostname
@@ -304,7 +306,7 @@ class EdgeServerInput:
     def version(self) -> str:
         return self.__version
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         self.__version = version
 
 
@@ -331,7 +333,7 @@ class EdgeServerConfig:
     def internal_hostname(self) -> str:
         return self.__internal_hostname
 
-    def __init__(self, version: str, hostname: str, internal_hostname: str):
+    def __init__(self, version: str, hostname: str, internal_hostname: str) -> None:
         self.__version = version
         self.__hostname = hostname
         self.__internal_hostname = internal_hostname
@@ -349,7 +351,7 @@ class LoadBalancerInput:
     def sync_gateways(self) -> list[int]:
         return self.__sync_gateways
 
-    def __init__(self, sync_gateways: list[int]):
+    def __init__(self, sync_gateways: list[int]) -> None:
         self.__sync_gateways = sync_gateways
 
 
@@ -370,7 +372,7 @@ class LoadBalancerConfig:
     def upstreams(self) -> list[str]:
         return self.__upstreams
 
-    def __init__(self, hostname: str, upstreams: list[str]):
+    def __init__(self, hostname: str, upstreams: list[str]) -> None:
         self.__hostname = hostname
         self.__upstreams = upstreams
 
@@ -420,7 +422,7 @@ class TestServerInput:
         download: bool,
         *,
         ip_hint: str | None = None,
-    ):
+    ) -> None:
         self.__location = location
         self.__cbl_version = cbl_version
         self.__dataset_version = dataset_version
@@ -461,7 +463,7 @@ class TestServerConfig:
         cbl_version: str,
         dataset_version: str | None,
         platform: str,
-    ):
+    ) -> None:
         self.__ip_address = ip_address
         self.__cbl_version = cbl_version
         self.__dataset_version = dataset_version
@@ -499,7 +501,7 @@ class TopologyConfig:
         parent_defaults: ConfigDefaults | None = None,
         *,
         config_input: dict | None = None,
-    ):
+    ) -> None:
         if config_input:
             if config_file is not None:
                 raise ValueError("Cannot specify both config_file and config_input")
@@ -659,7 +661,7 @@ class TopologyConfig:
 
         return self.__ssh_key
 
-    def read_from_terraform(self, terraform_dir: str):
+    def read_from_terraform(self, terraform_dir: str) -> None:
         """
         Read the topology configuration from Terraform outputs.
 
@@ -688,7 +690,7 @@ class TopologyConfig:
         ssh_key_material = cast(str, all_info["private_key_material"]["value"])
         self.__ssh_key = Ed25519Key.from_private_key(io.StringIO(ssh_key_material))
 
-    def resolve_test_servers(self):
+    def resolve_test_servers(self) -> None:
         """
         Resolve the IP addresses of the test servers based on their locations.
         """
@@ -705,7 +707,7 @@ class TopologyConfig:
                 )
             )
 
-    def run_test_servers(self):
+    def run_test_servers(self) -> None:
         """
         Run the test servers based on their configurations.
         """
@@ -747,7 +749,7 @@ class TopologyConfig:
             if not success:
                 raise RuntimeError(f"Test server failed to start at {test_server_input.location}")
 
-    def stop_test_servers(self):
+    def stop_test_servers(self) -> None:
         """
         Stop the running test servers.
         """
@@ -762,7 +764,7 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.stop(test_server_input.location)
 
-    def apply_sgw_hostnames(self, hostnames: list[str], internal_hostnames: list[str]):
+    def apply_sgw_hostnames(self, hostnames: list[str], internal_hostnames: list[str]) -> None:
         """
         Apply the Sync Gateway hostnames to the configuration.
 
@@ -780,7 +782,7 @@ class TopologyConfig:
             )
             self.__sync_gateways.append(sgw)
 
-    def apply_es_hostnames(self, hostnames: list[str], internal_hostnames: list[str]):
+    def apply_es_hostnames(self, hostnames: list[str], internal_hostnames: list[str]) -> None:
         """
         Apply the Edge Server hostnames to the configuration.
 
@@ -796,7 +798,7 @@ class TopologyConfig:
             )
             self.__edge_servers.append(es)
 
-    def apply_server_hostnames(self, server_hostnames: list[str], server_internal_hostnames: list[str]):
+    def apply_server_hostnames(self, server_hostnames: list[str], server_internal_hostnames: list[str]) -> None:
         """
         Apply the server hostnames to the configuration.
 
@@ -812,7 +814,7 @@ class TopologyConfig:
             self.__clusters.append(cluster)
             i += cluster_input.server_count
 
-    def apply_lb_hostnames(self, hostnames: list[str]):
+    def apply_lb_hostnames(self, hostnames: list[str]) -> None:
         """
         Apply the load balancer hostnames to the configuration.
 
@@ -833,7 +835,7 @@ class TopologyConfig:
             lb = LoadBalancerConfig(hostnames.pop(0), sgw_hostnames)
             self.__load_balancers.append(lb)
 
-    def dump(self):
+    def dump(self) -> None:
         """
         Print the resulting topology configuration.
         """

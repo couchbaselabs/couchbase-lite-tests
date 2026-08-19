@@ -18,7 +18,7 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationFunctional(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -305,7 +305,9 @@ class TestReplicationFunctional(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("channel", ["*", "ChannelA"])
-    async def test_CBL_SG_replication_with_rev_messages(self, cblpytest: CBLPyTest, dataset_path: Path, channel: str):
+    async def test_CBL_SG_replication_with_rev_messages(
+        self, cblpytest: CBLPyTest, dataset_path: Path, channel: str
+    ) -> None:
         self.mark_test_step("Reset SG and load `short_expiry` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -486,7 +488,9 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_behavior_with_channelRole_modification(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replication_behavior_with_channelRole_modification(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -693,7 +697,7 @@ class TestReplicationFunctional(CBLTestClass):
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_default_conflict_withConflicts_withChannels(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_default_conflict_withConflicts_withChannels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_sgw_not(cblpytest.sync_gateways[0], "<=4.0.0")
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]

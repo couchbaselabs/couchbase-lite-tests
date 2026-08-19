@@ -3,28 +3,29 @@ name = "couchbase-lite-tests"
 requires-python = ">=3.10"
 version = "0.1.0"
 dependencies = [
-    "cbltest",
-    "click==8.1.8",
-    "paramiko==3.5.0",
-    "psutil==7.0.0",
-    "pyyaml==6.0.2",
-    "tenacity==9.1.4",
-    "tqdm==4.67.1",
+  "cbltest",
+  "click==8.1.8",
+  "paramiko==3.5.0",
+  "psutil==7.0.0",
+  "pyyaml==6.0.2",
+  "tenacity==9.1.4",
+  "tqdm==4.67.1",
 ]
 
 [tool.ruff]
-lint.extend-select = ["I"]
+lint.extend-select = ["ANN", "I"]
 lint.ignore = [
-    "E402",
-    "BLE001",   # TODO: BLE001 (blind-except) - will fix later
-    "S110",     # TODO: S110 (try-except-pass) - will fix later
-    "PLW1510",  # TODO: PLW1510 (subprocess-run-without-check) - will fix later
-    "TRY002",   # TODO: TRY002 (raise-vanilla-exception) - will fix later
-    "TRY201",   # TODO: TRY201 (verbose-raise) - will fix later
-    "TRY004",   # TODO: TRY004 (type-check-without-type-error) - will fix later
-    "S112",     # TODO: S112 (try-except-continue) - will fix later
-    "B023",     # TODO: B023 (function-uses-loop-loopvar) - will fix later
-    "LOG015",   # TODO: LOG015 (root-logger-calls) - will fix later
+  "E402",
+  "ANN401",  # `Any` is legitimate for JSON (de)serialization boundaries
+  "BLE001",  # TODO: BLE001 (blind-except) - will fix later
+  "S110",    # TODO: S110 (try-except-pass) - will fix later
+  "PLW1510", # TODO: PLW1510 (subprocess-run-without-check) - will fix later
+  "TRY002",  # TODO: TRY002 (raise-vanilla-exception) - will fix later
+  "TRY201",  # TODO: TRY201 (verbose-raise) - will fix later
+  "TRY004",  # TODO: TRY004 (type-check-without-type-error) - will fix later
+  "S112",    # TODO: S112 (try-except-continue) - will fix later
+  "B023",    # TODO: B023 (function-uses-loop-loopvar) - will fix later
+  "LOG015",  # TODO: LOG015 (root-logger-calls) - will fix later
 ]
 line-length = 120
 target-version = "py310"
@@ -41,17 +42,11 @@ url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
 explicit = true
 
 [dependency-groups]
-lint = [
-    "ty>=0.0.19",
-    "ruff>=0.15.4",
-    "types-netifaces==0.11.0.20241025",
-]
-dotnet-build = [
-    "dotnetenv",
-]
+lint = ["ty>=0.0.19", "ruff>=0.16.3", "types-netifaces==0.11.0.20241025"]
+dotnet-build = ["dotnetenv"]
 
 [tool.uv.workspace]
-members = [ "client" ]
+members = ["client"]
 
 [tool.ty.environment]
 root = [".", "client/src", "tests"]

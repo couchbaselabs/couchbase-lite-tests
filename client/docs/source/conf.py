@@ -1,3 +1,5 @@
+from typing import Any
+
 # Configuration file for the Sphinx documentation builder.
 
 # -- Project information
@@ -34,9 +36,9 @@ autodoc_inherit_docstrings = True
 html_theme = "sphinx_rtd_theme"
 
 
-def skip_private(app, what, name, obj, skip, options):
+def skip_private(app: Any, what: str, name: str, obj: Any, skip: bool, options: Any) -> bool:
     return skip or name.split(".")[-1].startswith("_")
 
 
-def setup(sphinx):
+def setup(sphinx: Any) -> None:
     sphinx.connect("autoapi-skip-member", skip_private)

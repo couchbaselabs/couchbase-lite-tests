@@ -36,7 +36,7 @@ def main(
     java: str | None,
     c: str | None,
     global_version: str | None,
-):
+) -> None:
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
     click.secho("Platform specifications:", fg="cyan")
     print_platform_spec("Global Version", global_version)

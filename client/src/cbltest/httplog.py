@@ -16,7 +16,7 @@ class _HttpLogWriter:
         """Gets the number of this log writer"""
         return self.__num
 
-    def __init__(self, num: int):
+    def __init__(self, num: int) -> None:
         test_name = CBLPyTestGlobal.running_test_name
         test_name = test_name.removeprefix("test_")
 

@@ -27,7 +27,7 @@ class TestQueryConsistency(CBLTestClass):
 
     @pytest_asyncio.fixture(scope="class", autouse=True)
     @classmethod
-    async def cluster_cleanup(cls, cblpytest: CBLPyTest):
+    async def cluster_cleanup(cls, cblpytest: CBLPyTest) -> None:
         """
         Overrides the function-scoped `cluster_cleanup` fixture: this class reuses
         one SGW database/CBS bucket across all its (read-only) tests, so cleanup
@@ -36,7 +36,7 @@ class TestQueryConsistency(CBLTestClass):
         await cluster_cleanup.perform_cleanup(cblpytest)
 
     @pytest_asyncio.fixture(autouse=True)
-    async def setup_method_fixture(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def setup_method_fixture(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         if TestQueryConsistency.__database is not None:
             return
 
@@ -80,7 +80,7 @@ class TestQueryConsistency(CBLTestClass):
         collection: str,
         sort: Callable[[dict], str] | None = None,
         comparison: Callable[[Any, Any], bool] = json_equivalent,
-    ):
+    ) -> None:
         assert TestQueryConsistency.__database is not None, "Weird...setup not finished?"
 
         query_for_logging = query.format(f"travel.{collection}")
@@ -97,7 +97,7 @@ class TestQueryConsistency(CBLTestClass):
 
         assert comparison(local_results, remote_results)
 
-    async def _test_join(self, cblpytest: CBLPyTest, query: str, server_query: str | None = None):
+    async def _test_join(self, cblpytest: CBLPyTest, query: str, server_query: str | None = None) -> None:
         assert TestQueryConsistency.__database is not None, "Weird...setup not finished?"
 
         if server_query is None:
@@ -116,9 +116,9 @@ class TestQueryConsistency(CBLTestClass):
         assert json_equivalent(local_results, remote_results)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_docids(self, cblpytest: CBLPyTest):
+    async def test_query_docids(self, cblpytest: CBLPyTest) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -129,9 +129,9 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_any_operator(self, cblpytest: CBLPyTest):
+    async def test_any_operator(self, cblpytest: CBLPyTest) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -149,13 +149,13 @@ class TestQueryConsistency(CBLTestClass):
             "doc_id_does_not_exist",
         ],
     )
-    async def test_select_star(self, cblpytest: CBLPyTest, doc_id: str):
+    async def test_select_star(self, cblpytest: CBLPyTest, doc_id: str) -> None:
         await self._test_query(cblpytest, f'SELECT * FROM {{}} WHERE meta().id = "{doc_id}"', "airlines")
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("limit, offset", [(5, 5), (-5, -5)])
-    async def test_limit_offset(self, cblpytest: CBLPyTest, limit: int, offset: int):
-        def comparison(left, right):
+    async def test_limit_offset(self, cblpytest: CBLPyTest, limit: int, offset: int) -> None:
+        def comparison(left: Any, right: Any) -> bool:
             return len(left) == len(right) and len(left) == max(0, limit)
 
         await self._test_query(
@@ -166,9 +166,9 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_where_and_or(self, cblpytest: CBLPyTest):
+    async def test_query_where_and_or(self, cblpytest: CBLPyTest) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -179,9 +179,9 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_multiple_selects(self, cblpytest: CBLPyTest):
+    async def test_multiple_selects(self, cblpytest: CBLPyTest) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -203,9 +203,9 @@ class TestQueryConsistency(CBLTestClass):
             "%Eng____r%",
         ],
     )
-    async def test_query_pattern_like(self, cblpytest: CBLPyTest, like_val: str):
+    async def test_query_pattern_like(self, cblpytest: CBLPyTest, like_val: str) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -220,9 +220,9 @@ class TestQueryConsistency(CBLTestClass):
         "regex",
         ["\\bEng.*e\\b", "\\beng.*e\\b"],
     )
-    async def test_query_pattern_regex(self, cblpytest: CBLPyTest, regex: str):
+    async def test_query_pattern_regex(self, cblpytest: CBLPyTest, regex: str) -> None:
         # This is annoying because the sort algorithm is different between server and lite
-        def id_sort(x: dict):
+        def id_sort(x: dict) -> str:
             return x["id"]
 
         await self._test_query(
@@ -233,7 +233,7 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_is_not_valued(self, cblpytest: CBLPyTest):
+    async def test_query_is_not_valued(self, cblpytest: CBLPyTest) -> None:
         await self._test_query(
             cblpytest,
             'SELECT meta().id, name FROM {} WHERE meta().id NOT LIKE "_sync%" and (name IS NULL OR name IS MISSING) ORDER BY name ASC LIMIT 100',
@@ -241,7 +241,7 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_ordering(self, cblpytest: CBLPyTest):
+    async def test_query_ordering(self, cblpytest: CBLPyTest) -> None:
         await self._test_query(
             cblpytest,
             'SELECT meta().id, title FROM {} WHERE type = "hotel" ORDER BY name ASC',
@@ -249,7 +249,7 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_substring(self, cblpytest: CBLPyTest):
+    async def test_query_substring(self, cblpytest: CBLPyTest) -> None:
         await self._test_query(
             cblpytest,
             'SELECT meta().id, email, UPPER(name) from {} t where CONTAINS(t.email, "gmail.com")',
@@ -257,7 +257,7 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_join(self, cblpytest: CBLPyTest):
+    async def test_query_join(self, cblpytest: CBLPyTest) -> None:
         query = """SELECT DISTINCT airlines.name, airlines.callsign, routes.destinationairport, routes.stops, routes.airline
                    FROM travel.routes as routes
                     JOIN travel.airlines AS airlines
@@ -277,7 +277,7 @@ class TestQueryConsistency(CBLTestClass):
         await self._test_join(cblpytest, query, server_query)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_query_inner_join(self, cblpytest: CBLPyTest):
+    async def test_query_inner_join(self, cblpytest: CBLPyTest) -> None:
         query = """
             SELECT routes.airline, routes.sourceairport, airports.country
             FROM travel.routes as routes
@@ -295,7 +295,7 @@ class TestQueryConsistency(CBLTestClass):
         "server_join_type",
         ["LEFT JOIN", "LEFT OUTER JOIN"],
     )
-    async def test_query_left_join(self, cblpytest: CBLPyTest, server_join_type: str):
+    async def test_query_left_join(self, cblpytest: CBLPyTest, server_join_type: str) -> None:
         query = """
             SELECT airlines, routes
             FROM travel.routes AS routes
@@ -322,7 +322,7 @@ class TestQueryConsistency(CBLTestClass):
         "operation",
         ["=", "!="],
     )
-    async def test_equality(self, cblpytest: CBLPyTest, operation: str):
+    async def test_equality(self, cblpytest: CBLPyTest, operation: str) -> None:
         await self._test_query(
             cblpytest,
             f'SELECT meta().id, name FROM {{}} WHERE country {operation} "France" ORDER BY meta().id ASC',
@@ -334,7 +334,7 @@ class TestQueryConsistency(CBLTestClass):
         "operation",
         [">", ">=", "<", "<="],
     )
-    async def test_comparison(self, cblpytest: CBLPyTest, operation: str):
+    async def test_comparison(self, cblpytest: CBLPyTest, operation: str) -> None:
         await self._test_query(
             cblpytest,
             f"SELECT meta().id FROM {{}} WHERE geo.alt {operation} 1000 ORDER BY meta().id ASC",
@@ -342,7 +342,7 @@ class TestQueryConsistency(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_in(self, cblpytest: CBLPyTest):
+    async def test_in(self, cblpytest: CBLPyTest) -> None:
         await self._test_query(
             cblpytest,
             'SELECT meta().id FROM {} WHERE (country IN ["United States", "France"]) ORDER BY meta().id ASC',
@@ -354,7 +354,7 @@ class TestQueryConsistency(CBLTestClass):
         "keyword",
         ["BETWEEN", "NOT BETWEEN"],
     )
-    async def test_between(self, cblpytest: CBLPyTest, keyword: str):
+    async def test_between(self, cblpytest: CBLPyTest, keyword: str) -> None:
         await self._test_query(
             cblpytest,
             f"SELECT meta().id FROM {{}} WHERE geo.alt {keyword} 100 and 200 ORDER BY meta().id ASC",
@@ -366,7 +366,7 @@ class TestQueryConsistency(CBLTestClass):
         "keyword",
         ["IS", "IS NOT"],
     )
-    async def test_same(self, cblpytest: CBLPyTest, keyword: str):
+    async def test_same(self, cblpytest: CBLPyTest, keyword: str) -> None:
         await self._test_query(
             cblpytest,
             f"SELECT meta().id FROM {{}} WHERE iata {keyword} null ORDER BY meta().id ASC",

@@ -30,7 +30,7 @@ class TestServerInfo:
         """Gets the dataset version of the test server instance"""
         return self.__dataset_version
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict) -> None:
         self.__url: str = _assert_string_entry(data, self.___url_key)
         self.__dataset_version: str | None = None
         if self.__dataset_version_key in data:
@@ -83,7 +83,7 @@ class SyncGatewayInfo:
         """Gets the index of the cluster this SGW belongs to"""
         return self.__cluster_index
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict) -> None:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
         self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, 4985)
@@ -121,7 +121,7 @@ class CouchbaseServerInfo:
         """Gets the index of the cluster that this CBS instance belongs to"""
         return self.__cluster_index
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict) -> None:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__admin_user: str = _get_str_or_default(data, self.__admin_user_key, "Administrator")
         self.__admin_password: str = _get_str_or_default(data, self.__admin_password_key, "password")
@@ -150,10 +150,10 @@ class EdgeServerInfo:
         return self.__admin_password
 
     @property
-    def config_path(self):
+    def config_path(self) -> str:
         return self.__config_path
 
-    def _get_repo_root(self):
+    def _get_repo_root(self) -> Path:
         repo_root = next(
             p
             for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
@@ -161,7 +161,7 @@ class EdgeServerInfo:
         )
         return repo_root
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict) -> None:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__admin_user = _get_str_or_default(data, self.__admin_user_key, "admin_user")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
@@ -244,7 +244,7 @@ class ParsedConfig:
         """The URL of the optional logslurp server to send and collect logs"""
         return self.__logslurp_url
 
-    def __init__(self, json: dict):
+    def __init__(self, json: dict) -> None:
         self.__test_servers = _get_typed_nonnull(json, self.__test_server_key, list[dict], [])
         self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, list[dict], [])
         self.__couchbase_servers = _get_typed_nonnull(json, self.__cbs_key, list[dict], [])

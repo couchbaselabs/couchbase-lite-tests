@@ -9,13 +9,13 @@ DIR="/opt/couchbase-edge-server/etc"
 if [[ -n "$REQUEST_BODY" && "$REQUEST_BODY" != "{}" ]]; then
   echo "New config received. Updating config.json"
   rm -f "$DIR/config.json" || true
-  echo "$REQUEST_BODY" > "$DIR/config.json"
+  echo "$REQUEST_BODY" >"$DIR/config.json"
 else
   echo "No new config provided. Using existing config.json"
 fi
 
 LOG="$DIRLOG/edge.log"
-setsid /opt/couchbase-edge-server/bin/couchbase-edge-server $DIR/config.json > $LOG 2>&1 < /dev/null &
+setsid /opt/couchbase-edge-server/bin/couchbase-edge-server $DIR/config.json >$LOG 2>&1 </dev/null &
 disown
 EDGE_SERVER_PID=$!
 sleep 1

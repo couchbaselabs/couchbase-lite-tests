@@ -5,44 +5,43 @@ build-backend = "hatchling.build"
 [project]
 name = "cbltest"
 dynamic = ["version"]
-authors = [
-    { name = "Jim Borden", email = "jim.borden@couchbase.com" }
-]
+authors = [{ name = "Jim Borden", email = "jim.borden@couchbase.com" }]
 description = "A client for consuming the Couchbase Lite functional testing REST API"
 readme = "README.md"
 # couchbase SDK only has wheels for < 3.14
 requires-python = ">=3.10,<3.14"
-license = {text ="Apache-2.0"}
+license = { text = "Apache-2.0" }
 classifiers = [
-    "Programming Language :: Python :: 3 :: Only",
-    "License :: OSI Approved :: Apache Software License",
-    "Framework :: Pytest",
-    "Topic :: Software Development :: Testing",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-    "Environment :: Console"
+  "Programming Language :: Python :: 3 :: Only",
+  "License :: OSI Approved :: Apache Software License",
+  "Framework :: Pytest",
+  "Topic :: Software Development :: Testing",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Environment :: Console",
 ]
 dependencies = [
-    "aiofiles==25.1.0",
-    "aiohttp==3.11.11",
-    "couchbase==4.3.4",
-    "cryptography==44.0.0",
-    "deepdiff==8.6.1",
-    "junitparser==4.0.2",
-    "netifaces==0.11.0",
-    "opentelemetry-api==1.29.0",
-    "opentelemetry-exporter-otlp-proto-common==1.29.0",
-    "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
-    "opentelemetry-proto==1.29.0",
-    "opentelemetry-sdk==1.29.0",
-    "opentelemetry-semantic-conventions==0.50b0",
-    "packaging==24.2",
-    "pydantic>=2.13.3",
-    "pyjson5==1.6.8",
-    "pytest==9.0.2",
-    "pytest-asyncio==1.3.0",
-    "requests==2.32.3",
-    "websocket-client==1.8.0",
+  "aiofiles==25.1.0",
+  "aiohttp==3.14.3",
+  "couchbase==4.3.4",
+  "cryptography==44.0.0",
+  "deepdiff==8.6.1",
+  "junitparser==4.0.2",
+  "netifaces==0.11.0",
+  "opentelemetry-api==1.29.0",
+  "opentelemetry-exporter-otlp-proto-common==1.29.0",
+  "opentelemetry-exporter-otlp-proto-grpc==1.29.0",
+  "opentelemetry-proto==1.29.0",
+  "opentelemetry-sdk==1.29.0",
+  "opentelemetry-semantic-conventions==0.50b0",
+  "packaging==24.2",
+  "pydantic>=2.13.3",
+  "pyjson5==1.6.8",
+  "pytest==9.0.2",
+  "pytest-asyncio==1.3.0",
+  "pytest-timeout==2.5.0",
+  "requests==2.32.3",
+  "websocket-client==1.8.0",
 ]
 
 [project.urls]
@@ -56,20 +55,18 @@ cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
+sigterm_handler = "cbltest.plugins.sigterm_handler"
+timeout_fixture = "cbltest.plugins.timeout_fixture"
 cluster_cleanup = "cbltest.plugins.cluster_cleanup"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"
 
 [tool.hatch.build]
-include = [
-    "src/cbltest"
-]
+include = ["src/cbltest"]
 
 [tool.hatch.build.targets.wheel]
-packages = [
-    "src/cbltest"
-]
+packages = ["src/cbltest"]
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "session"

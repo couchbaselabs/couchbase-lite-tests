@@ -21,6 +21,7 @@ import sys
 import tarfile
 import time
 import zipfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from fnmatch import fnmatch
 from pathlib import Path
@@ -90,7 +91,7 @@ def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: 
     file_size = os.path.getsize(local_path)
     with tqdm(total=file_size, unit="B", unit_scale=True, desc=local_path.name) as bar:
 
-        def callback(transferred, total):
+        def callback(transferred: int, total: int) -> None:
             bar.update(transferred - bar.n)
 
         sftp.put(local_path, remote_path, callback=callback)
@@ -279,7 +280,7 @@ def configure_terminal_encoding() -> None:
 
 
 @contextmanager
-def pushd(new_dir: Path):
+def pushd(new_dir: Path) -> Iterator[None]:
     prev_dir = Path.cwd()
     try:
         os.chdir(new_dir)

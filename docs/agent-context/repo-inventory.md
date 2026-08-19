@@ -25,7 +25,7 @@
 
 - Root: `pyproject.toml`, `.pre-commit-config.yaml`, `.secrets.baseline`
 - Client package: `client/pyproject.toml`
-- CI: `.github/workflows/python_verify.yml`, `.github/workflows/openapi.yml`
+- CI: `.github/workflows/pre-commit.yml`, `.github/workflows/python_verify.yml`, `.github/workflows/openapi.yml`
 - Topology schema: `environment/aws/topology_setup/topology_schema.json`
 - Test config schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`
 

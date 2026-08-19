@@ -18,7 +18,7 @@ mkdir -p "$CERT_DIR"
 
 # Write certificate to file
 CERT_PATH="$CERT_DIR/$CERT_NAME"
-echo "$CERT_CONTENT" > "$CERT_PATH"
+echo "$CERT_CONTENT" >"$CERT_PATH"
 
 # Set appropriate permissions
 chmod 644 "$CERT_PATH"

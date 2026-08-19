@@ -1,3 +1,5 @@
+from types import FunctionType
+
 import aiohttp
 import pytest
 from cbltest import CBLPyTest
@@ -7,7 +9,7 @@ from cbltest.logging import LogSlurpHandler, _cbl_log
 
 
 class TestLogSlurp:
-    def setup_method(self, method):
+    def setup_method(self, method: FunctionType) -> None:
         # If writing a new test do not forget this step or the test server
         # will not be informed about the currently running test
         CBLPyTestGlobal.running_test_name = method.__name__

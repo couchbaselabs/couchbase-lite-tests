@@ -1,3 +1,4 @@
+# Lint, format and type checks live in the pre-commit workflow.
 name: Validate Python Files
 on:
   push:
@@ -24,47 +25,12 @@ on:
       - 'jenkins/pipelines/**/*.py'
       - 'scripts/check_topology_markers.py'
       - '.github/workflows/*py*'
-
 jobs:
-  ty:
-    strategy:
-      fail-fast: false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: "latest"
-      - name: ty validation
-        working-directory: ${{github.workspace}}
-        shell: bash
-        run: .github/workflows/verify_python.sh
-  python-format:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
-        with:
-          args: 'format --check'
-  python-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/ruff-action@v3
-  topology-markers:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: "latest"
-      - name: Check topology markers
-        run: uv run python scripts/check_topology_markers.py $(find tests/dev_e2e tests/QE -name 'test_*.py')
   client-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
       - name: Run test
         run: |
           uv run -- pytest --config client/tests/empty_config.json client/tests

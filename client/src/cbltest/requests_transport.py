@@ -22,7 +22,7 @@ class RequestTransport(ABC):
 
 
 class _RequestHttpTransport(RequestTransport):
-    def __init__(self, url: str, session: ClientSession):
+    def __init__(self, url: str, session: ClientSession) -> None:
         self.__url = url
         self.__session = session
 
@@ -93,7 +93,7 @@ class _RequestHttpTransport(RequestTransport):
 
 
 class _RequestWebSocketTransport(RequestTransport):
-    def __init__(self, url: str, ws_router: WebSocketRouter):
+    def __init__(self, url: str, ws_router: WebSocketRouter) -> None:
         self.__url = url
         self.__ws_router = ws_router
 

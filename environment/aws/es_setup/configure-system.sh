@@ -20,7 +20,7 @@ curl -LO https://github.com/msoap/shell2http/releases/download/v1.17.0/shell2htt
 tar xvf shell2http_1.17.0_linux_amd64.tar.gz shell2http
 rm shell2http_1.17.0_linux_amd64.tar.gz
 
-if ! command -v iptables &> /dev/null; then
+if ! command -v iptables &>/dev/null; then
   sudo dnf install iptables-services -y
   sudo systemctl enable iptables
   sudo systemctl start iptables

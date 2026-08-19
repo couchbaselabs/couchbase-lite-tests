@@ -25,7 +25,7 @@ class PostGetAllDocumentsEntry:
     def rev(self) -> str:
         return self.__rev
 
-    def __init__(self, body: dict):
+    def __init__(self, body: dict) -> None:
         assert isinstance(body, dict), "Invalid PostGetAllDocumentsEntry received (not an object)"
         self.__id = _assert_string_entry(body, self.__id_key)
         self.__rev = _assert_string_entry(body, self.__rev_key)
@@ -54,7 +54,7 @@ class PostSnapshotDocumentsResponseMethods(ABC):
 
 
 class ValueOrMissing:
-    def __init__(self, value: Any | None = None, exists: bool = False):
+    def __init__(self, value: Any | None = None, exists: bool = False) -> None:
         self.value = value
         self.exists = exists if value is None else True
 
@@ -125,7 +125,7 @@ class ReplicatorStatusBody:
         that once viewed it will be cleared"""
         return self.__documents
 
-    def __init__(self, body: dict):
+    def __init__(self, body: dict) -> None:
         if self.__activity_key not in body:
             return
 
@@ -216,7 +216,7 @@ class MultipeerReplicatorStatusEntry:
         """Gets the transport type of the replicator"""
         return self.__transport
 
-    def __init__(self, body: dict):
+    def __init__(self, body: dict) -> None:
         assert isinstance(body, dict), "Invalid MultipeerReplicatorStatusEntry received (not an object)"
 
         self.__peer_id = _assert_string_entry(body, self.__peer_id_key)

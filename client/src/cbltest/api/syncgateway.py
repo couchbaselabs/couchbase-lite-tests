@@ -15,7 +15,7 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
+from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
@@ -223,7 +223,7 @@ class ISGRPayload(JSONSerializable):
         remote_password: str | None = None,
         collections_local: list[str] | None = None,
         collections_remote: list[str] | None = None,
-    ):
+    ) -> None:
         """
         Creates an ISGR configuration payload.
 
@@ -329,7 +329,7 @@ class AllDocumentsResponse:
         return self.__rows
 
     @property
-    def revmap(self):
+    def revmap(self) -> dict:
         return self.__revmap
 
     def __len__(self) -> int:
@@ -432,7 +432,7 @@ class DocumentUpdateEntry(JSONSerializable):
 
         return cast(str, self.__body["_rev"])
 
-    def __init__(self, id: str, revid: str | None, body: dict):
+    def __init__(self, id: str, revid: str | None, body: dict) -> None:
         self.__body = body.copy()
         self.__body["_id"] = id
         if revid:
@@ -524,7 +524,7 @@ class CouchbaseVersion(ABC):
     def parse(self, input: str) -> tuple[str, int]:
         pass
 
-    def __init__(self, input: str):
+    def __init__(self, input: str) -> None:
         self.__raw = input
         parsed = self.parse(input)
         self.__version = parsed[0]
@@ -680,7 +680,7 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
-    ):
+    ) -> None:
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
@@ -695,7 +695,7 @@ class _SyncGatewayBase:
             scheme,
             url,
             port,
-            BasicAuth(username, password, "ascii"),
+            encode_basic_auth(username, password, "ascii"),
         )
 
     @property
@@ -718,18 +718,21 @@ class _SyncGatewayBase:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth: BasicAuth | None) -> ClientSession:
+    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+        """Create a session, where `auth_header` is an `Authorization` header value
+        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
+        headers = {"Authorization": auth_header} if auth_header is not None else None
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
             return ClientSession(
                 f"{scheme}{url}:{port}",
-                auth=auth,
+                headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
         else:
-            return ClientSession(f"{scheme}{url}:{port}", auth=auth)
+            return ClientSession(f"{scheme}{url}:{port}", headers=headers)
 
     async def _send_request(
         self,
@@ -1524,7 +1527,9 @@ class _SyncGatewayBase:
         db_name: str,
         doc_id: str,
         revision: str,
-        auth: BasicAuth,
+        *,
+        username: str,
+        password: str,
         scope: str = "_default",
         collection: str = "_default",
     ) -> dict[str, Any]:
@@ -1535,7 +1540,8 @@ class _SyncGatewayBase:
             db_name: The name of the database
             doc_id: The document ID
             revision: The specific revision to retrieve
-            auth: User authentication credentials
+            username: The username to authenticate as
+            password: The password for the user
             scope: The scope name (defaults to "_default")
             collection: The collection name (defaults to "_default")
 
@@ -1548,7 +1554,8 @@ class _SyncGatewayBase:
         _assert_not_null(db_name, "db_name")
         _assert_not_null(doc_id, "doc_id")
         _assert_not_null(revision, "revision")
-        _assert_not_null(auth, "auth")
+        _assert_not_null(username, "username")
+        _assert_not_null(password, "password")
 
         path = (
             f"/{db_name}/{scope}.{collection}/{doc_id}"
@@ -1557,7 +1564,8 @@ class _SyncGatewayBase:
         )
         params = {"rev": revision}
 
-        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth) as session:
+        auth_header = encode_basic_auth(username, password, "ascii")
+        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth_header) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
@@ -1837,7 +1845,7 @@ class SyncGateway(_SyncGatewayBase):
         port: int = 4985,
         secure: bool = False,
         public_port: int = 4984,
-    ):
+    ) -> None:
         """
         Initialize a SyncGateway admin client.
 
@@ -2361,6 +2369,111 @@ class SyncGateway(_SyncGatewayBase):
 
             raise TimeoutError(f"ISGR {replication_id} did not reach status '{target_status}' within {timeout} seconds")
 
+    async def get_user_access_history(self, db_name: str, name: str) -> dict[str, dict[str, list[str]]]:
+        """
+        Gets the channel access history of a user, organized by scope and collection.
+
+        :param db_name: The name of the database
+        :param name: The username to query
+        :return: A dict of scope -> collection -> list of channel names
+        """
+        with self._tracer.start_as_current_span(
+            "get_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_user/{name}/_access_history")
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("channels", {})
+
+    async def compact_user_access_history(
+        self, db_name: str, name: str, channels: dict[str, dict[str, list[str]]]
+    ) -> dict[str, dict[str, list[str]]]:
+        """
+        Removes the specified channels from a user's channel access history.
+
+        :param db_name: The name of the database
+        :param name: The username whose history should be compacted
+        :param channels: The channels to remove, organized by scope and collection
+            (e.g. {"scope1": {"collection1": ["channel1"]}})
+        :return: The channels that were actually removed, organized by scope and collection
+        """
+        with self._tracer.start_as_current_span(
+            "compact_user_access_history", attributes={"sg.database.name": db_name, "cbl.user.name": name}
+        ):
+            body = {"channels": channels}
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}/_user/{name}/_access_history/compact",
+                JSONDictionary(body),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", {})
+
+    async def get_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict[str, list[int]]:
+        """
+        Gets the channel revocation history of a document.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to query
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: A dict of channel name -> sequences at which the document was removed from it
+        """
+        with self._tracer.start_as_current_span(
+            "get_document_channel_history",
+            attributes={
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
+            },
+        ):
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def compact_document_channel_history(
+        self,
+        db_name: str,
+        doc_id: str,
+        seq: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> list[str]:
+        """
+        Compacts a document's channel history, removing revocation entries for channels the
+        document left before the given sequence.
+
+        :param db_name: The name of the database
+        :param doc_id: The document ID to compact
+        :param seq: Channel history with end sequences earlier than this will be removed
+        :param scope: The scope the document is in (default '_default')
+        :param collection: The collection the document is in (default '_default')
+        :return: The list of channels that were compacted
+        """
+        with self._tracer.start_as_current_span(
+            "compact_document_channel_history",
+            attributes={
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
+                "sg.compact.seq": seq,
+            },
+        ):
+            resp = await self._send_request(
+                "post",
+                f"/{db_name}.{scope}.{collection}/_channel_history/{doc_id}/compact",
+                JSONDictionary({"seq": seq}),
+            )
+            assert isinstance(resp, dict)
+            return cast(dict, resp).get("compacted_channels", [])
+
 
 class SyncGatewayUserClient(_SyncGatewayBase):
     """
@@ -2377,7 +2490,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         password: str,
         port: int = 4984,
         secure: bool = False,
-    ):
+    ) -> None:
         """
         Initialize a SyncGatewayUserClient for public API access.
 

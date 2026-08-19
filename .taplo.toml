@@ -1,0 +1,7 @@
+# https://taplo.tamasfe.dev/configuration/file.html
+include = ["**/*.toml"]
+exclude = [".venv/**", "**/node_modules/**"]
+
+[formatting]
+# Match the ruff line-length in pyproject.toml.
+column_width = 120

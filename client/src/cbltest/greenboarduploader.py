@@ -1,7 +1,9 @@
 import json
 import os
+from collections.abc import Generator
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -145,7 +147,7 @@ class GreenboardUploader:
       the end to emit one aggregate ``platform="sgw-upgrade"`` doc.
     """
 
-    def __init__(self, url: str, username: str, password: str):
+    def __init__(self, url: str, username: str, password: str) -> None:
         if "://" not in url:
             url = f"couchbase://{url}"
 
@@ -159,7 +161,7 @@ class GreenboardUploader:
         self.__has_sgw_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]):
+    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any, None]:
         outcome = yield
         report: TestReport = outcome.get_result()
         if report.when != "call":
@@ -198,7 +200,7 @@ class GreenboardUploader:
         *,
         pass_count: int | None = None,
         fail_count: int | None = None,
-    ):
+    ) -> None:
         """
         Uploads the results using the specified platform and version.  The reason that they
         are specified here is because they are probably unknown at the time that this object

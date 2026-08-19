@@ -42,7 +42,7 @@ TMP_LOCATION: Final[Path] = SCRIPT_DIR / ".tmp"
 @click.command()
 @click.argument("name", type=click.Choice([a.value for a in ToolName]), required=True)
 @click.argument("version", type=str, required=True)
-def main(name: str, version: str):
+def main(name: str, version: str) -> None:
     download_tool(ToolName(name), version)
 
 
@@ -84,7 +84,7 @@ def _extract(location: Path) -> None:
 
 
 # Entry for other scripts to call
-def download_tool(name: ToolName, version: str):
+def download_tool(name: ToolName, version: str) -> None:
     header(f"Downloading {name.value} v{version}")
     TMP_LOCATION.mkdir(parents=True, exist_ok=True)
     if name == ToolName.BackupManager:
@@ -93,7 +93,7 @@ def download_tool(name: ToolName, version: str):
         raise RuntimeError(f"Unsupported tool: {name.value}")
 
 
-def download_cbbackupmgr(version: str):
+def download_cbbackupmgr(version: str) -> None:
     os = _get_os()
     arch = _get_arch(os)
     ext = _get_ext(os)

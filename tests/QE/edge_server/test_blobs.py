@@ -75,6 +75,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -147,6 +148,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         self.mark_test_step("Adding an empty blob to the document.")
         empty_blob = b""
@@ -216,6 +218,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)
@@ -296,6 +299,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         self.mark_test_step("Verify delete nonexistent blob fails.")
         attachment_name = "missing_blob.png"
@@ -332,6 +336,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
@@ -393,6 +398,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
@@ -409,6 +415,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test2.png"
 
@@ -444,6 +451,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "20mb.jpg"
 
@@ -510,6 +518,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)

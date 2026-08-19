@@ -1,3 +1,5 @@
+from types import FunctionType
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -7,7 +9,7 @@ from cbltest.responses import ServerVariant
 
 
 class TestUpdateDatabase(CBLTestClass):
-    def setup_method(self, method) -> None:
+    def setup_method(self, method: FunctionType) -> None:
         super().setup_method(method)
 
         self.db: Database | None = None

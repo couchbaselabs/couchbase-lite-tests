@@ -11,7 +11,7 @@ class SyncGatewayCluster:
     of them.
     """
 
-    def __init__(self, sync_gateways: Sequence[SyncGateway]):
+    def __init__(self, sync_gateways: Sequence[SyncGateway]) -> None:
         if not sync_gateways:
             raise ValueError("At least one Sync Gateway must be provided")
         self.__sync_gateways = sync_gateways

@@ -5,7 +5,7 @@ from cbltest.utils import async_retry_assert
 
 class TestAsyncRetryAssert:
     @pytest.mark.asyncio
-    async def test_returns_result_once_assertion_passes(self):
+    async def test_returns_result_once_assertion_passes(self) -> None:
         calls = {"n": 0}
 
         async def poll() -> str:
@@ -19,7 +19,7 @@ class TestAsyncRetryAssert:
         assert calls["n"] == 3
 
     @pytest.mark.asyncio
-    async def test_raises_timeout_with_assertion_message(self):
+    async def test_raises_timeout_with_assertion_message(self) -> None:
         async def poll() -> None:
             raise AssertionError("still not ready")
 
@@ -29,7 +29,7 @@ class TestAsyncRetryAssert:
         assert str(exc_info.value).startswith("still not ready")
 
     @pytest.mark.asyncio
-    async def test_timeout_error_chains_the_assertion_error(self):
+    async def test_timeout_error_chains_the_assertion_error(self) -> None:
         async def poll() -> None:
             raise AssertionError("still not ready")
 
@@ -40,7 +40,7 @@ class TestAsyncRetryAssert:
         assert str(exc_info.value.__cause__) == "still not ready"
 
     @pytest.mark.asyncio
-    async def test_reports_the_last_attempts_message_not_the_first(self):
+    async def test_reports_the_last_attempts_message_not_the_first(self) -> None:
         calls = {"n": 0}
 
         async def poll() -> None:
@@ -54,7 +54,7 @@ class TestAsyncRetryAssert:
         assert str(exc_info.value).startswith("attempt 4")
 
     @pytest.mark.asyncio
-    async def test_does_not_retry_non_assertion_errors(self):
+    async def test_does_not_retry_non_assertion_errors(self) -> None:
         calls = {"n": 0}
 
         async def poll() -> None:

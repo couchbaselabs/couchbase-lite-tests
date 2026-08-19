@@ -16,7 +16,7 @@ bash scripts/setup-hooks.sh
 | Lint | `uv run ruff check .` | Includes import sorting checks (`I` rules). |
 | Format | `uv run ruff format .` | Use `--check` in CI-equivalent runs. |
 | Typecheck | `uv run --group lint ty check` | Root + `client/src` type environment. |
-| Pre-commit suite | `uv run pre-commit run --all-files` | Runs ruff, ruff-format, pyupgrade, ty, and merge-conflict/shebang checks. Secrets scanning is not wired into pre-commit; run `detect-secrets scan --baseline .secrets.baseline` manually. |
+| Pre-commit suite | `uvx pre-commit run --all-files` | Same suite CI runs. Covers ruff, ruff-format, pyupgrade, ty, topology markers, yamlfmt, taplo, shfmt, editorconfig, and merge-conflict/shebang checks. Secrets scanning is not wired into pre-commit; run `detect-secrets scan --baseline .secrets.baseline` manually. |
 
 ## Component-Specific Validation
 
@@ -39,10 +39,9 @@ bash scripts/setup-hooks.sh
 
 ## CI Evidence
 
+- GitHub Actions hook suite: `.github/workflows/pre-commit.yml`
+  - `pre-commit run --all-files` (ruff, ruff-format, pyupgrade, ty, topology markers, yamlfmt, taplo, shfmt, editorconfig)
 - GitHub Actions Python checks: `.github/workflows/python_verify.yml`
-  - `ty check` via `.github/workflows/verify_python.sh`
-  - `ruff format --check`
-  - `ruff` lint
   - `client/tests` command with `empty_config.json`
 - OpenAPI checks: `.github/workflows/openapi.yml`
   - Redocly lint on `spec/api/api.yaml`

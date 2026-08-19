@@ -37,12 +37,16 @@ pipeline {
                 KEYCHAIN_PASSWORD = credentials('mac-mini-new-keychain-password')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'sgw'
+                // pytest's graceful stop budget (seconds), applied by the timeout_fixture plugin via
+                // --session-timeout. Kept comfortably below the stage timeout below so pytest stops itself
+                // gracefully -- with a runway to finish junit/greenboard/sgcollect -- before Jenkins' hard SIGTERM.
+                CBL_PYTEST_SESSION_TIMEOUT = '9000'
             }
             steps {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
-                timeout(time: 120, unit: 'MINUTES') {
+                timeout(time: 160, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
                 }
                 echo "=== SGW Tests Complete"

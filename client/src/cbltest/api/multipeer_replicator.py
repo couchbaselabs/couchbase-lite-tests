@@ -34,7 +34,7 @@ class MultipeerReplicatorStatus:
         """Gets the list of replicators and their statuses"""
         return self.__replicators
 
-    def __init__(self, replicators: list[MultipeerReplicatorStatusEntry]):
+    def __init__(self, replicators: list[MultipeerReplicatorStatusEntry]) -> None:
         self.__replicators = replicators
 
 
@@ -72,7 +72,7 @@ class MultipeerReplicator:
         authenticator: MultipeerReplicatorAuthenticator | None = None,
         identity: CertKeyPair | None = None,
         transports: MultipeerTransportType = MultipeerTransportType.ALL,
-    ):
+    ) -> None:
         self.__index = database._index
         self.__request_factory = database._request_factory
         self.__peerGroupID = peerGroupID

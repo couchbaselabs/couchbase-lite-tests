@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from logging import (
     DEBUG,
@@ -23,7 +24,7 @@ class LogSlurpHandler(Handler):
     def id(self) -> str:
         return self.__id
 
-    def __init__(self, url: str, id: str):
+    def __init__(self, url: str, id: str) -> None:
         super().__init__()
         self.__url = url
         self.__id = id
@@ -32,10 +33,10 @@ class LogSlurpHandler(Handler):
             header=[f"CBL-Log-ID: {id}", "CBL-Log-Tag: test-client"],
         )
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         self.__ws.send_text(self.format(record))
 
-    def close(self):
+    def close(self) -> None:
         super().close()
         self.__ws.close()
         s = requests.Session()
@@ -87,7 +88,7 @@ def cbl_log_init(log_id: str, logslurp_url: str | None) -> None:
     _cbl_log.info(f"-- Python test client v{VERSION} started --\n")
 
 
-def cbl_setLogLevel(level: LogLevel):
+def cbl_setLogLevel(level: LogLevel) -> None:
     if level == LogLevel.ERROR:
         console.setLevel(ERROR)
     elif level == LogLevel.WARNING:
@@ -98,17 +99,17 @@ def cbl_setLogLevel(level: LogLevel):
         console.setLevel(DEBUG)
 
 
-def cbl_error(msg: str, include_stack: bool = True):
+def cbl_error(msg: str, include_stack: bool = True) -> None:
     _cbl_log.error(msg, stack_info=include_stack, stacklevel=3)
 
 
-def cbl_warning(msg: str):
+def cbl_warning(msg: str) -> None:
     _cbl_log.warning(msg)
 
 
-def cbl_info(msg: str):
+def cbl_info(msg: str) -> None:
     _cbl_log.info(msg)
 
 
-def cbl_trace(msg: str):
+def cbl_trace(msg: str) -> None:
     _cbl_log.debug(msg)

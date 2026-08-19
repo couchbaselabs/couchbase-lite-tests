@@ -57,7 +57,7 @@ uv sync                              # Install deps
 uv run pytest -x -v --config ...     # Run tests
 uv run ruff check .                  # Lint
 uv run ruff format .                 # Format
-uv run pre-commit run --all-files    # All pre-commit hooks
+uvx pre-commit run --all-files    # All pre-commit hooks
 ```
 
 ## Agent Delegation

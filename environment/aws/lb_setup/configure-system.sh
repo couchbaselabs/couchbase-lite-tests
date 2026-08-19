@@ -2,7 +2,7 @@
 
 set -x
 
-if ! command -v docker &> /dev/null; then
+if ! command -v docker &>/dev/null; then
   sudo dnf install -y docker
   sudo systemctl start docker
 fi

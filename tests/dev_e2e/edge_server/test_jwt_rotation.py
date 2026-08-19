@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
@@ -19,17 +20,17 @@ JWT_FILE = "/home/ec2-user/cert/jwt.txt"
 class TestJWTReplication(CBLTestClass):
     """Test Edge Server replication using JWT file-based authentication."""
 
-    async def _write_file_on_es(self, es_manager, path: str, content: str):
+    async def _write_file_on_es(self, es_manager: EdgeServer, path: str, content: str) -> None:
         """Write content to a file on the ES host via shell2http."""
         await es_manager._send_request(
             "post",
             "write-file",
             JSONDictionary({"path": path, "content": content}),
-            session=es_manager._EdgeServer__shell_session,
+            session=es_manager._EdgeServer__shell_session,  # ty: ignore[unresolved-attribute]
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_with_jwt_file(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replication_with_jwt_file(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Verify that ES can replicate with SGW using a JWT token read from a file.
 
@@ -146,7 +147,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("PASSED — Replication works with JWT file-based authentication")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_token_rotation_reconnect(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_token_rotation_reconnect(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Verify that ES detects a JWT file change and reconnects with the new token.
 
@@ -272,7 +273,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step(f"PASSED — Token rotation works: {final_count} docs after rotating to Token-B")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_invalid_token_rotation_causes_401_stop(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_invalid_token_rotation_causes_401_stop(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Overwrite the JWT file with an invalid token (signed by unknown key)
         while replication is active. ES detects the change via FileWatcher,
@@ -401,7 +402,7 @@ class TestJWTReplication(CBLTestClass):
             self.mark_test_step("PASSED — Invalid token correctly causes auth failure")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_corrupt_token_file_content_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_corrupt_token_file_content_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Overwrite the JWT token file with corrupt content while replication is active.
 
@@ -520,7 +521,7 @@ class TestJWTReplication(CBLTestClass):
                 pytest.fail(f"Unexpected status after JWT file deletion: {status}, error: {error}")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_valid_invalid_valid_token_cycle(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_valid_invalid_valid_token_cycle(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Test cycle: valid token → invalid token → valid token.
 

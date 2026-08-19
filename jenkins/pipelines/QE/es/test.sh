@@ -2,7 +2,7 @@
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 ES_VERSION="${1:-1.0.1}"
 TEST_NAME="${2:-test_crud.py}"
 TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
@@ -12,7 +12,7 @@ DATASET_VERSION="${5:-4.0}"
 TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
 
 if [ -z "$SGW_VERSION" ]; then
-    echo "Skipping sync gateway and cb server provisioning"
+  echo "Skipping sync gateway and cb server provisioning"
 fi
 
 source $SCRIPT_DIR/../../shared/config.sh
@@ -23,17 +23,17 @@ uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW
 # Run Tests :
 echo "RUNNING COORDINATED TEST"
 
-pushd "${QE_TESTS_DIR}/edge_server" > /dev/null
+pushd "${QE_TESTS_DIR}/edge_server" >/dev/null
 export COLUMNS=200
 
 if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json --dataset-version "$DATASET_VERSION" "$TEST_NAME"; then
-    echo "========== PYTEST OUTPUT END =========="
-    echo ""
-    echo "🎉 COORDINATED TEST PASSED!"
-    TEST_RESULT=0
+  echo "========== PYTEST OUTPUT END =========="
+  echo ""
+  echo "🎉 COORDINATED TEST PASSED!"
+  TEST_RESULT=0
 else
-    echo "========== PYTEST OUTPUT END =========="
-    echo ""
-    echo "💥 COORDINATED TEST FAILED!"
-    TEST_RESULT=1
+  echo "========== PYTEST OUTPUT END =========="
+  echo ""
+  echo "💥 COORDINATED TEST FAILED!"
+  TEST_RESULT=1
 fi

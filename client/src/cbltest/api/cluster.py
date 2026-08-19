@@ -40,7 +40,7 @@ class CouchbaseCluster:
         self,
         sync_gateways: Sequence[SyncGateway],
         servers: Sequence[CouchbaseServer],
-    ):
+    ) -> None:
         self.__sync_gateway_cluster = SyncGatewayCluster(sync_gateways)
         self.__couchbase_servers: Sequence[CouchbaseServer] = []
         if len(servers) > 0:

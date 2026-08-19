@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from contextlib import contextmanager
 from unittest.mock import patch
 
@@ -5,17 +6,18 @@ import pytest
 from cbltest.api import couchbaseserver
 from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.error import CblTestError
+from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from conftest import fake_sync_gateways
 
 
 @contextmanager
-def fake_sync_gateway():
+def fake_sync_gateway() -> Iterator[SyncGateway]:
     with fake_sync_gateways(1) as gateways:
         yield gateways[0]
 
 
-def test_cluster_without_couchbase_server():
+def test_cluster_without_couchbase_server() -> None:
     with fake_sync_gateway() as sync_gateway:
         sync_gateway.using_rosmar = False
         with pytest.raises(
@@ -30,7 +32,7 @@ def test_cluster_without_couchbase_server():
     assert len(cluster.couchbase_servers) == 0
 
 
-def test_cluster_with_couchbase_server():
+def test_cluster_with_couchbase_server() -> None:
     with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
@@ -42,7 +44,7 @@ def test_cluster_with_couchbase_server():
     assert cluster.couchbase_servers[0] is cbs
 
 
-def test_cluster_with_multiple_sync_gateways():
+def test_cluster_with_multiple_sync_gateways() -> None:
     with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
@@ -56,7 +58,7 @@ def test_cluster_with_multiple_sync_gateways():
         assert cluster.sync_gateway_cluster.sync_gateways == sync_gateways
 
 
-def test_cluster_multiple_sync_gateways_requires_couchbase_server():
+def test_cluster_multiple_sync_gateways_requires_couchbase_server() -> None:
     with (
         fake_sync_gateways(2) as sync_gateways,
         pytest.raises(

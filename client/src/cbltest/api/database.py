@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from json import dumps
 from re import match
+from types import TracebackType
 from typing import Any, Final, cast
 
 from opentelemetry.trace import get_tracer
@@ -28,11 +29,11 @@ BASE_BLOB_URL = (
 
 
 class SnapshotUpdater:
-    def __init__(self, id: str):
+    def __init__(self, id: str) -> None:
         self._id = id
         self._updates: list[DatabaseUpdateEntry] = []
 
-    def delete_document(self, collection: str, id: str):
+    def delete_document(self, collection: str, id: str) -> None:
         """
         Adds a delete document operation to be performed
 
@@ -41,7 +42,7 @@ class SnapshotUpdater:
         """
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
 
-    def purge_document(self, collection: str, id: str):
+    def purge_document(self, collection: str, id: str) -> None:
         """
         Adds a purge document operation to be performed
 
@@ -57,7 +58,7 @@ class SnapshotUpdater:
         new_properties: list[dict[str, Any]] | None = None,
         removed_properties: list[str] | None = None,
         new_blobs: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """
         Updates or inserts a document using the given new and/or removed properties
 
@@ -98,7 +99,7 @@ class DatabaseUpdater:
     A class which collects database operations to perform so that they can be sent in a batch
     """
 
-    def __init__(self, db_name: str, request_factory: RequestFactory, index: int):
+    def __init__(self, db_name: str, request_factory: RequestFactory, index: int) -> None:
         self._db_name = db_name
         self._updates: list[DatabaseUpdateEntry] = []
         self.__request_factory = request_factory
@@ -106,11 +107,17 @@ class DatabaseUpdater:
         self.__error: str | None = None
         self.__tracer = get_tracer(__name__, VERSION)
 
-    async def __aenter__(self):
+    # typing.Self is 3.11+; this project supports 3.10
+    async def __aenter__(self) -> DatabaseUpdater:  # noqa: PYI034
         self._updates.clear()
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        tb: TracebackType | None,
+    ) -> DatabaseUpdater:
         with self.__tracer.start_as_current_span("update_database"):
             if self.__error is not None:
                 raise CblTestError(self.__error)
@@ -127,7 +134,7 @@ class DatabaseUpdater:
 
             return self
 
-    def delete_document(self, collection: str, id: str):
+    def delete_document(self, collection: str, id: str) -> None:
         """
         Adds a delete document operation to be performed
 
@@ -136,7 +143,7 @@ class DatabaseUpdater:
         """
         self._updates.append(DatabaseUpdateEntry(DatabaseUpdateType.DELETE, collection, id))
 
-    def purge_document(self, collection: str, id: str):
+    def purge_document(self, collection: str, id: str) -> None:
         """
         Adds a purge document operation to be performed
 
@@ -152,7 +159,7 @@ class DatabaseUpdater:
         new_properties: list[dict[str, Any]] | None = None,
         removed_properties: list[str] | None = None,
         new_blobs: dict[str, str] | None = None,
-    ):
+    ) -> None:
         """
         Updates or inserts a document using the given new and/or removed properties
 
@@ -204,7 +211,7 @@ class AllDocumentsEntry:
         """Gets the rev ID of the document"""
         return self.__rev
 
-    def __init__(self, body: PostGetAllDocumentsEntry):
+    def __init__(self, body: PostGetAllDocumentsEntry) -> None:
         self.__id = body.id
         self.__rev = body.rev
 
@@ -224,7 +231,7 @@ class AllDocumentsCollection:
         """
         return self.__documents
 
-    def __init__(self, docs: list[PostGetAllDocumentsEntry]):
+    def __init__(self, docs: list[PostGetAllDocumentsEntry]) -> None:
         self.__documents = [AllDocumentsEntry(x) for x in docs]
 
 
@@ -348,7 +355,7 @@ class Database:
     def _index(self) -> int:
         return self.__index
 
-    def __init__(self, factory: RequestFactory, index: int, name: str):
+    def __init__(self, factory: RequestFactory, index: int, name: str) -> None:
         self.__name = name
         self.__index = index
         self.__request_factory = factory
