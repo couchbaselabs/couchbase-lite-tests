@@ -912,6 +912,7 @@ class EdgeServer:
             },
         ):
             content = await self.get_log_content(log_file)
+            print(content)
             return [line for line in content.splitlines() if search_string in line]
 
     async def start_server(self, config: dict | None = None):
