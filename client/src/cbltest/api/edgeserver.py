@@ -12,7 +12,7 @@ import aiofiles
 import pyjson5 as json5
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
 from opentelemetry.trace import get_tracer
-
+import time
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
@@ -885,7 +885,7 @@ class EdgeServer:
             try:
                 prefix = "/home/ec2-user/"
                 path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                caddy_url = f"http://{self.hostname}:20000/{path}"
+                caddy_url = f"http://{self.hostname}:20000/{path}?_={time.time_ns()}"
                 content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
                 return content.decode("utf-8")
             except Exception as e:
