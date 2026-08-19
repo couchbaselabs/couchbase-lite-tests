@@ -946,24 +946,6 @@ class _SyncGatewayBase:
         """
         await self._delete_database(db_name, 0)
 
-    async def drop_rosmar_bucket(self, bucket_name: str) -> None:
-        """
-        Drops a Rosmar-backed bucket. Unlike a Couchbase Server bucket, Rosmar data
-        is not deleted by removing the Sync Gateway database that uses it, so this
-        must be called separately to clear it out.
-
-        .. note:: Only valid when this Sync Gateway node is using Rosmar
-            (``self.using_rosmar``).
-
-        :param bucket_name: The name of the Rosmar bucket to drop
-        """
-        with self._tracer.start_as_current_span("drop_rosmar_bucket", attributes={"cbl.bucket.name": bucket_name}):
-            try:
-                await self._send_request("delete", f"/_rosmar/{bucket_name}")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code != 404:
-                    raise
-
     async def get_all_database_names(self) -> list[str]:
         """
         Gets the names of all databases configured on this Sync Gateway instance.
@@ -1878,6 +1860,26 @@ class SyncGateway(_SyncGatewayBase):
         # failing on a connection error.
         self.has_caddy_sidecar: bool = _is_sidecar_reachable(url, CADDY_PORT)
         self.has_shell2http_sidecar: bool = _is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    async def drop_rosmar_bucket(self, bucket_name: str) -> None:
+        """
+        Drops a Rosmar-backed bucket.
+
+        .. note:: Only valid when this Sync Gateway node is using Rosmar
+            (``self.using_rosmar``).
+
+        :param bucket_name: The name of the Rosmar bucket to drop
+        :raises CblTestError: If this Sync Gateway node is not using Rosmar
+        """
+        with self._tracer.start_as_current_span("drop_rosmar_bucket", attributes={"cbl.bucket.name": bucket_name}):
+            if not self.using_rosmar:
+                raise CblTestError(f"Cannot drop Rosmar bucket '{bucket_name}', Sync Gateway is not using Rosmar")
+
+            try:
+                await self._send_request("delete", f"/_rosmar/{bucket_name}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
 
     async def is_using_views(self, db_name: str) -> bool:
         """Determine whether the given Sync Gateway database is using views rather than GSI.
