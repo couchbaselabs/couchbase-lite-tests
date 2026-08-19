@@ -7,7 +7,7 @@ from json import dumps
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
-
+from datetime import datetime, timezone
 import aiofiles
 import pyjson5 as json5
 from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
@@ -943,7 +943,6 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
-        await self.close()
         return EdgeServer(self.__hostname, config_file=config_file)
 
     async def set_firewall_rules(
