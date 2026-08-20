@@ -42,13 +42,24 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         Creates a bucket and configures a Sync Gateway database whose sync function
         assigns channel membership directly from each document's `channels` field, so
         tests can drive channel history purely by editing that field.
+
+        Sync Gateway rejects a database-level `sync` shorthand once scopes/collections
+        are specified explicitly, so the sync function is injected into every named
+        collection's own config instead.
         """
         cbs.create_bucket(bucket_name)
+        resolved_scopes = scopes if scopes is not None else {"_default": ScopeConfig(collections={"_default": {}})}
+        for scope_config in resolved_scopes.values():
+            assert isinstance(scope_config.collections, dict), (
+                "_configure_channel_tracking_db only supports the {name: {...}} collections form"
+            )
+            for collection_config in scope_config.collections.values():
+                collection_config["sync"] = _CHANNEL_SYNC_FUNCTION
+
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
-            scopes=scopes if scopes is not None else {"_default": ScopeConfig(collections={"_default": {}})},
-            sync=_CHANNEL_SYNC_FUNCTION,
+            scopes=resolved_scopes,
             import_docs=import_docs,
             enable_shared_bucket_access=True if import_docs else None,
         )
