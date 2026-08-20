@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import TypeAlias
@@ -19,6 +20,7 @@ from cbltest.api.syncgateway import RemoteDocument
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
+from cbltest.plugins.cluster_cleanup import perform_cleanup
 
 
 class DocSnapshot:
@@ -35,6 +37,30 @@ def tools_path() -> Path:
     return Path(__file__).resolve().parents[1] / ".tools"
 
 
+def is_initial_upgrade_phase() -> bool:
+    """
+    True when this is the first phase of an SGW upgrade run, which is the only phase
+    with no state to inherit from the phase before it.
+
+    `SGW_UPGRADE_PHASE` is set per pytest invocation by the upgrade pipelines
+    (`jenkins/pipelines/QE/upg-sgw/test{,_rolling}.sh`); unset means no pipeline is
+    driving the test, which is treated the same as the first phase.
+    """
+    return os.environ.get("SGW_UPGRADE_PHASE", "") in ("", "initial")
+
+
+async def cleanup_unless_mid_upgrade(cblpytest: CBLPyTest) -> None:
+    """
+    Body for a `cluster_cleanup` fixture override on an SGW upgrade test class: clean
+    only in the initial phase, since later phases assert that earlier docs survived.
+    """
+    if not is_initial_upgrade_phase():
+        cbl_info(f"🧹 Skipping cleanup: phase '{os.environ['SGW_UPGRADE_PHASE']}' inherits the previous state")
+        return
+
+    await perform_cleanup(cblpytest)
+
+
 async def setup_upgrade_env(
     test_case: CBLTestClass,
     cblpytest: CBLPyTest,
@@ -47,14 +73,8 @@ async def setup_upgrade_env(
     dataset_ver = cblpytest.test_servers[0].dataset_version
     test_case.skip_if_not(dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver}).")
 
-    test_case.mark_test_step("Delete Sync Gateway 'upgrade' database if exists")
-    # delete_database silently swallows 403 internally (config-managed DBs)
-    # and retries 500s; no need to wrap further.
-    await cblpytest.sync_gateways[0].delete_database("upgrade")
-
     test_case.mark_test_step("Restore Couchbase Server Bucket using `upgrade` dataset")
     cbs: CouchbaseServer = cblpytest.couchbase_servers[0]
-    cbs.drop_bucket("upgrade")
     cbs.restore_bucket(
         "upgrade",
         tools_path(),

@@ -36,7 +36,7 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 - Use `cblpytest` fixture (auto-injected) and `dataset_path` fixture
 - Mark tests: `@pytest.mark.sgw`, `@pytest.mark.cbl`, `@pytest.mark.upg_sgw`
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`
-- QE tests get auto-cleanup via `cleanup_after_test` fixture in conftest.py
+- All tests get auto-cleanup via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`)
 
 ### API Versioning (client/src/cbltest/)
 

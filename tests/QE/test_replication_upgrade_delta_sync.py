@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import (
     DatabaseConfig,
@@ -72,17 +71,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         payload = _DELTA_SYNC_UPGRADE_CONFIG
 
         self.mark_test_step("Create SG 'upgrade' database with delta_sync enabled and import from bucket")
-        try:
-            await sg.put_database("upgrade", payload)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 412:
-                raise
-            await sg.delete_database("upgrade")
-            try:
-                await sg.put_database("upgrade", payload)
-            except CblSyncGatewayBadResponseError as e2:
-                if e2.code != 412:
-                    raise
+        await cblpytest.sync_gateway_cluster.update_database_config("upgrade", payload)
 
         self.mark_test_step("Verify delta_sync is actually enabled on SGW 'upgrade' database")
         config = await sg.get_database_config("upgrade")

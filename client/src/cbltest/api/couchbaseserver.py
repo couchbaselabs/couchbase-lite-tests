@@ -18,6 +18,7 @@ import json
 from urllib.parse import quote_plus, urlparse
 
 import requests
+import tenacity
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (
@@ -37,7 +38,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
-from cbltest.utils import _try_n_times
+from cbltest.utils import _try_n_times, async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
 
@@ -207,7 +208,7 @@ class CouchbaseServer:
         num_replicas: int = 0,
         retries: int = 60,
         interval: float = 2.0,
-    ) -> None:
+    ) -> bool:
         """
         Creates a bucket with a given name that Sync Gateway can use
 
@@ -215,6 +216,7 @@ class CouchbaseServer:
         :param num_replicas: The number of replicas for the bucket (default 0)
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
+        :return: True if the bucket was created, False if it already existed
         """
         with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
             mgr = self.__cluster.buckets()
@@ -224,18 +226,43 @@ class CouchbaseServer:
                 ram_quota_mb=512,
                 num_replicas=num_replicas,
             )
+            newly_created = True
             try:
                 mgr.create_bucket(settings)
             except BucketAlreadyExistsException:
-                pass
+                newly_created = False
 
             # Bucket creation is asynchronous in the cluster. Wait until it is healthy
             # and responding before returning so callers can safely proceed.
             for _ in range(retries):
                 if self.bucket_healthy(name) and self.bucket_kv_responding(name) and self.collections_ready(name):
-                    return
+                    return newly_created
                 sleep(interval)
             raise TimeoutError(f"Bucket {name} did not become ready")
+
+    def wait_for_indexes_removed(self, bucket: str) -> None:
+        """
+        CBL-4977: A bucket recreated with the same name can have stale indexes that are
+        still being deleted asynchronously.  Sync Gateway will then wrongly detect that
+        the indexes already exist, and querying later fails with index-not-available
+        once the deletion catches up.  Wait for them to be gone before Sync Gateway
+        gets a chance to look.
+
+        .. note:: Call this after the bucket's collections have been created, otherwise
+            QueryIndexManager will not return the pending-to-removed indexes that were
+            created for those collections.
+
+        :param bucket: The bucket to wait on
+        """
+        retry_assert(
+            lambda: self._check_all_indexes_removed(bucket),
+            tenacity.wait_fixed(2),
+            tenacity.stop_after_attempt(10),
+        )
+
+    def _check_all_indexes_removed(self, bucket: str) -> None:
+        count = self.indexes_count(bucket)
+        assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
 
     def drop_bucket(self, name: str) -> None:
         """
@@ -322,6 +349,27 @@ class CouchbaseServer:
                 await asyncio.sleep(retry_delay)
 
             raise CblTestError(f"Bucket '{bucket_name}' was not deleted after {max_retries * retry_delay} seconds")
+
+    async def wait_for_no_buckets(
+        self,
+        max_retries: int = 30,
+        retry_delay: float = 2.0,
+    ) -> None:
+        """
+        Waits for the Couchbase cluster to have no buckets at all.
+        Async because deletion is eventual and requires polling remote state.
+        """
+
+        async def _wait_for_no_buckets_poll() -> None:
+            bucket_names = self.get_bucket_names()
+            assert not bucket_names, f"Cluster still has buckets: {bucket_names}"
+
+        with self.__tracer.start_as_current_span("wait_for_no_buckets"):
+            await async_retry_assert(
+                _wait_for_no_buckets_poll,
+                tenacity.wait_fixed(retry_delay),
+                tenacity.stop_after_attempt(max_retries),
+            )
 
     def restore_bucket(
         self,

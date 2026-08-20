@@ -104,7 +104,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - Use the `dataset_path` fixture (defined per-suite in `conftest.py`).
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`, etc.
 - Behavior markers: `@pytest.mark.sgw`, `.cbl`, `.upg_sgw`.
-- QE tests auto-clean via the `cleanup_after_test` fixture.
+- All tests auto-clean via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`).
 
 ## Config Files (Generated — Do Not Hand-Edit)
 

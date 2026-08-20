@@ -35,7 +35,7 @@ tests/
 │   └── test_query_consistency.py
 │
 ├── QE/                                 # QA — broader coverage + edge cases
-│   ├── conftest.py                     # dataset_path + cleanup_after_test (autouse)
+│   ├── conftest.py                     # dataset_path fixture (../../dataset/sg)
 │   ├── config.json                     # Generated — DO NOT hand-edit
 │   ├── test_db_gone.py
 │   ├── test_delta_sync.py
@@ -115,7 +115,7 @@ class TestFeatureName(CBLTestClass):
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None
 
-        # dev_e2e: manual cleanup. QE: handled by cleanup_after_test.
+        # Resets local CBL state. SGW/CBS buckets are handled globally by cluster_cleanup.
         await cblpytest.test_servers[0].cleanup()
 ```
 
@@ -125,7 +125,7 @@ class TestFeatureName(CBLTestClass):
 |---|---|---|---|
 | `cblpytest` | session (auto) | `cbltest.plugins.cblpytest_fixture` | Top-level entry: `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers`, `.load_balancers`, `.request_factory` |
 | `dataset_path` | session | per-suite `conftest.py` | `Path` to `dataset/sg/` |
-| `cleanup_after_test` | function (autouse, QE only) | `tests/QE/conftest.py` | Cleans up SGW DBs + CBS buckets after every `@pytest.mark.sgw` test |
+| `cluster_cleanup` | function (autouse) | `cbltest.plugins.cluster_cleanup` (framework-wide entry point) | Removes all SGW databases + CBS/Rosmar buckets before every test |
 
 ## Markers
 
@@ -146,7 +146,7 @@ class TestFeatureName(CBLTestClass):
 | Aspect | dev_e2e | QE |
 |---|---|---|
 | Audience | CBL release validation | QA regression |
-| Cleanup | manual `await ts.cleanup()` | autouse `cleanup_after_test` |
+| Cleanup | autouse `cluster_cleanup` + manual `await ts.cleanup()` | autouse `cluster_cleanup` |
 | Markers | topology only | `sgw` / `cbl` + topology |
 | Edge Server | — | `edge_server/` sub-suite |
 | SGW upgrade | `test_replication_upgrade.py` | `test_upg_sgw.py` |

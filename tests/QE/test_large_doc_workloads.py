@@ -47,16 +47,13 @@ class TestLargeDocWorkloads(CBLTestClass):
         password = "pass"
         channels = ["test"]
 
-        self.mark_test_step("Create bucket on Couchbase Server.")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint.")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with channel access.")
         await sg.reset_user(sg_db, username, password, channels)
