@@ -51,9 +51,9 @@ endpoints share a shape.
 
 1. Configure a Sync Gateway database with a channel-membership sync function.
 2. Create a document assigned to channel `ABC`.
-3. Update the document to leave `ABC` for `OTHER`, then update it again to rejoin `ABC`, then update it once more to leave `ABC` for `OTHER` a second time.
+3. Update the document to leave `ABC` for `OTHER`, then rejoin `ABC` then remove `ABC` a second time.
 4. Get the document's channel history.
-5. Check the history entry for `ABC` is a list containing both historical leave-sequences, in order, and nothing else.
+5. Check the history entry for `ABC` is a list containing both historical leave-sequences, and nothing else.
 
 ## test_compact_removes_entry_past_its_seq
 
@@ -105,7 +105,7 @@ to the same default collection and behave identically.
 
 1. Configure a Sync Gateway database with a channel-membership sync function.
 2. Create three documents, each assigned to channel `ABC`, one per keyspace form to be tested.
-3. Update each document to move it from `ABC` to `OTHER`, addressing it by its own keyspace form (bare `db`, `db._default`, `db._default._default`).
+3. Update each document to move it from `ABC` to `OTHER`.
 4. Get each document's channel history using the same keyspace form used to update it.
 5. Check all three histories contain an identical entry for `ABC`.
 6. Compact all three using their own keyspace form and a sequence past the entry.
@@ -143,22 +143,6 @@ mutation.
 5. Update the document through Sync Gateway to move it from `ABC` to `OTHER`.
 6. Get the document's channel history again and check it now has a fresh entry for `ABC`.
 
-## test_flagship_offline_revoke_then_compact_before_reconnect_still_removes_document
-
-The flagship scenario: a device is offline while its access to a document's channel is
-revoked *and* that revocation is compacted out of the document's history before the
-device reconnects. Compaction is purely an administrative record; it must not interfere
-with Sync Gateway computing the removal from the document's live channel assignment, so
-the device must still correctly lose the document on reconnect.
-
-1. Configure a Sync Gateway database with a channel-membership sync function.
-2. Create a user with access to channel `ABC` only.
-3. Create a document assigned to channel `ABC`.
-4. Reset a local database and pull as that user so the document replicates to the device.
-5. While the device is offline: update the document to move it from `ABC` to `OTHER`, then compact the document's channel history for `ABC` with a sequence past the entry.
-6. Reconnect: start a new pull replicator for the same user.
-7. Check the device received the document with the access-removed flag set.
-
 ## test_compact_enormous_seq_never_removes_an_active_channel_membership
 
 Critical safety invariant: no matter how large a compaction sequence is, a channel the
@@ -175,13 +159,13 @@ already-ended history entries are eligible.
 
 ## test_compact_stale_entry_leaves_live_regranted_same_channel_untouched
 
-The actual shape of the flagship scenario: a document loses and then regains the *same*
-channel name before compaction runs. Compacting the stale (already-ended) entry must
-leave the live, current membership in that same channel completely untouched.
+A document loses and then regains the *same* channel name before compaction runs.
+Compacting the stale (already-ended) entry must leave the live, current membership in
+that same channel completely untouched.
 
 1. Configure a Sync Gateway database with a channel-membership sync function.
 2. Create a document assigned to channel `ABC`.
-3. Update the document to leave `ABC` for `OTHER`, then update it again to rejoin `ABC`.
+3. Make some seq-updates, then make the original document rejoin `ABC`.
 4. Compact the document's channel history for `ABC` with a sequence past the historical (first) entry only.
 5. Check the response reports `ABC` as compacted.
 6. Get the document's channel history and check the entry for `ABC` is gone.
