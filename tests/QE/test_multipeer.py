@@ -38,7 +38,7 @@ class TestMultipeer(CBLTestClass):
         for idx, db in enumerate(all_dbs):
             device_key = f"device{idx + 1}"
             async with db.batch_updater() as b:
-                await b.upsert_document(
+                b.upsert_document(
                     "_default._default",
                     "conflict1",
                     [{"counter": {device_key: idx + 1}}],

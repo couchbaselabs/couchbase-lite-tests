@@ -151,7 +151,7 @@ class TestSystemMultipeer(CBLTestClass):
                         end = min(start + 10, len(to_update))
                         async with all_dbs[update_testserver].batch_updater() as b:
                             for doc_id in to_update[start:end]:
-                                b.upsert_document("_default._default", doc_id, updated_docs[doc_id])
+                                b.upsert_document("_default._default", doc_id, [updated_docs[doc_id]])
                         docs_to_update = updated_docs
 
             async def stop_restart_task() -> None:

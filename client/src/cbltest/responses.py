@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Flag, auto
-from typing import Any, Final
+from typing import Any, Final, TypeVar
 
 from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
@@ -10,9 +10,11 @@ from cbltest.jsonhelper import _get_typed, _get_typed_required
 
 _response_registry: dict[tuple[type, int], type] = {}
 
+_ResponseT = TypeVar("_ResponseT", bound=type["TestServerResponse"])
 
-def register_response(request_type: type, version: int | list[int]) -> Callable[[type[TestServerResponse]], type]:
-    def deco(cls: type[TestServerResponse]) -> type:
+
+def register_response(request_type: type, version: int | list[int]) -> Callable[[_ResponseT], _ResponseT]:
+    def deco(cls: _ResponseT) -> _ResponseT:
         if isinstance(version, list):
             for v in version:
                 _response_registry[(request_type, v)] = cls
