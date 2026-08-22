@@ -50,7 +50,7 @@ async def _configure_channel_tracking_db(
             assert isinstance(collections, dict), (
                 "_configure_channel_tracking_db only supports the {name: {...}} or [name, ...] collections forms"
             )
-
+            cbs.create_collections(bucket_name, scope_name, list(collections.keys()))
     for scope_config in resolved_scopes.values():
         collection_configs = scope_config.collections
         assert isinstance(collection_configs, dict)
