@@ -2454,3 +2454,64 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         """
         super().__init__(url, username, password, port, secure)
+
+    async def create_session(
+        self,
+        db_name: str,
+        name: str | None = None,
+        password: str | None = None,
+        one_time: bool | None = None,
+    ) -> dict:
+        """
+        Creates a login session via the public API (POST /{db}/_session).
+
+        If ``name`` and ``password`` are provided, the session is created for that user.
+        Otherwise the session is created for the currently authenticated user.  On success
+        a session cookie is stored on the client for future API calls.
+
+        :param db_name: The name of the database to create the session against
+        :param name: Optional username to create the session for.  Omit to create a
+            session for the authenticated user making the request.
+        :param password: Optional password for ``name``.  Omit to use the authenticated user.
+        :param one_time: If True, the session is valid for a single authentication and
+            expires in 5 minutes if unused (the session id is returned only in the
+            response body, not the cookie header).
+        :return: The session response (``userCtx``, ``authentication_handlers``, and
+            ``one_time_session_id`` when ``one_time`` is set)
+        """
+        with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
+            body: dict[str, Any] = {}
+            if name is not None:
+                body["name"] = name
+            if password is not None:
+                body["password"] = password
+
+            params = {"one_time": "true"} if one_time else None
+            return await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body), params=params)
+
+    async def get_session(self, db_name: str) -> dict:
+        """
+        Gets information about the current user session via the public API
+        (GET /{db}/_session).
+
+        :param db_name: The name of the database to query the session against
+        :return: The session info (``userCtx``, ``authentication_handlers``, ...)
+        """
+        with self._tracer.start_as_current_span("get_session", attributes={"sg.database.name": db_name}):
+            return await self._send_request("get", f"/{db_name}/_session")
+
+    async def delete_session(self, db_name: str) -> None:
+        """
+        Deletes (logs out) the current user session via the public API
+        (DELETE /{db}/_session).  A 404 (no active session) is treated as success.
+
+        :param db_name: The name of the database to delete the session against
+        """
+        with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
+            try:
+                await self._send_request("delete", f"/{db_name}/_session")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code == 404:
+                    pass
+                else:
+                    raise
