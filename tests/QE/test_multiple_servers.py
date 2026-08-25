@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -44,27 +44,6 @@ def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> 
     else:
         cbs_one.add_node(cbs_two)
     cbs_one.rebalance()
-
-
-def _set_alternate_addresses(cbs_servers: Sequence) -> None:
-    """Set alternate addresses with all service ports for all CBS nodes."""
-    session = requests.Session()
-    session.auth = ("Administrator", "password")
-    for cbs_node in cbs_servers:
-        session.put(
-            f"http://{cbs_node.hostname}:8091/node/controller/setupAlternateAddresses/external",
-            data={
-                "hostname": cbs_node.hostname,
-                "kv": "11210",
-                "kvSSL": "11207",
-                "mgmt": "8091",
-                "mgmtSSL": "18091",
-                "capi": "8092",
-                "capiSSL": "18092",
-                "n1ql": "8093",
-                "n1qlSSL": "18093",
-            },
-        )
 
 
 @asynccontextmanager
@@ -314,9 +293,6 @@ class TestISGRCollectionMapping(CBLTestClass):
         b2_collections = ["collection4", "collection5"]
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
-
-        self.mark_test_step("Set alternate addresses on all CBS nodes")
-        _set_alternate_addresses(cblpytest.couchbase_servers)
 
         self.mark_test_step("Create collections in _default scope for each bucket")
         for bucket, collections in [
