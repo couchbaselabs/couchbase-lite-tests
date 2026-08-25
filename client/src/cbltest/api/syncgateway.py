@@ -674,8 +674,6 @@ class SessionResponse(BaseModel):
     authentication_handlers: list[str] | None = None
     ok: bool | None = None
     userCtx: SessionUserContext | None = None
-    # Only present on POST /{db}/_session when a one-time session is requested.
-    one_time_session_id: str | None = None
 
 
 class _SyncGatewayBase:
@@ -2483,7 +2481,6 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         db_name: str,
         name: str | None = None,
         password: str | None = None,
-        one_time: bool | None = None,
     ) -> SessionResponse:
         """
         Creates a login session via the public API (POST /{db}/_session).
@@ -2496,11 +2493,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param name: Optional username to create the session for.  Omit to create a
             session for the authenticated user making the request.
         :param password: Optional password for ``name``.  Omit to use the authenticated user.
-        :param one_time: If True, the session is valid for a single authentication and
-            expires in 5 minutes if unused (the session id is returned only in the
-            response body, not the cookie header).
-        :return: The session response (``userCtx``, ``authentication_handlers``, and
-            ``one_time_session_id`` when ``one_time`` is set)
+        :return: The session response (``userCtx``, ``authentication_handlers``, ...)
         """
         with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
             body: dict[str, Any] = {}
@@ -2509,8 +2502,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
             if password is not None:
                 body["password"] = password
 
-            params = {"one_time": "true"} if one_time else None
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body), params=params)
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
             assert isinstance(resp, dict)
             return SessionResponse.model_validate(resp)
 
