@@ -2485,6 +2485,9 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         with, so the returned session token matches that user.  On success a session
         cookie is stored on the client for future API calls.
 
+        Calling this again does not invalidate the existing session; it creates an
+        additional session alongside it.
+
         :param db_name: The name of the database to create the session against
         :return: The session response (``userCtx``, ``authentication_handlers``, ...)
         """
