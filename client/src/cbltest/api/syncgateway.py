@@ -482,16 +482,34 @@ class RemoteDocument(JSONSerializable):
         assert self.__rev is not None
         return self.__rev
 
-    def __init__(self, body: dict) -> None:
+    @property
+    def seq(self) -> int:
+        """
+        Gets the sequence Sync Gateway assigned to this revision.
+
+        :raises CblTestError: if the sequence was never read back from the changes feed (see the
+                              `wait_for_caching_feed` argument of :func:`SyncGateway.update_document`)
+        """
+        if self.__seq is None:
+            raise CblTestError(
+                f"No sequence recorded for document {self.__id}; it was not read back from the changes feed "
+                "(pass wait_for_caching_feed=True to the call that returned it)"
+            )
+
+        return self.__seq
+
+    def __init__(self, body: dict, seq: int | None = None) -> None:
         if "error" in body:
             raise ValueError("Trying to create remote document from error response")
 
+        self.__seq = seq
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
-        del self.__body["_rev"]
+        if self.__rev is not None:
+            del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
 
@@ -1056,6 +1074,8 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
+        doc_ids: list[str] | None = None,
+        request_plus: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -1064,6 +1084,9 @@ class _SyncGatewayBase:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        :param doc_ids: If provided, restrict the feed to these document IDs via the `_doc_ids` filter
+        :param request_plus: If True, wait for the channel cache to catch up to the latest sequence allocated
+                             at the time of the request instead of serving whatever is already cached
         """
         with self._tracer.start_as_current_span(
             "get_changes",
@@ -1073,8 +1096,14 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            query_params = f"version_type={version_type}"
-            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}")
+            query_params = {"version_type": version_type}
+            if doc_ids is not None:
+                query_params["filter"] = "_doc_ids"
+                query_params["doc_ids"] = dumps(doc_ids)
+            if request_plus:
+                query_params["request_plus"] = "true"
+
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_changes", params=query_params)
 
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
@@ -1369,6 +1398,7 @@ class _SyncGatewayBase:
         rev: str,
         scope: str = "_default",
         collection: str = "_default",
+        wait_for_caching_feed: bool = False,
     ) -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
@@ -1379,6 +1409,10 @@ class _SyncGatewayBase:
         :param rev: The current revision ID of the document
         :param scope: The scope where the document exists (default '_default')
         :param collection: The collection where the document exists (default '_default')
+        :param wait_for_caching_feed: If True, read the update back from a `request_plus` changes feed filtered to
+                                      this document before returning, and populate the returned document's `seq`
+                                      from the entry matching the revision just written. This makes `seq` this
+                                      update's own sequence rather than a stale pre-write one (default False)
         :return: The updated document as a RemoteDocument object
         """
         with self._tracer.start_as_current_span(
@@ -1422,7 +1456,32 @@ class _SyncGatewayBase:
             if "cv" in cast_resp:
                 cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
 
-            return RemoteDocument(cast_resp)
+            if not wait_for_caching_feed:
+                return RemoteDocument(cast_resp)
+
+            # A request_plus feed only guarantees the cache has caught up to the sequence allocated when the
+            # request was made, so match on the revision this call just wrote rather than trusting whichever
+            # entry comes back -- an entry for an older revision would hand back a stale sequence.
+            version_type = "rev" if "_rev" in cast_resp else "cv"
+            expected_revision = cast_resp["_rev"] if version_type == "rev" else cast_resp["_cv"]
+            changes = await self.get_changes(
+                db_name,
+                scope,
+                collection,
+                version_type=version_type,
+                doc_ids=[doc_id],
+                request_plus=True,
+            )
+            for entry in changes.results:
+                if entry.id == doc_id and expected_revision in entry.changes:
+                    return RemoteDocument(cast_resp, entry.seq)
+
+            feed = [{"id": e.id, "seq": e.seq, "changes": e.changes, "deleted": e.deleted} for e in changes.results]
+            raise CblSyncGatewayBadResponseError(
+                500,
+                f"Changes feed has no entry for {doc_id} at revision {expected_revision} even after a "
+                f"request_plus feed (last_seq={changes.last_seq}, results={dumps(feed)})",
+            )
 
     async def close(self) -> None:
         """
