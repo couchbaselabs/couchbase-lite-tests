@@ -6,6 +6,7 @@ pipeline {
 // But just for reference, these are the params that are used by the job :
 //         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
 //         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
+//         string(name: 'TS_TEST_FILTER', description: 'An optional filter for running a subset of tests')
     stages {
         stage('Init') {
             agent any
@@ -47,7 +48,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 160, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION}"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                 }
                 echo "=== SGW Tests Complete"
             }

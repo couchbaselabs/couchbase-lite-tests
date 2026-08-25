@@ -11,32 +11,43 @@ export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <cbl_version> <sg_version> [dataset_version] [--setup-only]"
-  echo "  dataset_version: Version of CBL dataset to use (default: 4.0)"
+  echo "Usage: $0 <cbl_version> <sg_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
   exit 1
 }
 
-# Allow up to 4 args now (2 required + dataset + flag)
-if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION="$1"
 if [ -z "$CBL_VERSION" ]; then usage; fi
 
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
+shift 2
 
 DATASET_VERSION="4.0"
+TEST_FILTER=""
 SETUP_ONLY=false
 
-# Parse optional args (starting from 3rd)
-for arg in "${@:3}"; do
-  case "$arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dataset-version)
+      DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
     --setup-only)
       SETUP_ONLY=true
+      shift
       ;;
     *)
-      DATASET_VERSION="$arg"
+      echo "Unknown argument: $1"
+      usage
       ;;
   esac
 done
@@ -62,7 +73,15 @@ echo $! >logcat.pid
 echo "Run tests..."
 pushd $QE_TESTS_DIR >/dev/null
 adb shell input keyevent KEYCODE_WAKEUP
-uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
-  --config config.json \
-  --dataset-version "$DATASET_VERSION" \
-  -m cbl
+if [ -n "$TEST_FILTER" ]; then
+  uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl \
+    -k "$TEST_FILTER"
+else
+  uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl
+fi

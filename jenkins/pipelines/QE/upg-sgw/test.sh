@@ -42,9 +42,10 @@ function upload_batch_results() {
 trap upload_batch_results EXIT
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
+  echo "Usage: $0 <version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--test-filter EXPR] [--setup-only]"
   echo "  <cbl_version>: The Couchbase Server version to test against."
   echo "  <sgw_version_X>: One or more Sync Gateway versions for the upgrade test."
+  echo "  --test-filter: An optional pytest -k filter expression"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
   echo "  Build number will be auto-fetched for the specified version"
   exit 1
@@ -56,13 +57,23 @@ CBL_VERSION=${1}
 shift # The rest of the arguments are SGW versions or flags
 
 SETUP_ONLY=false
+TEST_FILTER=""
 SGW_VERSIONS=()
-for arg in "$@"; do
-  if [ "$arg" = "--setup-only" ]; then
-    SETUP_ONLY=true
-  else
-    SGW_VERSIONS+=("$arg")
-  fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --setup-only)
+      SETUP_ONLY=true
+      shift
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
+    *)
+      SGW_VERSIONS+=("$1")
+      shift
+      ;;
+  esac
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
@@ -77,6 +88,21 @@ UPGRADE_VERSIONS=$(
   IFS=,
   echo "${SGW_VERSIONS[*]}"
 )
+
+function run_upg_sgw_tests() {
+  if [ -n "$TEST_FILTER" ]; then
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+      --upgrade-versions "$UPGRADE_VERSIONS" \
+      --sgcollect-on-test-failure \
+      -k "$TEST_FILTER" \
+      test_upg_sgw.py
+  else
+    uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
+      --upgrade-versions "$UPGRADE_VERSIONS" \
+      --sgcollect-on-test-failure \
+      test_upg_sgw.py
+  fi
+}
 
 # Initial full setup with the first SGW version
 CURRENT_SGW_VERSION="${SGW_VERSIONS[0]}"
@@ -97,10 +123,7 @@ export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 export SGW_UPGRADE_PHASE="initial"
 unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
 pushd $QE_TESTS_DIR >/dev/null
-uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
-  --upgrade-versions "$UPGRADE_VERSIONS" \
-  --sgcollect-on-test-failure \
-  test_upg_sgw.py
+run_upg_sgw_tests
 popd >/dev/null
 
 # Loop through the remaining SGW versions and perform upgrades
@@ -133,10 +156,7 @@ for ((i = 1; i < ${#SGW_VERSIONS[@]}; i++)); do
   export SGW_UPGRADE_PHASE="upgrade_to_$CURRENT_SGW_VERSION"
   export SGW_PREVIOUS_VERSION="$PREVIOUS_SGW_VERSION"
   pushd $QE_TESTS_DIR >/dev/null
-  uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
-    --upgrade-versions "$UPGRADE_VERSIONS" \
-    --sgcollect-on-test-failure \
-    test_upg_sgw.py
+  run_upg_sgw_tests
   popd >/dev/null
 done
 

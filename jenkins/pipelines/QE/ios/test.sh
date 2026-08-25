@@ -4,29 +4,42 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [dataset_version] [--setup-only]"
-  echo "  dataset_version: Version of CBL dataset to use (default: 4.0)"
+  echo "Usage: $0 <version> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
   echo "  Build number will be auto-fetched for the specified version"
   exit 1
 }
 
-if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then usage; fi
+if [ "$#" -lt 2 ]; then usage; fi
 
 CBL_VERSION=${1}
 SGW_VERSION=${2}
+shift 2
 
 SETUP_ONLY=false
 DATASET_VERSION="4.0"
+TEST_FILTER=""
 
 # Parse optional arguments
-for arg in "${@:3}"; do
-  case "$arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dataset-version)
+      DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
     --setup-only)
       SETUP_ONLY=true
+      shift
       ;;
     *)
-      DATASET_VERSION="$arg"
+      echo "Unknown argument: $1"
+      usage
       ;;
   esac
 done
@@ -51,7 +64,15 @@ echo "Run tests..."
 
 pushd "${QE_TESTS_DIR}" >/dev/null
 
-uv run pytest -v --no-header -W ignore::DeprecationWarning \
-  --config config.json \
-  --dataset-version "$DATASET_VERSION" \
-  -m cbl
+if [ -n "$TEST_FILTER" ]; then
+  uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl \
+    -k "$TEST_FILTER"
+else
+  uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl
+fi

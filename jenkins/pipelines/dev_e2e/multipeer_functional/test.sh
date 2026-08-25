@@ -7,6 +7,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
 dataset_version="4.0"
+test_filter=""
 setup_args=()
 # Get arguments for pytest, and send the rest to setup_test
 while [[ $# -gt 0 ]]; do
@@ -14,6 +15,8 @@ while [[ $# -gt 0 ]]; do
     --*)
       if [[ "$1" == "--dataset-version" ]]; then
         dataset_version="$2"
+      elif [[ "$1" == "--test-filter" ]]; then
+        test_filter="$2"
       else
         setup_args+=("$1" "$2")
       fi
@@ -52,7 +55,15 @@ echo "========== PYTEST OUTPUT START =========="
 
 pushd "${DEV_E2E_TESTS_DIR}" >/dev/null
 
-if uv run pytest -v --no-header --config config.json --dataset-version=$dataset_version test_multipeer.py; then
+function run_pytest() {
+  if [ -n "$test_filter" ]; then
+    uv run pytest -v --no-header --config config.json --dataset-version="$dataset_version" -k "$test_filter" test_multipeer.py
+  else
+    uv run pytest -v --no-header --config config.json --dataset-version="$dataset_version" test_multipeer.py
+  fi
+}
+
+if run_pytest; then
   echo "========== PYTEST OUTPUT END =========="
   echo ""
   echo "🎉 COORDINATED TEST PASSED!"
