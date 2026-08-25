@@ -15,7 +15,13 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import (
+    ClientError,
+    ClientSession,
+    ClientTimeout,
+    CookieJar,
+    TCPConnector,
+)
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
@@ -25,7 +31,7 @@ from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import assert_not_null, retry_assert
+from cbltest.utils import assert_not_null, basic_auth_headers, retry_assert
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -491,7 +497,8 @@ class RemoteDocument(JSONSerializable):
         self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
-        del self.__body["_rev"]
+        if self.__rev is not None:
+            del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
 
@@ -664,10 +671,11 @@ class _SyncGatewayBase:
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int,
         secure: bool = False,
+        *,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
     ) -> None:
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -678,13 +686,9 @@ class _SyncGatewayBase:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__session: ClientSession = self._create_session(
-            secure,
-            scheme,
-            url,
-            port,
-            encode_basic_auth(username, password, "ascii"),
-        )
+        self._headers: dict[str, str] | None = dict(headers) if headers else None
+        self._cookies: dict[str, str] | None = dict(cookies) if cookies else None
+        self.__session: ClientSession = self._create_session(secure, scheme, url, port, self._headers, self._cookies)
 
     @property
     def hostname(self) -> str:
@@ -706,21 +710,30 @@ class _SyncGatewayBase:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
-        """Create a session, where `auth_header` is an `Authorization` header value
-        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
-        headers = {"Authorization": auth_header} if auth_header is not None else None
+    def _create_session(
+        self,
+        secure: bool,
+        scheme: str,
+        url: str,
+        port: int,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+    ) -> ClientSession:
+        """Create a session that sends `headers` and `cookies` on every request.
+        Pass neither for an anonymous session."""
+        kwargs: dict[str, Any] = {"headers": headers}
+        if cookies:
+            kwargs["cookies"] = cookies
+            # aiohttp's default jar silently drops cookies set by a host addressed by
+            # IP, which is how the AWS environment addresses Sync Gateway.
+            kwargs["cookie_jar"] = CookieJar(unsafe=True)
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            return ClientSession(
-                f"{scheme}{url}:{port}",
-                headers=headers,
-                connector=TCPConnector(ssl=ssl_context),
-            )
-        else:
-            return ClientSession(f"{scheme}{url}:{port}", headers=headers)
+            kwargs["connector"] = TCPConnector(ssl=ssl_context)
+
+        return ClientSession(f"{scheme}{url}:{port}", **kwargs)
 
     async def _send_request(
         self,
@@ -1272,6 +1285,8 @@ class _SyncGatewayBase:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
+        *,
+        rev: str | None = None,
     ) -> RemoteDocument | None:
         """
         Gets a document from Sync Gateway
@@ -1280,6 +1295,7 @@ class _SyncGatewayBase:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :param rev: A specific revision to fetch, instead of the current one
         """
         with self._tracer.start_as_current_span(
             "get_document",
@@ -1290,7 +1306,8 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+            params = {"rev": rev} if rev is not None else None
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}", params=params)
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
@@ -1445,52 +1462,6 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span("get_database_config", attributes={"cbl.database.name": db_name}):
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
-
-    async def get_document_revision_public(
-        self,
-        db_name: str,
-        doc_id: str,
-        revision: str,
-        *,
-        username: str,
-        password: str,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> dict[str, Any]:
-        """
-        Gets a specific revision of a document using the public API with user authentication.
-
-        Args:
-            db_name: The name of the database
-            doc_id: The document ID
-            revision: The specific revision to retrieve
-            username: The username to authenticate as
-            password: The password for the user
-            scope: The scope name (defaults to "_default")
-            collection: The collection name (defaults to "_default")
-
-        Returns:
-            Dictionary containing the document at the specified revision
-
-        Raises:
-            CblSyncGatewayBadResponseError: If the document or revision is not found
-        """
-        _assert_not_null(db_name, "db_name")
-        _assert_not_null(doc_id, "doc_id")
-        _assert_not_null(revision, "revision")
-        _assert_not_null(username, "username")
-        _assert_not_null(password, "password")
-
-        path = (
-            f"/{db_name}/{scope}.{collection}/{doc_id}"
-            if scope != "_default" or collection != "_default"
-            else f"/{db_name}/{doc_id}"
-        )
-        params = {"rev": revision}
-
-        auth_header = encode_basic_auth(username, password, "ascii")
-        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth_header) as session:
-            return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
         self,
@@ -1764,27 +1735,30 @@ class SyncGateway(_SyncGatewayBase):
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int = 4985,
         secure: bool = False,
         public_port: int = 4984,
+        *,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
     ) -> None:
         """
         Initialize a SyncGateway admin client.
 
         :param url: The hostname/URL of the Sync Gateway instance
-        :param username: Admin username
-        :param password: Admin password
         :param port: Admin API port (default 4985)
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
+        :param headers: Headers sent on every request, e.g. ``basic_auth_headers(user, pass)``
+            for RBAC credentials or an ``Authorization: Bearer ...`` token
+        :param cookies: Cookies sent on every request, e.g. a ``SyncGatewaySession`` cookie
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, port, secure, headers=headers, cookies=cookies)
         self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
-            auth=(username, password),
+            headers=self._headers,
+            cookies=self._cookies,
             # disable hostname verification as we do in _create_session
             verify=False,
             timeout=10,
@@ -2047,7 +2021,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, 4984, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, 4984) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
@@ -2186,6 +2160,32 @@ class SyncGateway(_SyncGatewayBase):
             collection_access={"_default": {"_default": {"admin_channels": channels}}},
         )
 
+    def get_user_client(
+        self,
+        *,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
+    ) -> "SyncGatewayUserClient":
+        """
+        Builds a client for this Sync Gateway's public API, authenticating with whatever
+        `headers` and `cookies` are given (e.g. `basic_auth_headers(user, pass)`, a bearer
+        token, or a `SyncGatewaySession` cookie). Unlike `create_user_client`, this does not
+        create or modify the user - it just points a client at the public port.
+
+        The caller owns the returned client and should `close()` it, or use it as an async
+        context manager.
+
+        :param headers: Headers sent on every request
+        :param cookies: Cookies sent on every request
+        """
+        return SyncGatewayUserClient(
+            self.hostname,
+            port=self.__public_port,
+            secure=self.secure,
+            headers=headers,
+            cookies=cookies,
+        )
+
     @asynccontextmanager
     async def create_user_client(
         self,
@@ -2209,13 +2209,7 @@ class SyncGateway(_SyncGatewayBase):
         """
         await self.reset_user(db_name, username, password, channels)
 
-        client = SyncGatewayUserClient(
-            self.hostname,
-            username,
-            password,
-            port=self.__public_port,
-            secure=self.secure,
-        )
+        client = self.get_user_client(headers=basic_auth_headers(username, password))
         try:
             yield client
         finally:
@@ -2439,18 +2433,25 @@ class SyncGatewayUserClient(_SyncGatewayBase):
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int = 4984,
         secure: bool = False,
+        *,
+        headers: dict[str, str] | None = None,
+        cookies: dict[str, str] | None = None,
     ) -> None:
         """
         Initialize a SyncGatewayUserClient for public API access.
 
         :param url: The hostname/URL of the Sync Gateway instance
-        :param username: Username for authentication
-        :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
+        :param headers: Headers sent on every request, e.g. ``basic_auth_headers(user, pass)``
+        :param cookies: Cookies sent on every request, e.g. a ``SyncGatewaySession`` cookie
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, port, secure, headers=headers, cookies=cookies)
+
+    async def __aenter__(self) -> "SyncGatewayUserClient":  # noqa: PYI034 - typing.Self needs 3.11, we target 3.10
+        return self
+
+    async def __aexit__(self, *exc_info: object) -> None:
+        await self.close()

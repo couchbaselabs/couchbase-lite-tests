@@ -9,6 +9,7 @@ from typing import Any, NoReturn, TypeVar, cast
 import tenacity
 import tenacity._utils
 import tenacity.asyncio
+from aiohttp import encode_basic_auth
 
 from .api.error import CblTimeoutError
 
@@ -67,6 +68,12 @@ def _try_n_times(
                 print(f"Trying {function_name} failed (reason='{e}')")
 
     raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
+
+
+def basic_auth_headers(username: str, password: str) -> dict[str, str]:
+    """Build the ``Authorization`` header for HTTP Basic credentials, in the shape the
+    Sync Gateway clients expect for their ``headers`` argument."""
+    return {"Authorization": encode_basic_auth(username, password, "ascii")}
 
 
 def assert_not_null(input: T | None, msg: str) -> T:

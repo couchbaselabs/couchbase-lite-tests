@@ -13,7 +13,11 @@ import pytest
 from _pytest.reports import TestReport
 from cbltest import CBLPyTest
 from cbltest.api import testserver
-from cbltest.api.syncgateway import CouchbaseVersion, SyncGateway, SyncGatewayVersion
+from cbltest.api.syncgateway import (
+    CouchbaseVersion,
+    SyncGateway,
+    SyncGatewayVersion,
+)
 from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
     GreenboardUploader,
@@ -24,6 +28,7 @@ from cbltest.greenboarduploader import (
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
+from cbltest.utils import basic_auth_headers
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
 
@@ -107,7 +112,7 @@ class FakeSyncGateway(SyncGateway):
         mock_response = MagicMock()
         mock_response.json.return_value = {"bootstrap": {"server": "couchbase://localhost"}}
         with patch("cbltest.api.syncgateway.requests.get", return_value=mock_response):
-            super().__init__("localhost", "admin", "password")
+            super().__init__("localhost", headers=basic_auth_headers("admin", "password"))
         self._version_str = version_str
 
     async def get_version(self) -> SyncGatewayVersion:

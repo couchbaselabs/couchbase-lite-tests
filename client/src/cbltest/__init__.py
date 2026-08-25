@@ -19,6 +19,7 @@ from .extrapropsparser import _parse_extra_props
 from .globals import CBLPyTestGlobal
 from .logging import LogLevel, cbl_log_init, cbl_setLogLevel
 from .requests import RequestFactory
+from .utils import basic_auth_headers
 from .version import available_api_version
 
 
@@ -171,10 +172,9 @@ class CBLPyTest:
                 cluster_builder.add_entry(
                     SyncGateway(
                         sgw_info.hostname,
-                        sgw_info.rbac_user,
-                        sgw_info.rbac_password,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
+                        headers=basic_auth_headers(sgw_info.rbac_user, sgw_info.rbac_password),
                     ),
                     sgw_info.cluster_index,
                 )

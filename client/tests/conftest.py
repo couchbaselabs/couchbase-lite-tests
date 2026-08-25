@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from unittest.mock import patch
 
 from cbltest.api import syncgateway
+from cbltest.utils import basic_auth_headers
 
 
 @contextmanager
@@ -14,8 +15,7 @@ def fake_sync_gateways(count: int) -> Iterator[list[syncgateway.SyncGateway]]:
         yield [
             syncgateway.SyncGateway(
                 url="https://example.com",
-                username="user",
-                password="pass",
+                headers=basic_auth_headers("user", "pass"),
             )
             for _ in range(count)
         ]
