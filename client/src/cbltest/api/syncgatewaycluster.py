@@ -79,5 +79,5 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to update
         :param config: The configuration to apply
         """
-        version = await self.random_node.update_database_config(db_name, config)
+        version = await self.random_node._update_database_config(db_name, config)
         await self.wait_for_db_online(db_name, version)

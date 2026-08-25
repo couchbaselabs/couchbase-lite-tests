@@ -77,14 +77,14 @@ async def _setup_database_and_user(
     channels: list,
 ) -> AsyncIterator[SyncGatewayUserClient]:
     """Setup bucket, database, and user."""
-    cluster.couchbase_servers[0].create_bucket(bucket_name, num_replicas=1)
-    await cluster.sync_gateway_cluster.create_database(
+    await cluster.create_database(
         sg_db,
         DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=1),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         ),
+        bucket_replicas=1,
     )
 
     sg = cluster.sync_gateways[0]

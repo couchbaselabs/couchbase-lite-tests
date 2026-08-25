@@ -746,7 +746,7 @@ class TestXattrs(CBLTestClass):
                 cbs.delete_document_xattr(bucket_name, doc_id, "_sync", "_default", "_default")
 
             self.mark_test_step("Restart Sync Gateway to force re-import with updated xattrs")
-            await sg.update_database_config(sg_db, db_payload)
+            await cblpytest.sync_gateway_cluster.update_database_config(sg_db, db_payload)
 
             # Recreate users after database restart
             await sg.reset_user(sg_db, username1, password, [sg_channel1])

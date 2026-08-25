@@ -874,9 +874,13 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
+    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
         """
         Upsert a database configuration on the Sync Gateway instance
+
+        Private: use `SyncGatewayCluster.update_database_config` instead of calling
+        this directly, so that all nodes in the cluster stay in sync and the caller
+        waits for the database to come back online with the new config.
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create

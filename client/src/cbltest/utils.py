@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import subprocess
@@ -56,11 +57,28 @@ def retry_assert(
     stop: tenacity.stop.stop_base,
 ) -> T:
     """Retries function while it raises AssertionError; on exhaustion, re-raises
-    as TimeoutError with elapsed time."""
+    as TimeoutError with elapsed time.
+
+    :raises TypeError: if function is async.  An async callable returns its
+        coroutine without running any assertions, which would look like success on
+        the first attempt and silently skip the retry loop.  Use
+        :func:`async_retry_assert` instead.
+    """
     __tracebackhide__ = True
 
+    def checked_function() -> T:
+        __tracebackhide__ = True
+        result = function()
+        if inspect.isawaitable(result):
+            close = getattr(result, "close", None)
+            if close is not None:
+                close()
+            name = getattr(function, "__name__", repr(function))
+            raise TypeError(f"{name} is async, use async_retry_assert instead of retry_assert")
+        return result
+
     retrying = tenacity.Retrying(**_retry_assert_policy(wait, stop))
-    return retrying(function)
+    return retrying(checked_function)
 
 
 def _try_n_times(

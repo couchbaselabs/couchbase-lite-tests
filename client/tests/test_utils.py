@@ -1,6 +1,6 @@
 import pytest
 import tenacity
-from cbltest.utils import async_retry_assert
+from cbltest.utils import async_retry_assert, retry_assert
 
 
 class TestAsyncRetryAssert:
@@ -65,3 +65,31 @@ class TestAsyncRetryAssert:
             await async_retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
 
         assert calls["n"] == 1
+
+
+class TestRetryAssert:
+    def test_returns_result_once_assertion_passes(self) -> None:
+        calls = {"n": 0}
+
+        def poll() -> str:
+            calls["n"] += 1
+            assert calls["n"] >= 3, f"not ready yet (attempt {calls['n']})"
+            return "ok"
+
+        result = retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
+
+        assert result == "ok"
+        assert calls["n"] == 3
+
+    def test_rejects_async_functions(self) -> None:
+        calls = {"n": 0}
+
+        async def poll() -> None:
+            calls["n"] += 1
+            raise AssertionError("still not ready")
+
+        with pytest.raises(TypeError) as exc_info:
+            retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
+
+        assert "async_retry_assert" in str(exc_info.value)
+        assert calls["n"] == 0

@@ -151,18 +151,19 @@ class CouchbaseCluster:
             await sg.load_dataset(dataset_name, data_filepath)
         await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
 
-    async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
+    async def create_database(self, db_name: str, config: DatabaseConfig, *, bucket_replicas: int = 0) -> None:
         """
         Create the backing bucket and collections for a database, then create the
         database itself on the Sync Gateway cluster.
 
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
+        :param bucket_replicas: The number of replicas for the backing bucket (default 0)
         """
         # buckets and collections are implicitly created when using Rosmar
         if not self.sync_gateways[0].using_rosmar:
             assert config.bucket, "bucket needs to be specified in a database config"
-            bucket_created = self.couchbase_servers[0].create_bucket(config.bucket)
+            bucket_created = self.couchbase_servers[0].create_bucket(config.bucket, num_replicas=bucket_replicas)
             self.create_collections(config)
             # Stale indexes only linger from a previous incarnation of the bucket, so
             # this is only worth waiting on when we just recreated it.
