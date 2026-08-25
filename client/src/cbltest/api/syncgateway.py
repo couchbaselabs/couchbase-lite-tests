@@ -655,6 +655,29 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
+class SessionUserContext(BaseModel):
+    """
+    The ``userCtx`` block of a Sync Gateway public ``_session`` response,
+    describing the authenticated user and its channel access.
+    """
+
+    name: str | None = None
+    channels: dict[str, Any] | None = None
+
+
+class SessionResponse(BaseModel):
+    """
+    Output of the public ``_session`` endpoints of Sync Gateway
+    (GET/POST /{db}/_session).
+    """
+
+    authentication_handlers: list[str] | None = None
+    ok: bool | None = None
+    userCtx: SessionUserContext | None = None
+    # Only present on POST /{db}/_session when a one-time session is requested.
+    one_time_session_id: str | None = None
+
+
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -2461,7 +2484,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         name: str | None = None,
         password: str | None = None,
         one_time: bool | None = None,
-    ) -> dict:
+    ) -> SessionResponse:
         """
         Creates a login session via the public API (POST /{db}/_session).
 
@@ -2487,9 +2510,11 @@ class SyncGatewayUserClient(_SyncGatewayBase):
                 body["password"] = password
 
             params = {"one_time": "true"} if one_time else None
-            return await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body), params=params)
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body), params=params)
+            assert isinstance(resp, dict)
+            return SessionResponse.model_validate(resp)
 
-    async def get_session(self, db_name: str) -> dict:
+    async def get_session(self, db_name: str) -> SessionResponse:
         """
         Gets information about the current user session via the public API
         (GET /{db}/_session).
@@ -2498,7 +2523,9 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :return: The session info (``userCtx``, ``authentication_handlers``, ...)
         """
         with self._tracer.start_as_current_span("get_session", attributes={"sg.database.name": db_name}):
-            return await self._send_request("get", f"/{db_name}/_session")
+            resp = await self._send_request("get", f"/{db_name}/_session")
+            assert isinstance(resp, dict)
+            return SessionResponse.model_validate(resp)
 
     async def delete_session(self, db_name: str) -> None:
         """
