@@ -9,7 +9,7 @@ from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 import aiofiles
 import packaging.version
@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
@@ -405,14 +406,20 @@ class ChangesResponse:
 
     @property
     def last_seq(self) -> str:
-        """Gets the last sequence number"""
+        """
+        Gets the sequence this feed ended on, i.e. the one to resume it from.  This keeps the
+        form Sync Gateway sent, since a compound sequence has to go back out as `since` intact.
+        """
         return self.__last_seq
 
     def __init__(self, input: dict) -> None:
         self.__results: list[ChangesResponseEntry] = []
         for entry in cast(list[dict], input.get("results", [])):
             self.__results.append(ChangesResponseEntry(entry))
-        self.__last_seq = cast(str, input.get("last_seq", "0"))
+
+        last_seq = input.get("last_seq")
+        assert isinstance(last_seq, str), f"Unusable last_seq in changes feed response: {last_seq!r}"
+        self.__last_seq = last_seq
 
 
 class DocumentUpdateEntry(JSONSerializable):
@@ -489,10 +496,11 @@ class RemoteDocument(JSONSerializable):
         return self.__rev
 
     @property
-    def seq(self) -> int | str:
+    def seq(self) -> int:
         """
-        Gets the sequence Sync Gateway assigned to this revision, exactly as the changes feed reported
-        it (see :attr:`ChangesResponseEntry.seq` for why this is not always an int).
+        Gets the sequence Sync Gateway assigned to this revision, as read back from the changes
+        feed.  A compound sequence is reduced to the revision's own sequence by
+        :func:`parse_sequence_id()<cbltest.api.sync_gateway_sequence.parse_sequence_id>`.
 
         :raises CblTestError: if the sequence was never read back from the changes feed (see the
                               `wait_for_caching_feed` argument of :func:`SyncGateway.update_document`)
@@ -505,7 +513,7 @@ class RemoteDocument(JSONSerializable):
 
         return self.__seq
 
-    def __init__(self, body: dict, seq: int | str | None = None) -> None:
+    def __init__(self, body: dict, seq: int | None = None) -> None:
         if "error" in body:
             raise ValueError("Trying to create remote document from error response")
 
@@ -761,8 +769,11 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
+            # Log the query string too, otherwise the log cannot show which variant of an
+            # endpoint was called (e.g. whether a _changes call was request_plus or filtered)
+            logged_path = f"{path}?{urlencode(params)}" if params else path
             writer = get_next_writer()
-            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data)
+            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {logged_path}", data)
             resp = await session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -771,11 +782,13 @@ class _SyncGatewayBase:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(
-                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {logged_path} {resp.status}",
                 data,
             )
             if not resp.ok:
-                raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}: {data}")
+                raise CblSyncGatewayBadResponseError(
+                    resp.status, f"{method} {logged_path} returned {resp.status}: {data}"
+                )
 
             return ret_val
 
@@ -1501,7 +1514,7 @@ class _SyncGatewayBase:
                 f"{expected_revision} could be read back"
             )
 
-            return RemoteDocument(cast_resp, matching[0].seq)
+            return RemoteDocument(cast_resp, parse_sequence_id(matching[0].seq))
 
     async def close(self) -> None:
         """
