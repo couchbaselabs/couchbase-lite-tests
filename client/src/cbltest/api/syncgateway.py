@@ -360,8 +360,12 @@ class ChangesResponseEntry:
     """
 
     @property
-    def seq(self) -> int:
-        """Gets the sequence number"""
+    def seq(self) -> int | str:
+        """
+        Gets the sequence, exactly as Sync Gateway reported it.  Simple sequences arrive as numbers,
+        but compound ones (backfill, or a change triggered by a channel grant) arrive as strings such
+        as "2:5", so this is not always an int.
+        """
         return self.__seq
 
     @property
@@ -380,7 +384,9 @@ class ChangesResponseEntry:
         return self.__deleted
 
     def __init__(self, entry: dict) -> None:
-        self.__seq = entry.get("seq", 0)
+        seq = entry.get("seq")
+        assert isinstance(seq, int | str), f"Unusable sequence in changes feed entry: {seq!r}"
+        self.__seq = seq
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
         changes_list = cast(list[dict], entry.get("changes", []))
@@ -483,22 +489,23 @@ class RemoteDocument(JSONSerializable):
         return self.__rev
 
     @property
-    def seq(self) -> int:
+    def seq(self) -> int | str:
         """
-        Gets the sequence Sync Gateway assigned to this revision.
+        Gets the sequence Sync Gateway assigned to this revision, exactly as the changes feed reported
+        it (see :attr:`ChangesResponseEntry.seq` for why this is not always an int).
 
         :raises CblTestError: if the sequence was never read back from the changes feed (see the
                               `wait_for_caching_feed` argument of :func:`SyncGateway.update_document`)
         """
         if self.__seq is None:
             raise CblTestError(
-                f"No sequence recorded for document {self.__id}; it was not read back from the changes feed "
-                "(pass wait_for_caching_feed=True to the call that returned it)"
+                f"No sequence recorded for document {self.__id}; it was not read back from the changes feed. "
+                "Only SyncGateway.update_document(wait_for_caching_feed=True) populates a sequence."
             )
 
         return self.__seq
 
-    def __init__(self, body: dict, seq: int | None = None) -> None:
+    def __init__(self, body: dict, seq: int | str | None = None) -> None:
         if "error" in body:
             raise ValueError("Trying to create remote document from error response")
 
@@ -1412,7 +1419,9 @@ class _SyncGatewayBase:
         :param wait_for_caching_feed: If True, read the update back from a `request_plus` changes feed filtered to
                                       this document before returning, and populate the returned document's `seq`
                                       from the entry matching the revision just written. This makes `seq` this
-                                      update's own sequence rather than a stale pre-write one (default False)
+                                      update's own sequence rather than a stale pre-write one. Raises if the
+                                      document was superseded by a concurrent write before the feed was read,
+                                      since the feed then reports only that later sequence (default False)
         :return: The updated document as a RemoteDocument object
         """
         with self._tracer.start_as_current_span(
@@ -1459,11 +1468,15 @@ class _SyncGatewayBase:
             if not wait_for_caching_feed:
                 return RemoteDocument(cast_resp)
 
-            # A request_plus feed only guarantees the cache has caught up to the sequence allocated when the
-            # request was made, so match on the revision this call just wrote rather than trusting whichever
-            # entry comes back -- an entry for an older revision would hand back a stale sequence.
+            assert "_rev" in cast_resp or "_cv" in cast_resp, (
+                f"Update of document {doc_id} returned neither a revision ID nor a CV, so its sequence "
+                "cannot be read back from the changes feed"
+            )
             version_type = "rev" if "_rev" in cast_resp else "cv"
-            expected_revision = cast_resp["_rev"] if version_type == "rev" else cast_resp["_cv"]
+            expected_revision = cast(str, cast_resp[f"_{version_type}"])
+
+            # request_plus waits for the cache to catch up to every sequence allocated before this request,
+            # which includes the one the PUT above was given.
             changes = await self.get_changes(
                 db_name,
                 scope,
@@ -1472,16 +1485,23 @@ class _SyncGatewayBase:
                 doc_ids=[doc_id],
                 request_plus=True,
             )
-            for entry in changes.results:
-                if entry.id == doc_id and expected_revision in entry.changes:
-                    return RemoteDocument(cast_resp, entry.seq)
-
-            feed = [{"id": e.id, "seq": e.seq, "changes": e.changes, "deleted": e.deleted} for e in changes.results]
-            raise CblSyncGatewayBadResponseError(
-                500,
-                f"Changes feed has no entry for {doc_id} at revision {expected_revision} even after a "
-                f"request_plus feed (last_seq={changes.last_seq}, results={dumps(feed)})",
+            entries = [e for e in changes.results if e.id == doc_id]
+            assert entries, (
+                f"Changes feed has no entry for {doc_id} even after a request_plus feed "
+                f"(last_seq={changes.last_seq}, results="
+                f"{dumps([{'id': e.id, 'seq': e.seq, 'changes': e.changes, 'deleted': e.deleted} for e in changes.results])})"
             )
+
+            # The feed carries only the document's current revision, so no match means a concurrent write
+            # superseded this one and the sequence on offer is that write's, not ours.
+            matching = [e for e in entries if expected_revision in e.changes]
+            assert matching, (
+                f"Document {doc_id} was superseded by {[e.changes for e in entries]} "
+                f"(seq {[e.seq for e in entries]}) before the sequence assigned to revision "
+                f"{expected_revision} could be read back"
+            )
+
+            return RemoteDocument(cast_resp, matching[0].seq)
 
     async def close(self) -> None:
         """
