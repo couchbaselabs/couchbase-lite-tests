@@ -2530,15 +2530,9 @@ class SyncGatewayUserClient(_SyncGatewayBase):
     async def delete_session(self, db_name: str) -> None:
         """
         Deletes (logs out) the current user session via the public API
-        (DELETE /{db}/_session).  A 404 (no active session) is treated as success.
+        (DELETE /{db}/_session).
 
         :param db_name: The name of the database to delete the session against
         """
         with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
-            try:
-                await self._send_request("delete", f"/{db_name}/_session")
-            except CblSyncGatewayBadResponseError as e:
-                if e.code == 404:
-                    pass
-                else:
-                    raise
+            await self._send_request("delete", f"/{db_name}/_session")
