@@ -2476,33 +2476,20 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         """
         super().__init__(url, username, password, port, secure)
 
-    async def create_session(
-        self,
-        db_name: str,
-        name: str | None = None,
-        password: str | None = None,
-    ) -> SessionResponse:
+    async def create_session(self, db_name: str) -> SessionResponse:
         """
-        Creates a login session via the public API (POST /{db}/_session).
+        Creates a login session for the authenticated user via the public API
+        (POST /{db}/_session).
 
-        If ``name`` and ``password`` are provided, the session is created for that user.
-        Otherwise the session is created for the currently authenticated user.  On success
-        a session cookie is stored on the client for future API calls.
+        The session is created for the user whose credentials this client authenticates
+        with, so the returned session token matches that user.  On success a session
+        cookie is stored on the client for future API calls.
 
         :param db_name: The name of the database to create the session against
-        :param name: Optional username to create the session for.  Omit to create a
-            session for the authenticated user making the request.
-        :param password: Optional password for ``name``.  Omit to use the authenticated user.
         :return: The session response (``userCtx``, ``authentication_handlers``, ...)
         """
         with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
-            body: dict[str, Any] = {}
-            if name is not None:
-                body["name"] = name
-            if password is not None:
-                body["password"] = password
-
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({}))
             assert isinstance(resp, dict)
             return SessionResponse.model_validate(resp)
 
