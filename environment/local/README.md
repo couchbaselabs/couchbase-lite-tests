@@ -67,6 +67,44 @@ manage it directly, use `cbdinocluster`
 (`go run github.com/couchbaselabs/cbdinocluster@latest rm <cluster-id>`) — `start_local.py` has
 no `--stop-cbs` equivalent to `--stop-sync-gateway`.
 
+## Multiple Sync Gateway instances
+
+`--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests
+marked `min_sync_gateways(N)`:
+
+```bash
+uv run environment/local/start_local.py --server cbs --connstr couchbase://127.0.0.1 --sync-gateways 2
+```
+
+Instances are numbered from 1. Instance N binds to Sync Gateway's default ports shifted by
+`(N-1)*10`, so instance 1 stays on 4984/4985/4986 and instance 2 lands on 4994/4995/4996. Every
+file belonging to an instance is named `sync_gateway_instanceN` — its generated config
+(gitignored) and its log:
+
+| Instance | Public / admin / metrics | Config | Log |
+|----------|--------------------------|--------|-----|
+| 1 | 4984 / 4985 / 4986 | `sync_gateway_config/sync_gateway_instance1_*.json` | `sync_gateway_instance1.log` |
+| 2 | 4994 / 4995 / 4996 | `sync_gateway_config/sync_gateway_instance2_*.json` | `sync_gateway_instance2.log` |
+| 3 | 5004 / 5005 / 5006 | `sync_gateway_config/sync_gateway_instance3_*.json` | `sync_gateway_instance3.log` |
+
+The generated topology config lists every instance with its ports, so the test framework can see
+them all.
+
+Starting Sync Gateway wipes the previous run's logs and generated configs first, so nothing is
+left over from a run that used more instances than the current one — a stale
+`sync_gateway_instance3.log` next to a two-instance run would just be something to misread.
+
+`N > 1` requires `--server cbs`: rosmar keeps its bucket in the process's own memory, so
+separate instances would share no data.
+
+`--stop-sync-gateway` stops every instance started from this checkout — matched on the executable
+path, so a system-installed Sync Gateway or one run from another checkout is left alone — and waits
+for each to release its ports before returning.
+
+`--skip-sync-gateway-start` describes whatever is already listening rather than whatever
+`--sync-gateways` says, since a run that starts nothing cannot know how many are up. Passing
+`--sync-gateways` alongside it is an error unless the two agree.
+
 ## Running the individual steps
 
 `build_sync_gateway.py` and `run_sync_gateway.py` have been folded into `start_local.py`.
@@ -83,7 +121,8 @@ To stop the background Sync Gateway process independently:
 uv run environment/local/start_local.py --stop-sync-gateway
 ```
 
-- **Logs:** Written to `environment/local/sync_gateway.log`.
+- **Logs:** Written to `environment/local/sync_gateway_instanceN.log`, one per instance
+  (`sync_gateway_instance1.log` for a single-instance run). Wiped at the start of each run.
 - **Configuration:**
   - `--server rosmar`: uses `environment/local/sync_gateway_config/basic_sync_gateway_rosmar.json`
   - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json` (with `bootstrap.server` overridden by `--connstr`/`--start-cbs`, if given)

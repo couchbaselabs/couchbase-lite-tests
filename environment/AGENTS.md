@@ -209,8 +209,11 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
   cd tests/dev_e2e
   uv run pytest --config "$(cat ../../environment/local/topology_config)"
   ```
+- `--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests marked `min_sync_gateways(N)`. Instances are numbered from 1: instance N binds to Sync Gateway's default ports shifted by `(N-1)*10` (instance 2 is 4994/4995/4996), and every file belonging to it shares the stem `sync_gateway_instanceN` — its config (`sync_gateway_instanceN_*.json`) and its log (`sync_gateway_instanceN.log`). All instances are listed in the generated topology config. Requires `--server cbs` when N > 1 — each rosmar instance keeps its bucket in its own process memory, so the instances would share no data.
+- Each start wipes the previous run's Sync Gateway logs and regenerates its configs and topology config from scratch, so a run with fewer instances than the last leaves no surplus files behind to misread.
 - `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
-- `--stop-sync-gateway` stops the background Sync Gateway process. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
+- `--stop-sync-gateway` stops every background Sync Gateway process started from this checkout (matched on executable path, so other copies are spared) and waits for their ports to free before returning; a process it is not allowed to signal is reported rather than passed over silently.
+- `--skip-sync-gateway-start` derives the topology's instance count by probing admin ports, not from `--sync-gateways` — a run that starts nothing cannot know how many are up. Combining it with an explicit `--sync-gateways` that disagrees is a usage error. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 
 ## Prerequisites (AWS)
