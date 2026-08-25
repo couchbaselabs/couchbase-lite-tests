@@ -27,23 +27,23 @@ The test adapts its behavior based on `SGW_UPGRADE_PHASE` environment variable:
 Setup phase with all 3 nodes on the same version.
 
 **Steps**:
-1. Create bucket `rolling_upg_bucket` on CBS
-2. Reset CBL database `rolling_upg_cbl`
-3. Configure SGW database on all 3 nodes with:
+1. Reset CBL database `rolling_upg_cbl`
+2. Create SGW database `rolling_upg_db` on the cluster, which also creates the backing
+   bucket `rolling_upg_bucket` and its scopes/collections on CBS, with:
    - `revs_limit: 1000`
    - `enable_shared_bucket_access: true`
    - `delta_sync: enabled`
    - Sync function: `channel("upgrade")`
-4. Create user `user1` on all 3 nodes with full `_default._default` access
-5. Ingest 30 documents (10 per node) via SGW admin API:
+3. Create user `user1` on all 3 nodes with full `_default._default` access
+4. Ingest 30 documents (10 per node) via SGW admin API:
    - `type: rolling_upgrade_doc`
    - `created_by_node: N` (0, 1, or 2)
    - `version: <current_version>`
    - `content: "Initial doc created via node N"`
-6. Start continuous push-pull replicator from node 0
-7. Wait for replicator to IDLE with no errors
-8. **Verify all 30 docs replicated to CBL**
-9. **Verify revision consistency across all 3 nodes** (all revision IDs match)
+5. Start continuous push-pull replicator from node 0
+6. Wait for replicator to IDLE with no errors
+7. **Verify all 30 docs replicated to CBL**
+8. **Verify revision consistency across all 3 nodes** (all revision IDs match)
 
 **Expected outcome**: All documents synced, cluster consistent, ready for rolling upgrade.
 
@@ -57,9 +57,12 @@ Upgrade phase after node N has been upgraded to the new version, while other nod
 - `SGW_VERSION_UNDER_TEST`: New version (node N is running this)
 - `SGW_PREVIOUS_VERSION`: Old version (other nodes running this)
 
+The bucket and SGW database created in the `initial` phase are inherited, not recreated,
+and cluster cleanup is skipped so that documents from earlier phases survive.
+
 **Steps**:
 
-1. **Wait for upgraded node online**: Call `wait_for_db_up(sg_db)` on the upgraded node N
+1. **Wait for the database online on the cluster**: Call `wait_for_db_online(sg_db)`
 2. **Cross-version read verification**:
    - Get all documents from upgraded node N (new version) → verify count > 0
    - Get all documents from each old-version node → verify same count

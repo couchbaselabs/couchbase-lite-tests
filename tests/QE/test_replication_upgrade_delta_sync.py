@@ -70,7 +70,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         payload = _DELTA_SYNC_UPGRADE_CONFIG
 
-        self.mark_test_step("Create SG 'upgrade' database with delta_sync enabled and import from bucket")
+        self.mark_test_step("Update the SG 'upgrade' database config to enable delta_sync")
         await cblpytest.sync_gateway_cluster.update_database_config("upgrade", payload)
 
         self.mark_test_step("Verify delta_sync is actually enabled on SGW 'upgrade' database")

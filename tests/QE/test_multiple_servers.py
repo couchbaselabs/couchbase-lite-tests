@@ -315,7 +315,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
 
-        self.mark_test_step("Clean up and setup test environment")
+        self.mark_test_step("Set alternate addresses on all CBS nodes")
         _set_alternate_addresses(cblpytest.couchbase_servers)
 
         self.mark_test_step("Create collections in _default scope for each bucket")
