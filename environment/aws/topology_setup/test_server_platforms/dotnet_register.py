@@ -120,9 +120,12 @@ class DotnetTestServer(TestServer):
         Build the .NET test server.
         """
         dotnet, env = _dotnet_env()
-        version_parts = self.version.split("-")
-        build = version_parts[1]
-        cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
+        build_number = self.build_number
+        cbl_version = (
+            self.version
+            if build_number is None
+            else f"{self.bare_version}-b{build_number.zfill(4)}"
+        )
         csproj_path = (
             DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
         )
@@ -193,9 +196,12 @@ class DotnetTestServerCli(TestServer):
         Build the .NET CLI test server.
         """
         dotnet, env = _dotnet_env()
-        version_parts = self.version.split("-")
-        build = version_parts[1]
-        cbl_version = f"{version_parts[0]}-b{build.zfill(4)}"
+        build_number = self.build_number
+        cbl_version = (
+            self.version
+            if build_number is None
+            else f"{self.bare_version}-b{build_number.zfill(4)}"
+        )
         csproj_path = (
             DOTNET_TEST_SERVER_DIR / "testserver.logic" / "testserver.logic.csproj"
         )
@@ -294,10 +300,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
-        )
+        return self.artifact_path("testserver_ios.zip")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -403,8 +406,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return self.artifact_path("testserver_android.apk")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -504,8 +506,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return self.artifact_path("testserver_windows.zip")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -612,10 +613,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return (
-            f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
-        )
+        return self.artifact_path("testserver_macos.zip")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
