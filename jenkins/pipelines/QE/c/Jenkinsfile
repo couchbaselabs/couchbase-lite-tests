@@ -4,6 +4,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '4', description: 'The version of Sync Gateway to download')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild test servers (only for the checked platforms). Uncheck to skip prebuild entirely and reuse existing artifacts.')
         booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS tests')
         booleanParam(name: 'RUN_IOS',     defaultValue: true, description: 'Run iOS tests')
@@ -68,7 +69,7 @@ pipeline {
                     steps {
                         echo "=== Run C macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C macOS Tests Complete"
                     }
@@ -106,7 +107,7 @@ pipeline {
                         }
                         echo "=== Run C iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C iOS Tests Complete"
                     }
@@ -144,7 +145,7 @@ pipeline {
                     steps {
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Android Tests Complete"
                     }
@@ -174,7 +175,7 @@ pipeline {
                     steps {
                         echo "=== Run C Linux Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Linux Tests Complete"
                     }
@@ -204,7 +205,7 @@ pipeline {
                     steps {
                         echo "=== Run C Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Windows Tests Complete"
                     }
