@@ -52,7 +52,6 @@ class JavaBridge(PlatformBridge):
         if platform.system() != "Linux":
             return
 
-        version_parts = cbl_version.split("-")
         supportlib_dir = JAK_TEST_SERVER_DIR / variant / "supportlib"
         supportlib_dir.mkdir(0o755, exist_ok=True)
 
@@ -62,7 +61,11 @@ class JavaBridge(PlatformBridge):
             )
             return
 
-        download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version_parts[0]}/{version_parts[1]}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
+        if "-" in cbl_version:
+            version, build = cbl_version.split("-", 1)
+            download_url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-lite-java/{version}/{build}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
+        else:
+            download_url = f"https://packages.couchbase.com/releases/couchbase-lite-java/{cbl_version}/couchbase-lite-java-linux-supportlibs-{cbl_version}.zip"
         try:
             click.echo(f"Downloading support libraries from {download_url}")
             response = requests.get(download_url, stream=True)
@@ -305,8 +308,7 @@ class JAKTestServer_Android(JAKTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return self.artifact_path("testserver_android.apk")
 
     def create_bridge(self, **kwargs) -> PlatformBridge:
         """
@@ -399,8 +401,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/CBLTestServer-Java-{self.__jar_name}.jar"
+        return self.artifact_path(f"CBLTestServer-Java-{self.__jar_name}.jar")
 
     def compress_package(self):
         """

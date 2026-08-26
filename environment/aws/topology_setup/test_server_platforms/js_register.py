@@ -145,20 +145,22 @@ class JavascriptTestServer(TestServer):
 
     @property
     def latestbuilds_path(self) -> str:
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver.zip"
+        return self.artifact_path("testserver.zip")
 
     def build(self) -> None:
         header(f"Installing CBL JS and dependencies for version {self.version}")
         click.echo("Installing CBL")
-        subprocess.run(
-            [
-                "bun",
-                "install",
-                f"@couchbase/lite-js@{self.version}",
+        install_args = ["bun", "install", f"@couchbase/lite-js@{self.version}"]
+        if not self.is_release:
+            # Prerelease builds only exist on the internal proget npm feed; release
+            # versions are published to the default (public) npm registry.
+            install_args += [
                 "--registry",
                 "https://proget.sc.couchbase.com/npm/cbl-npm/",
-            ],
+            ]
+
+        subprocess.run(
+            install_args,
             check=True,
             cwd=JS_TEST_SERVER_DIR,
         )
