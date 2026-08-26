@@ -10,9 +10,7 @@ from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import SyncGateway
 
 
-def prepare_es_replication_for_sgw(
-    config: dict[str, Any], sync_gateway: SyncGateway, db_name: str
-) -> dict[str, Any]:
+def prepare_es_replication_for_sgw(config: dict[str, Any], sync_gateway: SyncGateway, db_name: str) -> dict[str, Any]:
     """Point ES at SG using the live URL and drop pinned_cert when SG is HTTP."""
     replications = config.setdefault("replications", [{}])
     if not replications:
@@ -72,7 +70,6 @@ def js_edge_replicator_url(edge_server: EdgeServer, db_name: str) -> str:
     url = edge_server.replication_url(db_name)
     if not url.startswith("ws://"):
         raise AssertionError(
-            f"JS CBL requires ws:// Edge Server URL, got {url}. "
-            "Remove the https block from the local ES config."
+            f"JS CBL requires ws:// Edge Server URL, got {url}. Remove the https block from the local ES config."
         )
     return url

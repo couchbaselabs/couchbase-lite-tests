@@ -13,16 +13,12 @@ from es_ws import assert_http_only_es_config, js_edge_replicator_url
 @pytest.mark.min_edge_servers(1)
 class TestEdgeServerCbl(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_js_push_to_edge_server_over_ws(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_js_push_to_edge_server_over_ws(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         config_path = EdgeServerInfo(cblpytest.config.edge_servers[0]).config_path
         assert_http_only_es_config(config_path)
 
         self.mark_test_step("Start HTTP Edge Server with an empty `db`")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name="db", config_file=config_path
-        )
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="db", config_file=config_path)
         target = js_edge_replicator_url(edge_server, "db")
 
         self.mark_test_step("Reset local database")
@@ -54,8 +50,6 @@ class TestEdgeServerCbl(CBLTestClass):
         self.mark_test_step("Verify documents on Edge Server REST")
         remote = await edge_server.get_all_documents("db")
         remote_ids = {row.id for row in remote.rows}
-        assert {"es_ws_1", "es_ws_2", "es_ws_3"} <= remote_ids, (
-            f"Missing pushed docs on ES: {sorted(remote_ids)}"
-        )
+        assert {"es_ws_1", "es_ws_2", "es_ws_3"} <= remote_ids, f"Missing pushed docs on ES: {sorted(remote_ids)}"
 
         await cblpytest.test_servers[0].cleanup()

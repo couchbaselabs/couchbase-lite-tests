@@ -1,7 +1,7 @@
 """Run existing SG-targeted e2e tests against Edge Server as the remote.
 
-`--cbl-remote=es` replaces `cblpytest.sync_gateways[0]` with this adapter and
-points `CouchbaseCloud.configure_dataset` at an HTTP Edge Server database
+`--cbl-remote=es` replaces the first cluster's Sync Gateway with this adapter
+and points `CouchbaseCluster.configure_dataset` at an HTTP Edge Server database
 loaded from the same `{name}-sg.json` files used for Sync Gateway.
 """
 
@@ -14,11 +14,12 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-from cbltest.api.cloud import CouchbaseCloud
+from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.edgeserver import BulkDocOperation, EdgeServer
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import AllDocumentsResponse, DocumentUpdateEntry, RemoteDocument
 from cbltest.asyncfile import write_json_file
+from cbltest.plugins import cluster_cleanup as cluster_cleanup_mod
 from es_ws import js_edge_replicator_url
 
 # Tests that need SG sync functions, users/roles, or CBS N1QL.
@@ -73,7 +74,7 @@ class EsRemote:
     secure = False
     port = 59840
 
-    def __init__(self, edge: EdgeServer, dataset_path: Path):
+    def __init__(self, edge: EdgeServer, dataset_path: Path) -> None:
         self._edge = edge
         self._dataset_path = dataset_path
         self._original_sync_gateways: list[Any] = []
@@ -96,7 +97,7 @@ class EsRemote:
         scope: str = "_default",
         collection: str = "_default",
         include_docs: bool = False,
-    ):
+    ) -> AllDocumentsResponse:
         return await self._edge.get_all_documents(
             db_name,
             scope=scope,
@@ -110,10 +111,8 @@ class EsRemote:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-    ):
-        return await self._edge.get_document(
-            db_name, doc_id, scope=scope, collection=collection
-        )
+    ) -> RemoteDocument | None:
+        return await self._edge.get_document(db_name, doc_id, scope=scope, collection=collection)
 
     async def update_documents(
         self,
@@ -163,6 +162,13 @@ class EsRemote:
     async def add_role(self, *args: Any, **kwargs: Any) -> None:
         """ES has no SG roles."""
 
+    async def get_all_databases_verbose(self) -> dict[str, Any]:
+        """Cleanup walks SG databases; ES is reset in configure_dataset instead."""
+        return {}
+
+    async def delete_database(self, db_name: str) -> None:
+        del db_name
+
     def create_collection_access_dict(self, input_data: dict[str, list[str]]) -> dict:
         return input_data
 
@@ -206,15 +212,11 @@ class EsRemote:
                 "file": {"dir": "/home/ec2-user/log", "format": "text"},
             },
         }
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", suffix=".json", delete=False
-        ) as handle:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".json", delete=False) as handle:
             runtime_config = Path(handle.name)
         await write_json_file(str(runtime_config), es_config)
 
-        await self._edge.configure_dataset(
-            db_name=dataset_name, config_file=str(runtime_config)
-        )
+        await self._edge.configure_dataset(db_name=dataset_name, config_file=str(runtime_config))
         await _wait_for_es(self._edge)
 
         if data_filepath.exists() and data_filepath.stat().st_size > 0:
@@ -228,9 +230,7 @@ class EsRemote:
         async def flush() -> None:
             if not collected:
                 return
-            await self._edge.bulk_doc_op(
-                collected, db_name, scope=last_scope, collection=last_coll
-            )
+            await self._edge.bulk_doc_op(collected, db_name, scope=last_scope, collection=last_coll)
             collected.clear()
 
         async with aiofiles.open(path, encoding="utf-8") as handle:
@@ -241,11 +241,7 @@ class EsRemote:
                 doc = json.loads(line)
                 scope = str(doc.pop("scope", "_default"))
                 collection = str(doc.pop("collection", "_default"))
-                if (
-                    scope != last_scope
-                    or collection != last_coll
-                    or len(collected) >= 200
-                ) and collected:
+                if (scope != last_scope or collection != last_coll or len(collected) >= 200) and collected:
                     await flush()
                 last_scope = scope
                 last_coll = collection
@@ -267,21 +263,32 @@ async def _wait_for_es(edge: EdgeServer, timeout: float = 30) -> None:
 
 def install_es_remote(cblpytest: Any, dataset_path: Path) -> EsRemote:
     if not cblpytest.edge_servers:
-        raise RuntimeError(
-            "--cbl-remote=es requires an edge-servers entry in the test config"
-        )
+        raise RuntimeError("--cbl-remote=es requires an edge-servers entry in the test config")
+    if not cblpytest.clusters:
+        raise RuntimeError("--cbl-remote=es requires a cluster in the test config")
     remote = EsRemote(cblpytest.edge_servers[0], dataset_path)
-    remote._original_sync_gateways = list(cblpytest.sync_gateways)
-    cblpytest.sync_gateways[:] = [remote]
+    cluster = cblpytest.clusters[0]
+    sgs = cluster.sync_gateway_cluster.sync_gateways
+    remote._original_sync_gateways = list(sgs)
+    if not isinstance(sgs, list):
+        raise TypeError("Expected a mutable Sync Gateway list on the cluster")
+    sgs[:] = [remote]
 
     async def _configure(
-        self: CouchbaseCloud,
-        path: Path,
+        self: CouchbaseCluster,
+        dataset_path: Path,
         dataset_name: str,
         sg_config_options: list[str] | None = None,
     ) -> None:
         del self
-        await remote.configure_dataset(path, dataset_name, sg_config_options)
+        await remote.configure_dataset(dataset_path, dataset_name, sg_config_options)
 
-    CouchbaseCloud.configure_dataset = _configure  # type: ignore[method-assign]
+    CouchbaseCluster.configure_dataset = _configure  # type: ignore[invalid-assignment]
+
+    async def _skip_cleanup(_cblpytest: Any) -> None:
+        # configure_dataset is patched and does not recreate CBS buckets; dropping
+        # them here would wedge Sync Gateway's GSI indexer for later SG runs.
+        return
+
+    cluster_cleanup_mod.perform_cleanup = _skip_cleanup  # type: ignore[invalid-assignment]
     return remote

@@ -84,12 +84,8 @@ class TestQueryConsistency(CBLTestClass):
         edge = getattr(remote, "_edge", None)
         if edge is not None:
             # ES SQL++ matches CBL. POST to a collection keyspace in `travel`.
-            return await edge.adhoc_query(
-                "travel", "travel", collection, query=cbl_query
-            )
-        return cblpytest.couchbase_servers[0].run_query(
-            cbs_query, "travel", "travel", collection
-        )
+            return await edge.adhoc_query("travel", "travel", collection, query=cbl_query)
+        return cblpytest.couchbase_servers[0].run_query(cbs_query, "travel", "travel", collection)
 
     async def _test_query(
         self,
@@ -106,9 +102,7 @@ class TestQueryConsistency(CBLTestClass):
         local_results = await TestQueryConsistency.__database.run_query(query_for_logging)
 
         self.mark_test_step(f"Run '{query_for_logging}' on remote")
-        remote_results = await self._query_remote(
-            cblpytest, query_for_logging, query, collection
-        )
+        remote_results = await self._query_remote(cblpytest, query_for_logging, query, collection)
 
         self.mark_test_step("Check that the results are equivalent")
         if sort is not None:
@@ -131,9 +125,7 @@ class TestQueryConsistency(CBLTestClass):
         # If running this test standalone, you may need to CREATE PRIMARY INDEX
         # on both the airlines and routes collections.
         self.mark_test_step(f"Run '{server_query}' on remote")
-        remote_results = await self._query_remote(
-            cblpytest, query, server_query, "airlines"
-        )
+        remote_results = await self._query_remote(cblpytest, query, server_query, "airlines")
 
         assert json_equivalent(local_results, remote_results)
 

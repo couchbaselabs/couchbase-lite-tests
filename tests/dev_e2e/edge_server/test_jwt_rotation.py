@@ -123,9 +123,7 @@ class TestJWTReplication(CBLTestClass):
                         f'"scope":"travel","collection":"{collection}",'
                         f'"type":"{collection}","name":"JWT {collection} {i}"}}\n'
                     )
-            with tempfile.NamedTemporaryFile(
-                "w", encoding="utf-8", suffix=".jsonl", delete=False
-            ) as seed:
+            with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".jsonl", delete=False) as seed:
                 seed.write("".join(lines))
                 seed_path = Path(seed.name)
             await sgw.load_dataset("travel", seed_path)

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
 from cbltest.utils import verify_lfs_checkout
 from es_remote import ES_SKIP_FILES, ES_SKIP_TEST_NAMES, install_es_remote
 
@@ -31,16 +32,12 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-def pytest_collection_modifyitems(
-    config: pytest.Config, items: list[pytest.Item]
-) -> None:
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if config.getoption("--cbl-remote") != "es":
         return
     if config.getoption("--investigate-es-hangs"):
         return
-    skip = pytest.mark.skip(
-        reason="Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
-    )
+    skip = pytest.mark.skip(reason="Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es")
     for item in items:
         path = Path(str(item.path))
         if (
@@ -54,9 +51,9 @@ def pytest_collection_modifyitems(
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _install_es_remote_if_requested(
     request: pytest.FixtureRequest,
-    cblpytest,
+    cblpytest: CBLPyTest,
     dataset_path: Path,
-):
+) -> None:
     if request.config.getoption("--cbl-remote") != "es":
         return
     install_es_remote(cblpytest, dataset_path)
