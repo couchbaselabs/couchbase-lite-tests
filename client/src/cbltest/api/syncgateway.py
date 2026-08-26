@@ -713,12 +713,19 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
+        public_port: int | None = None,
     ) -> None:
+        """
+        :param port: The port this client sends its own requests to.
+        :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
+            correct for a client that already talks to the public API; an admin client must pass it,
+            since its own `port` is the admin one.
+        """
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
-        # Replication always uses public port 4984
-        self.__replication_url = f"{ws_scheme}{url}:4984"
+        self.__public_port: int = public_port if public_port is not None else port
+        self.__replication_url = f"{ws_scheme}{url}:{self.__public_port}"
         self._tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
@@ -740,6 +747,11 @@ class _SyncGatewayBase:
     def port(self) -> int:
         """Gets the HTTP API port of the Sync Gateway instance"""
         return self.__port
+
+    @property
+    def public_port(self) -> int:
+        """Gets the public REST/replication port of the Sync Gateway instance"""
+        return self.__public_port
 
     @property
     def secure(self) -> bool:
@@ -1646,7 +1658,9 @@ class _SyncGatewayBase:
         params = {"rev": revision}
 
         auth_header = encode_basic_auth(username, password, "ascii")
-        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth_header) as session:
+        async with self._create_session(
+            self.secure, self.scheme, self.hostname, self.public_port, auth_header
+        ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
@@ -1937,8 +1951,7 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure)
-        self.__public_port = public_port
+        super().__init__(url, username, password, port, secure, public_port)
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2220,11 +2233,11 @@ class SyncGateway(_SyncGatewayBase):
         :param config_name: Name of the config file (without .json extension).
         :raises Exception: If the start fails
         """
-        # Check if SGW is already running by probing the public endpoint (4984)
+        # Check if SGW is already running by probing its public endpoint
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, 4984, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
@@ -2361,7 +2374,7 @@ class SyncGateway(_SyncGatewayBase):
             self.hostname,
             username,
             password,
-            port=self.__public_port,
+            port=self.public_port,
             secure=self.secure,
         )
         try:
