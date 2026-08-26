@@ -9,7 +9,7 @@ from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from typing import Any, cast
-from urllib.parse import urljoin
+from urllib.parse import urlencode, urljoin
 
 import aiofiles
 import packaging.version
@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
@@ -360,8 +361,12 @@ class ChangesResponseEntry:
     """
 
     @property
-    def seq(self) -> int:
-        """Gets the sequence number"""
+    def seq(self) -> int | str:
+        """
+        Gets the sequence, exactly as Sync Gateway reported it.  Simple sequences arrive as numbers,
+        but compound ones (backfill, or a change triggered by a channel grant) arrive as strings such
+        as "2:5", so this is not always an int.
+        """
         return self.__seq
 
     @property
@@ -380,7 +385,9 @@ class ChangesResponseEntry:
         return self.__deleted
 
     def __init__(self, entry: dict) -> None:
-        self.__seq = entry.get("seq", 0)
+        seq = entry.get("seq")
+        assert isinstance(seq, int | str), f"Unusable sequence in changes feed entry: {seq!r}"
+        self.__seq = seq
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
         changes_list = cast(list[dict], entry.get("changes", []))
@@ -399,14 +406,20 @@ class ChangesResponse:
 
     @property
     def last_seq(self) -> str:
-        """Gets the last sequence number"""
+        """
+        Gets the sequence this feed ended on, i.e. the one to resume it from.  This keeps the
+        form Sync Gateway sent, since a compound sequence has to go back out as `since` intact.
+        """
         return self.__last_seq
 
     def __init__(self, input: dict) -> None:
         self.__results: list[ChangesResponseEntry] = []
         for entry in cast(list[dict], input.get("results", [])):
             self.__results.append(ChangesResponseEntry(entry))
-        self.__last_seq = cast(str, input.get("last_seq", "0"))
+
+        last_seq = input.get("last_seq")
+        assert isinstance(last_seq, str), f"Unusable last_seq in changes feed response: {last_seq!r}"
+        self.__last_seq = last_seq
 
 
 class DocumentUpdateEntry(JSONSerializable):
@@ -482,16 +495,36 @@ class RemoteDocument(JSONSerializable):
         assert self.__rev is not None
         return self.__rev
 
-    def __init__(self, body: dict) -> None:
+    @property
+    def seq(self) -> int:
+        """
+        Gets the sequence Sync Gateway assigned to this revision, as read back from the changes
+        feed.  A compound sequence is reduced to the revision's own sequence by
+        :func:`parse_sequence_id()<cbltest.api.sync_gateway_sequence.parse_sequence_id>`.
+
+        :raises CblTestError: if the sequence was never read back from the changes feed (see the
+                              `wait_for_caching_feed` argument of :func:`SyncGateway.update_document`)
+        """
+        if self.__seq is None:
+            raise CblTestError(
+                f"No sequence recorded for document {self.__id}; it was not read back from the changes feed. "
+                "Only SyncGateway.update_document(wait_for_caching_feed=True) populates a sequence."
+            )
+
+        return self.__seq
+
+    def __init__(self, body: dict, seq: int | None = None) -> None:
         if "error" in body:
             raise ValueError("Trying to create remote document from error response")
 
+        self.__seq = seq
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
-        del self.__body["_rev"]
+        if self.__rev is not None:
+            del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
 
@@ -763,8 +796,11 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
+            # Log the query string too, otherwise the log cannot show which variant of an
+            # endpoint was called (e.g. whether a _changes call was request_plus or filtered)
+            logged_path = f"{path}?{urlencode(params)}" if params else path
             writer = get_next_writer()
-            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data)
+            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {logged_path}", data)
             resp = await session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -773,11 +809,13 @@ class _SyncGatewayBase:
                 data = await resp.text()
                 ret_val = data
             writer.write_end(
-                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {logged_path} {resp.status}",
                 data,
             )
             if not resp.ok:
-                raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}: {data}")
+                raise CblSyncGatewayBadResponseError(
+                    resp.status, f"{method} {logged_path} returned {resp.status}: {data}"
+                )
 
             return ret_val, resp.headers
 
@@ -1106,6 +1144,8 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         version_type: str = "rev",
+        doc_ids: list[str] | None = None,
+        request_plus: bool = False,
     ) -> ChangesResponse:
         """
         Gets the changes feed from Sync Gateway, including deleted documents
@@ -1114,6 +1154,9 @@ class _SyncGatewayBase:
         :param scope: The scope to use when querying Sync Gateway
         :param collection: The collection to use when querying Sync Gateway
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version vectors in SGW 4.0+)
+        :param doc_ids: If provided, restrict the feed to these document IDs via the `_doc_ids` filter
+        :param request_plus: If True, wait for the channel cache to catch up to the latest sequence allocated
+                             at the time of the request instead of serving whatever is already cached
         """
         with self._tracer.start_as_current_span(
             "get_changes",
@@ -1123,8 +1166,14 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            query_params = f"version_type={version_type}"
-            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_changes?{query_params}")
+            query_params = {"version_type": version_type}
+            if doc_ids is not None:
+                query_params["filter"] = "_doc_ids"
+                query_params["doc_ids"] = dumps(doc_ids)
+            if request_plus:
+                query_params["request_plus"] = "true"
+
+            resp = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_changes", params=query_params)
 
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
@@ -1419,6 +1468,7 @@ class _SyncGatewayBase:
         rev: str,
         scope: str = "_default",
         collection: str = "_default",
+        wait_for_caching_feed: bool = False,
     ) -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
@@ -1429,6 +1479,12 @@ class _SyncGatewayBase:
         :param rev: The current revision ID of the document
         :param scope: The scope where the document exists (default '_default')
         :param collection: The collection where the document exists (default '_default')
+        :param wait_for_caching_feed: If True, read the update back from a `request_plus` changes feed filtered to
+                                      this document before returning, and populate the returned document's `seq`
+                                      from the entry matching the revision just written. This makes `seq` this
+                                      update's own sequence rather than a stale pre-write one. Raises if the
+                                      document was superseded by a concurrent write before the feed was read,
+                                      since the feed then reports only that later sequence (default False)
         :return: The updated document as a RemoteDocument object
         """
         with self._tracer.start_as_current_span(
@@ -1472,7 +1528,43 @@ class _SyncGatewayBase:
             if "cv" in cast_resp:
                 cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
 
-            return RemoteDocument(cast_resp)
+            if not wait_for_caching_feed:
+                return RemoteDocument(cast_resp)
+
+            assert "_rev" in cast_resp or "_cv" in cast_resp, (
+                f"Update of document {doc_id} returned neither a revision ID nor a CV, so its sequence "
+                "cannot be read back from the changes feed"
+            )
+            version_type = "rev" if "_rev" in cast_resp else "cv"
+            expected_revision = cast(str, cast_resp[f"_{version_type}"])
+
+            # request_plus waits for the cache to catch up to every sequence allocated before this request,
+            # which includes the one the PUT above was given.
+            changes = await self.get_changes(
+                db_name,
+                scope,
+                collection,
+                version_type=version_type,
+                doc_ids=[doc_id],
+                request_plus=True,
+            )
+            entries = [e for e in changes.results if e.id == doc_id]
+            assert entries, (
+                f"Changes feed has no entry for {doc_id} even after a request_plus feed "
+                f"(last_seq={changes.last_seq}, results="
+                f"{dumps([{'id': e.id, 'seq': e.seq, 'changes': e.changes, 'deleted': e.deleted} for e in changes.results])})"
+            )
+
+            # The feed carries only the document's current revision, so no match means a concurrent write
+            # superseded this one and the sequence on offer is that write's, not ours.
+            matching = [e for e in entries if expected_revision in e.changes]
+            assert matching, (
+                f"Document {doc_id} was superseded by {[e.changes for e in entries]} "
+                f"(seq {[e.seq for e in entries]}) before the sequence assigned to revision "
+                f"{expected_revision} could be read back"
+            )
+
+            return RemoteDocument(cast_resp, parse_sequence_id(matching[0].seq))
 
     async def close(self) -> None:
         """

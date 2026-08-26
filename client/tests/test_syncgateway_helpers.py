@@ -175,6 +175,18 @@ class TestSendRequest:
 
         assert "internal server error" in str(exc_info.value)
 
+    @pytest.mark.asyncio
+    async def test_error_includes_the_query_string(self, sync_gateway: SyncGatewayFixture) -> None:
+        """The query string is what says which variant of an endpoint was called (request_plus,
+        _doc_ids filtered, ...), so it has to reach the log and the error alongside the path."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 500, "json": {"error": "boom"}}]
+
+        with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
+            await sg._send_request("get", "/db/_changes", params={"request_plus": "true", "filter": "_doc_ids"})
+
+        assert "get /db/_changes?request_plus=true&filter=_doc_ids returned 500" in str(exc_info.value)
+
 
 class TestGetAllDatabasesVerbose:
     @pytest.mark.asyncio
