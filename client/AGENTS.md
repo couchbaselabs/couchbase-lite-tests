@@ -73,7 +73,9 @@ client/
         ├── required_topology.py        # min_test_servers / min_sync_gateways / … markers
         ├── cbse_filter.py              # CBSE (CBS Edition) test filtering
         ├── greenboard_fixture.py
-        └── span_generation_fixture.py  # OpenTelemetry spans
+        ├── span_generation_fixture.py  # OpenTelemetry spans
+        ├── sgcollect_fixture.py        # sgcollect on failure
+        └── cluster_cleanup.py          # cluster_cleanup (autouse) — wipes SGW DBs + CBS/Rosmar buckets
 ```
 
 ## Core Concepts
@@ -92,7 +94,7 @@ Takes an already-parsed `ParsedConfig` (the `cblpytest` pytest fixture parses th
 
 Exposed properties: `.request_factory`, `.test_servers`, `.clusters`, `.edge_servers`, `.load_balancers`, `.config`, `.log_level`, `.extra_props`. `.sync_gateways` and `.couchbase_servers` are shorthands for `.clusters[0].sync_gateways` / `.clusters[0].couchbase_servers` — use `.clusters[N]` directly for multi-cluster topologies (e.g. XDCR).
 
-`CouchbaseCluster` (`api/cluster.py`) groups the Sync Gateway + Couchbase Server nodes for one logical cluster and owns `configure_dataset()` / `drop_bucket()`; test methods take a `CouchbaseCluster` (e.g. `cloud = cblpytest.clusters[0]`) rather than the old, now-removed `CouchbaseCloud`.
+`CouchbaseCluster` (`api/cluster.py`) groups the Sync Gateway + Couchbase Server nodes for one logical cluster and owns `configure_dataset()` / `create_database()`; test methods take a `CouchbaseCluster` (e.g. `cloud = cblpytest.clusters[0]`) rather than the old, now-removed `CouchbaseCloud`.
 
 ### `RequestFactory` + versioned registry
 
@@ -125,6 +127,8 @@ cbse_filter             = "cbltest.plugins.cbse_filter"
 cblpytest_fixture       = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture      = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
+sgcollect_fixture       = "cbltest.plugins.sgcollect_fixture"
+cluster_cleanup         = "cbltest.plugins.cluster_cleanup"
 ```
 
 CLI options added by `cblpytest_fixture`:

@@ -57,6 +57,7 @@ span_generation_fixture = "cbltest.plugins.span_generation_fixture"
 sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
 timeout_fixture = "cbltest.plugins.timeout_fixture"
+cluster_cleanup = "cbltest.plugins.cluster_cleanup"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"

@@ -2,7 +2,7 @@ import asyncio
 import random
 from collections.abc import Sequence
 
-from cbltest.api.syncgateway import SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 
 
 class SyncGatewayCluster:
@@ -40,6 +40,7 @@ class SyncGatewayCluster:
     async def wait_for_db_online(
         self,
         db_name: str,
+        version: str | None = None,
         max_retries: int = 70,
         retry_delay: int = 1,
     ) -> None:
@@ -48,42 +49,35 @@ class SyncGatewayCluster:
         all nodes concurrently.
 
         :param db_name: Database name to poll.
+        :param version: If given, also wait until every node serves this config version.
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
         """
         await asyncio.gather(
             *(
-                sg._wait_for_db_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
+                sg._wait_for_db_online(db_name, version=version, max_retries=max_retries, retry_delay=retry_delay)
                 for sg in self.__sync_gateways
             )
         )
 
-    async def wait_for_db_gone(
-        self,
-        db_name: str,
-        max_retries: int = 30,
-        retry_delay: int = 2,
-    ) -> None:
+    async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
         """
-        Wait until every node in the cluster no longer lists the database, polling
-        all nodes concurrently.
+        Create a database on one node of the cluster, and wait until every node
+        reports it online with the config that was just written.
 
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
+        :param db_name: The name of the database to create
+        :param config: The configuration of the database to create
         """
-        await asyncio.gather(
-            *(
-                sg._wait_for_db_gone(db_name, max_retries=max_retries, retry_delay=retry_delay)
-                for sg in self.__sync_gateways
-            )
-        )
+        version = await self.random_node._put_database(db_name, config)
+        await self.wait_for_db_online(db_name, version)
 
-    async def wait_for_no_databases(self, bucket_name: str) -> None:
+    async def update_database_config(self, db_name: str, config: DatabaseConfig) -> None:
         """
-        Wait until every node in the cluster no longer backs any database with the
-        given bucket, polling all nodes concurrently.
+        Update the config of an existing database on one node of the cluster, and wait
+        until every node reports it online with the config that was just written.
 
-        :param bucket_name: Bucket name to check for.
+        :param db_name: The name of the database to update
+        :param config: The configuration to apply
         """
-        await asyncio.gather(*(sg._wait_for_no_databases(bucket_name) for sg in self.__sync_gateways))
+        version = await self.random_node._update_database_config(db_name, config)
+        await self.wait_for_db_online(db_name, version)
