@@ -271,8 +271,7 @@ class CTestServer_iOS(CTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return self.artifact_path("testserver_ios.zip")
 
     def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
@@ -395,8 +394,7 @@ class CTestServer_Android(CTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return self.artifact_path("testserver_android.apk")
 
     def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
@@ -489,8 +487,7 @@ class CTestServer_Windows(CTestServer_Desktop):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_windows.zip"
+        return self.artifact_path("testserver_windows.zip")
 
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-windows-x86_64.zip"
@@ -556,8 +553,7 @@ class CTestServer_macOS(CTestServer_Desktop):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_macos.zip"
+        return self.artifact_path("testserver_macos.zip")
 
     def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
@@ -620,8 +616,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_linux-{self.__arch}.tar.gz"
+        return self.artifact_path(f"testserver_linux-{self.__arch}.tar.gz")
 
     def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
