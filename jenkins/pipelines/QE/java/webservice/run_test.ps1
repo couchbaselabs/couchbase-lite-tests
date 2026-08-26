@@ -10,7 +10,7 @@ uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
 
 $pytestArgs = @('--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '-m', 'cbl')
 if ($TestFilter) {
-    $pytestArgs += @('-k', $TestFilter)
+    $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }
 
 Push-Location $QE_TESTS_DIR

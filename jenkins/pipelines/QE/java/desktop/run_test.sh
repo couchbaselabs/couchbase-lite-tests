@@ -66,7 +66,8 @@ if [ -n "$TEST_FILTER" ]; then
     --config config.json \
     --dataset-version "$DATASET_VERSION" \
     -m cbl \
-    -k "$TEST_FILTER"
+    -k "$TEST_FILTER" \
+    --no-result-upload
 else
   uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
     --config config.json \

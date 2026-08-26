@@ -74,7 +74,7 @@ uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
 
 pushd $DEV_E2E_TESTS_DIR
 if [ -n "$test_filter" ]; then
-  uv run pytest -v --no-header --config config.json --dataset-version "$dataset_version" -k "$test_filter"
+  uv run pytest -v --no-header --config config.json --dataset-version "$dataset_version" -k "$test_filter" --no-result-upload
 else
   uv run pytest -v --no-header --config config.json --dataset-version "$dataset_version"
 fi

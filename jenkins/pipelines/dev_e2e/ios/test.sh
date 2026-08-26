@@ -50,7 +50,7 @@ echo "Run tests..."
 
 pushd "${DEV_E2E_TESTS_DIR}" >/dev/null
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER"
+  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
 else
   uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION"
 fi

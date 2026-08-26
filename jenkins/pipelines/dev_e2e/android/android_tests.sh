@@ -64,7 +64,7 @@ echo "Run the tests"
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER"
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
 else
   uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION"
 fi

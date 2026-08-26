@@ -57,7 +57,7 @@ pushd "${DEV_E2E_TESTS_DIR}" >/dev/null
 
 function run_pytest() {
   if [ -n "$test_filter" ]; then
-    uv run pytest -v --no-header --config config.json --dataset-version="$dataset_version" -k "$test_filter" test_multipeer.py
+    uv run pytest -v --no-header --config config.json --dataset-version="$dataset_version" -k "$test_filter" --no-result-upload test_multipeer.py
   else
     uv run pytest -v --no-header --config config.json --dataset-version="$dataset_version" test_multipeer.py
   fi

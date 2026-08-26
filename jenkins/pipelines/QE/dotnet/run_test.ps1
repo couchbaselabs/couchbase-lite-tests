@@ -17,7 +17,7 @@ if($LASTEXITCODE -ne 0) {
 
 $pytestArgs = @('-v', '--no-header', '--config', 'config.json', '--dataset-version', $DatasetVersion, '-m', 'cbl')
 if ($TestFilter) {
-    $pytestArgs += @('-k', $TestFilter)
+    $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }
 
 Push-Location $QE_TESTS_DIR

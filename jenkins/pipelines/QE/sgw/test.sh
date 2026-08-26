@@ -62,7 +62,8 @@ if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header --config QE/config.json \
     --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure \
-    -k "$TEST_FILTER"
+    -k "$TEST_FILTER" \
+    --no-result-upload
 else
   uv run pytest -v --no-header --config QE/config.json \
     --ignore=dev_e2e/test_replication_xdcr.py \

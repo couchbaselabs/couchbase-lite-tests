@@ -95,6 +95,7 @@ function run_upg_sgw_tests() {
       --upgrade-versions "$UPGRADE_VERSIONS" \
       --sgcollect-on-test-failure \
       -k "$TEST_FILTER" \
+      --no-result-upload \
       test_upg_sgw.py
   else
     uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
