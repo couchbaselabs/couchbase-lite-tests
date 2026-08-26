@@ -165,11 +165,12 @@ class EdgeServerInfo:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__admin_user = _get_str_or_default(data, self.__admin_user_key, "admin_user")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
-        self.__config_path = _get_str_or_default(
-            data,
-            self.__config_path_key,
-            f"{self._get_repo_root()}/environment/aws/es_setup/config/config.json",
-        )
+        default_config = f"{self._get_repo_root()}/environment/aws/es_setup/config/config.json"
+        raw_path = _get_str_or_default(data, self.__config_path_key, default_config)
+        config_path = Path(raw_path)
+        if not config_path.is_absolute():
+            config_path = (self._get_repo_root() / config_path).resolve()
+        self.__config_path = str(config_path)
 
 
 class TransportType(Enum):

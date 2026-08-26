@@ -4,6 +4,10 @@
     "databases": {
         "travel": {
             "path": "/home/ec2-user/database/travel.cblite2",
+            "create": true,
+            "collections": [
+                "travel.airlines"
+            ],
             "enable_adhoc_queries": true,
             "enable_client_writes": true,
             "enable_client_sync": true
@@ -12,7 +16,7 @@
     "users": "/home/ec2-user/user/users.json",
     "replications": [
         {
-            "source": "wss://ec2-32-197-126-140.compute-1.amazonaws.com:4984/travel",
+            "source": "ws://localhost:4984/travel",
             "target": "travel",
             "bidirectional": true,
             "continuous": true,
@@ -20,10 +24,9 @@
                 "travel.airlines"
             ],
             "auth": {
-                "openid_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyMSIsImlzcyI6InRlc3QtaXNzdWVyIiwiYXVkIjoiZWRnZS1zZXJ2ZXIiLCJpYXQiOjE3ODIyMjM2NzgsImV4cCI6MTc4MjIyNzI3OH0.jfqRMDXXzDnLsxa76JiEkJI3O4ifEcdBmR52MG0XQGl-5AGz-IEVrsJG9Bi1SSJR3d1tW9XJv4JpmUm9wYs0H5Cin49NOdDLud01TVNckkmeQuEChX3qPu0_s9DfC8KeRGoborTxX7TVIXpUBSoeRxIVAkGAc_sKM9xVdo2TntdI-RlON1zhbxNTKWxGAhKfqnHER4HbLgfx5Nr75HcmxQImzFFiEH8rbFdE2rkErtVpI4ncaQ1gCF8oHxY_VubNWWM8gbgnd12ao-g23svQ-gZ2oyplpUMTASs8TzCnK7LOKgeqJZbFHrnl4Kng_gTGBa9aCLzTXmsVbSO6HJoLqA",
+                "openid_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyMSIsImlzcyI6InRlc3QtaXNzdWVyIiwiYXVkIjoiZWRnZS1zZXJ2ZXIiLCJpYXQiOjE3ODc1NzM2NjAsImV4cCI6MTc4NzU3NzI2MH0.uaHKsWXSLObTeXle_SA_sGPQ_k54yikovmvCDty4TorF5lotRyRasCFMH-sTpAjq1tidOA4JbDK9pWOx5NOSzTR8N-C-VLTqOcOVki3HeXkwTJbtjd3pV4sJUQOf8g-cDeXqY7vSnN169xPCTFY1LuoA8kZ14KQQHZ5pUXIypZo5wtCkLI64SNhu9uSvF6BEoZgscb2Lx8dznW_l9-noh-G_gCVtBXn1cqY2tnMTVK5EWpnPR_HLzraMIn9FoZr2JtI8U55Sj4n4nJY8WIPaKIXTRqGTwHyE82e6321atS73P_GbaqrO9e8ST9TlKGtPebfJuKRzy1Q1rAPkZToVvg",
                 "reconnect_on_token_change": false
-            },
-            "pinned_cert": "/home/ec2-user/cert/sg_cert.pem"
+            }
         }
     ],
     "logging": {

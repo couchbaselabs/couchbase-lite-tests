@@ -19,6 +19,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
+from es_ws import prepare_es_replication_for_sgw
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -139,7 +140,9 @@ class TestJWTSimple(CBLTestClass):
         # If this fails, the JWT/key configuration is wrong.
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
-        sgw_public_url = f"https://{sync_gateway.hostname}:4984/{sg_db_name}/"
+        sgw_public_url = (
+            f"{sync_gateway.scheme}{sync_gateway.hostname}:4984/{sg_db_name}/"
+        )
         async with (
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
             session.get(
@@ -173,8 +176,8 @@ class TestJWTSimple(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
         config = await read_json_file(config_path)
 
-        # Set the real SGW replication URL (wss://hostname:4984/travel)
-        config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        # Set the live SGW replication URL (ws:// locally, wss:// on AWS TLS).
+        prepare_es_replication_for_sgw(config, sync_gateway, sg_db_name)
 
         # Set auth to inline JWT token string (oneOf: string form).
         # reconnect_on_token_change=false since we use a static inline token.
@@ -217,7 +220,7 @@ class TestJWTSimple(CBLTestClass):
         max_wait = 30
         poll_interval = 3
         elapsed = 0
-        expected_min = 150  # Pre-loaded travel dataset from zip
+        expected_min = 5  # Docs this test wrote to CBS (zip dataset is optional)
         final_count = 0
         while elapsed < max_wait:
             response = await edge_server.get_all_documents("travel", collection="travel.airlines")

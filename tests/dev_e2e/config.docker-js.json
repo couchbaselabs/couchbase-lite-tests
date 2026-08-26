@@ -1,0 +1,28 @@
+{
+  "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
+  "test-servers": [
+    {
+      "url": "http://localhost:5173",
+      "transport": "ws"
+    }
+  ],
+  "sync-gateways": [
+    {
+      "hostname": "localhost",
+      "tls": false
+    }
+  ],
+  "couchbase-servers": [
+    {
+      "hostname": "localhost"
+    }
+  ],
+  "edge-servers": [
+    {
+      "hostname": "localhost",
+      "admin_user": "admin_user",
+      "admin_password": "password",
+      "config_path": "environment/docker/es/config.json"
+    }
+  ]
+}

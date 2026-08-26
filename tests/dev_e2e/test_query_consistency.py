@@ -73,6 +73,24 @@ class TestQueryConsistency(CBLTestClass):
         )
         TestQueryConsistency.__database = dbs[0]
 
+    async def _query_remote(
+        self,
+        cblpytest: CBLPyTest,
+        cbl_query: str,
+        cbs_query: str,
+        collection: str,
+    ) -> list[Any]:
+        remote = cblpytest.sync_gateways[0]
+        edge = getattr(remote, "_edge", None)
+        if edge is not None:
+            # ES SQL++ matches CBL. POST to a collection keyspace in `travel`.
+            return await edge.adhoc_query(
+                "travel", "travel", collection, query=cbl_query
+            )
+        return cblpytest.couchbase_servers[0].run_query(
+            cbs_query, "travel", "travel", collection
+        )
+
     async def _test_query(
         self,
         cblpytest: CBLPyTest,
@@ -87,8 +105,10 @@ class TestQueryConsistency(CBLTestClass):
         self.mark_test_step(f"Run '{query_for_logging}' on test server")
         local_results = await TestQueryConsistency.__database.run_query(query_for_logging)
 
-        self.mark_test_step(f"Run '{query_for_logging}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(query, "travel", "travel", collection)
+        self.mark_test_step(f"Run '{query_for_logging}' on remote")
+        remote_results = await self._query_remote(
+            cblpytest, query_for_logging, query, collection
+        )
 
         self.mark_test_step("Check that the results are equivalent")
         if sort is not None:
@@ -110,8 +130,10 @@ class TestQueryConsistency(CBLTestClass):
         # only choose one, but the others should be set up by now do to previous tests
         # If running this test standalone, you may need to CREATE PRIMARY INDEX
         # on both the airlines and routes collections.
-        self.mark_test_step(f"Run '{server_query}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(server_query, "travel", "travel", "airlines")
+        self.mark_test_step(f"Run '{server_query}' on remote")
+        remote_results = await self._query_remote(
+            cblpytest, query, server_query, "airlines"
+        )
 
         assert json_equivalent(local_results, remote_results)
 

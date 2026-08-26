@@ -733,8 +733,8 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            "There were unexpected replication events on replicator #1: "
-            "{found.collection}, {found.id}, {found.direction}, {found.flags}"
+            f"There were unexpected replication events on replicator #1: "
+            f"{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
         self.mark_test_step("Verify that there are no document replication events in db2, for 10 seconds")
@@ -751,8 +751,8 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            "There were unexpected replication events on replicator #2: "
-            "{found.collection}, {found.id}, {found.direction}, {found.flags}"
+            f"There were unexpected replication events on replicator #2: "
+            f"{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
         self.mark_test_step("Verify that db1 has not changed")
@@ -833,8 +833,8 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            "There were unexpected replication events on replicator #2: "
-            "{found.collection}, {found.id}, {found.direction}, {found.flags}"
+            f"There were unexpected replication events on replicator #2: "
+            f"{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
         self.mark_test_step("Verify that there are no new documents in db2")
@@ -982,8 +982,8 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            "There were unexpected replication events on replicator #2: "
-            "{found.collection}, {found.id}, {found.direction}, {found.flags}"
+            f"There were unexpected replication events on replicator #2: "
+            f"{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
         self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")
@@ -1163,8 +1163,8 @@ class TestFest(CBLTestClass):
             max_retries=10,
         )
         assert found is None, (
-            "There were unexpected replication events on replicator #2: "
-            "{found.collection}, {found.id}, {found.direction}, {found.flags}"
+            f"There were unexpected replication events on replicator #2: "
+            f"{found.collection}, {found.id}, {found.direction}, {found.flags}"
         )
 
         self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")

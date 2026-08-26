@@ -1,0 +1,32 @@
+{
+  "bootstrap": {
+    "server": "couchbases://cbl-test-cbs",
+    "server_tls_skip_verify": true,
+    "username": "admin",
+    "password": "password"
+  },
+  "api": {
+    "public_interface": ":4984",
+    "admin_interface": ":4985",
+    "cors": {
+      "origin": ["http://localhost:5173"],
+      "login_origin": ["http://localhost:5173"],
+      "headers": ["Authorization", "Content-Type"]
+    }
+  },
+  "logging": {
+    "console": {
+      "enabled": true,
+      "log_level": "info",
+      "log_keys": ["*"]
+    },
+    "log_file_path": "/opt/sg/log",
+    "debug": {
+      "enabled": true,
+      "rotation": {
+        "max_size": 512,
+        "rotated_logs_size_limit": 1024
+      }
+    }
+  } 
+}

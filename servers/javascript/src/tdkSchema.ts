@@ -251,8 +251,18 @@ export interface LogRequest extends TestRequest {
 //-------- Loading datasets:
 
 /** Base URL for our JSON datasets. */
-export const kDatasetBaseURL = "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
-export const kBlobBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/";
+const remoteDatasetBaseURL =
+    "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
+const remoteBlobBaseURL =
+    "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/";
+
+/** In Vite dev, serve datasets from the repo via `vite.config.js` middleware. */
+export const kDatasetBaseURL = import.meta.env.DEV
+    ? `${globalThis.location.origin}/local-dataset/`
+    : remoteDatasetBaseURL;
+export const kBlobBaseURL = import.meta.env.DEV
+    ? `${globalThis.location.origin}/local-blobs/`
+    : remoteBlobBaseURL;
 
 /** Schema of `index.json` */
 export interface DatasetIndex {

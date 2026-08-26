@@ -1,0 +1,6 @@
+# Local override: use HTTP for Sync Gateway so cbltest admin API calls work
+# without the AWS-specific CA bundle (Docker uses its own self-signed cert).
+services:
+  cbl-test-sg:
+    environment:
+      SSL: "false"

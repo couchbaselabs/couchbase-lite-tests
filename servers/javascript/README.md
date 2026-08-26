@@ -8,7 +8,8 @@ over **WebSocket** rather than HTTP (handled on the client side by
 ## Requirements
 
 - Node.js + npm
-- Couchbase Lite is an npm dependency (`@couchbase/lite-js`).
+- Couchbase Lite is an npm dependency (`@couchbase/lite-js`), installed from the
+  ProGet `cbl-npm` feed (see `.npmrc`).
 
 ## Build and Run
 

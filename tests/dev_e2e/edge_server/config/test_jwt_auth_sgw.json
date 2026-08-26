@@ -4,6 +4,14 @@
     "databases": {
         "travel": {
             "path": "/home/ec2-user/database/travel.cblite2",
+            "create": true,
+            "collections": [
+                "travel.airlines",
+                "travel.airports",
+                "travel.hotels",
+                "travel.landmarks",
+                "travel.routes"
+            ],
             "enable_adhoc_queries": true,
             "enable_client_writes": true,
             "enable_client_sync": true
@@ -12,7 +20,7 @@
     "users": "/home/ec2-user/user/users.json",
     "replications": [
         {
-            "source": "wss://ec2-32-197-126-140.compute-1.amazonaws.com:4984/travel",
+            "source": "ws://localhost:4984/travel",
             "target": "travel",
             "bidirectional": true,
             "continuous": true,
@@ -28,8 +36,7 @@
                     "path": "/home/ec2-user/cert/jwt.txt"
                 },
                 "reconnect_on_token_change": true
-            },
-            "pinned_cert": "/home/ec2-user/cert/sg_cert.pem"
+            }
         }
     ],
     "logging": {
