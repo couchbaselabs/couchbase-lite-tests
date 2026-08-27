@@ -44,6 +44,7 @@ class TestHighAvailability(CBLTestClass):
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
         await sgs[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
+        # Hardcoded because `load_balancers` config carries no port of its own.
         lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")

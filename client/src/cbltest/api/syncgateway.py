@@ -229,7 +229,8 @@ class ISGRPayload(JSONSerializable):
         Creates an ISGR configuration payload.
 
         :param replication_id: A unique identifier for this replication
-        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
+        :param remote_url: The URL of the remote Sync Gateway, without a database -- use the remote
+            client's `http_url` rather than building it by hand
         :param remote_db: The database name on the remote Sync Gateway
         :param direction: Replication direction - "push", "pull", or "pushAndPull"
         :param continuous: Whether the replication should be continuous (default False)
@@ -749,11 +750,6 @@ class _SyncGatewayBase:
         return self.__port
 
     @property
-    def public_port(self) -> int:
-        """Gets the public REST/replication port of the Sync Gateway instance"""
-        return self.__public_port
-
-    @property
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
@@ -762,6 +758,16 @@ class _SyncGatewayBase:
     def scheme(self) -> str:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
+
+    @property
+    def http_url(self) -> str:
+        """Gets the REST API base URL this client sends its own requests to (i.e. follows `port`)"""
+        return self.__http_url
+
+    @property
+    def public_url(self) -> str:
+        """Gets the REST API base URL of the instance's public port, whichever port this client uses"""
+        return f"{self.scheme}{self.hostname}:{self.__public_port}"
 
     def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
@@ -1659,7 +1665,7 @@ class _SyncGatewayBase:
 
         auth_header = encode_basic_auth(username, password, "ascii")
         async with self._create_session(
-            self.secure, self.scheme, self.hostname, self.public_port, auth_header
+            self.secure, self.scheme, self.hostname, self.__public_port, auth_header
         ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
@@ -1952,6 +1958,7 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure, public_port)
+        self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2237,7 +2244,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, self.__public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
@@ -2374,7 +2381,7 @@ class SyncGateway(_SyncGatewayBase):
             self.hostname,
             username,
             password,
-            port=self.public_port,
+            port=self.__public_port,
             secure=self.secure,
         )
         try:

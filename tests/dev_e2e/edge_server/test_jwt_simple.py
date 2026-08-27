@@ -139,11 +139,10 @@ class TestJWTSimple(CBLTestClass):
         # If this fails, the JWT/key configuration is wrong.
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
-        sgw_public_url = f"https://{sync_gateway.hostname}:4984/{sg_db_name}/"
         async with (
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
             session.get(
-                sgw_public_url,
+                f"{sync_gateway.public_url}/{sg_db_name}/",
                 headers={"Authorization": f"Bearer {jwt_token}"},
             ) as resp,
         ):
@@ -173,7 +172,7 @@ class TestJWTSimple(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
         config = await read_json_file(config_path)
 
-        # Set the real SGW replication URL (wss://hostname:4984/travel)
+        # Set the real SGW replication URL (e.g. wss://hostname:<public_port>/travel)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
 
         # Set auth to inline JWT token string (oneOf: string form).
