@@ -9,7 +9,9 @@ against SGW's /_config endpoint during bootstrap, which is orthogonal to the
 async helpers under test here.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
+from json import loads
 from pathlib import Path
 
 import pytest
@@ -158,6 +160,8 @@ class TestSendRequest:
         assert "get /db/ returned 503" in message
         assert "Service Unavailable" in message
         assert "db offline" in message
+        # Also available on its own, so callers matching on it needn't parse the message.
+        assert loads(exc_info.value.body) == {"error": "Service Unavailable", "reason": "db offline"}
 
     @pytest.mark.asyncio
     async def test_error_includes_non_json_response_body(self, sync_gateway: SyncGatewayFixture) -> None:
@@ -362,3 +366,36 @@ class TestDatabaseConfig:
     def test_invalid_input(self) -> None:
         with pytest.raises(ValidationError):
             DatabaseConfig(scopes="not_a_dict")  # ty: ignore[invalid-argument-type]
+
+
+class TestDeleteDatabase:
+    """delete_database swallows the CBG-5731 500 SGW returns once the database's bucket
+    entry is gone, without swallowing 500s that a retry could still clear."""
+
+    @pytest.mark.asyncio
+    async def test_ignores_known_missing_bucket_failure(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        reason = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
+        specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": reason}}]
+
+        await sg.delete_database("db2")
+
+        # No retries: this response never changes.
+        assert len(received) == 1
+
+    @pytest.mark.asyncio
+    async def test_retries_then_raises_on_other_500(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": "boom"}}]
+
+        async def no_sleep(_seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(asyncio, "sleep", no_sleep)
+
+        with pytest.raises(CblSyncGatewayBadResponseError):
+            await sg.delete_database("db2")
+
+        assert len(received) == 4  # Initial attempt plus three retries.
