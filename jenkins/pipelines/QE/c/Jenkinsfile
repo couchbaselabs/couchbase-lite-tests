@@ -69,7 +69,7 @@ pipeline {
                     steps {
                         echo "=== Run C macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C macOS Tests Complete"
                     }
@@ -107,7 +107,7 @@ pipeline {
                         }
                         echo "=== Run C iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C iOS Tests Complete"
                     }
@@ -145,7 +145,7 @@ pipeline {
                     steps {
                         echo "=== Run C Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Android Tests Complete"
                     }
@@ -175,7 +175,7 @@ pipeline {
                     steps {
                         echo "=== Run C Linux Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
+                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} linux_x86_64 ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Linux Tests Complete"
                     }
@@ -205,7 +205,7 @@ pipeline {
                     steps {
                         echo "=== Run C Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION ?: '4.0'} -TestFilter '${params.TS_TEST_FILTER ?: ''}'"
+                            powershell "jenkins\\pipelines\\QE\\c\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== C Windows Tests Complete"
                     }

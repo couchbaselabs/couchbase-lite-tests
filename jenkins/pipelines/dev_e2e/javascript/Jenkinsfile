@@ -38,7 +38,7 @@ pipeline {
             steps {
                 lock("${env.NODE_NAME}") {
                     timeout(time: 60, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' --test-filter '${params.TS_TEST_FILTER ?: ''}'"
+                        sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' --test-filter '${params.TS_TEST_FILTER}'"
                     }
                 }
             }

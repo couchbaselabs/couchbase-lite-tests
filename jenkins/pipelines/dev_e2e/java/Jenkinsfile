@@ -64,7 +64,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -94,7 +94,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 pwsh """
-                                    jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION ?: '4.0'} -TestFilter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -122,7 +122,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -152,7 +152,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -182,7 +182,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 pwsh """
-                                    jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION ?: '4.0'} -TestFilter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -212,7 +212,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }

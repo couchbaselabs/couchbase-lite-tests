@@ -49,7 +49,7 @@ pipeline {
                 echo "=== Run Android Tests"
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}" --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                        jenkins/pipelines/QE/android/android_tests.sh "${params.CBL_VERSION}" "${params.SGW_VERSION}" --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                     """
                 }
                 echo "=== Android Tests Complete"

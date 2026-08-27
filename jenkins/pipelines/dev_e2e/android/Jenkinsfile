@@ -40,7 +40,7 @@ pipeline {
                 lock("mob-e2e-android-01") {
                     timeout(time: 60, unit: 'MINUTES') {
                         sh """
-                            jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'
+                            jenkins/pipelines/dev_e2e/android/android_tests.sh "${params.CBL_VERSION}-${params.CBL_BUILD}" "${params.SGW_VERSION}" --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                         """
                     }
                 }
