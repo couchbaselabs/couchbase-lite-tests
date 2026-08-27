@@ -814,7 +814,9 @@ class _SyncGatewayBase:
             )
             if not resp.ok:
                 raise CblSyncGatewayBadResponseError(
-                    resp.status, f"{method} {logged_path} returned {resp.status}: {data}"
+                    resp.status,
+                    f"{method} {logged_path} returned {resp.status}: {data}",
+                    body=data,
                 )
 
             return ret_val, resp.headers
@@ -969,8 +971,16 @@ class _SyncGatewayBase:
             try:
                 await self._send_request("delete", f"/{db_name}")
             except CblSyncGatewayBadResponseError as e:
-                if e.code == 500 and retry_count < 3:
-                    cbl_warning(f"Sync gateway returned 500 from DELETE database call, retrying ({retry_count + 1})...")
+                if e.code == 500 and "couldn't remove database" in e.body and "Not Found" in e.body:
+                    # CBG-5731: SGW fails to delete the database when its bucket entry is
+                    # already gone, leaving a 500 instead of a successful (or 404) delete.
+                    # Retrying never clears it, so treat it as deleted.
+                    current_span.add_event("SGW returned 500 (CBG-5731), ignored")
+                elif e.code == 500 and retry_count < 3:
+                    cbl_warning(
+                        f"Sync gateway returned 500 from DELETE database call, "
+                        f"retrying ({retry_count + 1})...: {e.body}"
+                    )
                     current_span.add_event("SGW returned 500, retry")
                     await asyncio.sleep(2)
                     await self._delete_database(db_name, retry_count + 1)
@@ -1025,6 +1035,7 @@ class _SyncGatewayBase:
                 raise CblSyncGatewayBadResponseError(
                     info["status"],
                     f"At least one bulk docs insert failed ({info['error']})",
+                    body=dumps(info),
                 )
 
     async def load_dataset(self, db_name: str, path: Path) -> None:
@@ -1399,7 +1410,9 @@ class _SyncGatewayBase:
                     return None
 
                 raise CblSyncGatewayBadResponseError(
-                    500, f"Get doc from sync gateway had error '{cast_resp['reason']}'"
+                    500,
+                    f"Get doc from sync gateway had error '{cast_resp['reason']}'",
+                    body=dumps(cast_resp),
                 )
 
             return RemoteDocument(cast_resp)
@@ -1442,10 +1455,12 @@ class _SyncGatewayBase:
             # Check for response structure
             if not isinstance(response, dict):
                 raise CblSyncGatewayBadResponseError(
-                    500, f"Failed to create document {doc_id}: unexpected response type"
+                    500,
+                    f"Failed to create document {doc_id}: unexpected response type",
+                    body=str(response),
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}")
+                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}", body=dumps(response))
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
@@ -1513,9 +1528,12 @@ class _SyncGatewayBase:
                 raise CblSyncGatewayBadResponseError(
                     500,
                     f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
+                    body=str(response),
                 )
             if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to update document {doc_id} with rev {rev}")
+                raise CblSyncGatewayBadResponseError(
+                    500, f"Failed to update document {doc_id} with rev {rev}", body=dumps(response)
+                )
 
             # Convert response to match expected format
             cast_resp = cast(dict, response)
