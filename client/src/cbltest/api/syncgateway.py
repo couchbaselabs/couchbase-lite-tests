@@ -655,27 +655,6 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
-class SessionUserContext(BaseModel):
-    """
-    The ``userCtx`` block of a Sync Gateway public ``_session`` response,
-    describing the authenticated user and its channel access.
-    """
-
-    name: str | None = None
-    channels: dict[str, Any] | None = None
-
-
-class SessionResponse(BaseModel):
-    """
-    Output of the public ``_session`` endpoints of Sync Gateway
-    (GET/POST /{db}/_session).
-    """
-
-    authentication_handlers: list[str] | None = None
-    ok: bool | None = None
-    userCtx: SessionUserContext | None = None
-
-
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -1927,6 +1906,35 @@ class SyncGateway(_SyncGatewayBase):
                 else:
                     raise
 
+    async def create_session(self, db_name: str, name: str) -> str:
+        """
+        Creates a login session for an existing user via the admin API
+        (POST /{db}/_session) and returns its session id.
+
+        A session cannot be created for a non-existent user or the GUEST user.
+
+        :param db_name: The name of the database to create the session against
+        :param name: The user to create the session for
+        :return: The id of the created session
+        """
+        with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({"name": name}))
+            assert isinstance(resp, dict)
+            session_id = resp["session_id"]
+            assert isinstance(session_id, str)
+            return session_id
+
+    async def delete_session(self, db_name: str, session_id: str) -> None:
+        """
+        Invalidates a session via the admin API (DELETE /{db}/_session/{sessionid}),
+        logging out anyone using it and preventing future use.
+
+        :param db_name: The name of the database the session belongs to
+        :param session_id: The id of the session to invalidate
+        """
+        with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_session/{session_id}")
+
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
         Adds the specified role to a Sync Gateway database with the specified collection access
@@ -2475,46 +2483,3 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         """
         super().__init__(url, username, password, port, secure)
-
-    async def create_session(self, db_name: str) -> SessionResponse:
-        """
-        Creates a login session for the authenticated user via the public API
-        (POST /{db}/_session).
-
-        The session is created for the user whose credentials this client authenticates
-        with, so the returned session token matches that user.  On success a session
-        cookie is stored on the client for future API calls.
-
-        Calling this again does not invalidate the existing session; it creates an
-        additional session alongside it.
-
-        :param db_name: The name of the database to create the session against
-        :return: The session response (``userCtx``, ``authentication_handlers``, ...)
-        """
-        with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({}))
-            assert isinstance(resp, dict)
-            return SessionResponse.model_validate(resp)
-
-    async def get_session(self, db_name: str) -> SessionResponse:
-        """
-        Gets information about the current user session via the public API
-        (GET /{db}/_session).
-
-        :param db_name: The name of the database to query the session against
-        :return: The session info (``userCtx``, ``authentication_handlers``, ...)
-        """
-        with self._tracer.start_as_current_span("get_session", attributes={"sg.database.name": db_name}):
-            resp = await self._send_request("get", f"/{db_name}/_session")
-            assert isinstance(resp, dict)
-            return SessionResponse.model_validate(resp)
-
-    async def delete_session(self, db_name: str) -> None:
-        """
-        Deletes (logs out) the current user session via the public API
-        (DELETE /{db}/_session).
-
-        :param db_name: The name of the database to delete the session against
-        """
-        with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
-            await self._send_request("delete", f"/{db_name}/_session")
