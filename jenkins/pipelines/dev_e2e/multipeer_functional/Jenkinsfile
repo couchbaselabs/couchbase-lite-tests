@@ -66,7 +66,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 lock('mob-e2e-iphone-01,mob-e2e-iphone-02,mob-e2e-android-01,mob-e2e-android-02') {
                     timeout(time: 60, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh --global-version ${params.CBL_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                        sh "jenkins/pipelines/dev_e2e/multipeer_functional/test.sh --global-version ${params.CBL_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                     }
                 }
             }

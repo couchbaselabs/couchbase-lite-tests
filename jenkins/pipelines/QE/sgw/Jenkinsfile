@@ -48,7 +48,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 160, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                 }
                 echo "=== SGW Tests Complete"
             }

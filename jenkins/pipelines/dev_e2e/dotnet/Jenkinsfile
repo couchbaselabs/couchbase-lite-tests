@@ -60,7 +60,7 @@ pipeline {
                     steps {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                pwsh "jenkins\\pipelines\\dev_e2e\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
+                                pwsh "jenkins\\pipelines\\dev_e2e\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION ?: '4.0'} -TestFilter '${params.TS_TEST_FILTER ?: ''}'"
                             }
                         }
                     }
@@ -83,7 +83,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         lock("${env.NODE_NAME}") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                             }
                         }
                     }
@@ -106,7 +106,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         lock("mob-e2e-iphone-01") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                             }
                         }
                     }
@@ -127,7 +127,7 @@ pipeline {
                     steps {
                         lock("mob-e2e-android-01") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                                sh "jenkins/pipelines/dev_e2e/dotnet/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                             }
                         }
                     }

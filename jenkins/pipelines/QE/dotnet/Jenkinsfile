@@ -69,7 +69,7 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
+                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION ?: '4.0'} -TestFilter '${params.TS_TEST_FILTER ?: ''}'"
                         }
                         echo "=== Dotnet Windows Tests Complete"
                     }
@@ -97,7 +97,7 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet macOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                         }
                         echo "=== Dotnet macOS Tests Complete"
                     }
@@ -129,7 +129,7 @@ pipeline {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                         }
                         echo "=== Dotnet iOS Tests Complete"
                     }
@@ -160,7 +160,7 @@ pipeline {
                     steps {
                         echo "=== Run Dotnet Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION ?: '4.0'} --test-filter '${params.TS_TEST_FILTER ?: ''}'"
                         }
                         echo "=== Dotnet Android Tests Complete"
                     }
