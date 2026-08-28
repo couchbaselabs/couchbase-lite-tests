@@ -731,6 +731,9 @@ class _SyncGatewayBase:
             encode_basic_auth(username, password, "ascii"),
         )
 
+    def __str__(self) -> str:
+        return f"{type(self).__name__} {self.hostname}:{self.port}"
+
     @property
     def hostname(self) -> str:
         """Gets the hostname of the Sync Gateway instance"""
@@ -964,7 +967,46 @@ class _SyncGatewayBase:
                     return None
                 raise
 
+    async def _wait_for_database_gone(
+        self,
+        db_name: str,
+        timeout: float = 30.0,
+        retry_delay: float = 1.0,
+    ) -> None:
+        """
+        Wait until this node stops reporting db_name.
+
+        :param db_name: Database the node should stop serving.
+        :param timeout: Seconds to wait, against a default config poll interval of 10s.
+        :param retry_delay: Seconds between polls.
+        :raises TimeoutError: if the node is still serving the database after timeout
+        """
+
+        async def _wait_for_database_gone_poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            assert db_name not in dbs, f"{self} is still serving database {db_name}"
+
+        with self._tracer.start_as_current_span("wait_for_database_gone", attributes={"sg.database.name": db_name}):
+            await async_retry_assert(
+                _wait_for_database_gone_poll,
+                tenacity.wait_fixed(retry_delay),
+                tenacity.stop_after_delay(timeout),
+            )
+
     async def _delete_database(self, db_name: str, retry_count: int = 0) -> None:
+        """
+        Delete a database from this node's Sync Gateway configuration.
+
+        Not public: a database belongs to the cluster, so callers want
+        :func:`SyncGatewayCluster.delete_database`, which covers every node.
+
+        .. warning:: This will not delete the data from the Couchbase Server bucket.
+            To delete the data see the
+            :func:`drop_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.drop_bucket>` function
+
+        :param db_name: The name of the Database to delete
+        :param retry_count: Retries already spent on this delete
+        """
         with self._tracer.start_as_current_span(
             "delete_database", attributes={"sg.database.name": db_name}
         ) as current_span:
@@ -972,10 +1014,11 @@ class _SyncGatewayBase:
                 await self._send_request("delete", f"/{db_name}")
             except CblSyncGatewayBadResponseError as e:
                 if e.code == 500 and "couldn't remove database" in e.body and "Not Found" in e.body:
-                    # CBG-5731: SGW fails to delete the database when its bucket entry is
-                    # already gone, leaving a 500 instead of a successful (or 404) delete.
-                    # Retrying never clears it, so treat it as deleted.
-                    current_span.add_event("SGW returned 500 (CBG-5731), ignored")
+                    # CBG-5731: the registry entry is already gone, so this node
+                    # removed nothing and will drop the database on its next config poll.
+                    # Retrying the DELETE only repeats the 500, so wait the node out.
+                    current_span.add_event("SGW returned 500 (CBG-5731), waiting for removal")
+                    await self._wait_for_database_gone(db_name)
                 elif e.code == 500 and retry_count < 3:
                     cbl_warning(
                         f"Sync gateway returned 500 from DELETE database call, "
@@ -988,18 +1031,6 @@ class _SyncGatewayBase:
                     pass  # Database doesn't exist anyway.
                 else:
                     raise
-
-    async def delete_database(self, db_name: str) -> None:
-        """
-        Deletes a database from Sync Gateway's configuration.
-
-        .. warning:: This will not delete the data from the Couchbase Server bucket.
-            To delete the data see the
-            :func:`drop_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.drop_bucket>` function
-
-        :param db_name: The name of the Database to delete
-        """
-        await self._delete_database(db_name, 0)
 
     async def get_all_database_names(self) -> list[str]:
         """
