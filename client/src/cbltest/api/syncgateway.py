@@ -2248,7 +2248,7 @@ class SyncGateway(_SyncGatewayBase):
                 if resp.status == 200:
                     cbl_info("SGW is already running, skipping start")
                     return
-        except (ClientConnectorError, asyncio.TimeoutError):
+        except (ClientConnectorError, TimeoutError):
             # SGW is not reachable or slow, proceed with start
             pass
 

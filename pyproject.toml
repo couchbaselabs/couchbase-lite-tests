@@ -19,7 +19,6 @@ lint.ignore = [
   "E402",
   "ANN401",  # `Any` is legitimate for JSON (de)serialization boundaries
   "UP015",   # off: only fires on existing `open(..., "r")` calls, not worth churning
-  "UP041",   # off: only fires on existing `asyncio.TimeoutError` uses, not worth churning
   "UP042",   # off: `(str, Enum)` -> `StrEnum` changes `str()` output on existing enums
   "BLE001",  # TODO: BLE001 (blind-except) - will fix later
   "S110",    # TODO: S110 (try-except-pass) - will fix later
