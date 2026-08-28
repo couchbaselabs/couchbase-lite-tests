@@ -4,16 +4,40 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, pkcs12
 from cryptography.x509 import (
+    AuthorityKeyIdentifier,
     BasicConstraints,
     Certificate,
     CertificateBuilder,
     ExtendedKeyUsage,
     ExtendedKeyUsageOID,
+    KeyUsage,
     Name,
     NameAttribute,
     NameOID,
+    SubjectKeyIdentifier,
     random_serial_number,
 )
+
+
+def _key_usage(
+    *,
+    digital_signature: bool = False,
+    key_encipherment: bool = False,
+    key_cert_sign: bool = False,
+    crl_sign: bool = False,
+) -> KeyUsage:
+    """Build a KeyUsage extension, defaulting every bit this codebase does not use to False."""
+    return KeyUsage(
+        digital_signature=digital_signature,
+        content_commitment=False,
+        key_encipherment=key_encipherment,
+        data_encipherment=False,
+        key_agreement=False,
+        key_cert_sign=key_cert_sign,
+        crl_sign=crl_sign,
+        encipher_only=False,
+        decipher_only=False,
+    )
 
 
 class CertKeyPair:
@@ -81,6 +105,10 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
         .not_valid_before(not_valid_before)
         .not_valid_after(not_valid_after)
         .add_extension(BasicConstraints(ca=True, path_length=None), critical=True)
+        # Strict verifiers reject a CA with no keyUsage, and Python 3.13 turns on
+        # ssl.VERIFY_X509_STRICT by default.
+        .add_extension(_key_usage(digital_signature=True, key_cert_sign=True, crl_sign=True), critical=True)
+        .add_extension(SubjectKeyIdentifier.from_public_key(private_key.public_key()), critical=False)
         .sign(private_key, hashes.SHA256())
     )
 
@@ -98,7 +126,7 @@ def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) 
     issuer_name = issuer_data.certificate.subject if issuer_data else cn_attribute
     signing_key = issuer_data.private_key if issuer_data else private_key
 
-    leaf_certificate = (
+    builder = (
         CertificateBuilder()
         .subject_name(cn_attribute)
         .issuer_name(issuer_name)
@@ -110,7 +138,21 @@ def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) 
             ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.SERVER_AUTH]),
             critical=False,
         )
-        .sign(signing_key, hashes.SHA256())
+        .add_extension(SubjectKeyIdentifier.from_public_key(private_key.public_key()), critical=False)
     )
+
+    if issuer_data is not None:
+        # Only a CA-issued certificate is a pure end entity.  A self-signed one doubles as
+        # its own trust anchor (see Listener, MultipeerReplicator), and CA:FALSE would break it.
+        builder = (
+            builder.add_extension(BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(_key_usage(digital_signature=True, key_encipherment=True), critical=True)
+            .add_extension(
+                AuthorityKeyIdentifier.from_issuer_public_key(issuer_data.private_key.public_key()),
+                critical=False,
+            )
+        )
+
+    leaf_certificate = builder.sign(signing_key, hashes.SHA256())
 
     return CertKeyPair(leaf_certificate, private_key)
