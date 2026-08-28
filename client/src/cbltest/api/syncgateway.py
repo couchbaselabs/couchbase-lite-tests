@@ -1935,7 +1935,7 @@ class SyncGateway(_SyncGatewayBase):
 
         :param db_name: The name of the database the session belongs to
         :param session_id: The id of the session to invalidate
-        
+
         :raises CblSyncGatewayBadResponseError: Sync Gateway answers 404 for an unknown, or already deleted session_id
         """
         with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
