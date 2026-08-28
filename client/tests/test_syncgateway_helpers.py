@@ -10,6 +10,7 @@ async helpers under test here.
 """
 
 import asyncio
+import inspect
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
@@ -18,7 +19,7 @@ import pytest
 import pytest_asyncio
 from aiohttp import encode_basic_auth, web
 from aiohttp.test_utils import TestServer
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import (
     ChangesResponse,
     DatabaseConfig,
@@ -412,12 +413,21 @@ class TestWaitForCachingFeed:
     """
 
     @staticmethod
-    def _record_get_changes(sg: SyncGateway, calls: list[dict]) -> None:
+    def _record_get_changes(sg: SyncGateway, calls: list[dict], deleted: bool = False) -> None:
+        """Record how get_changes was called, binding positional arguments to their names.
+
+        `doc_ids` is the fifth positional parameter of `get_changes`, so a guard that only
+        inspected **kwargs would pass even if it were being supplied.
+        """
+        signature = inspect.signature(SyncGateway.get_changes)
+
         async def fake_get_changes(*args: object, **kwargs: object) -> ChangesResponse:
-            calls.append(dict(kwargs))
-            return ChangesResponse(
-                {"results": [{"seq": 5, "id": "doc1", "changes": [{"rev": "2-abc"}]}], "last_seq": "5"}
-            )
+            bound = signature.bind(sg, *args, **kwargs)
+            calls.append({k: v for k, v in bound.arguments.items() if k != "self"})
+            entry: dict = {"seq": 5, "id": "doc1", "changes": [{"rev": "2-abc"}]}
+            if deleted:
+                entry["deleted"] = True
+            return ChangesResponse({"results": [entry], "last_seq": "5"})
 
         # An instance attribute, so only this SyncGateway is affected.
         sg.get_changes = fake_get_changes  # type: ignore[method-assign]
@@ -438,6 +448,97 @@ class TestWaitForCachingFeed:
             "ignores request_plus - so passing it here means no wait happens"
         )
         assert doc.seq == 5, "the sequence should come from the entry matching the revision written"
+
+    @pytest.mark.asyncio
+    async def test_create_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert doc.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_create_does_not_read_the_feed_by_default(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.create_document("db", "doc1", {"foo": "bar"})
+
+        assert calls == []
+        with pytest.raises(CblTestError, match="No sequence recorded"):
+            _ = doc.seq
+
+    @pytest.mark.asyncio
+    async def test_delete_waits_for_the_tombstone(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls, deleted=True)
+
+        tombstone = await sg.delete_document("doc1", "1-abc", "db", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert tombstone.tombstone is True
+        assert tombstone.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_delete_does_not_settle_for_a_live_revision(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A feed still showing the document alive must not satisfy a wait for its deletion."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        # deleted=False: the tombstone has not reached the cache yet.
+        self._record_get_changes(sg, [], deleted=False)
+
+        with pytest.raises(AssertionError, match="superseded"):
+            await sg.delete_document("doc1", "1-abc", "db", wait_for_caching_feed=True)
+
+    @pytest.mark.asyncio
+    async def test_delete_does_not_read_the_feed_by_default(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        tombstone = await sg.delete_document("doc1", "1-abc", "db")
+
+        assert calls == []
+        assert tombstone.tombstone is True
+        with pytest.raises(CblTestError, match="No sequence recorded"):
+            _ = tombstone.seq
+
+    @pytest.mark.asyncio
+    async def test_since_bounds_the_feed_read(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Writing in a loop, the previous write's sequence keeps each wait off the whole feed."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True, since=41)
+
+        assert calls[0].get("since") == 41
+
+    @pytest.mark.asyncio
+    async def test_feed_body_is_kept_out_of_the_http_log(self, sync_gateway: SyncGatewayFixture) -> None:
+        """The feed is read to find one document, so its body is noise in the log."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True)
+
+        assert calls[0].get("log_response") is False
 
     @pytest.mark.asyncio
     async def test_no_feed_read_when_not_requested(self, sync_gateway: SyncGatewayFixture) -> None:
