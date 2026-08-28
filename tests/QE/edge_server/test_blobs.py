@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -29,7 +29,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -140,7 +140,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id}."
@@ -177,7 +177,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -264,7 +264,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -288,7 +288,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -320,7 +320,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -383,7 +383,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -436,7 +436,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -477,7 +477,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 

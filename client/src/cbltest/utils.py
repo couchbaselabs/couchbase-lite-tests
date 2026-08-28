@@ -5,15 +5,13 @@ import subprocess
 import sys
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any, NoReturn, TypeVar, cast
+from typing import Any, NoReturn, cast
 
 import tenacity
 import tenacity._utils
 import tenacity.asyncio
 
 from .api.error import CblTimeoutError
-
-T = TypeVar("T")
 
 # Hide tenacity's retry-loop frames so failures show the actual assertion, not
 # Retrying/AsyncRetrying plumbing.
@@ -38,7 +36,7 @@ def _retry_assert_policy(wait: tenacity.wait.wait_base, stop: tenacity.stop.stop
     }
 
 
-async def async_retry_assert(
+async def async_retry_assert[T](
     function: Callable[[], Awaitable[T]],
     wait: tenacity.wait.wait_base,
     stop: tenacity.stop.stop_base,
@@ -51,7 +49,7 @@ async def async_retry_assert(
     return await retrying(function)
 
 
-def retry_assert(
+def retry_assert[T](
     function: Callable[[], T],
     wait: tenacity.wait.wait_base,
     stop: tenacity.stop.stop_base,
@@ -81,7 +79,7 @@ def retry_assert(
     return retrying(checked_function)
 
 
-def _try_n_times(
+def _try_n_times[T](
     num_times: int,
     seconds_between: float,
     wait_before_first_try: bool,
@@ -106,7 +104,7 @@ def _try_n_times(
     raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
 
 
-def assert_not_null(input: T | None, msg: str) -> T:
+def assert_not_null[T](input: T | None, msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
 

@@ -31,7 +31,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.13+
 - `uv` ([docs](https://docs.astral.sh/uv/))
 - Git LFS (install **before** cloning — the repo carries binary datasets via LFS)
 
@@ -90,7 +90,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Coding Standards
 
-- **Python 3.10+** — use `X | Y`, never `Union[X, Y]` / `Optional[X]`. Enforced by `pyupgrade --py310-plus` in pre-commit.
+- **Python 3.13+** — modern syntax (`X | Y`, not `Union`/`Optional`) is enforced by ruff `UP` rules and `pyupgrade --py313-plus` in pre-commit.
 - **Async everywhere** — test and framework I/O use `aiohttp` + `pytest-asyncio`.
 - **Formatting / linting** — `ruff` (with `I` import sorting) and `ruff-format`.
 - **Type checking** — `ty` (config in `[tool.ty.environment]`).

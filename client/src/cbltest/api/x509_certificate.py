@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -69,7 +69,7 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
         key_size=2048,
     )
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
-    not_valid_before = datetime.now(timezone.utc)
+    not_valid_before = datetime.now(UTC)
     not_valid_after = not_valid_before + timedelta(days=1)
 
     ca_certificate: Certificate = (
@@ -93,7 +93,7 @@ def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) 
         key_size=2048,
     )
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
-    not_valid_before = datetime.now(timezone.utc)
+    not_valid_before = datetime.now(UTC)
     not_valid_after = not_valid_before + timedelta(days=1)
     issuer_name = issuer_data.certificate.subject if issuer_data else cn_attribute
     signing_key = issuer_data.private_key if issuer_data else private_key

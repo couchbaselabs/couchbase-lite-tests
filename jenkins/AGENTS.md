@@ -217,7 +217,7 @@ Supported platform values: `dotnet_windows`, `dotnet_macos`, `dotnet_ios`, `dotn
 - **Always call `move_artifacts`** in `teardown.sh`.
 - **Teardown must run even on failure** — Jenkinsfile uses `post { always { … } }`.
 - **Never commit generated files** — `config.json` in test dirs, `topology.json` in `topology_setup/`.
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`.
+- **Python 3.13+** — modern syntax enforced by ruff `UP` + pyupgrade (see root [AGENTS.md](../AGENTS.md)).
 - **No markdown sidecars for pipeline changes** — code is self-documenting via shared scripts.
 
 ## Commands

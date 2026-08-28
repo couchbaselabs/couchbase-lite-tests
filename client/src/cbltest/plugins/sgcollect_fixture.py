@@ -45,7 +45,7 @@ async def run_sgcollects(sync_gateways: Sequence[SyncGateway], output_dir: Path)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def sgcollect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None, None]:
+async def sgcollect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None]:
     yield
     # Collect only if the run as a whole had trouble: at least one test failed over the session
     # (session.testsfailed is the cumulative count) OR the session timed out (pytest-timeout sets

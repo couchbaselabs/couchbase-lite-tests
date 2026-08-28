@@ -1,7 +1,6 @@
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeAlias
 
 from cbltest import CBLPyTest, CouchbaseServer
 from cbltest.api.cbltestclass import CBLTestClass
@@ -29,7 +28,7 @@ class DocSnapshot:
         self.remote = remote
 
 
-DocValidator: TypeAlias = Callable[[DocSnapshot, DocSnapshot], None]
+type DocValidator = Callable[[DocSnapshot, DocSnapshot], None]
 
 
 def tools_path() -> Path:

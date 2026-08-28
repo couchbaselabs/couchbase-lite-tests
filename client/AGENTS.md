@@ -152,7 +152,7 @@ CLI options added by `cblpytest_fixture`:
 
 ## Rules
 
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`.
+- **Python 3.13+** — modern syntax enforced by ruff `UP` + pyupgrade (see root [AGENTS.md](../AGENTS.md)).
 - **Async everywhere** — `aiohttp`, `pytest-asyncio`, `async def`.
 - **Type hints on every public method** — checked by `ty`.
 - **Imports**: `ruff` import sort (`I` rules); relative imports inside `cbltest`.
