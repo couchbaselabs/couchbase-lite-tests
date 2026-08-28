@@ -15,7 +15,7 @@ import com.couchbase.lite.CouchbaseLiteException;
 import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.mobiletest.services.KeyStoreService;
 
-public class JavaDesktopKeyStoreService extends KeyStoreService {
+public class JavaKeyStoreService extends KeyStoreService {
 
     private final Map<String, KeyStore> tlsKeyStores = new HashMap<>();
     private final Map<String, char[]> tlsKeyPasswords = new HashMap<>();
