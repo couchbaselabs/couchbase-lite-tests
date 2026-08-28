@@ -361,7 +361,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         """)
         isgr_1_payload = ISGRPayload(
             replication_id="isgr_sg1_to_sg2",
-            remote_url=f"https://{sg2.hostname}:4985",
+            remote_url=sg2.http_url,
             remote_db=sg_db2,
             direction="push",
             remote_username="admin",
@@ -385,7 +385,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         """)
         isgr_2_payload = ISGRPayload(
             replication_id="isgr_sg3_from_sg1",
-            remote_url=f"https://{sg1.hostname}:4985",
+            remote_url=sg1.http_url,
             remote_db=sg_db1,
             direction="pull",
             remote_username="admin",

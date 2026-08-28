@@ -181,6 +181,7 @@ class CBLPyTest:
                         sgw_info.rbac_password,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
+                        sgw_info.port,
                     ),
                     sgw_info.cluster_index,
                 )

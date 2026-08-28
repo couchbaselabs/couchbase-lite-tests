@@ -229,7 +229,8 @@ class ISGRPayload(JSONSerializable):
         Creates an ISGR configuration payload.
 
         :param replication_id: A unique identifier for this replication
-        :param remote_url: The URL of the remote Sync Gateway (e.g., "https://sg2.example.com:4985")
+        :param remote_url: The URL of the remote Sync Gateway, without a database -- use the remote
+            client's `http_url` rather than building it by hand
         :param remote_db: The database name on the remote Sync Gateway
         :param direction: Replication direction - "push", "pull", or "pushAndPull"
         :param continuous: Whether the replication should be continuous (default False)
@@ -713,12 +714,19 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
+        public_port: int | None = None,
     ) -> None:
+        """
+        :param port: The port this client sends its own requests to.
+        :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
+            correct for a client that already talks to the public API; an admin client must pass it,
+            since its own `port` is the admin one.
+        """
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
         self.__http_url = f"{scheme}{url}:{port}"
-        # Replication always uses public port 4984
-        self.__replication_url = f"{ws_scheme}{url}:4984"
+        self.__public_port: int = public_port if public_port is not None else port
+        self.__replication_url = f"{ws_scheme}{url}:{self.__public_port}"
         self._tracer = get_tracer(__name__, VERSION)
         self.__secure: bool = secure
         self.__hostname: str = url
@@ -750,6 +758,16 @@ class _SyncGatewayBase:
     def scheme(self) -> str:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
+
+    @property
+    def http_url(self) -> str:
+        """Gets the REST API base URL this client sends its own requests to (i.e. follows `port`)"""
+        return self.__http_url
+
+    @property
+    def public_url(self) -> str:
+        """Gets the REST API base URL of the instance's public port, whichever port this client uses"""
+        return f"{self.scheme}{self.hostname}:{self.__public_port}"
 
     def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
@@ -1664,7 +1682,9 @@ class _SyncGatewayBase:
         params = {"rev": revision}
 
         auth_header = encode_basic_auth(username, password, "ascii")
-        async with self._create_session(self.secure, self.scheme, self.hostname, 4984, auth_header) as session:
+        async with self._create_session(
+            self.secure, self.scheme, self.hostname, self.__public_port, auth_header
+        ) as session:
             return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
@@ -1955,7 +1975,7 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, username, password, port, secure, public_port)
         self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
@@ -2273,11 +2293,11 @@ class SyncGateway(_SyncGatewayBase):
         :param config_name: Name of the config file (without .json extension).
         :raises Exception: If the start fails
         """
-        # Check if SGW is already running by probing the public endpoint (4984)
+        # Check if SGW is already running by probing its public endpoint
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, 4984, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, self.__public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
