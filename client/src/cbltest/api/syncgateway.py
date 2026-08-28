@@ -1911,7 +1911,11 @@ class SyncGateway(_SyncGatewayBase):
         Creates a login session for an existing user via the admin API
         (POST /{db}/_session) and returns its session id.
 
-        A session cannot be created for a non-existent user or the GUEST user.
+        A session cannot be created for a non-existent user or the GUEST user;
+        Sync Gateway answers 404 and 400 respectively.
+
+        Calling this again does not invalidate the existing session; it creates an
+        additional session alongside it.
 
         :param db_name: The name of the database to create the session against
         :param name: The user to create the session for
