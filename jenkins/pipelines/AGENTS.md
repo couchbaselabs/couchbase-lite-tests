@@ -104,7 +104,7 @@ Does not call the shared `setup_test()` — has its own inline topology-composit
 - **Topology must match `@pytest.mark.min_*` decorators** before tests change.
 - **Always call `move_artifacts`** in `teardown.sh`.
 - **Teardown runs on failure** — Jenkinsfile uses `post { always { … } }`.
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]`.
+- **Python 3.13+** — `X | Y`, never `Union[X, Y]`.
 - **No markdown sidecars** for pipeline changes.
 
 ## Commands

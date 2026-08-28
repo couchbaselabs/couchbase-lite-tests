@@ -20,7 +20,7 @@ parsed_config_key: Final[pytest.StashKey[ParsedConfig]] = pytest.StashKey()
 
 
 @pytest_asyncio.fixture(scope="session")
-async def cblpytest(request: pytest.FixtureRequest) -> AsyncGenerator[CBLPyTest, None]:
+async def cblpytest(request: pytest.FixtureRequest) -> AsyncGenerator[CBLPyTest]:
     config = request.config.stash[parsed_config_key]
     log_level = request.config.getoption("--cbl-log-level")
     test_props = request.config.getoption("--test-props")

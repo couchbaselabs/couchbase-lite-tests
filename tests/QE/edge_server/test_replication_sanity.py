@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -33,7 +33,7 @@ class TestReplicationSanity(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -83,7 +83,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
         assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
@@ -102,7 +102,7 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc_body = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "changed": "yes",
         }
 
@@ -134,7 +134,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
@@ -154,7 +154,7 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc_body = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "changed": "yes",
         }
         updated_doc = await sync_gateway.update_document(sg_db_name, doc_id_es, updated_doc_body, rev_id)

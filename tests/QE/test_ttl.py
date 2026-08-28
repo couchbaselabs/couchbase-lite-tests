@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -39,7 +39,7 @@ class TestTTL(CBLTestClass):
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:
             self.mark_test_step("Create documents with different expiry times")
-            current_time = datetime.now(timezone.utc)
+            current_time = datetime.now(UTC)
             expire_5s = int((current_time + timedelta(seconds=5)).timestamp())
             expire_years = int((current_time + timedelta(days=365)).timestamp())
             await sg.update_documents(
