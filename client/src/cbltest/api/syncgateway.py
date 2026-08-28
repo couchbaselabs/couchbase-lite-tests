@@ -2101,6 +2101,41 @@ class SyncGateway(_SyncGatewayBase):
                 else:
                     raise
 
+    async def create_session(self, db_name: str, name: str) -> str:
+        """
+        Creates a login session for an existing user via the admin API
+        (POST /{db}/_session) and returns its session id.
+
+        A session cannot be created for a non-existent user or the GUEST user;
+        Sync Gateway answers 404 and 400 respectively.
+
+        Calling this again does not invalidate the existing session; it creates an
+        additional session alongside it.
+
+        :param db_name: The name of the database to create the session against
+        :param name: The user to create the session for
+        :return: The id of the created session
+        """
+        with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({"name": name}))
+            assert isinstance(resp, dict)
+            session_id = resp["session_id"]
+            assert isinstance(session_id, str)
+            return session_id
+
+    async def delete_session(self, db_name: str, session_id: str) -> None:
+        """
+        Invalidates a session via the admin API (DELETE /{db}/_session/{sessionid}),
+        logging out anyone using it and preventing future use.
+
+        :param db_name: The name of the database the session belongs to
+        :param session_id: The id of the session to invalidate
+
+        :raises CblSyncGatewayBadResponseError: Sync Gateway answers 404 for an unknown, or already deleted session_id
+        """
+        with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_session/{session_id}")
+
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
         Adds the specified role to a Sync Gateway database with the specified collection access
