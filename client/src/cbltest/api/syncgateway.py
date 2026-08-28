@@ -1494,12 +1494,14 @@ class _SyncGatewayBase:
         :param rev: The current revision ID of the document
         :param scope: The scope where the document exists (default '_default')
         :param collection: The collection where the document exists (default '_default')
-        :param wait_for_caching_feed: If True, read the update back from a `request_plus` changes feed filtered to
-                                      this document before returning, and populate the returned document's `seq`
-                                      from the entry matching the revision just written. This makes `seq` this
-                                      update's own sequence rather than a stale pre-write one. Raises if the
-                                      document was superseded by a concurrent write before the feed was read,
-                                      since the feed then reports only that later sequence (default False)
+        :param wait_for_caching_feed: If True, do not return until the new revision has reached the
+                                      channel cache, and populate the returned document's `seq` from the
+                                      entry matching the revision just written. This makes `seq` this
+                                      update's own sequence rather than a stale pre-write one, and means a
+                                      caller that goes on to read a changes feed cannot race the write.
+                                      Raises if the document was superseded by a concurrent write before
+                                      the feed was read, since the feed then reports only that later
+                                      sequence (default False)
         :return: The updated document as a RemoteDocument object
         """
         with self._tracer.start_as_current_span(
@@ -1556,21 +1558,25 @@ class _SyncGatewayBase:
             version_type = "rev" if "_rev" in cast_resp else "cv"
             expected_revision = cast(str, cast_resp[f"_{version_type}"])
 
-            # request_plus waits for the cache to catch up to every sequence allocated before this request,
-            # which includes the one the PUT above was given.
+            # request_plus waits for the cache to catch up to every sequence allocated before this
+            # request, which includes the one the PUT above was given.
+            #
+            # Deliberately no `doc_ids`: Sync Gateway only honours request_plus on the unfiltered
+            # feed.  `RequestPlusSeq` is read solely by `SimpleMultiChangesFeed`, while a `_doc_ids`
+            # feed is served by `DocIDChangesFeed`, which reads each document straight out of the
+            # bucket via `GetDocument` and never consults the cache.  Passing doc_ids here silently
+            # dropped the wait and returned as soon as the document was readable.
             changes = await self.get_changes(
                 db_name,
                 scope,
                 collection,
                 version_type=version_type,
-                doc_ids=[doc_id],
                 request_plus=True,
             )
             entries = [e for e in changes.results if e.id == doc_id]
             assert entries, (
                 f"Changes feed has no entry for {doc_id} even after a request_plus feed "
-                f"(last_seq={changes.last_seq}, results="
-                f"{dumps([{'id': e.id, 'seq': e.seq, 'changes': e.changes, 'deleted': e.deleted} for e in changes.results])})"
+                f"(last_seq={changes.last_seq}, {len(changes.results)} entries in the feed)"
             )
 
             # The feed carries only the document's current revision, so no match means a concurrent write

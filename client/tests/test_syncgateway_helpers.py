@@ -20,6 +20,7 @@ from aiohttp import encode_basic_auth, web
 from aiohttp.test_utils import TestServer
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import (
+    ChangesResponse,
     DatabaseConfig,
     DatabaseState,
     ScopeConfig,
@@ -399,3 +400,52 @@ class TestDeleteDatabase:
             await sg.delete_database("db2")
 
         assert len(received) == 4  # Initial attempt plus three retries.
+
+
+class TestWaitForCachingFeed:
+    """update_document(wait_for_caching_feed=True) has to read the unfiltered changes feed.
+
+    Sync Gateway only honours `request_plus` there: `RequestPlusSeq` is consumed by
+    `SimpleMultiChangesFeed`, while supplying `doc_ids` routes the request to
+    `DocIDChangesFeed`, which reads each document straight out of the bucket and never waits
+    for the channel cache.  Asking for both silently produced no wait at all.
+    """
+
+    @staticmethod
+    def _record_get_changes(sg: SyncGateway, calls: list[dict]) -> None:
+        async def fake_get_changes(*args: object, **kwargs: object) -> ChangesResponse:
+            calls.append(dict(kwargs))
+            return ChangesResponse(
+                {"results": [{"seq": 5, "id": "doc1", "changes": [{"rev": "2-abc"}]}], "last_seq": "5"}
+            )
+
+        # An instance attribute, so only this SyncGateway is affected.
+        sg.get_changes = fake_get_changes  # type: ignore[method-assign]
+
+    @pytest.mark.asyncio
+    async def test_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.update_document("db", "doc1", {"foo": "bar"}, "1-abc", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True, "request_plus is what does the waiting"
+        assert "doc_ids" not in calls[0], (
+            "a _doc_ids feed is served from the bucket, not the channel cache, and silently "
+            "ignores request_plus - so passing it here means no wait happens"
+        )
+        assert doc.seq == 5, "the sequence should come from the entry matching the revision written"
+
+    @pytest.mark.asyncio
+    async def test_no_feed_read_when_not_requested(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_document("db", "doc1", {"foo": "bar"}, "1-abc")
+
+        assert calls == [], "the default must not pay for a changes feed read"
