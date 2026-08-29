@@ -78,7 +78,7 @@ class TestXattrs(CBLTestClass):
                 original_vv = {row.id: row.cv for row in sg_all_docs.rows}
 
         self.mark_test_step("Stop Sync Gateway")
-        await sg.delete_database(sg_db)
+        await cluster.sync_gateway_cluster.delete_database(sg_db)
 
         self.mark_test_step("Update all SG docs via SDK")
         for doc_id in sg_doc_ids:

@@ -142,6 +142,9 @@ class CouchbaseServer:
         self.__hostname = parsed.hostname or parsed.netloc.split(":")[0]
         self.__rest_port = parsed.port or 8091
 
+    def __str__(self) -> str:
+        return f"{type(self).__name__} {self.__hostname}:{self.__rest_port}"
+
     @property
     def hostname(self) -> str:
         """

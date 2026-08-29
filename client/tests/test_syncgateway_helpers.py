@@ -368,20 +368,54 @@ class TestDatabaseConfig:
             DatabaseConfig(scopes="not_a_dict")  # ty: ignore[invalid-argument-type]
 
 
+MISSING_BUCKET_ENTRY_REASON = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
+
+
+def _missing_bucket_entry_500() -> dict:
+    """The 500 SGW returns when a database's registry entry is already gone (CBG-5731)."""
+    return {"status": 500, "json": {"error": "Internal Server Error", "reason": MISSING_BUCKET_ENTRY_REASON}}
+
+
+def _all_dbs(*db_names: str) -> dict:
+    return {"status": 200, "json": [{"db_name": name, "bucket": "b", "state": "Online"} for name in db_names]}
+
+
 class TestDeleteDatabase:
-    """delete_database swallows the CBG-5731 500 SGW returns once the database's bucket
-    entry is gone, without swallowing 500s that a retry could still clear."""
+    """The delete waits for the node to stop serving the database, and still reports 500s
+    that mean anything else."""
 
     @pytest.mark.asyncio
-    async def test_ignores_known_missing_bucket_failure(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_waits_out_the_node_on_missing_bucket_entry(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The CBG-5731 500 means the node is still serving it, so the delete must wait."""
         sg, specs, received = sync_gateway
-        reason = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
-        specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": reason}}]
+        wait_for_database_gone = sg._wait_for_database_gone
+        monkeypatch.setattr(
+            sg,
+            "_wait_for_database_gone",
+            lambda db_name: wait_for_database_gone(db_name, retry_delay=0),
+        )
+        specs[:] = [
+            _missing_bucket_entry_500(),
+            _all_dbs("db2"),  # still serving it
+            _all_dbs("db2"),
+            _all_dbs(),  # config poll caught up
+        ]
 
-        await sg.delete_database("db2")
+        await sg._delete_database("db2")
 
-        # No retries: this response never changes.
-        assert len(received) == 1
+        assert len(received) == 4  # The DELETE plus the polls it took.
+
+    @pytest.mark.asyncio
+    async def test_raises_if_the_node_never_stops_serving_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A node that never catches up is a failure. Exercised on the wait, which owns the
+        budget and which the delete awaits."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [_all_dbs("db2")]
+
+        with pytest.raises(TimeoutError, match="still serving database db2"):
+            await sg._wait_for_database_gone("db2", timeout=0.2, retry_delay=0)
 
     @pytest.mark.asyncio
     async def test_retries_then_raises_on_other_500(
@@ -396,6 +430,6 @@ class TestDeleteDatabase:
         monkeypatch.setattr(asyncio, "sleep", no_sleep)
 
         with pytest.raises(CblSyncGatewayBadResponseError):
-            await sg.delete_database("db2")
+            await sg._delete_database("db2")
 
         assert len(received) == 4  # Initial attempt plus three retries.
