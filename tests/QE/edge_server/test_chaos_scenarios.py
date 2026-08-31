@@ -304,82 +304,89 @@ class TestEdgeServerChaos(CBLTestClass):
         scope: str,
         collection: str,
         revmap: dict[str, str],
-    ) -> bool | None:
-        """Perform async CRUD operation based on random optype"""
+    ) -> bool:
+        """
+        Perform one CRUD operation of the given type, returning whether Edge Server
+        reported it as applied.
+
+        Errors deliberately propagate: swallowing them here turned every real failure
+        into a bare `assert False` at the call site, with no indication of what broke.
+        """
         doc_id = None
 
         # Nothing to operate on (except create)
         if optype != "create" and not docs_dict:
             return True
 
-        try:
-            if optype == "create":
-                doc_id = str(uuid.uuid4())
-                new_doc = docgen.generate_document(doc_id)
+        if optype == "create":
+            doc_id = str(uuid.uuid4())
+            # generate_document returns {doc_id: body} so batch_process can merge its
+            # results; a direct caller wants just the body, to match the shape
+            # generate_all_documents leaves in docs_dict.
+            new_doc = docgen.generate_document(doc_id)[doc_id]
 
-                response = await client.put_document_with_id(
-                    document=new_doc,
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                    id=doc_id,
-                )
+            response = await client.put_document_with_id(
+                document=new_doc,
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+                id=doc_id,
+            )
 
-                if response.get("ok"):
-                    docs_dict[doc_id] = new_doc
-                    revmap[doc_id] = response["rev"]
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict[doc_id] = new_doc
+                revmap[doc_id] = response["rev"]
+            return response.get("ok", False)
 
-            # Pick existing doc
-            doc_id = random.choice(list(docs_dict.keys()))
+        # Pick existing doc
+        doc_id = random.choice(list(docs_dict.keys()))
 
-            if optype == "update" and doc_id in revmap:
-                updated_doc = docgen.update_document(docs_dict[doc_id], doc_id)
+        if optype == "update" and doc_id in revmap:
+            updated_doc = docgen.update_document(docs_dict[doc_id], doc_id)[doc_id]
 
-                response = await client.put_document_with_id(
-                    id=doc_id,
-                    document=updated_doc,
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                    rev=revmap[doc_id],
-                )
+            response = await client.put_document_with_id(
+                id=doc_id,
+                document=updated_doc,
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+                rev=revmap[doc_id],
+            )
 
-                if response.get("ok"):
-                    docs_dict[doc_id] = updated_doc
-                    revmap[doc_id] = response["rev"]
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict[doc_id] = updated_doc
+                revmap[doc_id] = response["rev"]
+            return response.get("ok", False)
 
-            if optype == "delete" and doc_id in revmap:
-                response = await client.delete_document(
-                    doc_id,
-                    revid=revmap[doc_id],
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                )
+        if optype == "delete" and doc_id in revmap:
+            response = await client.delete_document(
+                doc_id,
+                revid=revmap[doc_id],
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+            )
 
-                if response.get("ok"):
-                    docs_dict.pop(doc_id, None)
-                    revmap.pop(doc_id, None)
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict.pop(doc_id, None)
+                revmap.pop(doc_id, None)
+            return response.get("ok", False)
 
-            if optype == "read":
-                remote_doc = await client.get_document(
-                    db_name=db_name, scope=scope, collection=collection, doc_id=doc_id
-                )
-                local_doc = docs_dict.get(doc_id)
-                if not local_doc:
-                    return True  # deleted concurrently
+        if optype == "read":
+            remote_doc = await client.get_document(db_name=db_name, scope=scope, collection=collection, doc_id=doc_id)
+            local_doc = docs_dict.get(doc_id)
+            if not local_doc:
+                return True  # deleted concurrently
 
-                assert remote_doc is not None, f"Document {doc_id} not found"
+            assert remote_doc is not None, f"Document {doc_id} not found"
 
-                for key, value in remote_doc.body.items():
-                    assert local_doc.get(key) == value
-                return True
+            for key, value in remote_doc.body.items():
+                assert local_doc.get(key) == value
+            return True
 
-        except Exception:
-            return False
+        # An update or delete for a document with no known revision: nothing to do,
+        # rather than falling off the end and returning None.
+        return True
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_with_concurrent_rest_requests(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

@@ -5,6 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import BulkDocOperation
+from cbltest.api.error import CblEdgeServerBadResponseError
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -71,10 +72,8 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("delete single doc")
         await edge_server.delete_document(doc_id=id2, revid=rev3, db_name=db_name)
         self.mark_test_step("fetch deleted doc")
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(db_name, doc_id=id2)
-        except Exception as e:
-            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -158,10 +157,8 @@ class TestCrud(CBLTestClass):
         rev3 = update["rev"]
         await edge_server.delete_document(doc_id=id3, revid=rev3, db_name=db_name)
         self.mark_test_step("fetch deleted doc")
-        try:
-            await edge_server.get_document(db_name, doc_id=id2)
-        except Exception as e:
-            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document(db_name, doc_id=id3)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
