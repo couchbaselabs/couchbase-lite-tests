@@ -25,6 +25,15 @@ stopped() {
   [[ -z "$(es_pids)" ]] && ! port_busy
 }
 
+# The RPM installs a systemd unit and starts it, so on a freshly provisioned host
+# Edge Server is service-managed: signalling its process just makes systemd spawn
+# another one and the port never frees. The service has to be stopped first. After
+# provisioning the tests run Edge Server by hand with setsid, which systemd knows
+# nothing about, so the signal escalation below is still needed.
+if systemctl cat couchbase-edge-server.service >/dev/null 2>&1; then
+  sudo systemctl stop couchbase-edge-server.service >/dev/null 2>&1 || true
+fi
+
 if stopped; then
   echo "Running process not found"
   exit 0
