@@ -131,6 +131,11 @@ pipeline {
                     echo "Triggered: ${triggered}"
                     echo "Skipped:   ${skipped}"
                     echo "Failed:    ${failed}"
+
+                    if (failed) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "WARNING: ${failed.size()} train(s) failed to resolve: ${failed}"
+                    }
                 }
             }
         }
