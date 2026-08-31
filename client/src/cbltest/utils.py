@@ -7,6 +7,7 @@ import time
 from collections.abc import Awaitable, Callable
 from typing import Any, NoReturn, cast
 
+import requests
 import tenacity
 import tenacity._utils
 import tenacity.asyncio
@@ -102,6 +103,48 @@ def _try_n_times[T](
                 print(f"Trying {function_name} failed (reason='{e}')")
 
     raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
+
+
+def is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
+    """
+    Whether anything responds on ``hostname:port``.  Any status counts -- this asks whether
+    a sidecar is there at all, not whether a particular resource exists.
+
+    :param hostname: Host to probe
+    :param port: Port the sidecar is expected on
+    :param timeout: Seconds to wait before deciding nothing is listening
+    :return: True if the port answered
+    """
+    try:
+        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
+
+
+def describe_transfer(received: int, expected: int | None) -> str:
+    """
+    Describes how much of a response body arrived, for error messages on a transfer that
+    did not finish.
+
+    :param received: Bytes actually read so far
+    :param expected: Bytes the response promised via Content-Length, or None if it did not say
+    :return: Something like "12.3 MiB of 40.0 MiB (31%)", or "12.3 MiB of unknown total"
+    """
+
+    def size(n: int) -> str:
+        value = float(n)
+        for unit in ("B", "KiB", "MiB", "GiB"):
+            if value < 1024 or unit == "GiB":
+                return f"{value:.1f} {unit}" if unit != "B" else f"{n} B"
+            value /= 1024
+        raise AssertionError("unreachable")
+
+    if expected is None:
+        return f"{size(received)} of unknown total"
+    if expected == 0:
+        return f"{size(received)} of 0 B"
+    return f"{size(received)} of {size(expected)} ({received * 100 // expected}%)"
 
 
 def assert_not_null[T](input: T | None, msg: str) -> T:

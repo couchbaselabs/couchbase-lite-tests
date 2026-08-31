@@ -10,9 +10,10 @@ from urllib.parse import urljoin
 
 import aiofiles
 import pyjson5 as json5
-from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
 
+from cbltest.api import caddy
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
@@ -109,6 +110,7 @@ class EdgeServer:
         if config_file is None:
             raise CblTestError("Config file cannot be None")
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
+        self._caddy = caddy.Caddy(url)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__hostname: str = url
@@ -130,9 +132,23 @@ class EdgeServer:
         )
         self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
 
+    async def close(self) -> None:
+        """
+        Closes every aiohttp session this Edge Server holds, including its Caddy's
+        """
+        for session in (self.__anonymous_session, self.__admin_session, self.__shell_session):
+            if not session.closed:
+                await session.close()
+        await self._caddy.close()
+
     @property
     def hostname(self) -> str:
         return self.__hostname
+
+    @property
+    def caddy(self) -> caddy.Caddy:
+        """Gets the Caddy file server running alongside this Edge Server"""
+        return self._caddy
 
     def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool, bool]:
         with open(config_file, encoding="utf-8") as file:
@@ -851,36 +867,12 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("kill edge server"):
             await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
 
-    async def _caddy_http_request(
-        self,
-        url: str,
-        operation: str,
-        timeout: int = 30,
-    ) -> bytes:
-        with self.__tracer.start_as_current_span(
-            "caddy_http_request",
-            attributes={"cbl.caddy.url": url},
-        ):
-            try:
-                async with (
-                    ClientSession() as session,
-                    session.get(url, timeout=ClientTimeout(total=timeout)) as response,
-                ):
-                    if response.status == 404:
-                        raise FileNotFoundError(f"{operation} not found at {url}")
-                    if response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(f"{operation} failed: HTTP {response.status} - {error_text}")
-                    return await response.read()
-            except ClientError as e:
-                raise Exception(f"Network error during {operation}: {e}") from e
-
     async def get_log_content(
         self,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
     ) -> str:
         """
-        Fetch raw log file content from the Edge Server host via Caddy (port 20000).
+        Fetch raw log file content from the Edge Server host via Caddy (port :data:`~cbltest.api.caddy.DEFAULT_PORT`).
 
         :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
         :return: Full log file content as string, or empty string on error.
@@ -892,10 +884,11 @@ class EdgeServer:
             try:
                 prefix = "/home/ec2-user/"
                 path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                caddy_url = f"http://{self.hostname}:20000/{path}"
-                content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
-                return content.decode("utf-8")
-            except Exception:
+                return await self._caddy.fetch(path)
+            except Exception as e:
+                # Callers treat "" as "nothing in the log", which is indistinguishable from
+                # a fetch that failed -- so say which one this was.
+                cbl_warning(f"Failed to fetch {log_file} via Caddy, treating as empty: {e}")
                 return ""
 
     async def check_log(
