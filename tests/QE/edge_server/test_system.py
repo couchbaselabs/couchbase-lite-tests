@@ -18,28 +18,14 @@ from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
-# spec/tests/QE/edge_server/test_system.md fixes these runs at six hours. The elapsed
-# window is the only thing that ends them: no loop here breaks out for any other
-# reason (the one `break`, in multi_client_chaos's chaos_controller, fires when
-# _sleep_until reports the window gone), and nothing bounds them from outside either.
-# The Edge Server job sets
-# neither PYTEST_TIMEOUT nor CBL_PYTEST_SESSION_TIMEOUT, and a session timeout would
-# not help anyway -- pytest-timeout checks it between tests and sets shouldfail, so it
-# never interrupts a test already running. Only a per-test PYTEST_TIMEOUT would.
-#
-# So nothing in CI runs this file today: jenkins/pipelines/QE/es/Jenkinsfile selects a
-# single file through TEST_NAME, which defaults to test_crud.py, and hard-kills the
-# stage at 60 minutes. Passing TEST_NAME=test_system.py would be killed roughly a
-# sixth of the way in, with no result. These need a longer-running pipeline, or a
-# shorter duration agreed with the spec.
+# Six hours, per spec/tests/QE/edge_server/test_system.md, and the elapsed window is
+# the only thing that ends these tests -- nothing times them out. Longer than the 60
+# minutes jenkins/pipelines/QE/es allows a stage, so no CI job runs this file today.
 RUN_DURATION = timedelta(minutes=360)
 
-# How long the chaos runs leave Edge Server alone between events, and how long they
-# keep it down once they kill it. Both are spec'd values
-# (spec/tests/QE/edge_server/test_system.md), kept here so a shorter run needs only
-# these changed rather than magic numbers buried in the coroutines. The quiet period
-# is slept a second at a time, so shortening RUN_DURATION alone is enough to end a
-# run promptly -- these only control how much chaos it gets through first.
+# Spec'd chaos timings, named here so a shorter run needs only these changed. The
+# quiet period is slept a second at a time, so these govern how much chaos a run
+# gets through, not how long it takes to finish.
 CHAOS_QUIET_PERIOD_MIN = timedelta(minutes=5)
 CHAOS_QUIET_PERIOD_MAX = timedelta(minutes=20)
 CHAOS_DOWN_WINDOW = timedelta(minutes=1)

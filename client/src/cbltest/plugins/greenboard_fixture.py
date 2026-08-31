@@ -112,11 +112,9 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     sgw_version = await cblpytest.sync_gateways[0].get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
-            # Only an edge-server-only run is an edge-server run. A session that also
-            # drove a CBL test server keeps that platform, the same way the sgw marker
-            # above only keeps a platform rather than claiming one; otherwise a mixed
-            # run (tests/dev_e2e, which includes dev_e2e/edge_server) would file all
-            # its CBL results under edge-server and drop the CBL version.
+            # Only claim the platform when there is no test server to attribute the run
+            # to, as the sgw marker above only ever keeps a platform. A mixed run would
+            # otherwise file its CBL results under edge-server.
             if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
                 if len(cblpytest.test_servers) == 0:
                     test_platform = "edge-server"

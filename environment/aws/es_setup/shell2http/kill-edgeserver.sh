@@ -1,13 +1,9 @@
 #!/bin/bash
 
-# Stop Edge Server and do not return until it has actually let go of its
-# listening port.
+# Stop Edge Server and do not return until it has let go of its listening port.
 #
-# Returning while the process is still shutting down means the next
-# /start-edgeserver races it and dies with "Address already in use", which
-# strands the host for every test that follows. So this escalates
-# SIGHUP -> SIGTERM -> SIGKILL and only returns once no edge-server process
-# remains and the port is free.
+# Returning mid-shutdown means the next /start-edgeserver races it and dies with
+# "Address already in use", stranding the host for every test that follows.
 
 ES_BIN="/opt/couchbase-edge-server/bin/couchbase-edge-server"
 PORT="${ES_PORT:-59840}"
