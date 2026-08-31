@@ -16,7 +16,7 @@ pipeline {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
                     env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
                     env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
-                    env.TS_TEST_FILTER = params.TS_TEST_FILTER
+                    env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
@@ -48,7 +48,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 160, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${env.TS_TEST_FILTER ?: ''}'"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${env.TS_TEST_FILTER}'"
                 }
                 echo "=== SGW Tests Complete"
             }
