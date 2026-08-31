@@ -18,6 +18,21 @@ from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
+# spec/tests/QE/edge_server/test_system.md fixes these runs at six hours. The elapsed
+# window is the only thing that ends them: no loop here breaks out early (the one
+# `break`, in multi_client_chaos's chaos_controller, just re-checks end_time after its
+# 5-20 minute sleep), and nothing bounds them from outside. The Edge Server job sets
+# neither PYTEST_TIMEOUT nor CBL_PYTEST_SESSION_TIMEOUT, and a session timeout would
+# not help anyway -- pytest-timeout checks it between tests and sets shouldfail, so it
+# never interrupts a test already running. Only a per-test PYTEST_TIMEOUT would.
+#
+# So nothing in CI runs this file today: jenkins/pipelines/QE/es/Jenkinsfile selects a
+# single file through TEST_NAME, which defaults to test_crud.py, and hard-kills the
+# stage at 60 minutes. Passing TEST_NAME=test_system.py would be killed roughly a
+# sixth of the way in, with no result. These need a longer-running pipeline, or a
+# shorter duration agreed with the spec.
+SOAK_DURATION = timedelta(minutes=360)
+
 
 def _doc_body(doc_id: str) -> dict[str, Any]:
     return {
@@ -120,7 +135,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + SOAK_DURATION
         (
             sync_gateway,
             edge_server,
@@ -230,7 +245,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + SOAK_DURATION
         (
             sync_gateway,
             edge_server,
@@ -373,7 +388,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_concurrent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + SOAK_DURATION
         (
             sync_gateway,
             edge_server,
@@ -490,7 +505,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + SOAK_DURATION
         (
             sync_gateway,
             edge_server,
