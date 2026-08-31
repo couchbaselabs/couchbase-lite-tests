@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -12,7 +13,7 @@ from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
 )
-from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, RemoteDocument, ScopeConfig, SyncGateway
 from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -31,6 +32,35 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
         **_doc_body(doc_id),
         "changed": "yes",
     }
+
+
+async def _get_document_after_rev(
+    edge_server: EdgeServer,
+    db_name: str,
+    doc_id: str,
+    previous_rev: str | None,
+    *,
+    timeout: float = 30.0,
+) -> RemoteDocument | None:
+    """
+    Read doc_id from the Edge Server, waiting for a revision newer than
+    previous_rev to arrive.
+
+    A write made on Sync Gateway reaches the Edge Server by replication, so
+    reading straight back races the replicator. Returns as soon as the
+    revision differs, or the last revision seen once the timeout expires, so
+    the caller's own assertion reports a genuine mismatch.
+    """
+    deadline = time.monotonic() + timeout
+    remote_doc = await edge_server.get_document(db_name, doc_id)
+    while time.monotonic() < deadline:
+        if remote_doc is not None and remote_doc.revid != previous_rev:
+            return remote_doc
+
+        await asyncio.sleep(0.5)
+        remote_doc = await edge_server.get_document(db_name, doc_id)
+
+    return remote_doc
 
 
 @pytest.mark.es
@@ -132,11 +162,11 @@ class TestSystem(CBLTestClass):
                     )
                     assert updated_doc is not None, f"Failed to update document {doc_id} via Sync Gateway"
                     self.mark_test_step(f"Verifying {doc_id} update on Edge Server.")
-                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                    remote_doc = await _get_document_after_rev(edge_server, es_db_name, doc_id, rev_id)
 
                     assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server"
                     assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
-                    assert remote_doc.revid != rev_id, "Revision ID (_rev) missing in the document"
+                    assert remote_doc.revid != rev_id, f"Document {doc_id} rev unchanged after update"
 
                     # Storing the revision ID
                     rev_id = remote_doc.revid
@@ -208,16 +238,21 @@ class TestSystem(CBLTestClass):
             es_db_name,
         ) = await self._setup_system_test(cblpytest)
         edge_server_down = False
-        end = datetime.now(UTC) + timedelta(minutes=2400)
+        # When chaos has killed the Edge Server, the time to restart it; None
+        # when nothing is pending. It must be cleared once consumed, or every
+        # later iteration retries the restart and Edge Server fails to bind
+        # its port with "Address already in use".
+        restart_at: datetime | None = None
         doc_counter = 11
 
         while datetime.now(UTC) < end_time:
-            if datetime.now(UTC) > end:
+            if restart_at is not None and datetime.now(UTC) > restart_at:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
                 await edge_server.start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 edge_server_down = False
+                restart_at = None
 
                 self.mark_test_step("Verifying doc counts match after Edge Server restart.")
                 sg_response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
@@ -237,7 +272,7 @@ class TestSystem(CBLTestClass):
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
                 await edge_server.kill_server()
-                end = datetime.now(UTC) + timedelta(minutes=1)
+                restart_at = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
                 edge_server_down = True
@@ -269,11 +304,11 @@ class TestSystem(CBLTestClass):
                     # Validate update on Edge Server
                     if not edge_server_down:
                         self.mark_test_step(f"Verifying {doc_id} update on Edge Server.")
-                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                        remote_doc = await _get_document_after_rev(edge_server, es_db_name, doc_id, rev_id)
 
                         assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server"
                         assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
-                        assert remote_doc.revid != rev_id, "Revision ID (_rev) missing in the document"
+                        assert remote_doc.revid != rev_id, f"Document {doc_id} rev unchanged after update"
 
                     # Storing the revision ID
                     rev_id = updated_doc.revid
@@ -380,7 +415,7 @@ class TestSystem(CBLTestClass):
                             f"[Client {client_id}] Failed to update {doc_id} via Sync Gateway"
                         )
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Edge Server.")
-                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                        remote_doc = await _get_document_after_rev(edge_server, es_db_name, doc_id, rev_id)
                         assert remote_doc is not None, (
                             f"[Client {client_id}] {doc_id} missing on Edge Server after update"
                         )
@@ -549,7 +584,7 @@ class TestSystem(CBLTestClass):
                         )
                         if not shared["edge_server_down"]:
                             self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Edge Server.")
-                            remote_doc = await edge_server.get_document(es_db_name, doc_id)
+                            remote_doc = await _get_document_after_rev(edge_server, es_db_name, doc_id, rev_id)
                             assert remote_doc is not None, (
                                 f"[Client {client_id}] {doc_id} missing on Edge Server after update"
                             )
