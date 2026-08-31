@@ -29,6 +29,7 @@ PUBLIC_PORT = 4984
 
 async def _setup_db(
     sg: SyncGateway,
+    sg_cluster: SyncGatewayCluster,
     cbs: CouchbaseServer,
     db_name: str,
     bucket_name: str,
@@ -59,7 +60,7 @@ async def _setup_db(
             )
         },
     )
-    await sg.put_database(db_name, db_payload)
+    await sg_cluster.create_database(db_name, db_payload)
     await SyncGatewayCluster([sg]).wait_for_db_online(db_name)
 
 
@@ -90,7 +91,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'newuser' with access to channel 'A' (never changed since)")
         await sg.add_user(
@@ -110,7 +111,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Get the access history for a user that was never created")
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
@@ -126,7 +127,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'alice' with access to channel 'A'")
         await sg.add_user(
@@ -151,7 +152,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'bob' with access to channels 'A' and 'B'")
         password = "pass"
@@ -201,7 +202,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'carol' with no channel access")
         await sg.add_user(
@@ -230,7 +231,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(sg, cbs, db_name, "data-bucket", extra_collections=["other"])
+        await _setup_db(
+            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        )
 
         self.mark_test_step(
             "Create user 'dave' with access to channel 'A' in _default._default and channel 'X' in _default.other"
@@ -277,7 +280,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(sg, cbs, db_name, "data-bucket", extra_collections=["other"])
+        await _setup_db(
+            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        )
 
         self.mark_test_step(
             "Create user 'erin' with access to channel 'A' in _default._default and channel 'X' in _default.other"
@@ -326,7 +331,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create role 'myrole' with access to channel 'ROLE_CHAN'")
         await sg.add_role(db_name, "myrole", {"_default": {"_default": {"admin_channels": ["ROLE_CHAN"]}}})
@@ -379,7 +384,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(sg, cbs, db_name, "data-bucket", extra_collections=["other"])
+        await _setup_db(
+            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        )
 
         self.mark_test_step(
             "Create user 'grace' with access to channel 'SHARED' in both _default._default and _default.other"
@@ -419,7 +426,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'henry' with access to channel 'A'")
         await sg.add_user(
@@ -463,7 +470,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step(
             "Create user 'iris' with access to channel 'B', and revoke channel 'A' to give her some access history"
@@ -540,7 +547,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'jack' with access to channel 'A'")
         await sg.add_user(
@@ -575,7 +582,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step(
             "Create users 'mona' and 'nora', each with access to channels 'ch1' and 'ch2', then revoke both for each"
@@ -621,8 +628,8 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         cbs = cblpytest.couchbase_servers[0]
 
         self.mark_test_step("Create two buckets and configure two separate Sync Gateway databases, one on each")
-        await _setup_db(sg, cbs, "db1", "data-bucket-1")
-        await _setup_db(sg, cbs, "db2", "data-bucket-2")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, "db1", "data-bucket-1")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, "db2", "data-bucket-2")
 
         self.mark_test_step("Create a user with the same name on both databases, each with access to channel 'A'")
         access = {"_default": {"_default": {"admin_channels": ["A"]}}}
@@ -663,7 +670,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         password = "pass"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cbs, db_name, "data-bucket")
+        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
 
         self.mark_test_step("Create user 'leo' with access to channel 'A'")
         await sg.reset_user(db_name, username, password, ["A"])
