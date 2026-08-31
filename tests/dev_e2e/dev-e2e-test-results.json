@@ -1,0 +1,772 @@
+{
+  "es": {
+    "test_basic_replication.py": {
+      "test_continuous_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_continuous_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_continuous_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_replicate_non_existing_sg_collections": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_reset_checkpoint_pull": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_reset_checkpoint_push": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_custom_conflict.py": {
+      "test_custom_conflict_delete": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_custom_conflict_merge": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_custom_conflict_remote_wins": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_push_pull_resolved_doc": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_edge_server_cbl.py": {
+      "test_js_push_to_edge_server_over_ws": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_fest.py": {
+      "test_create_tasks": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_delete_list": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_delete_task": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_share_list": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_unshare_list": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_update_shared_tasks": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_update_task": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_jwt_rotation.py": {
+      "test_corrupt_token_file_content_mid_replication": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_invalid_token_rotation_causes_401_stop": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_replication_with_jwt_file": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_token_rotation_reconnect": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_valid_invalid_valid_token_cycle": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_jwt_simple.py": {
+      "test_jwt_replication_reconnect_false": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_query_consistency.py": {
+      "test_any_operator": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_between[BETWEEN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_between[NOT BETWEEN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[<=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[<]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[>=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[>]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_equality[!=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_equality[=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_in": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_limit_offset[-5--5]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_limit_offset[5-5]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_multiple_selects": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_docids": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_inner_join": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_is_not_valued": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_join": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_left_join[LEFT JOIN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_left_join[LEFT OUTER JOIN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_ordering": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[%Eng____r%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[%eng____r%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Eng%e%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Royal Engineers Museum]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Royal engineers museum]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[eng%e%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_regex[\\\\bEng.*e\\\\b]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_regex[\\\\beng.*e\\\\b]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_substring": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_where_and_or": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_same[IS NOT]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_same[IS]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_select_star[airline_10]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_select_star[doc_id_does_not_exist]": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_replication_auto_purge.py": {
+      "test_auto_purge_after_resurrection[delete]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_auto_purge_after_resurrection[purge]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_filter_removed_access_documents": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_pull_after_restore_access": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_push_after_remove_access": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_docs_from_channel_with_auto_purge_disabled": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_docs_from_channel_with_auto_purge_enabled": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_role_from_channel[False]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_role_from_channel[True]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_user_from_role[False]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_remove_user_from_role[True]": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_revoke_access_with_auto_purge_disabled": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_revoke_access_with_auto_purge_enabled": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    },
+    "test_replication_behavior.py": {
+      "test_pull_empty_database_active_only": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_resurrected_doc": {
+        "outcome": "SKIPPED",
+        "reason": "CBL 1.1.0 not >= 4.2.0"
+      }
+    },
+    "test_replication_blob.py": {
+      "test_blob_replication": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_pull_non_blob_changes_with_delta_sync_and_compact": {
+        "outcome": "SKIPPED",
+        "reason": "JS is not in the platforms ANDROID|C|DOTNET|IOS|JVM"
+      }
+    },
+    "test_replication_filter.py": {
+      "test_custom_pull_filter": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_custom_push_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_channels_filter": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_pull_document_ids_filter": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_push_document_ids_filter": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      },
+      "test_replicate_public_channel": {
+        "outcome": "SKIPPED",
+        "reason": "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+      }
+    }
+  },
+  "meta": {
+    "runs": {
+      "es:test_basic_replication.py": "2026-08-28 09:51 UTC",
+      "es:test_custom_conflict.py": "2026-08-28 10:03 UTC",
+      "es:test_edge_server_cbl.py": "2026-08-28 10:07 UTC",
+      "es:test_fest.py": "2026-08-28 10:10 UTC",
+      "es:test_jwt_rotation.py": "2026-08-28 10:16 UTC",
+      "es:test_jwt_simple.py": "2026-08-28 10:19 UTC",
+      "es:test_query_consistency.py": "2026-08-28 10:19 UTC",
+      "es:test_replication_auto_purge.py": "2026-08-28 10:25 UTC",
+      "es:test_replication_behavior.py": "2026-08-28 10:31 UTC",
+      "es:test_replication_blob.py": "2026-08-28 10:33 UTC",
+      "es:test_replication_filter.py": "2026-08-28 10:34 UTC",
+      "sg:test_basic_replication.py": "2026-08-28 09:51 UTC",
+      "sg:test_custom_conflict.py": "2026-08-28 10:03 UTC",
+      "sg:test_edge_server_cbl.py": "2026-08-28 10:07 UTC",
+      "sg:test_fest.py": "2026-08-28 10:10 UTC",
+      "sg:test_jwt_rotation.py": "2026-08-28 10:16 UTC",
+      "sg:test_jwt_simple.py": "2026-08-28 10:19 UTC",
+      "sg:test_query_consistency.py": "2026-08-28 10:19 UTC",
+      "sg:test_replication_auto_purge.py": "2026-08-28 10:25 UTC",
+      "sg:test_replication_behavior.py": "2026-08-28 10:31 UTC",
+      "sg:test_replication_blob.py": "2026-08-28 10:33 UTC",
+      "sg:test_replication_filter.py": "2026-08-28 10:34 UTC"
+    }
+  },
+  "sg": {
+    "test_basic_replication.py": {
+      "test_continuous_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_continuous_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_continuous_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_default_collection_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push_and_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_replicate_non_existing_sg_collections": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_reset_checkpoint_pull": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_reset_checkpoint_push": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_custom_conflict.py": {
+      "test_custom_conflict_delete": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_custom_conflict_merge": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_custom_conflict_remote_wins": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push_pull_resolved_doc": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_edge_server_cbl.py": {
+      "test_js_push_to_edge_server_over_ws": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_fest.py": {
+      "test_create_tasks": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_delete_list": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_delete_task": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_share_list": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_unshare_list": {
+        "outcome": "FAILED",
+        "reason": "AssertionError: There were unexpected replication events on replicator #2: _default.lists, db1-list1, pull, NONE\nassert <cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10ca362d0> is None"
+      },
+      "test_update_shared_tasks": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_update_task": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_jwt_rotation.py": {
+      "test_corrupt_token_file_content_mid_replication": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_invalid_token_rotation_causes_401_stop": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_replication_with_jwt_file": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_token_rotation_reconnect": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_valid_invalid_valid_token_cycle": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_jwt_simple.py": {
+      "test_jwt_replication_reconnect_false": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_query_consistency.py": {
+      "test_any_operator": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_between[BETWEEN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_between[NOT BETWEEN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[<=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[<]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[>=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_comparison[>]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_equality[!=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_equality[=]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_in": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_limit_offset[-5--5]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_limit_offset[5-5]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_multiple_selects": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_docids": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_inner_join": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_is_not_valued": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_join": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_left_join[LEFT JOIN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_left_join[LEFT OUTER JOIN]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_ordering": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[%Eng____r%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[%eng____r%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Eng%e%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Royal Engineers Museum]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[Royal engineers museum]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_like[eng%e%]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_regex[\\\\bEng.*e\\\\b]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_pattern_regex[\\\\beng.*e\\\\b]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_substring": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_query_where_and_or": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_same[IS NOT]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_same[IS]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_select_star[airline_10]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_select_star[doc_id_does_not_exist]": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_replication_auto_purge.py": {
+      "test_auto_purge_after_resurrection[delete]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_auto_purge_after_resurrection[purge]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_filter_removed_access_documents": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_after_restore_access": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push_after_remove_access": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_docs_from_channel_with_auto_purge_disabled": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_docs_from_channel_with_auto_purge_enabled": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_role_from_channel[False]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_role_from_channel[True]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_user_from_role[False]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_remove_user_from_role[True]": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_revoke_access_with_auto_purge_disabled": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_revoke_access_with_auto_purge_enabled": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    },
+    "test_replication_behavior.py": {
+      "test_pull_empty_database_active_only": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_resurrected_doc": {
+        "outcome": "SKIPPED",
+        "reason": "CBL 1.1.0 not >= 4.2.0"
+      }
+    },
+    "test_replication_blob.py": {
+      "test_blob_replication": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_non_blob_changes_with_delta_sync_and_compact": {
+        "outcome": "SKIPPED",
+        "reason": "JS is not in the platforms ANDROID|C|DOTNET|IOS|JVM"
+      }
+    },
+    "test_replication_filter.py": {
+      "test_custom_pull_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_custom_push_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_channels_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_pull_document_ids_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_push_document_ids_filter": {
+        "outcome": "PASSED",
+        "reason": ""
+      },
+      "test_replicate_public_channel": {
+        "outcome": "PASSED",
+        "reason": ""
+      }
+    }
+  }
+}

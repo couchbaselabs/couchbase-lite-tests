@@ -1,0 +1,21 @@
+---
+description: JS Docker e2e session handoff — read before changing tests, JS server, or Docker
+alwaysApply: true
+---
+
+# JS Docker E2E session (2026-08-24, branch `js-test`)
+
+Before acting, read `.cursor/js-e2e-session-context.md` for full results, commands, and recovery.
+
+## Must know
+
+- Local JS e2e uses `tests/dev_e2e/config.docker-js.json`: test server `http://localhost:5173` **WebSocket**, SG `localhost` **tls false**, CBS `localhost`, ES `localhost:59840` HTTP + shell2http `:20001`.
+- JS TDK server is `servers/javascript` (`npm run dev`), **not** the sibling `couchbase-lite-js` Vite.
+- Docker stack lives in `environment/docker/` (override sets `SSL=false`). `start_environment.py` is a false ready-check (matches old "Sync Gateway is up" logs). Poll CBS `:8091`, query `:8093`, SG `:4984`, admin `:4985`, ES `:59840`.
+- **SG (default): 78 passed, 25 skipped.** **JWT+JS→ES: 7 passed.** **Same SG files vs ES (`--cbl-remote=es`): 46 passed, 7 skipped** (includes all 34 query-consistency tests). Remaining SG-only skips: fest, conflict, auto-purge, blob, channels, checkpoint `_purge`, upgrade, XDCR, encrypted, multipeer.
+- `--cbl-remote=es` swaps `sync_gateways[0]` for `EsRemote` (`tests/dev_e2e/es_remote.py`). Default is still SG. Do **not** use the flag on `edge_server/` JWT tests.
+- Local ES is HTTP only (`ws://`). JS/browser CBL cannot use HTTPS/WSS. `prepare_es_replication_for_sgw` rewrites SG URL and drops `pinned_cert`.
+- Rebuild ES with `docker compose up -d --no-deps --build cbl-test-es` — without `--no-deps` compose rebuilds CBS/SG.
+- SG can wedge after `configure_dataset` bucket recreate (GSI "bucket temporarily unavailable"). Restart **CBS and SG**, then rerun. First-run connection-reset failures were that hang, not product bugs.
+- WIP not committed: Docker backend add (CBS/SG/ES), `@couchbase/lite-js@1.1.0-5` + `.npmrc` ProGet feed, `test_fest.py` f-string fixes, ES adapter / JWT HTTP / query-vs-ES.
+- Do not stop CBS/SG/ES/JS unless asked. Do not commit unless asked.

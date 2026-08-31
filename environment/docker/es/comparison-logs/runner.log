@@ -1,0 +1,7 @@
+=== Sync Gateway run ===
+Running uv run pytest /Users/jayant.dhingra/Desktop/couchbase-lite-tests/tests/dev_e2e -v --tb=short --config=/Users/jayant.dhingra/Desktop/couchbase-lite-tests/tests/dev_e2e/config.docker-js.json --cbl-log-level=verbose -o console_output_style=classic --capture=no -> /Users/jayant.dhingra/Desktop/couchbase-lite-tests/environment/docker/es/comparison-logs/sg-full.log
+SG exit code: 1
+=== Edge Server run (--cbl-remote=es --investigate-es-hangs) ===
+Running uv run pytest /Users/jayant.dhingra/Desktop/couchbase-lite-tests/tests/dev_e2e -v --tb=short --config=/Users/jayant.dhingra/Desktop/couchbase-lite-tests/tests/dev_e2e/config.docker-js.json --cbl-log-level=verbose -o console_output_style=classic --capture=no --cbl-remote=es --investigate-es-hangs -> /Users/jayant.dhingra/Desktop/couchbase-lite-tests/environment/docker/es/comparison-logs/es-full.log
+ES exit code: 1
+Wrote environment/docker/es/js-cbl-e2e-test-comparison.html (83 SG tests, 83 ES tests parsed)

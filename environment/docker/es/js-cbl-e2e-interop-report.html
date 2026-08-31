@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CBL-JavaScript ↔ Edge Server E2E Interop Report</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --border: #3d4f66;
+      --text: #e7ecf3;
+      --muted: #9aa8bc;
+      --accent: #4da3ff;
+      --pass: #3dd68c;
+      --fail: #f87171;
+      --skip: #fbbf24;
+      --warn: #fb923c;
+      --code-bg: #0d1117;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      margin: 0;
+      padding: 2rem 1rem 4rem;
+      max-width: 960px;
+      margin-inline: auto;
+    }
+    header {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    h1 { font-size: 1.75rem; margin: 0 0 0.5rem; }
+    .subtitle { color: var(--muted); font-size: 0.95rem; }
+    h2 { font-size: 1.25rem; margin-top: 0; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin: 1.25rem 0 0.5rem; }
+    h4 { font-size: 0.95rem; margin: 1rem 0 0.35rem; color: var(--muted); }
+    a { color: var(--accent); }
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .badge-pass { background: rgba(61,214,140,.15); color: var(--pass); }
+    .badge-fail { background: rgba(248,113,113,.15); color: var(--fail); }
+    .badge-skip { background: rgba(251,191,36,.15); color: var(--skip); }
+    .badge-info { background: rgba(77,163,255,.15); color: var(--accent); }
+    .badge-warn { background: rgba(251,146,60,.15); color: var(--warn); }
+    nav.toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    nav.toc ul { margin: 0.5rem 0 0; padding-left: 1.25rem; }
+    nav.toc li { margin: 0.25rem 0; }
+    details {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.75rem;
+      overflow: hidden;
+    }
+    details[open] { border-color: #4da3ff55; }
+    summary {
+      cursor: pointer;
+      padding: 0.85rem 1rem;
+      font-weight: 600;
+      list-style: none;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      user-select: none;
+    }
+    summary::-webkit-details-marker { display: none; }
+    summary::before {
+      content: "▸";
+      color: var(--accent);
+      transition: transform 0.15s;
+      flex-shrink: 0;
+    }
+    details[open] > summary::before { transform: rotate(90deg); }
+    .detail-body { padding: 0 1rem 1rem; border-top: 1px solid var(--border); }
+    pre, code {
+      font-family: "SF Mono", "Fira Code", Consolas, monospace;
+      font-size: 0.82rem;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.85rem 1rem;
+      overflow-x: auto;
+      margin: 0.75rem 0;
+    }
+    code { background: var(--code-bg); padding: 0.1rem 0.35rem; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      margin: 0.75rem 0;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.65rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: var(--surface2); color: var(--muted); font-weight: 600; }
+    tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+    .flow {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      font-family: monospace;
+      font-size: 0.78rem;
+      line-height: 1.45;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .callout {
+      border-left: 3px solid var(--accent);
+      background: rgba(77,163,255,.08);
+      padding: 0.75rem 1rem;
+      margin: 0.75rem 0;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-size: 0.92rem;
+    }
+    .callout-warn {
+      border-left-color: var(--warn);
+      background: rgba(251,146,60,.08);
+    }
+    .callout-pass {
+      border-left-color: var(--pass);
+      background: rgba(61,214,140,.08);
+    }
+    ol.steps { padding-left: 1.25rem; }
+    ol.steps li { margin: 0.35rem 0; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 0.75rem;
+      margin: 1rem 0;
+    }
+    .meta-card {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 0.65rem 0.85rem;
+      font-size: 0.85rem;
+    }
+    .meta-card strong { display: block; color: var(--muted); font-size: 0.72rem; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>CBL-JavaScript ↔ Edge Server E2E Interop Report</h1>
+  <p class="subtitle">
+    For Edge Server developers · Couchbase Lite Test Harness (TDK) ·
+    Branch <code>js-test</code> · Last updated 2026-08-27
+  </p>
+  <div class="meta-grid">
+    <div class="meta-card"><strong>Client</strong>@couchbase/lite-js 1.1.0-5 (browser)</div>
+    <div class="meta-card"><strong>Edge Server</strong>1.2.0-4 (HTTP / ws://)</div>
+    <div class="meta-card"><strong>Sync Gateway</strong>3.2.0 (HTTP, baseline)</div>
+    <div class="meta-card"><strong>Config</strong>tests/dev_e2e/config.docker-js.json</div>
+  </div>
+</header>
+
+<!-- TL;DR -->
+<details open>
+  <summary>Executive summary (read this first)</summary>
+  <div class="detail-body">
+    <div class="callout">
+      <strong>Bottom line:</strong> 46 dev_e2e tests pass with JS CBL replicating to Edge Server.
+      <strong>8 tests</strong> expose real interop gaps. Sync Gateway is <em>not</em> involved in those failures — the same tests pass against SG with the same JS client.
+    </div>
+    <table>
+      <thead>
+        <tr><th>Run</th><th>Result</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>JS → Sync Gateway (default)</td>
+          <td><span class="badge badge-pass">78 passed</span> <span class="badge badge-skip">25 skipped</span></td>
+          <td>Skipped = platform limits or ES-only JWT smoke (not run as CBL→SG)</td>
+        </tr>
+        <tr>
+          <td>JS → Edge Server (<code>--cbl-remote=es</code>)</td>
+          <td><span class="badge badge-pass">46 passed</span> <span class="badge badge-skip">7 skipped</span></td>
+          <td>Includes all 34 query-consistency tests</td>
+        </tr>
+        <tr>
+          <td>JWT + JS→ES smoke</td>
+          <td><span class="badge badge-pass">7 passed</span></td>
+          <td>ES pulls from SG with JWT; uses real SG + ES</td>
+        </tr>
+        <tr>
+          <td><strong>8 interop tests (investigated)</strong></td>
+          <td><span class="badge badge-fail">8 failed vs ES</span> <span class="badge badge-pass">pass vs SG</span></td>
+          <td>See Part 5 — root causes differ (7 lifecycle, 1 API shape)</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>Two distinct problems</h3>
+    <ol>
+      <li><strong>Replicator lifecycle (7 tests):</strong> One-shot replication completes (docs move, <code>IDLE</code>) but never reaches <code>STOPPED</code> against ES. Same client reaches <code>STOPPED</code> on SG in ~1s.</li>
+      <li><strong>Document API shape (1 test):</strong> Blob replication succeeds; test checks Sync Gateway <code>_attachments</code> REST fields that ES does not expose.</li>
+    </ol>
+  </div>
+</details>
+
+<!-- TOC -->
+<nav class="toc">
+  <strong>Contents</strong> — all sections are collapsible; expand only what you need.
+  <ul>
+    <li><a href="#part1">Part 1 — System architecture</a></li>
+    <li><a href="#part2">Part 2 — End-to-end data flows</a></li>
+    <li><a href="#part3">Part 3 — How tests are executed</a></li>
+    <li><a href="#part4">Part 4 — Full test matrix (104 tests)</a></li>
+    <li><a href="#part5">Part 5 — The 8 interop failures (detailed)</a></li>
+    <li><a href="#part6">Part 6 — Root cause analysis</a></li>
+    <li><a href="#part7">Part 7 — Expected skips (not ES bugs)</a></li>
+    <li><a href="#part8">Part 8 — Investigation evidence</a></li>
+    <li><a href="#part9">Part 9 — Recommendations for Edge Server</a></li>
+    <li><a href="#part10">Part 10 — Reproduce locally</a></li>
+    <li><a href="#appendix">Appendix — Files &amp; commands</a></li>
+  </ul>
+</nav>
+
+<!-- PART 1 -->
+<details id="part1">
+  <summary>Part 1 — System architecture</summary>
+  <div class="detail-body">
+    <p>The Test Development Kit (TDK) drives a <strong>browser-based</strong> Couchbase Lite JavaScript test server, which performs all CBL operations. Python pytest orchestrates setup, assertions, and remote admin APIs.</p>
+    <div class="flow">┌─────────────────────┐     WebSocket      ┌──────────────────────────┐
+│  Python TDK client  │ ◄────────────────► │  JS test server (Vite)   │
+│  (cbltest / pytest) │   localhost:5173   │  @couchbase/lite-js      │
+└──────────┬──────────┘                    └────────────┬─────────────┘
+           │                                            │
+           │ HTTP admin / REST                          │ CBL Replicator
+           ▼                                            ▼
+┌─────────────────────┐                    ┌──────────────────────────┐
+│ Couchbase Server    │                    │ Remote (one of):         │
+│ (datasets, N1QL)    │                    │ • Sync Gateway :4984     │
+│ localhost:8091      │                    │ • Edge Server  ws://:59840 │
+└─────────────────────┘                    └──────────────────────────┘</div>
+
+    <h3>Why JavaScript is different from other platforms</h3>
+    <ul>
+      <li>Other platforms (C, .NET, JVM) expose an <strong>HTTP test server</strong> in-process.</li>
+      <li>JS runs in a <strong>browser</strong> — it cannot open a listener. The “server” is a WebSocket <em>client</em> that connects back to Python.</li>
+      <li>Browser CBL <strong>cannot use HTTPS/WSS</strong> to Edge Server in this setup — local ES must be HTTP + <code>ws://</code>.</li>
+    </ul>
+
+    <h3>Docker stack (local)</h3>
+    <table>
+      <thead><tr><th>Service</th><th>Port</th><th>Role in tests</th></tr></thead>
+      <tbody>
+        <tr><td>Couchbase Server</td><td>8091, 8093</td><td>SG backing store; N1QL for SG query-consistency</td></tr>
+        <tr><td>Sync Gateway</td><td>4984 / 4985</td><td>Default CBL remote; JWT source for ES smoke tests</td></tr>
+        <tr><td>Edge Server</td><td>59840, 20001</td><td>CBL remote when <code>--cbl-remote=es</code>; ES adhoc SQL++ for query tests</td></tr>
+        <tr><td>JS TDK (Vite)</td><td>5173</td><td>Browser test server (not in Docker)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<!-- PART 2 -->
+<details id="part2">
+  <summary>Part 2 — End-to-end data flows</summary>
+  <div class="detail-body">
+
+    <details>
+      <summary>Flow A — Default: JS CBL ↔ Sync Gateway</summary>
+      <div class="detail-body">
+        <ol class="steps">
+          <li>pytest loads <code>config.docker-js.json</code> → connects to JS server on :5173 via WebSocket router.</li>
+          <li><code>CouchbaseCloud.configure_dataset()</code> resets CBS bucket + configures SG database (e.g. <code>travel</code>) from <code>dataset/sg/{name}-sg.json</code>.</li>
+          <li><code>POST /reset</code> to JS server → browser opens local CBL DB, loads dataset from repo (or GitHub in prod builds).</li>
+          <li><code>POST /startReplicator</code> → JS CBL replicator targets <code>http://localhost:4984/{db}</code> (SG REST).</li>
+          <li>pytest polls <code>POST /getReplicatorStatus</code> until activity = <code>STOPPED</code>.</li>
+          <li>Assertions compare local CBL vs remote (SG REST or CBS N1QL).</li>
+        </ol>
+        <div class="callout-pass">This path is the <strong>baseline</strong>. 78 runnable tests pass here.</div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Flow B — JS CBL ↔ Edge Server (<code>--cbl-remote=es</code>)</summary>
+      <div class="detail-body">
+        <ol class="steps">
+          <li>Same pytest + JS server setup as Flow A.</li>
+          <li><code>install_es_remote()</code> replaces <code>cblpytest.sync_gateways[0]</code> with <code>EsRemote</code> adapter.</li>
+          <li><code>configure_dataset</code> is monkeypatched → creates ES database via HTTP admin, bulk-loads same <code>{name}-sg.json</code> docs (no CBS bucket recreate).</li>
+          <li>Replicator URL becomes <code>ws://localhost:59840/{db}</code> (must be ws://, not wss://).</li>
+          <li>Query-consistency tests POST CBL SQL++ to ES: <code>POST /{db}.{scope}.{collection}/_query</code> instead of CBS N1QL.</li>
+          <li>Tests that need SG channels, roles, <code>_purge</code>, or sync functions are skipped via <code>ES_SKIP_FILES</code>.</li>
+        </ol>
+        <pre><code># EsRemote duck-types Sync Gateway for tests:
+replication_url(db)  → ws://host:59840/db
+get_document(...)    → Edge Server REST
+update_documents(...)→ Edge Server bulk API
+add_user / add_role  → no-op (ES has no SG ACL model)</code></pre>
+      </div>
+    </details>
+
+    <details>
+      <summary>Flow C — JWT smoke: Edge Server ← Sync Gateway (not CBL→ES remote swap)</summary>
+      <div class="detail-body">
+        <p>These tests do <strong>not</strong> use <code>--cbl-remote=es</code>. They configure ES to pull from SG using JWT auth while JS CBL may push directly to ES over <code>ws://</code>.</p>
+        <ol class="steps">
+          <li>Real <code>SyncGateway</code> object remains (for <code>local_jwt</code>, SG admin).</li>
+          <li>ES config gets replications pointing at live SG URL; <code>pinned_cert</code> dropped when SG is HTTP.</li>
+          <li>ES databases declare collections (<code>create: true</code> alone only gives <code>_default._default</code>).</li>
+          <li>7 tests in <code>test_edge_server_cbl.py</code> + <code>edge_server/</code> — all pass locally.</li>
+        </ol>
+      </div>
+    </details>
+
+    <details>
+      <summary>Flow D — Single test request lifecycle (WebSocket)</summary>
+      <div class="detail-body">
+        <div class="flow">pytest                    WebSocket router              Browser (tdk.html)
+  │                              │                              │
+  │── POST /reset (JSON) ───────►│── ws message ts_command ────►│
+  │                              │                              │── CBL Database.open / load dataset
+  │◄── ts_id response ───────────│◄── ws response ──────────────│
+  │                              │                              │
+  │── POST /startReplicator ────►│─────────────────────────────►│
+  │                              │                              │── new Replicator({ url: ws://ES/... })
+  │── POST /getReplicatorStatus ─►│─────────────────────────────►│  (poll every 1s)
+  │◄── activity: IDLE|STOPPED ───│◄─────────────────────────────│</div>
+        <p>Tests treat <code>STOPPED</code> on a one-shot (<code>continuous: false</code>) replicator as “replication job finished.”</p>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- PART 3 -->
+<details id="part3">
+  <summary>Part 3 — How tests are executed</summary>
+  <div class="detail-body">
+    <h3>Commands</h3>
+    <pre><code># 1) Sync Gateway remote (default) — baseline
+cd tests/dev_e2e
+uv run pytest -v --config config.docker-js.json
+
+# 2) Edge Server as CBL remote
+uv run pytest -v --config config.docker-js.json --cbl-remote=es \
+  test_basic_replication.py test_query_consistency.py \
+  test_replication_behavior.py test_replication_filter.py
+
+# 3) JWT + JS→ES smoke (do NOT pass --cbl-remote=es)
+uv run pytest -v --config config.docker-js.json \
+  test_edge_server_cbl.py edge_server/
+
+# Investigate the 8 skipped interop tests (debug flag)
+uv run pytest -v --config config.docker-js.json --cbl-remote=es --investigate-es-hangs \
+  -k "test_push_document_ids_filter"</code></pre>
+
+    <h3>What <code>--cbl-remote=es</code> changes</h3>
+    <table>
+      <thead><tr><th>Component</th><th>Default (sgw)</th><th>With es</th></tr></thead>
+      <tbody>
+        <tr><td>CBL replicator target</td><td>SG REST URL</td><td><code>ws://ES:59840/{db}</code></td></tr>
+        <tr><td><code>configure_dataset</code></td><td>CBS + SG</td><td>ES HTTP admin + bulk docs</td></tr>
+        <tr><td>Remote doc reads in tests</td><td>SG REST</td><td>ES REST via <code>EsRemote</code></td></tr>
+        <tr><td>Query consistency “server” side</td><td>CBS N1QL</td><td>ES adhoc SQL++</td></tr>
+        <tr><td>SG-only tests</td><td>Run</td><td>Skipped (<code>ES_SKIP_FILES</code>)</td></tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<!-- PART 4 -->
+<details id="part4">
+  <summary>Part 4 — Full test matrix (104 nodeids)</summary>
+  <div class="detail-body">
+
+    <details>
+      <summary>Summary counts</summary>
+      <div class="detail-body">
+        <table>
+          <thead>
+            <tr><th></th><th>SG ✅</th><th>SG ⏭️</th><th>SG 🚫</th><th>ES ✅</th><th>ES ⏭️</th><th>ES 🚫</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Total</td><td>78</td><td>7</td><td>19</td><td>53*</td><td>8</td><td>43</td></tr>
+          </tbody>
+        </table>
+        <p><small>*53 = 46 via <code>--cbl-remote=es</code> subset + 7 JWT smoke tests</small></p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Per-suite breakdown</summary>
+      <div class="detail-body">
+        <table>
+          <thead><tr><th>Suite</th><th>Tests</th><th>SG</th><th>ES (--cbl-remote=es)</th></tr></thead>
+          <tbody>
+            <tr><td>Basic replication</td><td>12</td><td><span class="badge badge-pass">12 pass</span></td><td><span class="badge badge-pass">10 pass</span> <span class="badge badge-skip">2 🚫 _purge</span></td></tr>
+            <tr><td>Query consistency</td><td>34</td><td><span class="badge badge-pass">34 pass</span></td><td><span class="badge badge-pass">34 pass</span></td></tr>
+            <tr><td>Replication behavior</td><td>1</td><td><span class="badge badge-pass">1 pass</span></td><td><span class="badge badge-pass">1 pass</span></td></tr>
+            <tr><td>Replication filters</td><td>6</td><td><span class="badge badge-pass">6 pass</span></td><td><span class="badge badge-pass">1 pass</span> <span class="badge badge-fail">3 interop</span> <span class="badge badge-skip">2 🚫 channels</span></td></tr>
+            <tr><td>Custom conflict</td><td>4</td><td><span class="badge badge-pass">4 pass</span></td><td><span class="badge badge-fail">4 interop</span> (file skipped by default)</td></tr>
+            <tr><td>Fest / todo</td><td>7</td><td><span class="badge badge-pass">7 pass</span></td><td><span class="badge badge-skip">7 🚫 SG roles</span></td></tr>
+            <tr><td>Auto-purge</td><td>13</td><td><span class="badge badge-pass">13 pass</span></td><td><span class="badge badge-skip">13 🚫 channels</span></td></tr>
+            <tr><td>Blobs</td><td>2</td><td><span class="badge badge-pass">1 pass</span> <span class="badge badge-skip">1 🚫 JS</span></td><td><span class="badge badge-fail">1 interop</span> <span class="badge badge-skip">1 🚫 JS</span></td></tr>
+            <tr><td>JWT + JS→ES</td><td>7</td><td><span class="badge badge-skip">N/A</span></td><td><span class="badge badge-pass">7 pass</span></td></tr>
+            <tr><td>Encrypted / multipeer / upgrade / XDCR</td><td>18</td><td><span class="badge badge-skip">🚫 JS</span></td><td><span class="badge badge-skip">🚫 JS</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Legend: pass vs skip vs interop failure</summary>
+      <div class="detail-body">
+        <ul>
+          <li><span class="badge badge-pass">Pass</span> — Test ran and all assertions succeeded.</li>
+          <li><span class="badge badge-skip">Skip / 🚫</span> — Not supported by design (SG channels, JS platform limit, etc.). Not a product bug.</li>
+          <li><span class="badge badge-fail">Interop failure</span> — Test logic valid (passes on SG); fails or times out only against ES.</li>
+        </ul>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- PART 5 -->
+<details id="part5" open>
+  <summary>Part 5 — The 8 interop failures (detailed, one section each)</summary>
+  <div class="detail-body">
+    <div class="callout-warn callout">
+      All 8 tests <strong>pass against Sync Gateway</strong> with the same JS client and same test code.
+      Failures are specific to the <strong>JS CBL → Edge Server</strong> path.
+    </div>
+
+    <!-- Test 1 -->
+    <details>
+      <summary><span class="badge badge-fail">Interop</span> test_push_document_ids_filter</summary>
+      <div class="detail-body">
+        <p><strong>File:</strong> <code>tests/dev_e2e/test_replication_filter.py</code></p>
+        <p><strong>Purpose:</strong> Verify CBL pushes only documents whose IDs appear in the replicator’s <code>documentIDs</code> filter.</p>
+        <h4>Steps</h4>
+        <ol class="steps">
+          <li>Load <code>travel</code> dataset on remote and in local CBL.</li>
+          <li><strong>First push</strong> — filter airlines: <code>airline_10, airline_20, airline_1000</code>; routes: <code>route_10, route_20</code>. Wait <code>STOPPED</code>. Expect 4 doc events (1000 absent locally).</li>
+          <li>Local edits: add <code>airline_1000</code>, update <code>airline_10</code>, delete <code>route_10</code>.</li>
+          <li><strong>Second push</strong> — same filter. Wait <code>STOPPED</code>. Expect events for <code>airline_1000, airline_10, route_10</code>.</li>
+        </ol>
+        <h4>SG vs ES</h4>
+        <table>
+          <tr><th>Phase</th><th>SG</th><th>ES</th></tr>
+          <tr><td>First push</td><td>STOPPED ~1s</td><td>STOPPED ~1s ✅</td></tr>
+          <tr><td>Second push</td><td>STOPPED ~1s</td><td><strong>IDLE forever</strong> → 30s timeout ❌</td></tr>
+        </table>
+        <p><strong>Failure:</strong> <code>CblTimeoutError: Timeout waiting for replicator status</code> at step 4.</p>
+      </div>
+    </details>
+
+    <!-- Test 2 -->
+    <details>
+      <summary><span class="badge badge-fail">Interop</span> test_pull_document_ids_filter</summary>
+      <div class="detail-body">
+        <p><strong>File:</strong> <code>tests/dev_e2e/test_replication_filter.py</code></p>
+        <p><strong>Purpose:</strong> Same as push, but <strong>pull</strong> direction — only listed airport/landmark IDs sync down.</p>
+        <ol class="steps">
+          <li>First pull with document ID filters → wait <code>STOPPED</code> → verify 4 docs.</li>
+          <li>Modify remote (add/update/delete docs) → second pull → wait <code>STOPPED</code> → verify filtered changes.</li>
+        </ol>
+        <p><strong>Failure pattern:</strong> Same as push — typically hangs on <strong>second</strong> one-shot run (<code>IDLE</code>, never <code>STOPPED</code>).</p>
+      </div>
+    </details>
+
+    <!-- Test 3 -->
+    <details>
+      <summary><span class="badge badge-fail">Interop</span> test_custom_pull_filter</summary>
+      <div class="detail-body">
+        <p><strong>File:</strong> <code>tests/dev_e2e/test_replication_filter.py</code></p>
+        <p><strong>Purpose:</strong> Pull with CBL-side filter <code>deletedDocumentsOnly</code> — only tombstones pass the filter.</p>
+        <ol class="steps">
+          <li>Pull with filter → expect zero docs (nothing deleted yet).</li>
+          <li>Delete docs on remote → pull again → expect only deleted IDs replicate locally.</li>
+        </ol>
+        <p><strong>Note:</strong> <code>test_custom_push_filter</code> (push + filter) <strong>passes on ES</strong> because filtering runs locally before push.</p>
+        <p><strong>Failure:</strong> Pull with filter — replicator stays <code>IDLE</code>, test waits for <code>STOPPED</code>.</p>
+      </div>
+    </details>
+
+    <!-- Tests 4-7 conflict -->
+    <details>
+      <summary><span class="badge badge-fail">Interop</span> Custom conflict suite (4 tests)</summary>
+      <div class="detail-body">
+        <p><strong>File:</strong> <code>tests/dev_e2e/test_custom_conflict.py</code></p>
+        <p><strong>Shared pattern:</strong></p>
+        <ol class="steps">
+          <li>Load <code>names</code>; pull all docs into empty local DB.</li>
+          <li>Create conflict — same doc edited locally and on remote with different values.</li>
+          <li>Pull (or push) with a <strong>conflict resolver</strong> (<code>local-wins</code>, <code>remote-wins</code>, merge, delete-vs-update).</li>
+          <li>Wait <code>STOPPED</code> → verify resolved document content via snapshot.</li>
+        </ol>
+        <table>
+          <thead><tr><th>Test</th><th>Resolver / scenario</th></tr></thead>
+          <tbody>
+            <tr><td><code>test_push_pull_resolved_doc</code></td><td>local-wins + push/pull round-trip</td></tr>
+            <tr><td><code>test_custom_conflict_remote_wins</code></td><td>remote-wins</td></tr>
+            <tr><td><code>test_custom_conflict_delete</code></td><td>delete vs update</td></tr>
+            <tr><td><code>test_custom_conflict_merge</code></td><td>merge resolver</td></tr>
+          </tbody>
+        </table>
+        <h4>SG vs ES (example: local-wins pull)</h4>
+        <table>
+          <tr><th></th><th>SG</th><th>ES</th></tr>
+          <tr><td>Conflict pull completes?</td><td>Yes</td><td>Yes (work done)</td></tr>
+          <tr><td>Final activity</td><td><code>STOPPED</code> ~1s</td><td><code>IDLE</code> indefinitely</td></tr>
+        </table>
+        <p>Entire file is in <code>ES_SKIP_FILES</code> by default to avoid 30s timeouts in CI.</p>
+      </div>
+    </details>
+
+    <!-- Test 8 blob -->
+    <details>
+      <summary><span class="badge badge-fail">Interop</span> test_blob_replication</summary>
+      <div class="detail-body">
+        <p><strong>File:</strong> <code>tests/dev_e2e/test_replication_blob.py</code></p>
+        <p><strong>Purpose:</strong> Push a document with a binary blob (<code>s10.jpg</code> on property <code>watermelon</code>) and verify remote metadata.</p>
+        <ol class="steps">
+          <li>Create local doc <code>fruits</code> with blob.</li>
+          <li>Push to remote → wait <code>STOPPED</code>.</li>
+          <li>Fetch remote doc — check <code>watermelon</code> blob properties (@type, digest, length). ✅ <strong>Passes on ES</strong></li>
+          <li>Check Sync Gateway <code>_attachments["blob_/watermelon"]</code> stub. ❌ <strong>Fails on ES</strong></li>
+        </ol>
+        <div class="callout">
+          <strong>This is not a replication hang.</strong> Push completes in ~4s. Failure is an assertion on <strong>SG REST document shape</strong>, not on blob bytes reaching ES.
+        </div>
+        <pre><code>AssertionError: Property `_attachments` not found in the document</code></pre>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- PART 6 -->
+<details id="part6">
+  <summary>Part 6 — Root cause analysis</summary>
+  <div class="detail-body">
+
+    <details open>
+      <summary>Problem 1 — One-shot replicator stays IDLE (7 tests)</summary>
+      <div class="detail-body">
+        <h4>Symptom</h4>
+        <p>pytest calls <code>wait_for(ReplicatorActivityLevel.STOPPED, timeout=30s)</code>. Against ES, activity remains <code>IDLE</code> after replication work completes. Document listener shows expected doc events.</p>
+        <h4>What this is NOT</h4>
+        <ul>
+          <li>Not missing dataset / collections (first push passes; docs arrive)</li>
+          <li>Not SG or CBS misconfiguration (SG path identical and passes)</li>
+          <li>Not pytest timeout misconfiguration (SG reaches STOPPED well under 30s)</li>
+        </ul>
+        <h4>Likely cause (interop)</h4>
+        <p>For one-shot replication, CBL clients expect the session to end in <code>STOPPED</code>. Sync Gateway elicits that from lite-js; Edge Server does not (or lite-js does not interpret ES completion the same way).</p>
+        <div class="callout">
+          <strong>Ownership:</strong> Edge Server replication session lifecycle vs SG-compatible behavior — and/or lite-js handling of ES BLIP/WebSocket completion. SG is confirmed not at fault (same client passes).
+        </div>
+        <h4>Replicator activity states (reference)</h4>
+        <table>
+          <tr><th>State</th><th>Meaning</th><th>Test expectation</th></tr>
+          <tr><td><code>CONNECTING</code></td><td>Opening connection</td><td>Transient</td></tr>
+          <tr><td><code>IDLE</code></td><td>Connected; may have finished sync</td><td>ES gets stuck here</td></tr>
+          <tr><td><code>STOPPED</code></td><td>One-shot job finished</td><td>Tests wait for this</td></tr>
+        </table>
+      </div>
+    </details>
+
+    <details>
+      <summary>Problem 2 — _attachments assertion (1 test)</summary>
+      <div class="detail-body">
+        <p>Sync Gateway REST returns revision metadata including <code>_attachments</code> with stub entries for blobs. Edge Server returns the document body with blob properties inline; it does not mirror SG’s attachment map.</p>
+        <p><strong>Classification:</strong> API shape difference + test written for SG. Blob replication itself works on ES.</p>
+        <p><strong>Fix options:</strong> Skip step 7 for ES runs; extend <code>EsRemote.get_document()</code> to synthesize SG-shaped stubs; or document ES blob REST model for TDK.</p>
+      </div>
+    </details>
+
+    <details>
+      <summary>Why “passes on SG” implicates the ES path, not SG or generic test bugs</summary>
+      <div class="detail-body">
+        <table>
+          <tr><th>Variable</th><th>SG run</th><th>ES run</th></tr>
+          <tr><td>JS client (lite-js)</td><td>Same</td><td>Same</td></tr>
+          <tr><td>Test code</td><td>Same</td><td>Same (+ EsRemote adapter)</td></tr>
+          <tr><td>Remote server</td><td>Sync Gateway ✅</td><td>Edge Server ❌ (8 cases)</td></tr>
+        </table>
+        <p>Sync Gateway is the control. Failures isolate to <strong>Edge Server interop</strong> (plus one SG-specific assertion on blobs).</p>
+      </div>
+    </details>
+
+  </div>
+</details>
+
+<!-- PART 7 -->
+<details id="part7">
+  <summary>Part 7 — Expected skips (not Edge Server bugs)</summary>
+  <div class="detail-body">
+    <p>Many tests are skipped on ES by design. Extra Docker or config will not turn these into passes.</p>
+
+    <details>
+      <summary>Skipped because Edge Server lacks Sync Gateway features</summary>
+      <div class="detail-body">
+        <ul>
+          <li><strong>Channels / roles / sync functions</strong> — fest (7), auto-purge (13), channel filters (2)</li>
+          <li><strong><code>_purge</code> API</strong> — checkpoint reset tests (2)</li>
+          <li>ES 1.2 ACL is collection read/write only, not SG channel ACL</li>
+        </ul>
+      </div>
+    </details>
+
+    <details>
+      <summary>Skipped because JavaScript CBL cannot run them (any remote)</summary>
+      <div class="detail-body">
+        <ul>
+          <li>Multipeer (2) — no P2P API in lite-js</li>
+          <li>Encrypted properties (1) — C-only <code>EncryptedValue</code></li>
+          <li>SGW upgrade (13) — requires native CBL ≥ 4.0</li>
+          <li>XDCR (2) — multi-SG topology + CBL ≥ 4.0</li>
+          <li>Blob compact (1) — JS excluded (CBSE-14861)</li>
+        </ul>
+      </div>
+    </details>
+  </div>
+</details>
+
+<!-- PART 8 -->
+<details id="part8">
+  <summary>Part 8 — Investigation evidence (2026-08-27)</summary>
+  <div class="detail-body">
+    <details>
+      <summary>Document-ID push — second pass activity trace</summary>
+      <div class="detail-body">
+        <pre><code>SG  first push  → STOPPED in 1s, 4 docs
+ES  first push  → STOPPED in 1s, 4 docs
+SG  second push → STOPPED in 1s, 3 docs
+ES  second push → IDLE at 1s, 3 docs (work done), still IDLE at 34s</code></pre>
+      </div>
+    </details>
+    <details>
+      <summary>Conflict pull — local-wins activity trace</summary>
+      <div class="detail-body">
+        <pre><code>SG  conflict pull → STOPPED in 1s
+ES  conflict pull → IDLE at 1s, remains IDLE through 34s</code></pre>
+      </div>
+    </details>
+    <details>
+      <summary>Blob test — failure point</summary>
+      <div class="detail-body">
+        <pre><code>Steps 1-6: PASS (replicator STOPPED, blob metadata on `watermelon` valid)
+Step 7:    FAIL — `_attachments` not in remote document body</code></pre>
+      </div>
+    </details>
+    <details>
+      <summary>Environment note — dataset loading</summary>
+      <div class="detail-body">
+        <p>JS TDK loads datasets via HTTP fetch. In Vite dev, datasets must be served locally (<code>/local-dataset/</code>); GitHub raw URLs fail in browser with <code>TypeError: Failed to fetch</code>. This was fixed for investigation and is unrelated to ES replication protocol.</p>
+      </div>
+    </details>
+  </div>
+</details>
+
+<!-- PART 9 -->
+<details id="part9">
+  <summary>Part 9 — Recommendations for Edge Server team</summary>
+  <div class="detail-body">
+    <ol>
+      <li>
+        <strong>Investigate one-shot replication session completion</strong><br />
+        Compare BLIP/WebSocket session teardown with Sync Gateway for: document-ID filters (2nd run), pull filters, conflict resolver pulls. Goal: client observes <code>STOPPED</code> after work completes, matching SG behavior.
+      </li>
+      <li>
+        <strong>Document expected client-visible activity transitions</strong><br />
+        Clarify whether <code>IDLE</code> is terminal for non-continuous replications on ES, or if <code>STOPPED</code> should follow.
+      </li>
+      <li>
+        <strong>Blob document REST shape</strong><br />
+        Document how clients should verify blob presence on ES (no <code>_attachments</code>). If SG parity is desired, specify equivalent metadata.
+      </li>
+      <li>
+        <strong>Regression tests</strong><br />
+        Consider ES-native tests for: filtered push/pull second run, conflict resolver pull, blob push — with explicit session state assertions.
+      </li>
+    </ol>
+    <div class="callout-pass callout">
+      <strong>What already works:</strong> Basic push/pull (10/12), all 34 SQL++ query consistency tests, custom push filter, JWT ES←SG replication, direct JS push over <code>ws://</code>.
+    </div>
+  </div>
+</details>
+
+<!-- PART 10 -->
+<details id="part10">
+  <summary>Part 10 — Reproduce locally</summary>
+  <div class="detail-body">
+    <h4>Prerequisites</h4>
+    <ul>
+      <li>Docker: CBS + SG + ES from <code>environment/docker/</code></li>
+      <li>JS server: <code>cd servers/javascript && npm run dev</code> (:5173)</li>
+      <li>Python: <code>uv sync</code> at repo root</li>
+    </ul>
+    <h4>Start backend</h4>
+    <pre><code>cd environment/docker
+docker compose up -d
+# Poll: CBS :8091, query :8093, SG :4984, SG admin :4985, ES :59840</code></pre>
+    <h4>Run one failing test</h4>
+    <pre><code>cd tests/dev_e2e
+uv run pytest -v --tb=short --config config.docker-js.json \
+  --cbl-remote=es --investigate-es-hangs \
+  test_replication_filter.py::TestReplicationFilter::test_push_document_ids_filter</code></pre>
+    <h4>Compare with SG baseline</h4>
+    <pre><code>uv run pytest -v --config config.docker-js.json \
+  test_replication_filter.py::TestReplicationFilter::test_push_document_ids_filter</code></pre>
+  </div>
+</details>
+
+<!-- APPENDIX -->
+<details id="appendix">
+  <summary>Appendix — Key files &amp; skip lists</summary>
+  <div class="detail-body">
+    <table>
+      <thead><tr><th>Path</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>tests/dev_e2e/config.docker-js.json</code></td><td>Local topology (JS + SG + CBS + ES)</td></tr>
+        <tr><td><code>tests/dev_e2e/es_remote.py</code></td><td>EsRemote adapter + ES_SKIP_* lists</td></tr>
+        <tr><td><code>tests/dev_e2e/es_ws.py</code></td><td>ws:// URL helpers, JWT/ES config prep</td></tr>
+        <tr><td><code>tests/dev_e2e/conftest.py</code></td><td><code>--cbl-remote</code>, <code>--investigate-es-hangs</code></td></tr>
+        <tr><td><code>environment/docker/es/</code></td><td>ES 1.2.0-4 Docker image + config</td></tr>
+        <tr><td><code>servers/javascript/src/tdk.ts</code></td><td>JS TDK replicator + reset handlers</td></tr>
+        <tr><td><code>client/src/cbltest/websocket_router.py</code></td><td>Python ↔ browser WebSocket bridge</td></tr>
+        <tr><td><code>.cursor/js-e2e-test-matrix.md</code></td><td>Full per-test SG vs ES matrix</td></tr>
+      </tbody>
+    </table>
+    <h4>ES_SKIP_TEST_NAMES (interop — disabled by default)</h4>
+    <pre><code>test_pull_channels_filter
+test_replicate_public_channel
+test_reset_checkpoint_push
+test_reset_checkpoint_pull
+test_blob_replication
+test_push_document_ids_filter
+test_pull_document_ids_filter
+test_custom_pull_filter</code></pre>
+    <h4>ES_SKIP_FILES (entire files skipped on --cbl-remote=es)</h4>
+    <pre><code>test_fest.py
+test_replication_auto_purge.py
+test_replication_upgrade.py
+test_replication_xdcr.py
+test_multipeer.py
+test_encrypted_properties.py
+test_edge_server_cbl.py
+test_custom_conflict.py</code></pre>
+  </div>
+</details>
+
+<footer style="margin-top: 2rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem;">
+  Generated from Couchbase Lite TDK JS Docker E2E session ·
+  Open this file in any browser · All sections use native <code>&lt;details&gt;</code> — no JavaScript required.
+</footer>
+
+</body>
+</html>

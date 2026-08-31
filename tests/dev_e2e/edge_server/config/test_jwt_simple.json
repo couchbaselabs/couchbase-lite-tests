@@ -24,7 +24,7 @@
                 "travel.airlines"
             ],
             "auth": {
-                "openid_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyMSIsImlzcyI6InRlc3QtaXNzdWVyIiwiYXVkIjoiZWRnZS1zZXJ2ZXIiLCJpYXQiOjE3ODc1NzM2NjAsImV4cCI6MTc4NzU3NzI2MH0.uaHKsWXSLObTeXle_SA_sGPQ_k54yikovmvCDty4TorF5lotRyRasCFMH-sTpAjq1tidOA4JbDK9pWOx5NOSzTR8N-C-VLTqOcOVki3HeXkwTJbtjd3pV4sJUQOf8g-cDeXqY7vSnN169xPCTFY1LuoA8kZ14KQQHZ5pUXIypZo5wtCkLI64SNhu9uSvF6BEoZgscb2Lx8dznW_l9-noh-G_gCVtBXn1cqY2tnMTVK5EWpnPR_HLzraMIn9FoZr2JtI8U55Sj4n4nJY8WIPaKIXTRqGTwHyE82e6321atS73P_GbaqrO9e8ST9TlKGtPebfJuKRzy1Q1rAPkZToVvg",
+                "openid_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCIsImtpZCI6InRlc3Qta2V5LTEifQ.eyJzdWIiOiJ1c2VyMSIsImlzcyI6InRlc3QtaXNzdWVyIiwiYXVkIjoiZWRnZS1zZXJ2ZXIiLCJpYXQiOjE3ODc5MTIzODgsImV4cCI6MTc4NzkxNTk4OH0.XASaGATWKTXRYiDXZ5IZI_q66odaKPic0kV0-v3__-RvQBUaODdvQC3tuWFpgJSgkmegErLxEZTQv43sP4oUi-fdChMAVL9mW4IXExWVI3FuqgKjDL2rMYCqerdPKwuKIMO9fnDCCd1-NbnA2nG_lHVjV-ex6lltNngEjPNm1g7gtmqKTN2B-Una_UiTQZ8FTJaGjtMHel3v5NgcSgYFovEe_vQLJ4BGV51hovhQFsvluOkaLV2zql2O-dpu3dQQqKcRA5rTUIUsCjyh14or64nKHDStEJdwoTJyHK0NJVG3ReHU4JMpBh777dKabQyGRN9GpHrh1BdK-wwosUd7kA",
                 "reconnect_on_token_change": false
             }
         }

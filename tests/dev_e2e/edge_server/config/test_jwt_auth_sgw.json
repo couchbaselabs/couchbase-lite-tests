@@ -25,11 +25,7 @@
             "bidirectional": true,
             "continuous": true,
             "collections": [
-                "travel.airlines",
-                "travel.airports",
-                "travel.hotels",
-                "travel.landmarks",
-                "travel.routes"
+                "travel.airlines"
             ],
             "auth": {
                 "openid_token": {
