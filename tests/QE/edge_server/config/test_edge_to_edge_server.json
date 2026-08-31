@@ -13,7 +13,7 @@
     "users": "/home/ec2-user/user/users.json",
     "replications": [
         {
-            "source": "ws://54.162.8.212:59840/travel",
+            "source": "ws://98.87.169.88:59840/travel",
             "target": "travel",
             "bidirectional": true,
             "continuous": true,

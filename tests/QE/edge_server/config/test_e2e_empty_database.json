@@ -13,7 +13,7 @@
     },
     "replications": [
         {
-            "source": "ws://localhost:4984/db-1",
+            "source": "wss://ec2-50-17-124-11.compute-1.amazonaws.com:4984/db-1",
             "target": "db",
             "bidirectional": true,
             "continuous": true,
