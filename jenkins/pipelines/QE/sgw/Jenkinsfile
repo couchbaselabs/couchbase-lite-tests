@@ -6,10 +6,6 @@ pipeline {
 // But just for reference, these are the params that are used by the job :
 //         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
 //         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
-    parameters {
-        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
-        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
-    }
     stages {
         stage('Init') {
             agent any
@@ -20,6 +16,7 @@ pipeline {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
                     env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
                     env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    env.TS_TEST_FILTER = params.TS_TEST_FILTER
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
@@ -51,7 +48,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 160, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${env.TS_TEST_FILTER ?: ''}'"
                 }
                 echo "=== SGW Tests Complete"
             }
