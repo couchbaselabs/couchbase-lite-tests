@@ -1,11 +1,12 @@
 pipeline {
     agent none
-// CBL_VERSION and SGW_VERSIONS are UI defined params and their default values.
+// CBL_VERSION, SGW_VERSIONS, and TS_TEST_FILTER are UI defined params and their default values.
 // That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
 // The default values in the UI will be used if no parameters are provided at build time.
 // But just for reference, these are the params that are used by the job :
 //         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4"')
 //         string(name: 'SGW_VERSIONS', description: 'Sync Gateway Version to use, eg : "4.0.1 4.0.3 4.1.0"')
+//         string(name: 'TS_TEST_FILTER', description: 'An optional filter for running a subset of tests')
     stages {
         stage('Init') {
             agent any
