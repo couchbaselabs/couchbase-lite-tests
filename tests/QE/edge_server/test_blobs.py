@@ -127,7 +127,6 @@ class TestBlobs(CBLTestClass):
         assert sg_doc is not None
 
         assert "_attachments" not in sg_doc.body, "'_attachments' field is present in the document response"
-        await sync_gateway.delete_database(sg_db_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_empty_blob(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -251,7 +250,6 @@ class TestBlobs(CBLTestClass):
         )
         assert blob_info["digest"] == blob_metadata["digest"], "Blob digest mismatch"
         assert blob_info["length"] == blob_metadata["length"], "Blob length mismatch"
-        await sync_gateway.delete_database(sg_db_name)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_blob_get_nonexistent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -558,4 +556,3 @@ class TestBlobs(CBLTestClass):
         assert blob_info["length"] == blob_metadata["length"], (
             f"Blob length mismatch, expected '{blob_metadata['length']}', got '{blob_info['length']}'"
         )
-        await sync_gateway.delete_database(sg_db_name)

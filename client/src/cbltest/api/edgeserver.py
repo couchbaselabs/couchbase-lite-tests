@@ -1,18 +1,20 @@
 import asyncio
 import json
 import ssl
+import time
 import urllib.parse
 import uuid
+from datetime import UTC, datetime
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
-from datetime import datetime, timezone
+
 import aiofiles
 import pyjson5 as json5
 from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
-import time
+
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
@@ -121,14 +123,14 @@ class EdgeServer:
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session = self._create_session(self.scheme, url, port, None)
-        self.__admin_session = self._create_session(
+        self.__anonymous_session: ClientSession | None = self._create_session(self.scheme, url, port, None)
+        self.__admin_session: ClientSession | None = self._create_session(
             self.scheme,
             url,
             port,
             encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
         )
-        self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
+        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
 
     @property
     def hostname(self) -> str:
@@ -187,10 +189,10 @@ class EdgeServer:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            if self.__auth:
-                session = self.__admin_session
-            else:
-                session = self.__anonymous_session
+            session = self.__admin_session if self.__auth else self.__anonymous_session
+
+        if session is None:
+            raise CblTestError(f"Edge Server [{self.__hostname}] session is closed, cannot {method.upper()} {path}")
 
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
@@ -860,7 +862,11 @@ class EdgeServer:
             try:
                 async with (
                     ClientSession() as session,
-                    session.get(url, timeout=ClientTimeout(total=timeout),headers={"Cache-Control": "no-cache", "Pragma": "no-cache"} ) as response,
+                    session.get(
+                        url,
+                        timeout=ClientTimeout(total=timeout),
+                        headers={"Cache-Control": "no-cache", "Pragma": "no-cache"},
+                    ) as response,
                 ):
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
@@ -1030,16 +1036,10 @@ class EdgeServer:
         :param label: Optional suffix (e.g. test name) for the archive filename
         :return: Local path of the downloaded archive
         """
-        with self.__tracer.start_as_current_span(
-                "collect_logs", attributes={"cbl.edge_server.host": self.__hostname}
-        ):
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        with self.__tracer.start_as_current_span("collect_logs", attributes={"cbl.edge_server.host": self.__hostname}):
+            ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             safe_host = self.__hostname.replace(".", "-").replace(":", "-")
-            safe_label = (
-                "-" + "".join(c if c.isalnum() or c in "-_" else "_" for c in label)
-                if label
-                else ""
-            )
+            safe_label = "-" + "".join(c if c.isalnum() or c in "-_" else "_" for c in label) if label else ""
             filename = f"es-collect-{safe_host}-{ts}{safe_label}.tar.gz"
 
             async with ClientSession(f"http://{self.__hostname}:20001") as s:
@@ -1051,9 +1051,7 @@ class EdgeServer:
                 )
 
             caddy_url = f"http://{self.__hostname}:20000/collect/{filename}"
-            content = await self._caddy_http_request(
-                caddy_url, f"Download {filename}", timeout=300
-            )
+            content = await self._caddy_http_request(caddy_url, f"Download {filename}", timeout=300)
 
             output_dir.mkdir(parents=True, exist_ok=True)
             local_path = output_dir / filename
@@ -1061,7 +1059,7 @@ class EdgeServer:
                 await f.write(content)
             return local_path
 
-    async def write_file_on_es(self, path: str, content: str):
+    async def write_file_on_es(self, path: str, content: str) -> None:
         """Write content to a file on the ES host via shell2http."""
         await self._send_request(
             "post",

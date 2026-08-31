@@ -747,7 +747,7 @@ class TestRunResultFullDocument:
             "date": "2024-03-15",
         }
 
-    def test_all_fields_es_run(self):
+    def test_all_fields_es_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         es = EdgeServerVersion("1.1.0(45;abc)")

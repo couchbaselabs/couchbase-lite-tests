@@ -1,16 +1,16 @@
 import asyncio
 import pathlib
+from collections.abc import AsyncGenerator, Sequence
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
+from cbltest import CBLPyTest
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.logging import cbl_error, cbl_info
 
 
-async def run_es_collects(
-    edge_servers: list[EdgeServer], output_dir: Path, label: str | None = None
-) -> list[Path]:
+async def run_es_collects(edge_servers: Sequence[EdgeServer], output_dir: Path, label: str | None = None) -> list[Path]:
     """
     Collects logs from every given Edge Server node in parallel, downloading
     each resulting archive into output_dir, and logs a summary.
@@ -32,8 +32,7 @@ async def run_es_collects(
     results = await asyncio.gather(*(_collect_one(es) for es in edge_servers))
     collected = [path for path in results if path is not None]
     cbl_info(
-        f"es-collect: collected {len(collected)}/{len(results)} node(s) to "
-        f"{output_dir}: {[str(p) for p in collected]}"
+        f"es-collect: collected {len(collected)}/{len(results)} node(s) to {output_dir}: {[str(p) for p in collected]}"
     )
     if len(collected) < len(results):
         cbl_error(
@@ -45,7 +44,7 @@ async def run_es_collects(
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def es_collect_session(cblpytest, request: pytest.FixtureRequest):
+async def es_collect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None]:
     yield
     if request.config.getoption("--es-collect") and request.session.testsfailed:
         await run_es_collects(cblpytest.edge_servers, pathlib.Path.cwd())
