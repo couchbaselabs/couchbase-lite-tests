@@ -217,15 +217,8 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             url:         rq.config.endpoint,
             collections: {},
         };
-        if (rq.config.authenticator) {
-            if (rq.config.authenticator.type !== 'BASIC')
-                throw new HTTPError(501, "Only Basic auth is supported");
-            const basicAuth = rq.config.authenticator as tdk.ReplicatorBasicAuthenticator;
-            config.credentials = {
-                username: basicAuth.username,
-                password: basicAuth.password
-            };
-        }
+        if (rq.config.authenticator)
+            config.credentials = credentialsFromAuthenticator(rq.config.authenticator);
         for (const colls of rq.config.collections) {
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
@@ -369,14 +362,38 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
     //-------- Internals:
 
-
     #mkErrorInfo(error: Error | undefined): tdk.ErrorInfo | undefined {
+        if (!error) return undefined;
+
         let code = -1;
-        if (error instanceof cbl.ReplicatorError) {
+        if (error instanceof cbl.ReplicatorError)
             code = error.code ?? -1;
+
+        // A failed WebSocket handshake gives JS almost nothing -- no status, no
+        // headers -- so salvage whatever the error object does carry. Without this
+        // a TLS failure and an auth rejection are indistinguishable downstream.
+        const parts: string[] = [error.message];
+        if (error.name && error.name !== 'Error')
+            parts.push(`name=${error.name}`);
+
+        let cause: unknown = (error as {cause?: unknown}).cause;
+        let depth = 0;
+        while (cause !== undefined && depth++ < 4) {
+            if (cause instanceof Error) {
+                parts.push(`cause=${cause.name}: ${cause.message}`);
+                cause = (cause as {cause?: unknown}).cause;
+            } else {
+                parts.push(`cause=${String(cause)}`);
+                break;
+            }
         }
 
-        return error ? {domain: "CBL-JS", code: code, message: error.message} : undefined;
+        // The console keeps the full object and stack, which cannot survive the
+        // JSON round-trip back to pytest.
+        this.#logger.error`Replicator error: ${error.name}: ${error.message} (code ${code})`;
+        console.error("TDK replicator error:", error);
+
+        return {domain: "CBL-JS", code: code, message: parts.join(" | ")};
     }
 
 
@@ -528,4 +545,73 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 /** Adds the default scope name, if necessary, to an outgoing collection ID. */
 function collectionIDWithScope(id: string): string {
     return id.includes('.') ? id : `_default.${id}`;
+}
+
+
+/** The SDK's credentials type, derived from ReplicatorConfig rather than imported by
+ *  name, so that this keeps compiling if CBL renames or re-exports the type. */
+type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig['credentials']>;
+
+
+/** The default Sync Gateway session cookie name. A SESSION authenticator naming any
+ *  other cookie cannot be served on this platform -- see below. */
+const kDefaultSessionCookie = 'SyncGatewaySession';
+
+
+/** Maps a TDK authenticator onto the SDK's credentials type.
+ *
+ *  This is the single seam between the TDK wire format and the SDK's auth API. The SDK
+ *  supports five modes; the TDK reaches all of them:
+ *
+ *  | TDK                                | SDK credentials                    | Flow |
+ *  |------------------------------------|------------------------------------|------|
+ *  | `BASIC`                            | `{username, password}`             | POSTs `_session?one_time=true` with `Authorization: Basic`, then puts the returned token on the handshake |
+ *  | `BASIC` with both fields empty     | `{username: '', password: ''}`     | Legacy cookie mode: no `Authorization` header, `credentials: 'include'` so the browser attaches an existing cookie |
+ *  | `BEARER`                           | `{type: Bearer, token}`            | Same as BASIC but `Authorization: Bearer`; needs an `oidc`/`local_jwt` provider on the remote |
+ *  | `SESSION`                          | `{type: Session, sessionID}`       | No `_session` call at all; the ID goes straight onto the handshake |
+ *  | absent                             | `undefined`                        | Anonymous / GUEST |
+ *
+ *  Note that unlike every other platform, none of these send a `Cookie` header on the
+ *  WebSocket upgrade -- a browser will not allow it. The credential always reaches Sync
+ *  Gateway as a session token on the handshake subprotocol, which is why `cookieName`
+ *  has no meaning here. */
+function credentialsFromAuthenticator(auth: tdk.ReplicatorAuthenticator): ReplicatorCredentials {
+    switch (auth.type) {
+        case 'BASIC': {
+            const basic = auth as tdk.ReplicatorBasicAuthenticator;
+            check(typeof basic.username === 'string' && typeof basic.password === 'string',
+                  "BASIC authenticator requires username and password");
+            // Both-empty is legacy cookie mode and is deliberately allowed through. A
+            // half-empty credential is not cookie mode -- the SDK would send a literal
+            // `Authorization: Basic` header with a blank half -- so reject it rather
+            // than let a test think it was exercising the cookie path.
+            check(!!basic.username === !!basic.password,
+                  "BASIC authenticator must have both username and password, or neither "
+                  + "(both empty selects legacy cookie mode)");
+            return {username: basic.username, password: basic.password};
+        }
+        case 'BEARER': {
+            const bearer = auth as tdk.ReplicatorBearerAuthenticator;
+            check(typeof bearer.token === 'string' && bearer.token.length > 0,
+                  "BEARER authenticator requires a non-empty token");
+            return {type: cbl.CredentialType.Bearer, token: bearer.token};
+        }
+        case 'SESSION': {
+            const session = auth as tdk.ReplicatorSessionAuthenticator;
+            // The SDK has no cookieName: it never sends a cookie. Fail loudly rather
+            // than ignoring the field, so that a test asserting on a custom cookie name
+            // doesn't pass for the wrong reason.
+            if (session.cookieName !== undefined && session.cookieName !== kDefaultSessionCookie)
+                throw new HTTPError(501,
+                    `Custom session cookie names are not supported on this platform `
+                    + `(got "${session.cookieName}"): CBL JS presents the session ID on the `
+                    + `WebSocket handshake, not as a cookie.`);
+            // Deliberately not validating sessionID here -- the SDK rejects malformed
+            // tokens itself with ReplicatorError 400 before making any network call, and
+            // the tests need to observe that rather than a 400 from the TDK's own HTTP layer.
+            return {type: cbl.CredentialType.Session, sessionID: session.sessionID};
+        }
+        default:
+            throw new HTTPError(501, `Unsupported authenticator type "${(auth as {type: string}).type}"`);
+    }
 }

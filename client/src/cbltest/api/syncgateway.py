@@ -17,6 +17,7 @@ import requests
 import tenacity
 from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError
+from multidict import CIMultiDictProxy
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
@@ -109,6 +110,21 @@ with warnings.catch_warnings():
         register: bool | None = None
         algorithms: list[str] | None = None
         keys: list[JWK] | None = None
+
+
+class SessionInfo(BaseModel):
+    """
+    The response body of ``POST /{db}/_session`` on either the admin or the public port.
+
+    ``cookie_name`` is echoed back by Sync Gateway and honours
+    :attr:`DatabaseConfig.session_cookie_name`, so tests should pass this value
+    through to :class:`ReplicatorSessionAuthenticator` rather than assuming the
+    ``SyncGatewaySession`` default.
+    """
+
+    session_id: str
+    expires: str | None = None
+    cookie_name: str = "SyncGatewaySession"
 
 
 class DeltaSyncConfig(BaseModel):
@@ -668,6 +684,7 @@ class _SyncGatewayBase:
         password: str,
         port: int,
         secure: bool = False,
+        session_cookie: tuple[str, str] | None = None,
     ) -> None:
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -684,6 +701,7 @@ class _SyncGatewayBase:
             url,
             port,
             encode_basic_auth(username, password, "ascii"),
+            session_cookie,
         )
 
     @property
@@ -706,10 +724,31 @@ class _SyncGatewayBase:
         """Gets the URL scheme to use when connecting to the Sync Gateway instance (http or https)"""
         return "https://" if self.secure else "http://"
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+    def _create_session(
+        self,
+        secure: bool,
+        scheme: str,
+        url: str,
+        port: int,
+        auth_header: str | None,
+        session_cookie: tuple[str, str] | None = None,
+    ) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
-        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
-        headers = {"Authorization": auth_header} if auth_header is not None else None
+        from `aiohttp.encode_basic_auth`, or None for an anonymous session.
+
+        If `session_cookie` is given as a `(cookie_name, session_id)` pair it takes
+        precedence over `auth_header`, and the session authenticates by cookie only.
+        The two are deliberately mutually exclusive: sending both would let a request
+        succeed on the Basic credentials even after the session was revoked, which
+        would quietly invalidate every revocation assertion in the auth suite."""
+        headers: dict[str, str] | None
+        if session_cookie is not None:
+            headers = {"Cookie": f"{session_cookie[0]}={session_cookie[1]}"}
+        elif auth_header is not None:
+            headers = {"Authorization": auth_header}
+        else:
+            headers = None
+
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
@@ -753,6 +792,45 @@ class _SyncGatewayBase:
                 raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}: {data}")
 
             return ret_val
+
+    async def _send_request_with_headers(
+        self,
+        method: str,
+        path: str,
+        payload: JSONSerializable | DatabaseConfig | None = None,
+        params: dict[str, str] | None = None,
+        session: ClientSession | None = None,
+    ) -> tuple[Any, CIMultiDictProxy[str]]:
+        """
+        As :func:`_send_request`, but also returns the response headers.
+
+        Needed because Sync Gateway's public ``POST /{db}/_session`` returns the session
+        token only in ``Set-Cookie`` -- the body carries just ``userCtx``.  The admin
+        endpoint puts the ID in the body, so the two paths genuinely differ.
+        """
+        if session is None:
+            session = self.__session
+
+        with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
+            headers = {"Content-Type": "application/json"} if payload is not None else None
+            data = "" if payload is None else payload.serialize()
+            writer = get_next_writer()
+            writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {path}", data)
+            resp = await session.request(method, path, data=data, headers=headers, params=params)
+            if resp.content_type.startswith("application/json"):
+                ret_val = await resp.json()
+                data = dumps(ret_val, indent=2)
+            else:
+                data = await resp.text()
+                ret_val = data
+            writer.write_end(
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {path} {resp.status}",
+                data,
+            )
+            if not resp.ok:
+                raise CblSyncGatewayBadResponseError(resp.status, f"{method} {path} returned {resp.status}: {data}")
+
+            return ret_val, resp.headers
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -1446,6 +1524,21 @@ class _SyncGatewayBase:
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
 
+    async def update_database_config(self, db_name: str, payload: DatabaseConfig) -> None:
+        """
+        Updates the config of an existing database (``PUT /{db}/_config``).
+
+        Distinct from :func:`put_database`, which does ``PUT /{db}/`` to *create* a
+        database and returns 412 if one already exists.  Use this to change the config
+        of a database that ``configure_dataset`` has already set up -- adding an
+        ``oidc`` or ``local_jwt`` provider, for instance.
+
+        :param db_name: The name of the Database to reconfigure
+        :param payload: The full database config to apply
+        """
+        with self._tracer.start_as_current_span("update_database_config", attributes={"cbl.database.name": db_name}):
+            await self._send_request("put", f"/{db_name}/_config", payload)
+
     async def get_document_revision_public(
         self,
         db_name: str,
@@ -1905,6 +1998,89 @@ class SyncGateway(_SyncGatewayBase):
                     pass
                 else:
                     raise
+
+    async def create_session(self, db_name: str, name: str, ttl: int | None = None) -> SessionInfo:
+        """
+        Creates a session for an existing user via the admin API (``POST /{db}/_session``).
+
+        This is the admin path: it mints a session for `name` without needing that
+        user's password.  For the credential-checking path use
+        :func:`SyncGatewayUserClient.login()<cbltest.api.syncgateway.SyncGatewayUserClient.login>`
+        instead.
+
+        :param db_name: The name of the Database to create the session in
+        :param name: The user to create the session for.  The user must already exist.
+        :param ttl: Session lifetime in seconds.  Omitted means the Sync Gateway default.
+        :return: A :class:`SessionInfo` carrying the session ID and the cookie name to
+            hand to :class:`ReplicatorSessionAuthenticator`.
+        """
+        with self._tracer.start_as_current_span("create_session", attributes={"cbl.user.name": name}):
+            body: dict[str, Any] = {"name": name}
+            if ttl is not None:
+                body["ttl"] = ttl
+
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
+            assert isinstance(resp, dict)
+            return SessionInfo.model_validate(resp)
+
+    async def delete_session(self, db_name: str, session_id: str) -> None:
+        """
+        Revokes a single session by ID (``DELETE /{db}/_session/{sid}``).
+
+        A 404 is swallowed so that teardown is idempotent -- revoking an already
+        revoked or already expired session is not an error.
+
+        :param db_name: The name of the Database the session belongs to
+        :param session_id: The session ID to revoke
+        """
+        with self._tracer.start_as_current_span("delete_session"):
+            try:
+                await self._send_request("delete", f"/{db_name}/_session/{session_id}")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
+
+    async def delete_user_sessions(self, db_name: str, name: str) -> None:
+        """
+        Revokes every session belonging to a user (``DELETE /{db}/_user/{name}/_session``).
+
+        :param db_name: The name of the Database
+        :param name: The user whose sessions should be revoked
+        """
+        with self._tracer.start_as_current_span("delete_user_sessions", attributes={"cbl.user.name": name}):
+            try:
+                await self._send_request("delete", f"/{db_name}/_user/{name}/_session")
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 404:
+                    raise
+
+    @asynccontextmanager
+    async def session_for(self, db_name: str, name: str, ttl: int | None = None) -> AsyncIterator[SessionInfo]:
+        """
+        Creates a session for `name` and revokes it on exit.
+
+        Sessions are cheap but they are not free -- the Edge Server suites already leak
+        a handful per test.  Prefer this over a bare :func:`create_session` so that a
+        failing assertion doesn't strand a live credential for the rest of the run::
+
+            async with sync_gateway.session_for("names", "user1") as session:
+                replicator = Replicator(
+                    db,
+                    sync_gateway.replication_url("names"),
+                    authenticator=ReplicatorSessionAuthenticator(
+                        session.session_id, session.cookie_name
+                    ),
+                )
+
+        :param db_name: The name of the Database to create the session in
+        :param name: The user to create the session for
+        :param ttl: Session lifetime in seconds
+        """
+        session = await self.create_session(db_name, name, ttl)
+        try:
+            yield session
+        finally:
+            await self.delete_session(db_name, session.session_id)
 
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
@@ -2443,6 +2619,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         password: str,
         port: int = 4984,
         secure: bool = False,
+        session_cookie: tuple[str, str] | None = None,
     ) -> None:
         """
         Initialize a SyncGatewayUserClient for public API access.
@@ -2452,5 +2629,97 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
+        :param session_cookie: An optional ``(cookie_name, session_id)`` pair.  When
+            given, the client authenticates by cookie instead of Basic, and `username`
+            and `password` are ignored.  Prefer :func:`from_session` over passing this
+            directly.
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, username, password, port, secure, session_cookie)
+
+    @classmethod
+    def from_session(
+        cls,
+        url: str,
+        session: SessionInfo,
+        port: int = 4984,
+        secure: bool = False,
+    ) -> "SyncGatewayUserClient":
+        """
+        Builds a client that authenticates with a session cookie and nothing else.
+
+        This is the only way to assert on a session's own validity -- revocation,
+        expiry, database scoping -- without going through a replicator.  A client built
+        from Basic credentials would keep working after the session was revoked and the
+        assertion would silently pass.
+
+        :param url: The hostname/URL of the Sync Gateway instance
+        :param session: The :class:`SessionInfo` returned by ``create_session`` or ``login``
+        :param port: Public API port (default 4984)
+        :param secure: Whether to use TLS/HTTPS
+        """
+        return cls(
+            url,
+            "",
+            "",
+            port=port,
+            secure=secure,
+            session_cookie=(session.cookie_name, session.session_id),
+        )
+
+    async def login(self, db_name: str) -> SessionInfo:
+        """
+        Exchanges this client's credentials for a session via the public API
+        (``POST /{db}/_session`` on port 4984).
+
+        Unlike :func:`SyncGateway.create_session`, this validates the password, so it
+        is the path to use when the test is about authentication rather than about
+        getting a usable token cheaply.  A bad password raises
+        :class:`CblSyncGatewayBadResponseError` with code 401.
+
+        Note that the public endpoint does not put the session ID in the response body
+        the way the admin endpoint does -- the body carries only ``userCtx``, and the
+        token arrives in ``Set-Cookie``.  This parses it out so callers get the same
+        :class:`SessionInfo` either way.
+
+        :param db_name: The name of the Database to log in to
+        :return: A :class:`SessionInfo` carrying the session ID and cookie name
+        """
+        with self._tracer.start_as_current_span("login"):
+            body, headers = await self._send_request_with_headers("post", f"/{db_name}/_session")
+            assert isinstance(body, dict)
+
+            for raw_cookie in headers.getall("Set-Cookie", []):
+                name, _, rest = raw_cookie.partition("=")
+                value = rest.split(";", 1)[0].strip()
+                if not value:
+                    # An expiring cookie -- a logout response, not a login.
+                    continue
+                return SessionInfo(session_id=value, cookie_name=name.strip())
+
+            raise CblTestError(
+                f"POST /{db_name}/_session returned {body} but set no session cookie; "
+                "cannot build a SessionInfo without a token"
+            )
+
+    async def logout(self, db_name: str) -> None:
+        """
+        Invalidates the session held by this client (``DELETE /{db}/_session``).
+
+        :param db_name: The name of the Database to log out of
+        """
+        with self._tracer.start_as_current_span("logout"):
+            await self._send_request("delete", f"/{db_name}/_session")
+
+    async def get_session(self, db_name: str) -> dict:
+        """
+        Returns the session / user context for this client (``GET /{db}/_session``).
+
+        Useful for asserting that a session resolves to the expected identity and
+        channel set -- ``userCtx.name`` and ``userCtx.channels``.
+
+        :param db_name: The name of the Database
+        """
+        with self._tracer.start_as_current_span("get_session"):
+            resp = await self._send_request("get", f"/{db_name}/_session")
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
