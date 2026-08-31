@@ -93,6 +93,64 @@ class BulkDocOperation(JSONSerializable):
         return self._body
 
 
+class EdgeServerSession:
+    """
+    A session issued by Edge Server's ``POST /{db}/_session`` endpoint.
+
+    Edge Server returns the token under different keys depending on whether it is
+    one-time or reusable (``one_time_session_id`` vs ``session_id``), so this normalises
+    both into :attr:`session_id` and records which kind it is.
+    """
+
+    @property
+    def session_id(self) -> str:
+        """The session token, whichever key the server returned it under"""
+        return self.__session_id
+
+    @property
+    def cookie_name(self) -> str:
+        """The cookie the token should be presented in"""
+        return self.__cookie_name
+
+    @property
+    def expires(self) -> str | None:
+        """When the session expires, if the server said"""
+        return self.__expires
+
+    @property
+    def one_time(self) -> bool:
+        """Whether this token is single-use"""
+        return self.__one_time
+
+    def __init__(
+        self,
+        session_id: str,
+        cookie_name: str = "SyncGatewaySession",
+        expires: str | None = None,
+        one_time: bool = False,
+    ) -> None:
+        self.__session_id = session_id
+        self.__cookie_name = cookie_name
+        self.__expires = expires
+        self.__one_time = one_time
+
+    @classmethod
+    def parse_response(cls, body: dict, one_time: bool = False) -> "EdgeServerSession":
+        """
+        Builds a session from a ``POST /{db}/_session`` response body.
+        """
+        session_id = body.get("session_id") or body.get("one_time_session_id")
+        if not session_id:
+            raise CblTestError(f"Edge Server _session response contained no session token: {body}")
+
+        return cls(
+            session_id=cast(str, session_id),
+            cookie_name=cast(str, body.get("cookie_name", "SyncGatewaySession")),
+            expires=cast("str | None", body.get("expires")),
+            one_time=one_time,
+        )
+
+
 class EdgeServer:
     """
     A class for interacting with a given Edge Server instance
@@ -1008,3 +1066,60 @@ class EdgeServer:
                 is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def create_session(
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        one_time: bool = False,
+        ttl: int | None = None,
+    ) -> "EdgeServerSession":
+        with self.__tracer.start_as_current_span(
+            "es_create_session",
+            attributes={"cbl.database.name": db_name, "cbl.user.name": username},
+        ):
+            payload: dict[str, Any] = {}
+            if ttl is not None:
+                payload["ttl"] = ttl
+
+            async with self._create_session(
+                self.scheme,
+                self.__hostname,
+                self.__port,
+                encode_basic_auth(username, password, "ascii"),
+            ) as user_session:
+                resp = await self._send_request(
+                    "post",
+                    f"/{db_name}/_session",
+                    JSONDictionary(payload),
+                    params={"one_time": "true" if one_time else "false"},
+                    session=user_session,
+                )
+
+            assert isinstance(resp, dict), f"Unexpected _session response: {resp}"
+            return EdgeServerSession.parse_response(cast(dict, resp), one_time=one_time)
+
+    async def get_session(self, db_name: str, session: "EdgeServerSession") -> dict:
+        """
+        Returns the session's own details via ``GET /{db}/_session``.
+        """
+        with self.__tracer.start_as_current_span("es_get_session", attributes={"cbl.database.name": db_name}):
+            client = self._create_session(self.scheme, self.__hostname, self.__port, None)
+            client.headers["Cookie"] = f"{session.cookie_name}={session.session_id}"
+            resp = await self._send_request("get", f"/{db_name}/_session", session=client)
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def delete_session(self, db_name: str, session: "EdgeServerSession") -> None:
+        """
+        Revokes a session via ``DELETE /{db}/_session``.
+        """
+        with self.__tracer.start_as_current_span("es_delete_session", attributes={"cbl.database.name": db_name}):
+            try:
+                client = self._create_session(self.scheme, self.__hostname, self.__port, None)
+                client.headers["Cookie"] = f"{session.cookie_name}={session.session_id}"
+                await self._send_request("delete", f"/{db_name}/_session", session=client)
+            except CblEdgeServerBadResponseError as e:
+                if e.code != 404:
+                    raise e
