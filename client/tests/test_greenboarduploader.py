@@ -340,6 +340,17 @@ class TestOverallFailureGuard:
         doc = mock_upload.call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (7, 2)
 
+    def test_partial_counts_skip_upload(self) -> None:
+        """One override leaves the other on the truncated in-process counter."""
+        uploader = make_uploader()
+        drive_hook(uploader, make_report("call", passed=True))
+        drive_hook(uploader, make_report("setup", passed=False))
+
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, pass_count=7)
+
+        mock_upload.assert_not_called()
+
     def test_sgw_marker_still_recorded(self) -> None:
         """The marker picks the greenboard platform, so the latch must not stop it."""
         uploader = make_uploader()

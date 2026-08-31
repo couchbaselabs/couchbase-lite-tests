@@ -173,9 +173,8 @@ class GreenboardUploader:
         # collected zero tests (and no setup crash occurred).
         self.__test_ran = True
 
-        # Above the short-circuit so a first-test setup crash can't leave this
-        # False and file an SGW run under the CBL platform. Unlike the counts
-        # below, a marker is not a tally a mid-session failure can truncate.
+        # Above the short-circuit: tests that still run after the latch must
+        # set this, or an SGW run gets filed under the CBL platform.
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
             self.__has_sgw_marker = True
 
@@ -219,13 +218,11 @@ class GreenboardUploader:
         :param fail_count: Optional override for the fail count. Same
             semantics as ``pass_count``.
 
-        A setup/teardown failure skips the upload only when the counts come from
-        the in-process counter — that counter stops tallying at the failure, so
-        it would publish a partial result. Counts passed in are a full tally
-        from outside, and the caller decides whether such a run is worth
-        publishing (see :py:meth:`upload_from_junit_file`).
+        A setup/teardown failure skips the upload unless *both* counts are
+        supplied: the in-process counter stops tallying at the failure, so
+        anything falling back to it publishes a partial result.
         """
-        if self.__overall_fail and pass_count is None and fail_count is None:
+        if self.__overall_fail and (pass_count is None or fail_count is None):
             cbl_warning("Setup/teardown failure, skipping upload")
             return
 
