@@ -28,9 +28,9 @@ trap 'popd >/dev/null 2>&1 || true' EXIT
 export COLUMNS=200
 
 PYTEST_ARGS=(-v --no-header -W ignore::DeprecationWarning
-             --config ../config.json
-             --dataset-version "$DATASET_VERSION"
-             "$TEST_NAME")
+  --config ../config.json
+  --dataset-version "$DATASET_VERSION"
+  "$TEST_NAME")
 [ "${ES_COLLECT:-true}" = "true" ] && PYTEST_ARGS+=(--es-collect)
 
 set +e

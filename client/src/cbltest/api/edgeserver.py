@@ -115,10 +115,12 @@ class EdgeServer:
         self.__auth_password = admin_password
         self.__anonymous_session: ClientSession | None = None
         self.__admin_session: ClientSession | None = None
-        # The config this Edge Server was provisioned with. configure_dataset() moves
-        # __config_file on, so reset_to_initial_state() needs its own record of where
-        # to return to.
+        # What this Edge Server was provisioned with. configure_dataset() moves
+        # __config_file on and set_auth() overwrites the credentials, so
+        # reset_to_initial_state() needs its own record of what to return to.
         self.__initial_config_file: str = config_file
+        self.__initial_auth_name: str = admin_user
+        self.__initial_auth_password: str = admin_password
         self._apply_config(config_file)
         self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
 
@@ -1012,6 +1014,11 @@ class EdgeServer:
         the provisioned datasets, and it is restarted on the config this object
         was constructed with (by default the one setup_edge_servers.py
         installed).
+
+        The admin credentials are restored too. set_auth() overwrites them
+        permanently, and a test that leaves bad ones behind (test_basic_auth
+        deliberately ends on an invalid user) would otherwise have every later
+        admin request on this host answered with 401.
         """
         with self.__tracer.start_as_current_span("reset edge server"):
             await self.reset_firewall()
@@ -1022,6 +1029,8 @@ class EdgeServer:
                 config = json.loads(await f.read())
 
             await self.start_server(config=config)
+            self.__auth_name = self.__initial_auth_name
+            self.__auth_password = self.__initial_auth_password
             await self.reconfigure(self.__initial_config_file)
 
     async def set_firewall_rules(

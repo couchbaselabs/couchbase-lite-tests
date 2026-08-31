@@ -137,7 +137,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("fetch update doc after 20 seconds")
         await asyncio.sleep(20)
         with pytest.raises(CblEdgeServerBadResponseError):
-            await edge_server.get_document(db_name, doc_id=id1)
+            await edge_server.get_document(db_name, doc_id=id2)
 
         self.mark_test_step("delete a single doc of expiry 60 seconds")
         new_doc = {"test3": "This is new test doc"}
