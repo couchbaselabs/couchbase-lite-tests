@@ -7,7 +7,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
-from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.asyncfile import read_json_file, write_derived_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -123,7 +123,7 @@ class TestJWTReplication(CBLTestClass):
             "travel.landmarks",
             "travel.routes",
         ]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
@@ -219,7 +219,7 @@ class TestJWTReplication(CBLTestClass):
         config["replications"][0]["source"] = sgw.replication_url("travel")
         # Only sync airlines for this test
         config["replications"][0]["collections"] = ["travel.airlines"]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
@@ -342,7 +342,7 @@ class TestJWTReplication(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
@@ -465,7 +465,7 @@ class TestJWTReplication(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
@@ -599,7 +599,7 @@ class TestJWTReplication(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 

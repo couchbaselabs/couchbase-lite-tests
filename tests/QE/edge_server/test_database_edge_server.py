@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -23,7 +23,7 @@ class TestDatabase(CBLTestClass):
         config = await read_json_file(config_path)
         config["databases"]["db"]["create"] = True
         config["databases"]["db"]["collections"] = ["test"]
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
         resp = await edge_server.get_db_info(db_name="db", collection="test")
@@ -34,6 +34,3 @@ class TestDatabase(CBLTestClass):
             print(response)
         except Exception:
             self.mark_test_step("Edge server failed to add document as expected")
-        config["databases"]["db"]["create"] = False
-        del config["databases"]["db"]["collections"]
-        await write_json_file(config_path, config)

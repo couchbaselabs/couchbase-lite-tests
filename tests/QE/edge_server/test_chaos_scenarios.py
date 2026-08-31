@@ -9,7 +9,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import BulkDocOperation, EdgeServer
 from cbltest.api.json_generator import JSONGenerator
-from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -31,7 +31,7 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Monitor replication progress")
@@ -147,19 +147,19 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Configure Edge Server3 with ES2 replication URL")
         source_db = edge_server2.replication_url("travel")
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Configure Edge Server1 with ES3 replication URL")
         source_db = edge_server3.replication_url("travel")
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server1 = await edge_server1.configure_dataset(db_name="travel", config_file=config_path)
         self.mark_test_step("Empty the travel.hotels collection")
         all_docs = await edge_server1.get_all_documents(db_name="travel", collection="travel.hotels")
@@ -225,19 +225,19 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
         self.mark_test_step("Configure Edge Server 2 to replicate from Edge Server 1")
         config_path2 = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
         source_db = edge_server1.replication_url("travel")
         config = await read_json_file(config_path2)
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path2, config)
+        config_path2 = await write_derived_json_file(config_path2, config)
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path2)
         self.mark_test_step("Configure Edge Server 3 to replicate from Edge Server 2")
         source_db = edge_server2.replication_url("travel")
         config["replications"][0]["source"] = source_db
-        await write_json_file(config_path2, config)
+        config_path2 = await write_derived_json_file(config_path2, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path2)
 
         self.mark_test_step("Wait for replication to become idle across all Edge Servers")

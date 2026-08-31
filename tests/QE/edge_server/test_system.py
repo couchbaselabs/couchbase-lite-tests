@@ -13,7 +13,7 @@ from cbltest.api.error import (
     CblSyncGatewayBadResponseError,
 )
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway
-from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -75,7 +75,7 @@ class TestSystem(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 

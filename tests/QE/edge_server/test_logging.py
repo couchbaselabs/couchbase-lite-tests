@@ -7,7 +7,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
-from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.asyncfile import read_json_file, write_derived_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -136,7 +136,7 @@ class TestLogging(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
-        await write_json_file(config_path, config)
+        config_path = await write_derived_json_file(config_path, config)
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()

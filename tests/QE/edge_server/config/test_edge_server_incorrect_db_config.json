@@ -5,13 +5,10 @@
     "databases": {
         "db": {
             "path": "/home/ec2-user/database/db.cblite2",
-            "create": true,
+            "create": false,
             "enable_adhoc_queries": true,
             "enable_client_writes": false,
-            "enable_client_sync": true,
-            "collections": [
-                "test"
-            ]
+            "enable_client_sync": true
         }
     },
     "logging": {
