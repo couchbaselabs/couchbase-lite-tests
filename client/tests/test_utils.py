@@ -1,7 +1,8 @@
-from json import loads
+from json import dumps, loads
 
 import pytest
 import tenacity
+from cbltest.api.edgeserver import _error_detail
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
@@ -124,3 +125,21 @@ class TestBadResponseErrors:
 
         assert (es.code, es.body) == (500, "es body")
         assert (sg.code, sg.body) == (500, "sg body")
+
+
+class TestEdgeServerErrorDetail:
+    """Edge Server sends `reason` only sometimes; indexing it used to raise KeyError."""
+
+    def test_prefers_reason(self) -> None:
+        body = {"status": 404, "error": "Not Found", "reason": "No such collection"}
+        assert _error_detail(body) == "No such collection"
+
+    def test_falls_back_to_error_when_reason_is_absent(self) -> None:
+        """The real shape of an Edge Server 401 -- no `reason` key at all."""
+        assert _error_detail({"status": 401, "error": "Unauthorized"}) == "Unauthorized"
+
+    def test_falls_back_to_the_whole_body_when_neither_is_present(self) -> None:
+        assert _error_detail({"status": 500}) == dumps({"status": 500})
+
+    def test_treats_an_empty_reason_as_absent(self) -> None:
+        assert _error_detail({"error": "Conflict", "reason": ""}) == "Conflict"

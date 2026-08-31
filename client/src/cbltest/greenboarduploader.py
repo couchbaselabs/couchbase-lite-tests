@@ -177,8 +177,11 @@ class GreenboardUploader:
         # collected zero tests (and no setup crash occurred).
         self.__test_ran = True
 
-        if self.__overall_fail:
-            return
+        # __overall_fail latches on the first setup or teardown failure and is never
+        # cleared, so gating the tallies on it here froze them from that point on.
+        # upload() refuses to upload at all once it is set, so the ordinary path never
+        # noticed; record_upgrade_step does run in that state and writes
+        # "passCount": self.__pass_count, which understated the passes in the batch doc.
 
         # Track if any test has SGW-focused markers
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
