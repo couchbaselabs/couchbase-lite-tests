@@ -110,27 +110,62 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
+        self.__hostname: str = url
+        self.__auth_name = admin_user
+        self.__auth_password = admin_password
+        self.__anonymous_session: ClientSession | None = None
+        self.__admin_session: ClientSession | None = None
+        # The config this Edge Server was provisioned with. configure_dataset() moves
+        # __config_file on, so reset_to_initial_state() needs its own record of where
+        # to return to.
+        self.__initial_config_file: str = config_file
+        self._apply_config(config_file)
+        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
+
+    def _apply_config(self, config_file: str) -> None:
+        """
+        Adopt `config_file` as this Edge Server's current config, rebuilding the
+        sessions whose port, scheme and auth it determines.
+
+        Any sessions being replaced are dropped here; callers that can await should
+        go through :func:`reconfigure` so the old ones are closed first.
+        """
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
-        self.__hostname: str = url
         self.__port: int = port
         self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth_name = admin_user
-        self.__auth_password = admin_password
         self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
-        self.__replication_url = f"{ws_scheme}{url}:{port}"
+        self.__replication_url = f"{ws_scheme}{self.__hostname}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session: ClientSession | None = self._create_session(self.scheme, url, port, None)
-        self.__admin_session: ClientSession | None = self._create_session(
+        self.__anonymous_session = self._create_session(self.scheme, self.__hostname, port, None)
+        self.__admin_session = self._create_session(
             self.scheme,
-            url,
+            self.__hostname,
             port,
             encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
         )
-        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
+
+    async def reconfigure(self, config_file: str) -> None:
+        """
+        Adopt `config_file`, closing the sessions it replaces.
+
+        The shell2http session is left alone: it always talks plain HTTP to port
+        20001, whatever the Edge Server config says.
+        """
+        await self._close_client_sessions()
+        self._apply_config(config_file)
+
+    async def _close_client_sessions(self) -> None:
+        """Close the anonymous and admin sessions, leaving the shell2http one open."""
+        for session in (self.__admin_session, self.__anonymous_session):
+            if session is not None and not session.closed:
+                await session.close()
+
+        self.__admin_session = None
+        self.__anonymous_session = None
 
     @property
     def hostname(self) -> str:
@@ -838,6 +873,8 @@ class EdgeServer:
         else:
             self.__auth_name = name
             self.__auth_password = password
+            if self.__admin_session is not None and not self.__admin_session.closed:
+                await self.__admin_session.close()
             self.__admin_session = self._create_session(
                 self.scheme,
                 self.__hostname,
@@ -953,7 +990,11 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
-        return EdgeServer(self.__hostname, config_file=config_file)
+        # Reconfigure in place and hand back self. Returning a fresh EdgeServer left
+        # this one's sessions open with nobody holding a reference, which is what
+        # filled test output with "Unclosed client session".
+        await self.reconfigure(config_file)
+        return self
 
     async def reset_to_initial_state(self) -> None:
         """
@@ -977,10 +1018,11 @@ class EdgeServer:
             await self.kill_server()
             await self._send_request("post", "/reset-all-dbs", session=self.__shell_session)
 
-            async with aiofiles.open(self.__config_file) as f:
+            async with aiofiles.open(self.__initial_config_file) as f:
                 config = json.loads(await f.read())
 
             await self.start_server(config=config)
+            await self.reconfigure(self.__initial_config_file)
 
     async def set_firewall_rules(
         self,
