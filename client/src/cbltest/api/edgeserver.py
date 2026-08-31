@@ -29,7 +29,7 @@ from cbltest.api.syncgateway import (
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning
+from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.version import VERSION
 
 
@@ -921,7 +921,7 @@ class EdgeServer:
             },
         ):
             content = await self.get_log_content(log_file)
-            print(content)
+            cbl_trace(f"Edge Server [{self.__hostname}] {log_file}:\n{content}")
             return [line for line in content.splitlines() if search_string in line]
 
     async def start_server(self, config: dict | None = None) -> None:

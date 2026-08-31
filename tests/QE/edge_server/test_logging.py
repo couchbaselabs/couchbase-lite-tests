@@ -1,4 +1,5 @@
 import asyncio
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_derived_json_file
 
@@ -63,6 +65,29 @@ def _apply_audit_config_disabled(config: dict) -> None:
 def _apply_audit_config_enabled(config: dict) -> None:
     config["logging"]["audit"]["enable"] = "*"
     config["logging"]["audit"].pop("disable", None)
+
+
+async def _wait_for_audit_event(
+    edge_server: EdgeServer,
+    event_id: str,
+    *,
+    timeout: float = 30.0,
+) -> list[str]:
+    """
+    Poll the audit log until `event_id` shows up, returning the matching lines
+    (empty if it never does).
+
+    Edge Server flushes the audit file asynchronously: a create event lands
+    roughly a second after the request that caused it has already returned, so
+    reading once straight afterwards reliably misses it.
+    """
+    deadline = time.monotonic() + timeout
+    log = await edge_server.check_log(event_id)
+    while not log and time.monotonic() < deadline:
+        await asyncio.sleep(0.5)
+        log = await edge_server.check_log(event_id)
+
+    return log
 
 
 AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
@@ -185,7 +210,7 @@ class TestLogging(CBLTestClass):
             )
 
             self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
-            for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
+            for event_id, _, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
-                log = await edge_server.check_log(event_id)
-                assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"
+                log = await _wait_for_audit_event(edge_server, event_id)
+                assert len(log) > 0, f"Audit log for {step_name} event not found"
