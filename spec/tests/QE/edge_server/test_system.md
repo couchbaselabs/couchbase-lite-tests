@@ -117,8 +117,10 @@ Test that 4 concurrent async client coroutines continue to operate correctly whi
 **Steps:**
 1. **Setup:** Same as `test_system_one_client_l` step 1. Set `NUM_CLIENTS = 4`. Initialise `shared = {"edge_server_down": False}` and `recent_docs = []`.
 2. Define `chaos_controller()` as an async coroutine that loops until 6 hours have elapsed. Each iteration:
-   * `await asyncio.sleep(random.uniform(300, 1200))` — random quiet period of 5–20 minutes
-   * Exit if 6-hour window has expired
+   * random quiet period of 5–20 minutes, slept one second at a time and cut short once
+     the 6-hour window expires, so the end of the run is noticed as it happens rather
+     than up to 20 minutes later
+   * Exit if the 6-hour window has expired
    * *Triggering chaos: killing Edge Server.* — kill ES; set `shared["edge_server_down"] = True`; `await asyncio.sleep(10)`
    * `await asyncio.sleep(60)` — keep ES down for ~1 minute
    * *Restarting Edge Server after chaos window.* — start ES; `await asyncio.sleep(10)`; set `shared["edge_server_down"] = False`
