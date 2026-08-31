@@ -1,284 +1,263 @@
-# JS Docker E2E Session Context
+# JS Docker E2E + dev_e2e Catalog — Session Handoff
 
-Handoff for new chats. Date: **2026-08-24**. Branch: **`js-test`**.
-Repo: `/Users/jayant.dhingra/Desktop/couchbase-lite-tests`.
+**Give this file to a new chat** to continue catalog / harness work without re-discovering context.
 
-## What this session is about
+- **Updated:** 2026-08-31
+- **Repo:** `/Users/jayant.dhingra/Desktop/couchbase-lite-tests`
+- **Branch:** likely `js-test` (verify with `git branch`)
+- **Nothing committed unless user explicitly asked**
 
-Local JavaScript Couchbase Lite TDK work:
+---
 
-1. Docker CBS + SG backend, JS TDK server, run `tests/dev_e2e` against **Sync Gateway**.
-2. Add **local Edge Server 1.2.0-4** (HTTP / `ws://` only — JS/browser CBL cannot use HTTPS/WSS).
-3. Run JWT + JS→ES smoke against that ES.
-4. Re-run the same SG e2e files against ES via `--cbl-remote=es`.
+## What we are building
 
-Nothing in this chat was committed unless the user later asked.
+1. **JS dev_e2e against Docker** — CBS + SG + ES + JS TDK (`servers/javascript`, `@couchbase/lite-js@1.1.0-7`).
+2. **`--cbl-remote=es`** — run SG-targeted tests with Edge Server as the CBL replicator remote (`EsRemote` adapter).
+3. **HTML test catalog** — `tests/dev_e2e/dev-e2e-test-catalog.html` with **Sync Gateway** and **Edge Server** columns, N/A badges, and reasons.
+4. **Harness alignment** — pytest skips, catalog N/A sets, and skip reasons share one source of truth in `es_remote.py`.
 
-## Current environment (left running)
+Read also: `.cursor/rules/js-e2e-session.mdc` (must-know shortcuts), `environment/docker/es/js-cbl-e2e-interop-report.html` (interop proofs).
+
+---
+
+## Environment (local Docker + JS TDK)
 
 Do **not** stop CBS / SG / ES / JS unless asked.
 
-| Service | How | URL / ports | Notes |
-|---|---|---|---|
-| Couchbase Server | `docker-cbl-test-cbs-1` | `http://localhost:8091` | Admin `Administrator` / `password`. Query ping `:8093`. |
-| Sync Gateway | `docker-cbl-test-sg-1` | `http://localhost:4984` (public), `:4985` (admin) | HTTP, **not TLS**. Admin REST `admin` / `password`. CORS allows `http://localhost:5173`. |
-| LogSlurp | `docker-cbl-test-logslurp-1` | `:8180` | Started with compose; not required by this config. |
-| Edge Server 1.2.0-4 | `cbl-test-es` (`linux/amd64` deb) | `http://localhost:59840`, shell2http `:20001` | HTTP only (no TLS). CORS allows `http://localhost:5173`. Admin `admin_user` / `password`. Also `user1` / `user2` / `user3` with password `pass` (admin role). |
-| JS TDK test server | `npm run dev` in `servers/javascript` | `http://localhost:5173` | Vite. Transport is **WebSocket**, not HTTP. `GET /` may return 404; that is OK if Vite is listening. |
+| Service | Port(s) | Notes |
+|---------|---------|-------|
+| Couchbase Server | `:8091`, query `:8093` | Admin `Administrator` / `password` |
+| Sync Gateway | `:4984`, admin `:4985` | **HTTP** (`tls: false` in config) |
+| Edge Server 1.2 | `:59840`, shell2http `:20001` | **HTTP / ws:// only** — JS cannot use HTTPS/WSS |
+| JS TDK | `:5173` WebSocket | `servers/javascript` → `npm run dev` (**not** sibling `couchbase-lite-js` Vite) |
 
-Compose dir: `environment/docker/`.
-`docker-compose.override.yml` forces `SSL: "false"` so cbltest can talk to SG without the AWS CA bundle.
-
-Do **not** start a second Vite on 5173. Earlier, `couchbase-lite-js` (sibling repo `~/Desktop/couchbase-lite-js`) was occupying 5173; that is **not** the TDK server. The TDK server is `servers/javascript`.
-
-A leftover standalone container `cbl-sgw` (`couchbase/sync-gateway:3.2.7-enterprise`) was stopped because it held 4984/4985.
-
-latestbuilds `1.2.0/4` has **amd64** deb/rpm only (no linux arm64). This Mac is arm64 → Docker `platform: linux/amd64` + `couchbase-edge-server_1.2.0-4_amd64.deb`. Local checkout `/Users/jayant.dhingra/Desktop/edge-server-main` is **config/CORS/JWT reference only** — do not compile (LiteCore + EE submodules missing).
-
-`start_environment.py` is a false ready-check (matches any historical `"Sync Gateway is up"` log). Always poll CBS `:8091`, query `:8093`, SG `:4984`, admin `:4985`, ES `:59840`.
-
-Rebuild ES only: `docker compose up -d --no-deps --build cbl-test-es`. Without `--no-deps`, compose rebuilds CBS/SG.
-
-## Config
-
-`tests/dev_e2e/config.docker-js.json`:
-
-```json
-{
-  "test-servers": [{ "url": "http://localhost:5173", "transport": "ws" }],
-  "sync-gateways": [{ "hostname": "localhost", "tls": false }],
-  "couchbase-servers": [{ "hostname": "localhost" }],
-  "edge-servers": [{
-    "hostname": "localhost",
-    "admin_user": "admin_user",
-    "admin_password": "password",
-    "config_path": "environment/docker/es/config.json"
-  }]
-}
-```
-
-- Non-absolute `edge-servers[].config_path` is resolved against repo root (`client/src/cbltest/configparser.py`).
-- Default ES config (`environment/docker/es/config.json`): HTTP `:59840`, `enable_anonymous_users`, CORS `http://localhost:5173`, empty `db` with `create: true` + client sync.
-- `start-edgeserver.sh` rewrites `localhost`/`127.0.0.1` → `cbl-test-sg` in replications and drops `pinned_cert` on `ws://`. jq must tolerate missing `.replications` (default config has none).
-- `reset-db.sh` unzips `/home/ec2-user/database/{name}.cblite2.zip` if present; otherwise leaves an empty DB. Local Docker has **no** travel zip — JWT/ES dataset configs must `"create": true` and declare collections.
-
-## How to run
+Config: `tests/dev_e2e/config.docker-js.json`
 
 ```bash
-# Backend
-cd environment/docker
-docker compose up -d
-# poll CBS 8091, query 8093, SG 4984, SG admin 4985, ES 59840
+cd environment/docker && docker compose up -d
+# Poll: CBS 8091, query 8093, SG 4984, SG admin 4985, ES 59840
+cd servers/javascript && npm run dev
+```
 
-# JS test server
-cd servers/javascript
-npm run dev   # Vite on :5173
+Rebuild ES only: `docker compose up -d --no-deps --build cbl-test-es`
 
-# 1) SG remote (default) — 78 passed / 25 skipped
+**SG wedge after bucket recreate:** restart **CBS and SG**, then rerun tests.
+
+---
+
+## Core commands
+
+```bash
+# SG (default)
 cd tests/dev_e2e
-uv run pytest -v --tb=short --config config.docker-js.json
+uv run pytest -v --config config.docker-js.json
 
-# 2) JWT + JS→ES smoke (real SG + real ES, no --cbl-remote)
-uv run pytest -v --tb=short --config config.docker-js.json test_edge_server_cbl.py edge_server/
+# ES remote (same tests, EsRemote adapter)
+uv run pytest -v --config config.docker-js.json --cbl-remote=es
 
-# 3) Same SG e2e files, CBL replicates to ES
-uv run pytest -v --tb=short --config config.docker-js.json --cbl-remote=es \
-  test_basic_replication.py test_query_consistency.py \
-  test_replication_behavior.py test_replication_filter.py
+# Run without ES skips (prove N/A reasons — expect failures/timeouts)
+uv run pytest test_replication_filter.py::TestReplicationFilter::test_pull_channels_filter \
+  -v --config config.docker-js.json --cbl-remote=es --investigate-es-hangs
+
+# Regenerate catalog (merge into dev-e2e-test-results.json)
+uv run python tests/dev_e2e/generate_test_catalog_html.py
+uv run python tests/dev_e2e/generate_test_catalog_html.py --run-files test_replication_filter.py
 ```
 
-`--cbl-remote=es` (default `sgw`) is defined in `tests/dev_e2e/conftest.py`. It must **not** be used for `edge_server/` JWT tests — those need the real Sync Gateway object.
+**Do not** use `--cbl-remote=es` on `edge_server/` JWT tests — they need real SG.
 
-## Test results
+---
 
-### 1) Sync Gateway remote (default, no flag)
+## Catalog badge semantics
 
-**78 passed, 25 skipped, 0 real failures** out of 103 collected.
+| Badge | Meaning |
+|-------|---------|
+| **N/A** | Test does not target this remote by design. Catalog overrides stored SKIPPED/FAILED via `remote_applicable()` in `generate_test_catalog_html.py`. |
+| **Skipped** | Pytest skip fired. Catalog may still show **N/A** if test is in `*_NA_*` sets. |
+| **Passed / Failed** | Test actually ran against that remote. |
 
-The first full run hung when SG wedged creating GSI indexes after `configure_dataset` bucket recreate. After **CBS+SG restart**, remaining tests passed. Connection-reset failures were that hang, not product bugs.
+---
 
-#### Passed against SG (78)
+## Key files
 
-- `test_basic_replication.py` — 12/12
-- `test_custom_conflict.py` — 4/4
-- `test_fest.py` — 7/7
-- `test_query_consistency.py` — 34/34
-- `test_replication_auto_purge.py` — 13/13
-- `test_replication_behavior.py` — 1
-- `test_replication_blob.py` — `test_blob_replication`
-- `test_replication_filter.py` — 6/6
+| Path | Role |
+|------|------|
+| `tests/dev_e2e/generate_test_catalog_html.py` | Catalog generator; N/A sets, reasons, HTML output |
+| `tests/dev_e2e/dev-e2e-test-catalog.html` | Generated catalog (open in browser) |
+| `tests/dev_e2e/dev-e2e-test-results.json` | Persisted SG/ES/es2 run outcomes |
+| `tests/dev_e2e/es_remote.py` | `EsRemote` adapter + **shared skip/N/A reasons** |
+| `tests/dev_e2e/conftest.py` | `--cbl-remote`, `--investigate-es-hangs`, skip injection |
+| `tests/dev_e2e/config.docker-js.json` | Topology + `es-remote.skip-files` / `skip-tests` |
+| `tests/dev_e2e/es_ws.py` | ws:// URLs, JWT/ES config prep, drops `pinned_cert` for HTTP |
+| `environment/docker/es/js-cbl-e2e-interop-report.html` | SG vs ES interop evidence |
+| `environment/docker/es/comparison-logs/es-full.log` | Full ES run log (Aug 27) |
+| `.cursor/js-e2e-test-matrix.md` | Per-test SG vs ES matrix (may be stale vs catalog) |
 
-#### Skipped on SG (25) — topology / platform
+---
 
-- 6 Edge Server JWT tests (until local ES existed)
-- `test_encrypted_properties.py::test_encrypted_push`
-- 2 multipeer
-- `test_replication_blob.py::test_pull_non_blob_changes_with_delta_sync_and_compact` (not JS)
-- 13 SGW upgrade
-- 2 XDCR (need 2 SG + 2 CBS + LB)
+## ES skip / N/A single source of truth (`es_remote.py`)
 
-### 2) JWT + JS→ES smoke (no `--cbl-remote`)
-
-**7 passed**
-
-- `test_edge_server_cbl.py::test_js_push_to_edge_server_over_ws` — JS CBL push 3 docs to `ws://localhost:59840/db`, no pinned cert
-- `edge_server/test_jwt_simple.py` — inline JWT; ES pulls from SG over `ws://`; expected_min docs **5** (zip optional)
-- `edge_server/test_jwt_rotation.py` — 5 tests (file JWT, rotation, 401, corrupt file, valid→invalid→valid)
-
-JWT simple first failed with `collection travel.airlines is not found` because empty `create: true` DBs only have `_default._default`. Fix: declare collections on the ES database + `prepare_es_replication_for_sgw` copies replication collections onto the target DB. JWT JSON configs have `"create": true`. Rotation seeds a few docs per collection when `dataset/sg/travel-sg.json` is missing (the 3MB file **does** exist locally; the seed is a fallback).
-
-JWT uses `sync_gateway.scheme` (`http://` locally, `https://` on AWS). `prepare_es_replication_for_sgw` sets the live SG URL and drops `pinned_cert` when SG is HTTP.
-
-### 3) SG e2e files against Edge Server (`--cbl-remote=es`)
-
-**46 passed, 7 skipped** on:
-
-`test_basic_replication.py` + `test_query_consistency.py` + `test_replication_behavior.py` + `test_replication_filter.py`
-
-That is the same 78-test SG set, minus suites that cannot work on ES (see matrix).
-
-| SG suite (count) | Against ES |
-|---|---|
-| Query consistency (34) | **34 passed** — CBL SQL++ compared to ES adhoc query, not CBS |
-| Basic replication (12) | **10 passed**; skip checkpoint reset (ES has no `_purge`) |
-| Behavior (1) | **1 passed** |
-| Filters (6) | **1 passed** (`test_custom_push_filter`); 5 skipped |
-| Fest (7) | Skipped — JS hung (`updateDatabase` `-1`) with two continuous replicators; also needs SG roles/channels |
-| Custom conflict (4) | Skipped — replicator never reaches `STOPPED` |
-| Auto-purge (13) | Skipped — SG channel/ACL only |
-| Blob (1) | Skipped — JS `/updateDatabase` returned `-1` |
-
-**46 + 7 skipped in-file + 25 not collected in that command = the original 78.**
-
-#### How `--cbl-remote=es` works
-
-`tests/dev_e2e/es_remote.py` + autouse fixture in `conftest.py`:
-
-- Replaces `cblpytest.sync_gateways[0]` with `EsRemote` (duck-types SG: `replication_url`, `tls_cert`→None, `get_all_documents`, `get_document`, `update_documents`, `delete_document`, no-op `add_user`/`add_role`).
-- Monkeypatches `CouchbaseCloud.configure_dataset` to start ES with `{name}` DB + collections from `{name}-sg-config.json` and load `{name}-sg.json` via `_bulk_docs` (same dataset as SG).
-- Skip lists live in `ES_SKIP_FILES` / `ES_SKIP_TEST_NAMES` in `es_remote.py`.
-- `EsRemote.close()` closes the original Sync Gateway sessions.
-
-Query consistency (`_query_remote`): when the remote has `_edge`, POST the **CBL** SQL++ to `/travel.travel.{collection}/_query`. Working example:
-
-```text
-POST /travel.travel.airlines/_query
-{"query":"SELECT meta().id FROM travel.airlines WHERE meta().id NOT LIKE \"_sync%\" ORDER BY id LIMIT 3"}
+```python
+ES_NA_TEST_REASONS  # per-test pytest skip + catalog N/A reason
+ES_NA_FILE_REASONS  # per-file (fest, auto_purge)
+es_skip_reason_for_test(base)
+es_skip_reason_for_file(file_name)
+load_es_remote_skips(config)  # from config.docker-js.json es-remote section
 ```
 
-`POST /travel/_query` returns 404 (no such collection). Joins work on any collection keyspace in that DB (`FROM travel.routes JOIN travel.airlines`).
+`conftest.py` uses these for `--cbl-remote=es` skips.  
+`generate_test_catalog_html.py` imports `ES_NA_TEST_REASONS` / `ES_NA_FILE_REASONS` for catalog + `fill_missing_reasons()`.
 
-Isolated failures that caused skips (not cascade):
+### `config.docker-js.json` → `es-remote`
 
-- `_purge` → 404 (checkpoint tests)
-- Custom conflict / document-id filter / custom pull filter → `CblTimeoutError` waiting for `STOPPED`
-- Blob + fest create → JS TDK `POST /updateDatabase` returned `-1` (server wedged ~2 min)
+**skip-files:** fest, auto_purge, upgrade, xdcr, multipeer, encrypted, edge_server_cbl  
+**skip-tests:** `test_pull_channels_filter`, `test_replicate_public_channel`, `test_reset_checkpoint_push`, `test_blob_replication`
 
-These look like JS CBL ↔ ES interop limits, not missing dataset setup.
+---
 
-## ES Docker details
+## Catalog generator N/A sets (`generate_test_catalog_html.py`)
 
-`environment/docker/es/`:
+| Set | Scope |
+|-----|-------|
+| `BOTH_NA_FILES` | multipeer — no remote |
+| `BOTH_NA_FILES_JS` | encrypted, upgrade, xdcr — JS platform |
+| `BOTH_NA_TEST_BASES` | delta blob compact (CBSE-14861), pull resurrected (CBL-7841) |
+| `SG_NA_FILES` | JWT / ES smoke tests |
+| `ES_NA_FILES` | fest, auto_purge (whole files) |
+| `ES_NA_TEST_BASES` | channels filter, public channel, checkpoint push purge, blob `_attachments` |
+| `CATALOG_TAIL_ORDER` | encrypted + multipeer collapsed at bottom |
 
-| File | Role |
-|---|---|
-| `Dockerfile` | Ubuntu 22.04 amd64, ES 1.2.0-4 deb, shell2http |
-| `config.json` | HTTP listener, CORS, empty `db` |
-| `users.json` | Schema stub; `start.sh` / `--add-user` adds bcrypt users (JSON5 with `//` comment — `jq` cannot parse it raw) |
-| `start.sh` | Creates `admin_user`/`password`, `user1`/`user2`/`user3`/`pass`; starts shell2http + ES |
-| `start-edgeserver.sh` | Writes POSTed config; rewrites SG host; optional replications |
-| `reset-db.sh` | Delete `{filename}.cblite2`; unzip sibling zip if present |
-| `write-file.sh` | JWT rotation writes `/home/ec2-user/cert/jwt.txt` |
-| `add-user.sh` / `kill-edgeserver.sh` / `common.sh` | shell2http handlers |
+`TEST_CATALOG_NOTES` — visible notes in catalog for tests where SG/ES differ by design (blob, channels, checkpoint, etc.).
 
-Compose service `cbl-test-es` ports **59840** and **20001**, `depends_on` SG.
+---
 
-Users were added on the running container with `couchbase-edge-server --add-user …` then `docker compose restart cbl-test-es`. `start.sh` now creates them on boot after an image rebuild.
+## Latest catalog snapshot (Aug 31 — verify after regen)
 
-## Known Docker/SG failure mode
+Summary line in HTML may show **72 SG passed / 61 ES passed** — **SG rows for `test_replication_filter.py` can be stale** if last `--run-files` run hit a bad SG fixture (`_es_replicator_idle_terminal`). Live pytest (Aug 31) showed **4 passed + 2 skipped on ES**, **6 passed on SG** for that file.
 
-**Symptom:** SG `:4984` and `:4985` time out. Process is still up but HTTP is dead.
+### Suites fully analyzed in recent chat
 
-**Cause:** `configure_dataset()` deletes/recreates CBS buckets. SG creates GSI indexes and CBS indexer returns `Bucket does not exist or temporarily unavailable for creating new index`. SG retries forever.
+#### `test_replication_filter.py` (6 tests)
 
-**Recovery:**
+| Test | SG | ES | Notes |
+|------|----|----|-------|
+| `test_push_document_ids_filter` | Pass | Pass | CBL `documentIDs` filter |
+| `test_pull_document_ids_filter` | Pass | Pass | CBL `documentIDs` filter |
+| `test_pull_channels_filter` | Pass | **N/A** | SG channel pull filter |
+| `test_replicate_public_channel` | Pass | **N/A** | SG public channel `!` |
+| `test_custom_push_filter` | Pass | Pass | CBL-side push filter |
+| `test_custom_pull_filter` | Pass | Pass | CBL-side pull filter |
+
+**ES N/A proofs — `test_pull_channels_filter`**
+
+- Test uses `ReplicatorCollectionEntry(..., channels=["United Kingdom", "France"])` — SG sync channels, not document IDs.
+- `dataset/sg/travel-sg.json` docs have `"channels": [...]`; `travel-sg-config.json` sync functions call `channel(doc.channels)`.
+- `EsRemote.add_user`: *"ES has no SG channel ACL"*.
+- Interop report Part 7: *ES 1.2 ACL is collection read/write only*.
+- Without skip (`--investigate-es-hangs`): **`CblTimeoutError: Timeout waiting for replicator status`** (~34s, Aug 31 live run).
+- Log: `environment/docker/es/comparison-logs/es-full.log` line ~21760.
+
+**ES N/A proofs — `test_replicate_public_channel`**
+
+- Publishes doc with `"channels": ["!"]`; pulls as **user2** who has **empty** `collection_access` in `names-sg-config.json` → only public-channel doc visible on SG.
+- Without skip: **`AssertionError: Invalid number of documents after pull`** — **101 == 1** (`dev-e2e-test-results.json` `es2`, `es-full.log` ~21889).
+- ES loads full `names` dataset; no channel gate for user2.
+
+#### `test_replication_blob.py`
+
+| Test | SG | ES |
+|------|----|----|
+| `test_pull_non_blob_changes_with_delta_sync_and_compact` | **N/A both** | **N/A both** | CBSE-14861, JS platform skip |
+| `test_blob_replication` | Pass | **N/A** | Push OK on ES; step 7 asserts SG `_attachments` stub |
+
+#### `test_replication_behavior.py`
+
+| Test | SG | ES |
+|------|----|----|
+| `test_pull_resurrected_doc` | **N/A both** | **N/A both** | CBL-7841; `skip_if_cbl_not(..., ">= 4.2.0")`; not lite-js 1.x |
+
+#### Tail (both remotes N/A on JS catalog)
+
+- `test_encrypted_properties.py` — C TDK only
+- `test_basic_multipeer.py` — P2P, last in catalog
+
+#### ES file skips (N/A all tests in file)
+
+- `test_fest.py` — SG roles, channels, sync functions (SG: 78 passed after flaky `test_unshare_list` fixed)
+- `test_replication_auto_purge.py` — SG channels, roles, access revocation
+
+---
+
+## `--cbl-remote=es` mechanics (short)
+
+1. `conftest.py` autouse fixture calls `install_es_remote(cblpytest, dataset_path)`.
+2. Replaces `sync_gateways[0]` with `EsRemote` (duck-types SG REST).
+3. Patches `configure_dataset` → ES HTTP DB + bulk load from `{name}-sg.json`.
+4. `prepare_es_replication_for_sgw` rewrites SG URL to HTTP, drops `pinned_cert`.
+
+Query consistency (34 tests): ES adhoc query via `_query_remote`, not CBS — **all pass on ES**.
+
+---
+
+## Interop vs N/A (important distinction)
+
+| Category | Example | Catalog treatment |
+|----------|---------|-------------------|
+| **N/A by design** | SG channels, `_purge`, `_attachments` shape | N/A badge + specific reason |
+| **Interop failure** | doc-ID filter second push IDLE hang (older es-full) | Was Failed; some now Pass on current lite-js |
+| **JS product gap** | multipeer, encrypted, CBL ≥ 4.0 upgrade | N/A both remotes |
+
+See `js-cbl-e2e-interop-report.html` Part 5 (8 interop failures) and Part 7 (expected skips).
+
+---
+
+## Harness changes made (Aug 31, uncommitted)
+
+1. **`es_remote.py`** — `ES_NA_TEST_REASONS`, `ES_NA_FILE_REASONS`, `es_skip_reason_for_test/file()`.
+2. **`conftest.py`** — per-test/file skip reasons (not generic "channels/roles/CBS" for everything).
+3. **`generate_test_catalog_html.py`** — imports shared reasons; `TEST_CATALOG_NOTES` for blob, channels, resurrected, etc.; `test_blob_replication` in `ES_NA_TEST_BASES`.
+4. **`test_replication_behavior.py`** — `test_pull_resurrected_doc` kept at `skip_if_cbl_not >= 4.2.0` (product gap → N/A, not Failed).
+
+---
+
+## Regenerate catalog cleanly
 
 ```bash
-docker compose restart cbl-test-cbs cbl-test-sg   # from environment/docker
-# Poll CBS 8091 + query 8093 + SG 4984 + SG admin 4985 + ES 59840
+cd /Users/jayant.dhingra/Desktop/couchbase-lite-tests
+
+# Full regen from stored results (no pytest)
+uv run python tests/dev_e2e/generate_test_catalog_html.py
+
+# Refresh one file on both remotes (fixes stale SG rows)
+uv run python tests/dev_e2e/generate_test_catalog_html.py --run-files test_replication_filter.py
 ```
 
-Restarting SG alone is not enough if the indexer is wedged — restart **CBS and SG**.
+If SG runs fail with `ValueError: _es_replicator_idle_terminal did not yield a value`, fix env/fixture before trusting SG column — ES column + N/A reasons are still valid.
 
-`--cbl-remote=es` does **not** recreate CBS buckets (configure_dataset is patched), so this hang should not happen during the ES e2e run.
-
-Docker README: backend no longer officially supported; 8G RAM / 80G disk recommended.
-
-## WIP on branch `js-test` (not committed by this chat)
-
-### Docker backend
-
-`environment/docker/**` — CBS 7.6.4, SG 3.2.0, ES 1.2.0-4, LogSlurp. Override `SSL=false`. SG CORS includes `http://localhost:5173`.
-
-### JS test server
-
-- `servers/javascript/package.json`: `@couchbase/lite-js@1.1.0-5`; `@logtape/logtape`
-- `servers/javascript/.npmrc` (untracked): `@couchbase:registry=https://proget.sc.couchbase.com/npm/cbl-npm/`
-
-### Framework / tests
-
-- `client/src/cbltest/configparser.py` — relative ES `config_path` vs repo root
-- `tests/dev_e2e/config.docker-js.json` — JS + SG HTTP + CBS + ES
-- `tests/dev_e2e/es_ws.py` — `prepare_es_replication_for_sgw`, `assert_http_only_es_config`, `js_edge_replicator_url`
-- `tests/dev_e2e/es_remote.py` — `EsRemote` + skip lists + `install_es_remote`
-- `tests/dev_e2e/conftest.py` — `--cbl-remote` + skip hook + autouse installer
-- `tests/dev_e2e/test_query_consistency.py` — `_query_remote` (ES adhoc vs CBS)
-- `tests/dev_e2e/test_edge_server_cbl.py` — JS `ws://` smoke
-- `tests/dev_e2e/edge_server/test_jwt_*.py` + JWT JSON configs — TLS-aware, `create: true`, collections
-- `tests/dev_e2e/test_fest.py` — f-string assertion fixes (SG run)
-
-Do **not** re-point `test_basic_replication.py` at ES permanently. Default remains SG; ES is `--cbl-remote=es` only.
-
-## Status / health commands
-
-```bash
-docker compose -f environment/docker/docker-compose.yml ps
-curl -sS -m 5 -o /dev/null -w "CBS %{http_code}\n" http://localhost:8091/ui/index.html
-curl -sS -m 5 -o /dev/null -w "SG %{http_code}\n" http://localhost:4984/
-curl -sS -m 5 -o /dev/null -w "SGadmin %{http_code}\n" -u admin:password http://localhost:4985/_all_dbs
-curl -sS -m 5 -o /dev/null -w "ES %{http_code}\n" http://localhost:59840/
-curl -sS -m 5 -o /dev/null -w "ES-user1 %{http_code}\n" -u user1:pass http://localhost:59840/
-lsof -i :5173 -sTCP:LISTEN
-```
+---
 
 ## Do not do
 
-- Do not use AWS `start_backend.py` for this local JS loop.
-- Do not hand-edit generated `tests/dev_e2e/config.json` (`config.docker-js.json` is the intentional exception).
-- Do not compile `edge-server-main` (missing submodules).
-- Do not run `tests/QE/edge_server/` this pass unless asked.
-- Do not create extra markdown changelogs; this file is the session handoff.
-- Do not commit secrets, certs, or Terraform state.
-- Do not kill CBS/SG/ES/JS unless asked.
-- Do not commit unless asked.
+- Do not commit unless user asks.
+- Do not stop CBS/SG/ES/JS unless asked.
+- Do not use `--cbl-remote=es` on `edge_server/` JWT tests.
+- Do not hand-edit `dev-e2e-test-results.json` without understanding merge logic.
+- Do not create extra markdown changelogs — **this file is the handoff**.
+- Do not treat ES Failed on channel tests as product bugs — they are N/A (SG-only semantics).
 
-Per-test SG vs ES table (every nodeid, grouped): [`.cursor/js-e2e-test-matrix.md`](js-e2e-test-matrix.md).
+---
 
-**Skipped-test verdict (docs + lite-js 1.1.0-5, 2026-08-24):** extra Docker will **not** unskip the remaining 19 JS tests. JWT/ES 7 already run. Multipeer / encrypted-properties / blob-compact / upgrade / XDCR are JS product or CBL-version gates. ES-only skips (channels, `_purge`, fest, conflict hang) need SG features ES 1.2 does not have. Official JS 1.0 docs are stale on “no Edge Server” and “SG ≥ 3.3.1” (78 tests passed on SG 3.2.0; ES 1.1 CORS is why JS→ES works). Do not add a second CBS/SG/JS peer unless switching to a native CBL server.
+## Suggested next steps for a new chat
 
-## Related paths
+1. Regenerate catalog after clean SG+ES pytest for any file with stale SG failures.
+2. Continue suite-by-suite N/A proof docs (next: `test_basic_replication` checkpoint tests, `test_custom_conflict`).
+3. Optionally sync `.cursor/js-e2e-test-matrix.md` with catalog N/A sets.
+4. Commit harness + catalog when user asks.
 
-| Path | Role |
-|---|---|
-| `servers/javascript/` | JS TDK test server (Vite + WebSocket) |
-| `client/src/cbltest/websocket_router.py` | Client WS transport for JS |
-| `client/src/cbltest/configparser.py` | ES config path resolution |
-| `tests/dev_e2e/` | Developer E2E suite |
-| `tests/dev_e2e/es_ws.py` | TLS-aware ES↔SG helpers |
-| `tests/dev_e2e/es_remote.py` | ES-as-SG adapter for `--cbl-remote=es` |
-| `tests/dev_e2e/config.docker-js.json` | Local JS + Docker topology |
-| `environment/docker/` | Local CBS + SG + ES + LogSlurp |
-| `environment/docker/es/` | Edge Server 1.2.0-4 image |
-| `environment/docker/start_environment.py` | Compose up + **unreliable** SG-ready wait |
-| `dataset/sg/` | `{name}-sg.json` + `{name}-sg-config.json` (travel-sg.json is ~3MB, present) |
-| `.cursor/js-e2e-test-matrix.md` | Every dev_e2e test: SG vs ES Pass/Fail/Skip + reason |
+---
+
+## Quick attach prompt for new chat
+
+Copy-paste into a new Cursor chat:
+
+> Read `.cursor/js-e2e-session-context.md` and `.cursor/rules/js-e2e-session.mdc`. Continue JS dev_e2e catalog work: validate N/A classifications, regenerate `dev-e2e-test-catalog.html`, do not commit unless I ask.

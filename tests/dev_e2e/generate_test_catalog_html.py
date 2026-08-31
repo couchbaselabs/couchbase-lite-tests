@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from es_remote import ES_NA_FILE_REASONS, ES_NA_TEST_REASONS
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEV_E2E = REPO_ROOT / "tests" / "dev_e2e"
 DEFAULT_CONFIG = DEV_E2E / "config.docker-js.json"
@@ -24,13 +26,18 @@ JUNIT_PATH = DEV_E2E / ".catalog-junit.xml"
 OUTCOME_LINE_RE = re.compile(
     r"^(?P<file>[\w/_.-]+\.py)::\S+::(?P<test>\S+(?:\[[^\]]+\])?)\s+(?P<outcome>PASSED|FAILED|SKIPPED|ERROR)"
 )
-SKIP_SUMMARY_RE = re.compile(
-    r"^SKIPPED \[.*?\] (?P<file>[\w/_.-]+\.py)(?::\d+)?: (?P<reason>.+)$"
-)
+SKIP_SUMMARY_RE = re.compile(r"^SKIPPED \[.*?\] (?P<file>[\w/_.-]+\.py)(?::\d+)?: (?P<reason>.+)$")
 
 TestResult = dict[str, str]  # {"outcome": "...", "reason": "..."}
 
-# Peer-to-peer tests — no SG or ES remote involved.
+# Platform / JS-inapplicable tests — collapsed at end of catalog (multipeer always last).
+CATALOG_TAIL_ORDER = (
+    "test_encrypted_properties.py",
+    "test_replication_upgrade.py",
+    "test_replication_xdcr.py",
+    "test_basic_multipeer.py",
+)
+CATALOG_TAIL_COLLAPSED_FILES = frozenset(CATALOG_TAIL_ORDER)
 BOTH_NA_FILES = frozenset({"test_basic_multipeer.py"})
 
 # Platform / topology limits for the JS docker catalog (see .cursor/js-e2e-test-matrix.md).
@@ -41,7 +48,12 @@ BOTH_NA_FILES_JS = frozenset(
         "test_replication_xdcr.py",
     }
 )
-BOTH_NA_TEST_BASES = frozenset({"test_pull_non_blob_changes_with_delta_sync_and_compact"})
+BOTH_NA_TEST_BASES = frozenset(
+    {
+        "test_pull_non_blob_changes_with_delta_sync_and_compact",
+        "test_pull_resurrected_doc",
+    }
+)
 
 # ES-only smoke / JWT tests — not exercised as CBL → Sync Gateway.
 SG_NA_FILES = frozenset(
@@ -64,12 +76,29 @@ ES_NA_TEST_BASES = frozenset(
         "test_pull_channels_filter",
         "test_replicate_public_channel",
         "test_reset_checkpoint_push",
-        "test_reset_checkpoint_pull",
+        "test_blob_replication",
     }
 )
 
 FILE_NOTES: dict[str, str] = {
-    "test_basic_multipeer.py": "Peer-to-peer (CBL ↔ CBL) — not a Sync Gateway or Edge Server test.",
+    "test_encrypted_properties.py": (
+        "`EncryptedValue` field encryption is implemented on the C test server only; "
+        "not wired in the JS TDK (test skips unless platform is C)."
+    ),
+    "test_replication_upgrade.py": (
+        "SGW 4.x upgrade interop (pre-4.0 revision trees → HLV / version vectors) requires native CBL ≥ 4.0 "
+        "and the v4.0 `upgrade` dataset; lite-js 1.1.x has rev-tree IDs only (no HLV) and skips with "
+        "`CBL 1.1.0 not >= 4.0.0`."
+    ),
+    "test_replication_xdcr.py": (
+        "Cross-datacenter replication (XDCR) requires two Couchbase clusters, two Sync Gateways, "
+        "and a load balancer; the JS Docker config is single-cluster. Also requires native CBL ≥ 4.0 "
+        "(lite-js reports 1.1.x)."
+    ),
+    "test_basic_multipeer.py": (
+        "Peer-to-peer (CBL ↔ CBL) only — not Sync Gateway or Edge Server. "
+        "Not supported on Couchbase Lite JavaScript (no multipeer API; requires 2 test servers)."
+    ),
 }
 
 SG_NA_FILE_REASONS: dict[str, str] = {
@@ -78,36 +107,29 @@ SG_NA_FILE_REASONS: dict[str, str] = {
     "test_jwt_simple.py": "JWT / Edge Server replication test; not CBL → Sync Gateway.",
 }
 
-ES_NA_FILE_REASONS: dict[str, str] = {
-    "test_fest.py": "Requires Sync Gateway roles, channels, and sync functions.",
-    "test_replication_auto_purge.py": "Requires Sync Gateway channels, roles, and access revocation.",
-}
-
 ES_SKIP_REASON = "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
-ES_SKIP_FILES = frozenset(
-    {
-        "test_fest.py",
-        "test_replication_auto_purge.py",
-        "test_replication_upgrade.py",
-        "test_replication_xdcr.py",
-        "test_multipeer.py",
-        "test_encrypted_properties.py",
-        "test_edge_server_cbl.py",
-        "test_custom_conflict.py",
-    }
-)
 
-ES_NA_TEST_REASONS: dict[str, str] = {
-    "test_pull_channels_filter": "Requires Sync Gateway sync channels; Edge Server has no channel ACL.",
-    "test_replicate_public_channel": "Requires Sync Gateway public channel (`channel(\"!\")`).",
-    "test_reset_checkpoint_push": "Requires Sync Gateway `_purge` API; not available on Edge Server.",
-    "test_reset_checkpoint_pull": "Requires Sync Gateway `_purge` API; not available on Edge Server.",
+# Short catalog notes (visible + HTML comment) for tests where ES pass/fail differs by design.
+TEST_CATALOG_NOTES: dict[str, str] = {
+    "test_reset_checkpoint_push": "Push: purge on remote → needs SG `_purge` (ES N/A).",
+    "test_reset_checkpoint_pull": "Pull: purge on CBL only → remote still has doc (ES OK).",
+    "test_blob_replication": ("Push + blob metadata OK on ES; step 7 checks SG `_attachments` stubs (ES N/A)."),
+    "test_pull_non_blob_changes_with_delta_sync_and_compact": (
+        "CBSE-14861 — delta sync + compact blob path; not supported on lite-js (both remotes N/A)."
+    ),
+    "test_pull_channels_filter": (
+        "Pull filter by SG sync channels (`United Kingdom`, `France`); travel sync functions assign "
+        "`channel(doc.channels)`. ES has collection ACL only (ES N/A)."
+    ),
+    "test_replicate_public_channel": (
+        "SG public channel `!` with user2 (empty collection_access); ES run pulled 101 docs — no channel gate (ES N/A)."
+    ),
 }
 
 BOTH_NA_FILE_REASONS: dict[str, str] = {
     "test_basic_multipeer.py": "Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.",
-    "test_encrypted_properties.py": "Field encryption (`EncryptedValue`) is C-only; not supported on JS.",
-    "test_replication_upgrade.py": "Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.",
+    "test_encrypted_properties.py": "`EncryptedValue` not implemented on JS test server (C TDK only).",
+    "test_replication_upgrade.py": ("Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0."),
     "test_replication_xdcr.py": "Requires native CBL ≥ 4.0, XDCR topology, and load balancer; JS reports 1.1.0.",
 }
 
@@ -115,7 +137,19 @@ BOTH_NA_TEST_REASONS: dict[str, str] = {
     "test_pull_non_blob_changes_with_delta_sync_and_compact": (
         "Delta sync + compact path not supported on Couchbase Lite JavaScript (CBSE-14861)."
     ),
+    "test_pull_resurrected_doc": (
+        "CBL-7841 (pull resurrected doc over local tombstone) not in lite-js 1.x; native CBL ≥ 4.2.0."
+    ),
 }
+
+
+# Why a test is not applicable, in the vocabulary used by the catalog audit:
+#   CBL-JS — lite-js/JS TDK gap or wrong CBL version; neither remote can run it.
+#   ES     — valid for CBL → Sync Gateway, but Edge Server cannot exercise it.
+#   SGW    — targets Edge Server / JWT directly; never runs as CBL → Sync Gateway.
+NA_SCOPE_CBL_JS = "CBL-JS"
+NA_SCOPE_ES = "ES"
+NA_SCOPE_SGW = "SGW"
 
 
 def test_base_name(test_name: str) -> str:
@@ -149,6 +183,42 @@ def na_reason(file_name: str, test_name: str, remote: str) -> str | None:
         if base in ES_NA_TEST_REASONS:
             return ES_NA_TEST_REASONS[base]
     return "Not applicable to this remote."
+
+
+def na_scopes(file_name: str, test_name: str) -> list[str]:
+    """Scopes explaining why a test is N/A, ordered broadest first."""
+    base = test_base_name(test_name)
+    scopes: list[str] = []
+    if file_name in BOTH_NA_FILES or file_name in BOTH_NA_FILES_JS or base in BOTH_NA_TEST_BASES:
+        scopes.append(NA_SCOPE_CBL_JS)
+    if file_name in SG_NA_FILES:
+        scopes.append(NA_SCOPE_SGW)
+    if file_name in ES_NA_FILES or base in ES_NA_TEST_BASES:
+        scopes.append(NA_SCOPE_ES)
+    return scopes
+
+
+def applicability(file_name: str, test_name: str) -> tuple[str, str]:
+    """Return (Yes | Partial (… only) | No, N/A scope) for the applicability column."""
+    sg_ok = remote_applicable(file_name, test_name, "sg")
+    es_ok = remote_applicable(file_name, test_name, "es")
+    scope = "+".join(na_scopes(file_name, test_name))
+    if sg_ok and es_ok:
+        return "Yes", ""
+    if sg_ok:
+        return "Partial (SG only)", scope
+    if es_ok:
+        return "Partial (ES only)", scope
+    return "No", scope
+
+
+def applicability_cell(file_name: str, test_name: str) -> str:
+    label, scope = applicability(file_name, test_name)
+    css = {"Yes": "app-yes", "No": "app-no"}.get(label, "app-partial")
+    parts = [f'<span class="badge badge-{css}">{html.escape(label)}</span>']
+    if scope:
+        parts.append(f'<span class="scope-tag">{html.escape(scope)}</span>')
+    return f'<td class="applicable">{"".join(parts)}</td>'
 
 
 def normalize_test_result(value: str | dict[str, str] | None) -> TestResult | None:
@@ -306,6 +376,65 @@ def run_pytest(files: list[str], config: Path, remote: str) -> tuple[int, str]:
     return proc.returncode, output
 
 
+def run_es_full_suite(config: Path) -> tuple[int, dict[str, dict[str, TestResult]]]:
+    """Run all ES-applicable dev_e2e tests; JWT smoke runs without --cbl-remote=es."""
+    es_junit = DEV_E2E / ".catalog-es-full-junit.xml"
+    if es_junit.exists():
+        es_junit.unlink()
+
+    main_cmd = [
+        "uv",
+        "run",
+        "pytest",
+        str(DEV_E2E),
+        "--ignore",
+        str(DEV_E2E / "edge_server"),
+        "-v",
+        "--tb=short",
+        f"--config={config}",
+        "-o",
+        "console_output_style=classic",
+        "-rs",
+        f"--junitxml={es_junit}",
+        "--cbl-remote=es",
+    ]
+    print(f"Running {' '.join(main_cmd)}", flush=True)
+    main_proc = subprocess.run(main_cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    main_output = main_proc.stdout + main_proc.stderr
+    if main_proc.returncode not in (0, 1):
+        print(main_output, file=sys.stderr)
+
+    jwt_junit = DEV_E2E / ".catalog-es-full-jwt-junit.xml"
+    if jwt_junit.exists():
+        jwt_junit.unlink()
+    jwt_cmd = [
+        "uv",
+        "run",
+        "pytest",
+        str(DEV_E2E / "edge_server"),
+        "-v",
+        "--tb=short",
+        f"--config={config}",
+        "-o",
+        "console_output_style=classic",
+        "-rs",
+        f"--junitxml={jwt_junit}",
+    ]
+    print(f"Running {' '.join(jwt_cmd)}", flush=True)
+    jwt_proc = subprocess.run(jwt_cmd, cwd=REPO_ROOT, capture_output=True, text=True)
+    jwt_output = jwt_proc.stdout + jwt_proc.stderr
+    if jwt_proc.returncode not in (0, 1):
+        print(jwt_output, file=sys.stderr)
+
+    parsed = merge_parsed_results(parse_pytest_log(main_output), parse_junit(es_junit))
+    jwt_parsed = merge_parsed_results(parse_pytest_log(jwt_output), parse_junit(jwt_junit))
+    for file_name, tests in jwt_parsed.items():
+        parsed.setdefault(file_name, {}).update(tests)
+
+    exit_code = main_proc.returncode if main_proc.returncode != 0 else jwt_proc.returncode
+    return exit_code, parsed
+
+
 def load_results(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"sg": {}, "es": {}, "meta": {}}
@@ -313,12 +442,11 @@ def load_results(path: Path) -> dict[str, Any]:
     data.setdefault("sg", {})
     data.setdefault("es", {})
     data.setdefault("meta", {})
+    data.pop("es2", None)
     for remote in ("sg", "es"):
         normalized: dict[str, dict[str, TestResult]] = {}
-        for file_name, tests in data[remote].items():
-            normalized[file_name] = {
-                test_name: normalize_test_result(result) for test_name, result in tests.items()
-            }
+        for file_name, tests in data.get(remote, {}).items():
+            normalized[file_name] = {test_name: normalize_test_result(result) for test_name, result in tests.items()}
         data[remote] = normalized
     return data
 
@@ -327,13 +455,20 @@ def save_results(path: Path, data: dict[str, object]) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def fill_missing_reasons(store: dict[str, Any]) -> None:
-    for file_name, tests in store.get("es", {}).items():
-        for test_name, result in tests.items():
-            if result.get("outcome") != "SKIPPED" or result.get("reason"):
-                continue
-            if file_name in ES_SKIP_FILES or test_base_name(test_name) in ES_NA_TEST_BASES:
-                result["reason"] = ES_SKIP_REASON
+def fill_missing_reasons(store: dict[str, Any], config_path: Path) -> None:
+    from es_remote import load_es_remote_skips
+
+    skip_files, skip_tests = load_es_remote_skips(config_path)
+    for remote in ("es",):
+        for file_name, tests in store.get(remote, {}).items():
+            for test_name, result in tests.items():
+                if result.get("outcome") != "SKIPPED" or result.get("reason"):
+                    continue
+                base = test_base_name(test_name)
+                if file_name in skip_files:
+                    result["reason"] = ES_NA_FILE_REASONS.get(file_name, ES_SKIP_REASON)
+                elif base in skip_tests or base in ES_NA_TEST_BASES:
+                    result["reason"] = ES_NA_TEST_REASONS.get(base, ES_SKIP_REASON)
 
 
 def merge_results(
@@ -342,6 +477,7 @@ def merge_results(
     parsed: dict[str, dict[str, TestResult]],
     run_at: str,
 ) -> None:
+    store.setdefault(remote, {})
     for file_name, tests in parsed.items():
         store[remote].setdefault(file_name, {})
         for test_name, result in tests.items():
@@ -360,29 +496,34 @@ def reason_cell(
     lines: list[str] = []
 
     def add(remote_label: str, text: str) -> None:
-        lines.append(f'<div class="reason-line"><span class="reason-remote">{remote_label}</span>{html.escape(text)}</div>')
+        lines.append(
+            f'<div class="reason-line"><span class="reason-remote">{remote_label}</span>{html.escape(text)}</div>'
+        )
 
     if not sg_ok:
         add("SG", na_reason(file_name, test_name, "sg") or "Not applicable.")
-    elif (
-        sg_result
-        and sg_result.get("reason")
-        and sg_result.get("outcome") in ("SKIPPED", "FAILED", "ERROR")
-    ):
+    elif sg_result and sg_result.get("reason") and sg_result.get("outcome") in ("SKIPPED", "FAILED", "ERROR"):
         add("SG", sg_result["reason"])
 
     if not es_ok:
         add("ES", na_reason(file_name, test_name, "es") or "Not applicable.")
-    elif (
-        es_result
-        and es_result.get("reason")
-        and es_result.get("outcome") in ("SKIPPED", "FAILED", "ERROR")
-    ):
+    elif es_result and es_result.get("reason") and es_result.get("outcome") in ("SKIPPED", "FAILED", "ERROR"):
         add("ES", es_result["reason"])
+
+    base = test_base_name(test_name)
+    if base in TEST_CATALOG_NOTES:
+        lines.append(f'<div class="reason-note">{html.escape(TEST_CATALOG_NOTES[base])}</div>')
 
     if not lines:
         return '<td class="reason"><span class="reason-empty">—</span></td>'
     return f'<td class="reason">{"".join(lines)}</td>'
+
+
+def test_row_comment(test_name: str) -> str:
+    note = TEST_CATALOG_NOTES.get(test_base_name(test_name))
+    if not note:
+        return ""
+    return f"<!-- {note} -->\n        "
 
 
 def collect_tests(config: Path) -> dict[str, list[str]]:
@@ -446,9 +587,7 @@ def collect_summary_counts(
     sg_pass = sg_fail = sg_skip = es_pass = es_fail = es_skip = 0
     for file_name, tests in by_file.items():
         for test_name in tests:
-            sg_ok, es_ok, sg_result, es_result = effective_results(
-                file_name, test_name, sg_results, es_results
-            )
+            sg_ok, es_ok, sg_result, es_result = effective_results(file_name, test_name, sg_results, es_results)
             if sg_ok and sg_result:
                 outcome = sg_result.get("outcome")
                 if outcome == "PASSED":
@@ -468,6 +607,107 @@ def collect_summary_counts(
     return sg_pass, sg_fail, sg_skip, es_pass, es_fail, es_skip
 
 
+def collect_applicability_counts(by_file: dict[str, list[str]]) -> tuple[int, int, int]:
+    yes = partial = no = 0
+    for file_name, tests in by_file.items():
+        for test_name in tests:
+            label, _ = applicability(file_name, test_name)
+            if label == "Yes":
+                yes += 1
+            elif label == "No":
+                no += 1
+            else:
+                partial += 1
+    return yes, partial, no
+
+
+def catalog_file_order(by_file: dict[str, list[str]]) -> list[str]:
+    tail = [name for name in CATALOG_TAIL_ORDER if name in by_file]
+    main = sorted(name for name in by_file if name not in CATALOG_TAIL_COLLAPSED_FILES)
+    return main + tail
+
+
+def render_file_section(
+    file_name: str,
+    tests: list[str],
+    sg_results: dict[str, dict[str, TestResult]],
+    es_results: dict[str, dict[str, TestResult]],
+    *,
+    collapsed: bool = False,
+) -> str:
+    note = FILE_NOTES.get(file_name, "")
+    note_html = f'\n      <p class="file-note">{html.escape(note)}</p>' if note else ""
+    rows: list[str] = []
+    for test_name in tests:
+        sg_ok, es_ok, sg_result, es_result = effective_results(file_name, test_name, sg_results, es_results)
+        rows.append(
+            f"""        {test_row_comment(test_name)}<tr>
+          <td class="test-name">{html.escape(test_name)}</td>
+          <td class="status">{status_badge(sg_ok, test_outcome(sg_result))}</td>
+          <td class="status">{status_badge(es_ok, test_outcome(es_result))}</td>
+          {applicability_cell(file_name, test_name)}
+          {reason_cell(file_name, test_name, sg_ok, es_ok, sg_result, es_result)}
+        </tr>"""
+        )
+
+    table_html = f"""    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="col-sg">Sync Gateway</th>
+            <th class="col-es">Edge Server</th>
+            <th class="col-app">Applicable</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+{chr(10).join(rows)}
+        </tbody>
+      </table>
+    </div>"""
+
+    title = html.escape(file_name)
+    meta = f"{len(tests)} test{'s' if len(tests) != 1 else ''}"
+
+    if collapsed:
+        return f"""
+<section class="file-section file-section-collapsed" id="{html.escape(file_name, quote=True)}">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">{title}<span class="tag tag-na">Not applicable</span></span>
+      <span class="file-meta">{meta}</span>
+    </summary>
+    <div class="file-details-body">{note_html}
+{table_html}
+    </div>
+  </details>
+</section>"""
+
+    note_block = f'\n  <p class="file-note">{html.escape(note)}</p>' if note else ""
+    return f"""
+<section class="file-section" id="{html.escape(file_name, quote=True)}">
+  <h2>{title}</h2>
+  <p class="file-meta">{meta}</p>{note_block}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Test</th>
+          <th class="col-sg">Sync Gateway</th>
+          <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+{chr(10).join(rows)}
+      </tbody>
+    </table>
+  </div>
+</section>"""
+
+
 def build_html(
     by_file: dict[str, list[str]],
     config: Path,
@@ -478,9 +718,8 @@ def build_html(
     sg_results = results.get("sg", {})
     es_results = results.get("es", {})
 
-    sg_pass, sg_fail, sg_skip, es_pass, es_fail, es_skip = collect_summary_counts(
-        by_file, sg_results, es_results
-    )
+    sg_pass, sg_fail, sg_skip, es_pass, es_fail, es_skip = collect_summary_counts(by_file, sg_results, es_results)
+    app_yes, app_partial, app_no = collect_applicability_counts(by_file)
 
     sg_summary = f"{sg_pass} passed" if sg_pass else "—"
     if sg_fail:
@@ -495,49 +734,25 @@ def build_html(
 
     sections: list[str] = []
 
-    for file_name in sorted(by_file):
-        tests = by_file[file_name]
-        note = FILE_NOTES.get(file_name, "")
-        note_html = f'\n  <p class="file-note">{html.escape(note)}</p>' if note else ""
-        rows: list[str] = []
-        for test_name in tests:
-            sg_ok, es_ok, sg_result, es_result = effective_results(
-                file_name, test_name, sg_results, es_results
-            )
-            rows.append(
-                f"""        <tr>
-          <td class="test-name">{html.escape(test_name)}</td>
-          <td class="status">{status_badge(sg_ok, test_outcome(sg_result))}</td>
-          <td class="status">{status_badge(es_ok, test_outcome(es_result))}</td>
-          {reason_cell(file_name, test_name, sg_ok, es_ok, sg_result, es_result)}
-        </tr>"""
-            )
+    for file_name in catalog_file_order(by_file):
         sections.append(
-            f"""
-<section class="file-section" id="{html.escape(file_name, quote=True)}">
-  <h2>{html.escape(file_name)}</h2>
-  <p class="file-meta">{len(tests)} test{"s" if len(tests) != 1 else ""}</p>{note_html}
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Test</th>
-          <th class="col-sg">Sync Gateway</th>
-          <th class="col-es">Edge Server</th>
-          <th>Reason</th>
-        </tr>
-      </thead>
-      <tbody>
-{chr(10).join(rows)}
-      </tbody>
-    </table>
-  </div>
-</section>"""
+            render_file_section(
+                file_name,
+                by_file[file_name],
+                sg_results,
+                es_results,
+                collapsed=file_name in CATALOG_TAIL_COLLAPSED_FILES,
+            )
         )
 
     toc_items = "".join(
-        f'        <li><a href="#{html.escape(name, quote=True)}">{html.escape(name)}</a> ({len(by_file[name])})</li>\n'
-        for name in sorted(by_file)
+        (
+            f'        <li class="toc-tail"><a href="#{html.escape(name, quote=True)}">'
+            f'{html.escape(name)} <span class="tag tag-na tag-inline">N/A</span></a> ({len(by_file[name])})</li>\n'
+            if name in CATALOG_TAIL_COLLAPSED_FILES
+            else f'        <li><a href="#{html.escape(name, quote=True)}">{html.escape(name)}</a> ({len(by_file[name])})</li>\n'
+        )
+        for name in catalog_file_order(by_file)
     )
 
     return f"""<!DOCTYPE html>
@@ -556,6 +771,7 @@ def build_html(
       --muted: #8fa3bc;
       --sg: #4da3ff;
       --es: #a78bfa;
+      --app: #2dd4bf;
       --pending: #64748b;
       --pass: #34d399;
       --fail: #f87171;
@@ -633,7 +849,49 @@ def build_html(
       font-size: 1.1rem;
       color: var(--sg);
     }}
+    .file-section-collapsed {{
+      border-style: dashed;
+      border-color: rgba(251,191,36,.35);
+      background: rgba(251,191,36,.04);
+    }}
+    .file-details > summary {{
+      list-style: none;
+      cursor: pointer;
+    }}
+    .file-details > summary::-webkit-details-marker {{ display: none; }}
+    .file-summary {{
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.75rem;
+    }}
+    .file-summary-title {{
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+    }}
+    .file-details-body {{ margin-top: 0.75rem; }}
+    .tag {{
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      margin-left: 0.45rem;
+    }}
+    .tag-na {{
+      background: linear-gradient(135deg, rgba(251,191,36,.22), rgba(248,113,113,.18));
+      color: #fcd34d;
+      border: 1px solid rgba(251,191,36,.45);
+      box-shadow: 0 0 12px rgba(251,191,36,.12);
+    }}
+    .tag-inline {{ margin-left: 0.25rem; font-size: 0.55rem; padding: 0.08rem 0.4rem; }}
+    nav.toc .toc-tail a {{ color: var(--muted); }}
     .file-meta {{ color: var(--muted); font-size: 0.85rem; margin: 0 0 0.75rem; }}
+    .file-summary .file-meta {{ margin: 0; }}
     .file-note {{
       color: var(--muted);
       font-size: 0.85rem;
@@ -655,12 +913,36 @@ def build_html(
     th {{ background: var(--surface2); color: var(--muted); font-weight: 600; }}
     th.col-sg {{ border-top: 3px solid var(--sg); }}
     th.col-es {{ border-top: 3px solid var(--es); }}
+    th.col-app {{ border-top: 3px solid var(--app); }}
+    .applicable {{
+      text-align: center;
+      width: 170px;
+      white-space: nowrap;
+    }}
+    .applicable .badge + .scope-tag {{ margin-left: 0.35rem; }}
+    .scope-tag {{
+      display: inline-block;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 0.7rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 6px;
+      background: rgba(251,191,36,.12);
+      color: #fcd34d;
+      border: 1px solid rgba(251,191,36,.35);
+    }}
     tr:nth-child(even) td {{ background: rgba(255,255,255,.02); }}
     .test-name {{ font-family: "SF Mono", Consolas, monospace; font-size: 0.82rem; }}
     .status {{ text-align: center; width: 110px; }}
     .reason {{ font-size: 0.8rem; color: var(--muted); min-width: 220px; max-width: 420px; }}
     .reason-empty {{ color: var(--pending); }}
     .reason-line {{ margin: 0.15rem 0; line-height: 1.35; }}
+    .reason-note {{
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.3;
+    }}
     .reason-remote {{
       display: inline-block;
       font-size: 0.62rem;
@@ -687,6 +969,9 @@ def build_html(
     .badge-pass {{ background: rgba(52,211,153,.15); color: var(--pass); }}
     .badge-fail {{ background: rgba(248,113,113,.15); color: var(--fail); }}
     .badge-skip {{ background: rgba(251,191,36,.15); color: var(--skip); }}
+    .badge-app-yes {{ background: rgba(45,212,191,.15); color: var(--app); }}
+    .badge-app-partial {{ background: rgba(167,139,250,.15); color: var(--es); }}
+    .badge-app-no {{ background: rgba(100,116,139,.15); color: var(--muted); }}
     .hidden {{ display: none !important; }}
     .legend {{
       display: flex;
@@ -710,14 +995,23 @@ def build_html(
       <div class="summary-card"><strong>{total_tests}</strong><span>tests collected</span></div>
       <div class="summary-card"><strong>{sg_pass or "—"}</strong><span>Sync Gateway passed</span></div>
       <div class="summary-card"><strong>{es_pass or "—"}</strong><span>Edge Server passed</span></div>
+      <div class="summary-card"><strong>{app_yes}</strong><span>applicable to both remotes</span></div>
+      <div class="summary-card"><strong>{app_partial}</strong><span>applicable to one remote</span></div>
+      <div class="summary-card"><strong>{app_no}</strong><span>not applicable</span></div>
     </div>
     <p class="sub">Sync Gateway: {html.escape(sg_summary)} · Edge Server: {html.escape(es_summary)}</p>
+    <p class="sub">N/A scope — <strong>CBL-JS</strong>: lite-js / JS TDK gap or wrong CBL version (both remotes) ·
+      <strong>ES</strong>: Sync Gateway–only semantics Edge Server cannot exercise ·
+      <strong>SGW</strong>: targets Edge Server / JWT directly, never CBL → Sync Gateway</p>
     <div class="legend">
       <span class="legend-item"><span class="badge badge-pending">Not run</span> awaiting execution</span>
       <span class="legend-item"><span class="badge badge-na">N/A</span> not applicable to this remote</span>
       <span class="legend-item"><span class="badge badge-pass">Passed</span></span>
       <span class="legend-item"><span class="badge badge-fail">Failed</span></span>
       <span class="legend-item"><span class="badge badge-skip">Skipped</span></span>
+      <span class="legend-item"><span class="badge badge-app-yes">Yes</span> applicable to both remotes</span>
+      <span class="legend-item"><span class="badge badge-app-partial">Partial</span> applicable to one remote</span>
+      <span class="legend-item"><span class="badge badge-app-no">No</span> applicable to neither</span>
     </div>
   </header>
 
@@ -759,10 +1053,22 @@ def main() -> int:
     )
     parser.add_argument("--sg-log", type=Path, help="Import Sync Gateway results from a pytest log")
     parser.add_argument("--es-log", type=Path, help="Import Edge Server results from a pytest log")
+    parser.add_argument(
+        "--run-es-full",
+        action="store_true",
+        help="Run full dev_e2e suite against Edge Server and merge into ES results",
+    )
     args = parser.parse_args()
 
     result_store = load_results(args.results)
     run_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
+
+    if args.run_es_full:
+        code, parsed = run_es_full_suite(args.config)
+        merge_results(result_store, "es", parsed, run_at)
+        result_store["meta"].setdefault("runs", {})["es:full"] = run_at
+        save_results(args.results, result_store)
+        print(f"ES: exit {code}, {sum(len(v) for v in parsed.values())} tests recorded")
 
     if args.run_files:
         for remote in ("sg", "es"):
@@ -781,7 +1087,7 @@ def main() -> int:
         merge_results(result_store, "es", parsed, run_at)
         save_results(args.results, result_store)
 
-    fill_missing_reasons(result_store)
+    fill_missing_reasons(result_store, args.config)
     save_results(args.results, result_store)
 
     by_file = collect_tests(args.config)

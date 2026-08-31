@@ -24,5 +24,22 @@
       "admin_password": "password",
       "config_path": "environment/docker/es/config.json"
     }
-  ]
+  ],
+  "es-remote": {
+    "skip-files": [
+      "test_fest.py",
+      "test_replication_auto_purge.py",
+      "test_replication_upgrade.py",
+      "test_replication_xdcr.py",
+      "test_basic_multipeer.py",
+      "test_encrypted_properties.py",
+      "test_edge_server_cbl.py"
+    ],
+    "skip-tests": [
+      "test_pull_channels_filter",
+      "test_replicate_public_channel",
+      "test_reset_checkpoint_push",
+      "test_blob_replication"
+    ]
+  }
 }

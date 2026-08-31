@@ -14,6 +14,7 @@
       --muted: #8fa3bc;
       --sg: #4da3ff;
       --es: #a78bfa;
+      --app: #2dd4bf;
       --pending: #64748b;
       --pass: #34d399;
       --fail: #f87171;
@@ -91,7 +92,49 @@
       font-size: 1.1rem;
       color: var(--sg);
     }
+    .file-section-collapsed {
+      border-style: dashed;
+      border-color: rgba(251,191,36,.35);
+      background: rgba(251,191,36,.04);
+    }
+    .file-details > summary {
+      list-style: none;
+      cursor: pointer;
+    }
+    .file-details > summary::-webkit-details-marker { display: none; }
+    .file-summary {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.75rem;
+    }
+    .file-summary-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    .file-details-body { margin-top: 0.75rem; }
+    .tag {
+      display: inline-block;
+      font-size: 0.62rem;
+      font-weight: 700;
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      vertical-align: middle;
+      margin-left: 0.45rem;
+    }
+    .tag-na {
+      background: linear-gradient(135deg, rgba(251,191,36,.22), rgba(248,113,113,.18));
+      color: #fcd34d;
+      border: 1px solid rgba(251,191,36,.45);
+      box-shadow: 0 0 12px rgba(251,191,36,.12);
+    }
+    .tag-inline { margin-left: 0.25rem; font-size: 0.55rem; padding: 0.08rem 0.4rem; }
+    nav.toc .toc-tail a { color: var(--muted); }
     .file-meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 0.75rem; }
+    .file-summary .file-meta { margin: 0; }
     .file-note {
       color: var(--muted);
       font-size: 0.85rem;
@@ -113,12 +156,36 @@
     th { background: var(--surface2); color: var(--muted); font-weight: 600; }
     th.col-sg { border-top: 3px solid var(--sg); }
     th.col-es { border-top: 3px solid var(--es); }
+    th.col-app { border-top: 3px solid var(--app); }
+    .applicable {
+      text-align: center;
+      width: 170px;
+      white-space: nowrap;
+    }
+    .applicable .badge + .scope-tag { margin-left: 0.35rem; }
+    .scope-tag {
+      display: inline-block;
+      font-family: "SF Mono", Consolas, monospace;
+      font-size: 0.7rem;
+      padding: 0.12rem 0.45rem;
+      border-radius: 6px;
+      background: rgba(251,191,36,.12);
+      color: #fcd34d;
+      border: 1px solid rgba(251,191,36,.35);
+    }
     tr:nth-child(even) td { background: rgba(255,255,255,.02); }
     .test-name { font-family: "SF Mono", Consolas, monospace; font-size: 0.82rem; }
     .status { text-align: center; width: 110px; }
     .reason { font-size: 0.8rem; color: var(--muted); min-width: 220px; max-width: 420px; }
     .reason-empty { color: var(--pending); }
     .reason-line { margin: 0.15rem 0; line-height: 1.35; }
+    .reason-note {
+      margin-top: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.3;
+    }
     .reason-remote {
       display: inline-block;
       font-size: 0.62rem;
@@ -145,6 +212,9 @@
     .badge-pass { background: rgba(52,211,153,.15); color: var(--pass); }
     .badge-fail { background: rgba(248,113,113,.15); color: var(--fail); }
     .badge-skip { background: rgba(251,191,36,.15); color: var(--skip); }
+    .badge-app-yes { background: rgba(45,212,191,.15); color: var(--app); }
+    .badge-app-partial { background: rgba(167,139,250,.15); color: var(--es); }
+    .badge-app-no { background: rgba(100,116,139,.15); color: var(--muted); }
     .hidden { display: none !important; }
     .legend {
       display: flex;
@@ -161,32 +231,39 @@
 <div class="wrap">
   <header>
     <h1>dev_e2e Test Catalog</h1>
-    <p class="sub">Couchbase Lite Test Harness · 2026-08-28 10:38 UTC</p>
+    <p class="sub">Couchbase Lite Test Harness · 2026-08-31 12:38 UTC</p>
     <p class="sub">Config: <code>tests/dev_e2e/config.docker-js.json</code></p>
     <div class="summary">
       <div class="summary-card"><strong>15</strong><span>test files</span></div>
       <div class="summary-card"><strong>105</strong><span>tests collected</span></div>
-      <div class="summary-card"><strong>77</strong><span>Sync Gateway passed</span></div>
-      <div class="summary-card"><strong>53</strong><span>Edge Server passed</span></div>
+      <div class="summary-card"><strong>78</strong><span>Sync Gateway passed</span></div>
+      <div class="summary-card"><strong>61</strong><span>Edge Server passed</span></div>
+      <div class="summary-card"><strong>54</strong><span>applicable to both remotes</span></div>
+      <div class="summary-card"><strong>31</strong><span>applicable to one remote</span></div>
+      <div class="summary-card"><strong>20</strong><span>not applicable</span></div>
     </div>
-    <p class="sub">Sync Gateway: 77 passed, 1 failed, 1 skipped · Edge Server: 53 passed, 9 skipped</p>
+    <p class="sub">Sync Gateway: 78 passed · Edge Server: 61 passed</p>
+    <p class="sub">N/A scope — <strong>CBL-JS</strong>: lite-js / JS TDK gap or wrong CBL version (both remotes) ·
+      <strong>ES</strong>: Sync Gateway–only semantics Edge Server cannot exercise ·
+      <strong>SGW</strong>: targets Edge Server / JWT directly, never CBL → Sync Gateway</p>
     <div class="legend">
       <span class="legend-item"><span class="badge badge-pending">Not run</span> awaiting execution</span>
       <span class="legend-item"><span class="badge badge-na">N/A</span> not applicable to this remote</span>
       <span class="legend-item"><span class="badge badge-pass">Passed</span></span>
       <span class="legend-item"><span class="badge badge-fail">Failed</span></span>
       <span class="legend-item"><span class="badge badge-skip">Skipped</span></span>
+      <span class="legend-item"><span class="badge badge-app-yes">Yes</span> applicable to both remotes</span>
+      <span class="legend-item"><span class="badge badge-app-partial">Partial</span> applicable to one remote</span>
+      <span class="legend-item"><span class="badge badge-app-no">No</span> applicable to neither</span>
     </div>
   </header>
 
   <nav class="toc">
     <strong>Test files</strong>
     <ul>
-        <li><a href="#test_basic_multipeer.py">test_basic_multipeer.py</a> (2)</li>
         <li><a href="#test_basic_replication.py">test_basic_replication.py</a> (12)</li>
         <li><a href="#test_custom_conflict.py">test_custom_conflict.py</a> (4)</li>
         <li><a href="#test_edge_server_cbl.py">test_edge_server_cbl.py</a> (1)</li>
-        <li><a href="#test_encrypted_properties.py">test_encrypted_properties.py</a> (1)</li>
         <li><a href="#test_fest.py">test_fest.py</a> (7)</li>
         <li><a href="#test_jwt_rotation.py">test_jwt_rotation.py</a> (5)</li>
         <li><a href="#test_jwt_simple.py">test_jwt_simple.py</a> (1)</li>
@@ -195,8 +272,10 @@
         <li><a href="#test_replication_behavior.py">test_replication_behavior.py</a> (2)</li>
         <li><a href="#test_replication_blob.py">test_replication_blob.py</a> (2)</li>
         <li><a href="#test_replication_filter.py">test_replication_filter.py</a> (6)</li>
-        <li><a href="#test_replication_upgrade.py">test_replication_upgrade.py</a> (13)</li>
-        <li><a href="#test_replication_xdcr.py">test_replication_xdcr.py</a> (2)</li>
+        <li class="toc-tail"><a href="#test_encrypted_properties.py">test_encrypted_properties.py <span class="tag tag-na tag-inline">N/A</span></a> (1)</li>
+        <li class="toc-tail"><a href="#test_replication_upgrade.py">test_replication_upgrade.py <span class="tag tag-na tag-inline">N/A</span></a> (13)</li>
+        <li class="toc-tail"><a href="#test_replication_xdcr.py">test_replication_xdcr.py <span class="tag tag-na tag-inline">N/A</span></a> (2)</li>
+        <li class="toc-tail"><a href="#test_basic_multipeer.py">test_basic_multipeer.py <span class="tag tag-na tag-inline">N/A</span></a> (2)</li>
     </ul>
   </nav>
 
@@ -205,37 +284,6 @@
   </div>
 
 
-<section class="file-section" id="test_basic_multipeer.py">
-  <h2>test_basic_multipeer.py</h2>
-  <p class="file-meta">2 tests</p>
-  <p class="file-note">Peer-to-peer (CBL ↔ CBL) — not a Sync Gateway or Edge Server test.</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Test</th>
-          <th class="col-sg">Sync Gateway</th>
-          <th class="col-es">Edge Server</th>
-          <th>Reason</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="test-name">test_medium_mesh_sanity</td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div><div class="reason-line"><span class="reason-remote">ES</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div></td>
-        </tr>
-        <tr>
-          <td class="test-name">test_medium_mesh_consistency</td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div><div class="reason-line"><span class="reason-remote">ES</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
 <section class="file-section" id="test_basic_replication.py">
   <h2>test_basic_replication.py</h2>
   <p class="file-meta">12 tests</p>
@@ -246,6 +294,7 @@
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -254,73 +303,87 @@
           <td class="test-name">test_replicate_non_existing_sg_collections</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_push</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_push_and_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_continuous_push</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_continuous_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_continuous_push_and_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_default_collection_push</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_default_collection_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_default_collection_push_and_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
+        <!-- Push: purge on remote → needs SG `_purge` (ES N/A). -->
         <tr>
           <td class="test-name">test_reset_checkpoint_push</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway `_purge` API; not available on Edge Server.</div></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Purges on remote via SG `_purge`; Edge Server has no `_purge` API.</div><div class="reason-note">Push: purge on remote → needs SG `_purge` (ES N/A).</div></td>
         </tr>
+        <!-- Pull: purge on CBL only → remote still has doc (ES OK). -->
         <tr>
           <td class="test-name">test_reset_checkpoint_pull</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway `_purge` API; not available on Edge Server.</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><div class="reason-note">Pull: purge on CBL only → remote still has doc (ES OK).</div></td>
         </tr>
       </tbody>
     </table>
@@ -336,6 +399,7 @@
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -343,26 +407,30 @@
         <tr>
           <td class="test-name">test_push_pull_resolved_doc</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_custom_conflict_remote_wins</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_custom_conflict_delete</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_custom_conflict_merge</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
       </tbody>
     </table>
@@ -378,6 +446,7 @@
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -386,31 +455,8 @@
           <td class="test-name">test_js_push_to_edge_server_over_ws</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Edge Server smoke test; not CBL → Sync Gateway.</div></td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-<section class="file-section" id="test_encrypted_properties.py">
-  <h2>test_encrypted_properties.py</h2>
-  <p class="file-meta">1 test</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Test</th>
-          <th class="col-sg">Sync Gateway</th>
-          <th class="col-es">Edge Server</th>
-          <th>Reason</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td class="test-name">test_encrypted_push</td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Field encryption (`EncryptedValue`) is C-only; not supported on JS.</div><div class="reason-line"><span class="reason-remote">ES</span>Field encryption (`EncryptedValue`) is C-only; not supported on JS.</div></td>
         </tr>
       </tbody>
     </table>
@@ -426,6 +472,7 @@
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -434,44 +481,50 @@
           <td class="test-name">test_create_tasks</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_update_task</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_delete_task</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_delete_list</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_share_list</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_update_shared_tasks</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_unshare_list</td>
-          <td class="status"><span class="badge badge-fail">Failed</span></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>AssertionError: There were unexpected replication events on replicator #2: _default.lists, db1-list1, pull, NONE
-assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10ca362d0&gt; is None</div><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway roles, channels, and sync functions.</div></td>
         </tr>
       </tbody>
     </table>
@@ -487,6 +540,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -495,30 +549,35 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <td class="test-name">test_replication_with_jwt_file</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_token_rotation_reconnect</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_invalid_token_rotation_causes_401_stop</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_corrupt_token_file_content_mid_replication</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_valid_invalid_valid_token_cycle</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
       </tbody>
@@ -535,6 +594,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -543,6 +603,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <td class="test-name">test_jwt_replication_reconnect_false</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (ES only)</span><span class="scope-tag">SGW</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>JWT / Edge Server replication test; not CBL → Sync Gateway.</div></td>
         </tr>
       </tbody>
@@ -559,6 +620,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -567,204 +629,238 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <td class="test-name">test_query_docids</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_any_operator</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_select_star[airline_10]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_select_star[doc_id_does_not_exist]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_limit_offset[5-5]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_limit_offset[-5--5]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_where_and_or</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_multiple_selects</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[Royal Engineers Museum]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[Royal engineers museum]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[eng%e%]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[Eng%e%]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[%eng____r%]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_like[%Eng____r%]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_regex[\\bEng.*e\\b]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_pattern_regex[\\beng.*e\\b]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_is_not_valued</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_ordering</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_substring</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_join</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_inner_join</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_left_join[LEFT JOIN]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_query_left_join[LEFT OUTER JOIN]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_equality[=]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_equality[!=]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_comparison[&gt;]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_comparison[&gt;=]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_comparison[&lt;]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_comparison[&lt;=]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_in</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_between[BETWEEN]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_between[NOT BETWEEN]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_same[IS]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_same[IS NOT]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
       </tbody>
@@ -781,6 +877,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -789,78 +886,91 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <td class="test-name">test_remove_docs_from_channel_with_auto_purge_enabled</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_revoke_access_with_auto_purge_enabled</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_remove_docs_from_channel_with_auto_purge_disabled</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_revoke_access_with_auto_purge_disabled</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_filter_removed_access_documents</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_remove_user_from_role[True]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_remove_user_from_role[False]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_remove_role_from_channel[True]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_remove_role_from_channel[False]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_pull_after_restore_access</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_push_after_remove_access</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_auto_purge_after_resurrection[delete]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_auto_purge_after_resurrection[purge]</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway channels, roles, and access revocation.</div></td>
         </tr>
       </tbody>
@@ -877,6 +987,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -885,13 +996,15 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <td class="test-name">test_pull_empty_database_active_only</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_pull_resurrected_doc</td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>CBL 1.1.0 not &gt;= 4.2.0</div><div class="reason-line"><span class="reason-remote">ES</span>CBL 1.1.0 not &gt;= 4.2.0</div></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>CBL-7841 (pull resurrected doc over local tombstone) not in lite-js 1.x; native CBL ≥ 4.2.0.</div><div class="reason-line"><span class="reason-remote">ES</span>CBL-7841 (pull resurrected doc over local tombstone) not in lite-js 1.x; native CBL ≥ 4.2.0.</div></td>
         </tr>
       </tbody>
     </table>
@@ -907,21 +1020,26 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
       <tbody>
+        <!-- CBSE-14861 — delta sync + compact blob path; not supported on lite-js (both remotes N/A). -->
         <tr>
           <td class="test-name">test_pull_non_blob_changes_with_delta_sync_and_compact</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Delta sync + compact path not supported on Couchbase Lite JavaScript (CBSE-14861).</div><div class="reason-line"><span class="reason-remote">ES</span>Delta sync + compact path not supported on Couchbase Lite JavaScript (CBSE-14861).</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Delta sync + compact path not supported on Couchbase Lite JavaScript (CBSE-14861).</div><div class="reason-line"><span class="reason-remote">ES</span>Delta sync + compact path not supported on Couchbase Lite JavaScript (CBSE-14861).</div><div class="reason-note">CBSE-14861 — delta sync + compact blob path; not supported on lite-js (both remotes N/A).</div></td>
         </tr>
+        <!-- Push + blob metadata OK on ES; step 7 checks SG `_attachments` stubs (ES N/A). -->
         <tr>
           <td class="test-name">test_blob_replication</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Verifies SG REST `_attachments` blob stubs; Edge Server returns inline blob properties only.</div><div class="reason-note">Push + blob metadata OK on ES; step 7 checks SG `_attachments` stubs (ES N/A).</div></td>
         </tr>
       </tbody>
     </table>
@@ -937,6 +1055,7 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
           <th>Test</th>
           <th class="col-sg">Sync Gateway</th>
           <th class="col-es">Edge Server</th>
+          <th class="col-app">Applicable</th>
           <th>Reason</th>
         </tr>
       </thead>
@@ -944,168 +1063,280 @@ assert &lt;cbltest.api.replicator_types.WaitForDocumentEventEntry object at 0x10
         <tr>
           <td class="test-name">test_push_document_ids_filter</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_pull_document_ids_filter</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
+        <!-- Pull filter by SG sync channels (`United Kingdom`, `France`); travel sync functions assign `channel(doc.channels)`. ES has collection ACL only (ES N/A). -->
         <tr>
           <td class="test-name">test_pull_channels_filter</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway sync channels; Edge Server has no channel ACL.</div></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway sync channels; Edge Server has no channel ACL.</div><div class="reason-note">Pull filter by SG sync channels (`United Kingdom`, `France`); travel sync functions assign `channel(doc.channels)`. ES has collection ACL only (ES N/A).</div></td>
         </tr>
+        <!-- SG public channel `!` with user2 (empty collection_access); ES run pulled 101 docs — no channel gate (ES N/A). -->
         <tr>
           <td class="test-name">test_replicate_public_channel</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway public channel (`channel(&quot;!&quot;)`).</div></td>
+          <td class="applicable"><span class="badge badge-app-partial">Partial (SG only)</span><span class="scope-tag">ES</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway public channel (`channel(&quot;!&quot;)`).</div><div class="reason-note">SG public channel `!` with user2 (empty collection_access); ES run pulled 101 docs — no channel gate (ES N/A).</div></td>
         </tr>
         <tr>
           <td class="test-name">test_custom_push_filter</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
           <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
         <tr>
           <td class="test-name">test_custom_pull_filter</td>
           <td class="status"><span class="badge badge-pass">Passed</span></td>
-          <td class="status"><span class="badge badge-skip">Skipped</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">ES</span>Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es</div></td>
+          <td class="status"><span class="badge badge-pass">Passed</span></td>
+          <td class="applicable"><span class="badge badge-app-yes">Yes</span></td>
+          <td class="reason"><span class="reason-empty">—</span></td>
         </tr>
       </tbody>
     </table>
   </div>
 </section>
-<section class="file-section" id="test_replication_upgrade.py">
-  <h2>test_replication_upgrade.py</h2>
-  <p class="file-meta">13 tests</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
+<section class="file-section file-section-collapsed" id="test_encrypted_properties.py">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">test_encrypted_properties.py<span class="tag tag-na">Not applicable</span></span>
+      <span class="file-meta">1 test</span>
+    </summary>
+    <div class="file-details-body">
+      <p class="file-note">`EncryptedValue` field encryption is implemented on the C test server only; not wired in the JS TDK (test skips unless platform is C).</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="col-sg">Sync Gateway</th>
+            <th class="col-es">Edge Server</th>
+            <th class="col-app">Applicable</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
         <tr>
-          <th>Test</th>
-          <th class="col-sg">Sync Gateway</th>
-          <th class="col-es">Edge Server</th>
-          <th>Reason</th>
+          <td class="test-name">test_encrypted_push</td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>`EncryptedValue` not implemented on JS test server (C TDK only).</div><div class="reason-line"><span class="reason-remote">ES</span>`EncryptedValue` not implemented on JS test server (C TDK only).</div></td>
         </tr>
-      </thead>
-      <tbody>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+</section>
+<section class="file-section file-section-collapsed" id="test_replication_upgrade.py">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">test_replication_upgrade.py<span class="tag tag-na">Not applicable</span></span>
+      <span class="file-meta">13 tests</span>
+    </summary>
+    <div class="file-details-body">
+      <p class="file-note">SGW 4.x upgrade interop (pre-4.0 revision trees → HLV / version vectors) requires native CBL ≥ 4.0 and the v4.0 `upgrade` dataset; lite-js 1.1.x has rev-tree IDs only (no HLV) and skips with `CBL 1.1.0 not &gt;= 4.0.0`.</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="col-sg">Sync Gateway</th>
+            <th class="col-es">Edge Server</th>
+            <th class="col-app">Applicable</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
         <tr>
           <td class="test-name">test_nonconflict_case_1</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_nonconflict_case_2</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_nonconflict_case_3</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_nonconflict_case_4</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_nonconflict_case_5</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_nonconflict_case_6</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_1</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_2</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_3</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_4</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_5</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_6</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_conflict_case_7</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
-          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 and dataset v4.0 restore; JS reports 1.1.0.</div></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0 (HLV / upgrade interop); lite-js reports 1.1.0.</div></td>
         </tr>
-      </tbody>
-    </table>
-  </div>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
 </section>
-<section class="file-section" id="test_replication_xdcr.py">
-  <h2>test_replication_xdcr.py</h2>
-  <p class="file-meta">2 tests</p>
-  <div class="table-wrap">
-    <table>
-      <thead>
-        <tr>
-          <th>Test</th>
-          <th class="col-sg">Sync Gateway</th>
-          <th class="col-es">Edge Server</th>
-          <th>Reason</th>
-        </tr>
-      </thead>
-      <tbody>
+<section class="file-section file-section-collapsed" id="test_replication_xdcr.py">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">test_replication_xdcr.py<span class="tag tag-na">Not applicable</span></span>
+      <span class="file-meta">2 tests</span>
+    </summary>
+    <div class="file-details-body">
+      <p class="file-note">Cross-datacenter replication (XDCR) requires two Couchbase clusters, two Sync Gateways, and a load balancer; the JS Docker config is single-cluster. Also requires native CBL ≥ 4.0 (lite-js reports 1.1.x).</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="col-sg">Sync Gateway</th>
+            <th class="col-es">Edge Server</th>
+            <th class="col-app">Applicable</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
         <tr>
           <td class="test-name">test_push_and_pull_with_xdcr</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0, XDCR topology, and load balancer; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0, XDCR topology, and load balancer; JS reports 1.1.0.</div></td>
         </tr>
         <tr>
           <td class="test-name">test_fail_over</td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
           <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
           <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Requires native CBL ≥ 4.0, XDCR topology, and load balancer; JS reports 1.1.0.</div><div class="reason-line"><span class="reason-remote">ES</span>Requires native CBL ≥ 4.0, XDCR topology, and load balancer; JS reports 1.1.0.</div></td>
         </tr>
-      </tbody>
-    </table>
-  </div>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
+</section>
+<section class="file-section file-section-collapsed" id="test_basic_multipeer.py">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">test_basic_multipeer.py<span class="tag tag-na">Not applicable</span></span>
+      <span class="file-meta">2 tests</span>
+    </summary>
+    <div class="file-details-body">
+      <p class="file-note">Peer-to-peer (CBL ↔ CBL) only — not Sync Gateway or Edge Server. Not supported on Couchbase Lite JavaScript (no multipeer API; requires 2 test servers).</p>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Test</th>
+            <th class="col-sg">Sync Gateway</th>
+            <th class="col-es">Edge Server</th>
+            <th class="col-app">Applicable</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+        <tr>
+          <td class="test-name">test_medium_mesh_sanity</td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div><div class="reason-line"><span class="reason-remote">ES</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div></td>
+        </tr>
+        <tr>
+          <td class="test-name">test_medium_mesh_consistency</td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="status"><span class="badge badge-na" title="This test does not target this remote">N/A</span></td>
+          <td class="applicable"><span class="badge badge-app-no">No</span><span class="scope-tag">CBL-JS</span></td>
+          <td class="reason"><div class="reason-line"><span class="reason-remote">SG</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div><div class="reason-line"><span class="reason-remote">ES</span>Peer-to-peer (CBL ↔ CBL); no Sync Gateway or Edge Server remote.</div></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    </div>
+  </details>
 </section>
 </div>
 <script>

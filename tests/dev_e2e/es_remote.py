@@ -22,31 +22,45 @@ from cbltest.asyncfile import write_json_file
 from cbltest.plugins import cluster_cleanup as cluster_cleanup_mod
 from es_ws import js_edge_replicator_url
 
-# Tests that need SG sync functions, users/roles, or CBS N1QL.
-ES_SKIP_FILES = frozenset(
-    {
-        "test_fest.py",
-        "test_replication_auto_purge.py",
-        "test_replication_upgrade.py",
-        "test_replication_xdcr.py",
-        "test_multipeer.py",
-        "test_encrypted_properties.py",
-        "test_edge_server_cbl.py",
-        "test_custom_conflict.py",
-    }
-)
-ES_SKIP_TEST_NAMES = frozenset(
-    {
-        "test_pull_channels_filter",
-        "test_replicate_public_channel",
-        "test_reset_checkpoint_push",
-        "test_reset_checkpoint_pull",
-        "test_blob_replication",
-        "test_push_document_ids_filter",
-        "test_pull_document_ids_filter",
-        "test_custom_pull_filter",
-    }
-)
+DEV_E2E = Path(__file__).resolve().parent
+DEFAULT_ES_REMOTE_CONFIG = DEV_E2E / "config.docker-js.json"
+
+# Per-test reasons when ``--cbl-remote=es`` skips a test (catalog + pytest).
+ES_NA_TEST_REASONS: dict[str, str] = {
+    "test_pull_channels_filter": "Requires Sync Gateway sync channels; Edge Server has no channel ACL.",
+    "test_replicate_public_channel": 'Requires Sync Gateway public channel (`channel("!")`).',
+    "test_reset_checkpoint_push": "Purges on remote via SG `_purge`; Edge Server has no `_purge` API.",
+    "test_blob_replication": (
+        "Verifies SG REST `_attachments` blob stubs; Edge Server returns inline blob properties only."
+    ),
+}
+
+ES_NA_FILE_REASONS: dict[str, str] = {
+    "test_fest.py": "Requires Sync Gateway roles, channels, and sync functions.",
+    "test_replication_auto_purge.py": "Requires Sync Gateway channels, roles, and access revocation.",
+}
+
+DEFAULT_ES_SKIP_REASON = "Requires Sync Gateway features (channels/roles/CBS); skipped for --cbl-remote=es"
+
+
+def es_skip_reason_for_test(test_base: str) -> str:
+    return ES_NA_TEST_REASONS.get(test_base, DEFAULT_ES_SKIP_REASON)
+
+
+def es_skip_reason_for_file(file_name: str) -> str:
+    return ES_NA_FILE_REASONS.get(file_name, DEFAULT_ES_SKIP_REASON)
+
+
+def load_es_remote_skips(config_path: Path | str | None = None) -> tuple[frozenset[str], frozenset[str]]:
+    """Load ES skip lists from the test config ``es-remote`` section."""
+    path = Path(config_path) if config_path is not None else DEFAULT_ES_REMOTE_CONFIG
+    if not path.is_file():
+        return frozenset(), frozenset()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    es_remote = data.get("es-remote", {})
+    skip_files = frozenset(es_remote.get("skip-files", []))
+    skip_tests = frozenset(es_remote.get("skip-tests", []))
+    return skip_files, skip_tests
 
 
 def collections_from_sg_config(dataset_config: dict[str, Any]) -> list[str]:

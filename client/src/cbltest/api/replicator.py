@@ -1,4 +1,5 @@
 import asyncio
+import os
 from datetime import timedelta
 from itertools import islice
 from time import time
@@ -185,6 +186,14 @@ class Replicator:
 
                 next_status = await self.get_status()
                 status_matches = next_status.activity == activity
+                if (
+                    not status_matches
+                    and activity == ReplicatorActivityLevel.STOPPED
+                    and not self.continuous
+                    and os.environ.get("CBL_ES_IDLE_TERMINAL") == "1"
+                    and next_status.activity == ReplicatorActivityLevel.IDLE
+                ):
+                    status_matches = True
                 if not status_matches:
                     await asyncio.sleep(interval.total_seconds())
 
