@@ -251,8 +251,7 @@ class EdgeServer:
 
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(
-                    resp.status,
-                    f"{method} {path} returned {resp.status} for payload {data}",
+                    resp.status, f"{method} {path} returned {resp.status} for payload {data}", body=data
                 )
 
             return ret_val
@@ -369,7 +368,9 @@ class EdgeServer:
                 if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
                     return None
 
-                raise CblEdgeServerBadResponseError(500, f"Get doc from edge server had error '{cast_resp['reason']}'")
+                raise CblEdgeServerBadResponseError(
+                    500, f"Get doc from edge server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
+                )
 
             return RemoteDocument(cast_resp)
 
@@ -380,12 +381,10 @@ class EdgeServer:
                 return response
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"_all_dbs with Edge Server had error '{response.get('reason')}'",
+                    500, f"_all_dbs with Edge Server had error '{response.get('reason')}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from adhoc query: {type(response)}",
+                500, f"Unexpected response type from adhoc query: {type(response)}", body=str(response)
             )
 
     async def get_active_tasks(self) -> list:
@@ -396,12 +395,10 @@ class EdgeServer:
 
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get_active_tasks with Edge Server had error '{response.get('reason')}'",
+                    500, f"get_active_tasks with Edge Server had error '{response.get('reason')}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from get_active_tasks: {type(response)}",
+                500, f"Unexpected response type from get_active_tasks: {type(response)}", body=str(response)
             )
 
     async def get_db_info(self, db_name: str, scope: str = "", collection: str = "") -> dict:
@@ -420,8 +417,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get database info  from edge server had error '{cast_resp['reason']}'",
+                    500, f"get database info  from edge server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -487,8 +483,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"start replication with edge server had error '{cast_resp['reason']}'",
+                    500, f"start replication with edge server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp.get("session_id")
 
@@ -506,6 +501,7 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"get replication status with Edge Server had error '{cast_resp['reason']}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -518,10 +514,10 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"all_replication_status with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from all_replication_status: {type(response)}",
+                500, f"Unexpected response type from all_replication_status: {type(response)}", body=str(response)
             )
 
     async def stop_replication(self, replicator_id: int) -> None:
@@ -537,8 +533,7 @@ class EdgeServer:
             cast_resp = cast(dict, response) if response else {}
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"stop replication  with Edge Server had error '{cast_resp['reason']}'",
+                    500, f"stop replication  with Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
 
     def replication_url(self, db_name: str) -> str:
@@ -591,8 +586,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get changes feed with Edge Server had error '{cast_resp['reason']}'",
+                    500, f"get changes feed with Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -624,12 +618,10 @@ class EdgeServer:
 
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"named query with Edge Server had error '{response.get('reason')}'",
+                    500, f"named query with Edge Server had error '{response.get('reason')}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from named query: {type(response)}",
+                500, f"Unexpected response type from named query: {type(response)}", body=str(response)
             )
 
     async def adhoc_query(
@@ -659,12 +651,10 @@ class EdgeServer:
 
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"adhoc query with Edge Server had error '{response.get('reason')}'",
+                    500, f"adhoc query with Edge Server had error '{response.get('reason')}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from adhoc query: {type(response)}",
+                500, f"Unexpected response type from adhoc query: {type(response)}", body=str(response)
             )
 
     async def add_document_auto_id(
@@ -701,6 +691,7 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"add document with auto ID Edge Server had error '{cast_resp['reason']}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -745,8 +736,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"add document with ID Edge Server had error '{cast_resp['reason']}'",
+                    500, f"add document with ID Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -776,8 +766,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"delete sub-document Edge Server had error '{cast_resp['reason']}'",
+                    500, f"delete sub-document Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -811,8 +800,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"put sub-document Edge Server had error '{cast_resp['reason']}'",
+                    500, f"put sub-document Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -832,8 +820,7 @@ class EdgeServer:
                 cast_resp = cast(dict, resp)
                 if "error" in cast_resp:
                     raise CblEdgeServerBadResponseError(
-                        500,
-                        f"get sub-document Edge Server had error '{cast_resp['reason']}'",
+                        500, f"get sub-document Edge Server had error '{cast_resp['reason']}'", body=dumps(cast_resp)
                     )
                 return cast_resp
             else:
@@ -865,6 +852,7 @@ class EdgeServer:
                     raise CblEdgeServerBadResponseError(
                         500,
                         f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                        body=dumps(cast_resp),
                     )
             if isinstance(resp, list):
                 return cast(list, resp)
