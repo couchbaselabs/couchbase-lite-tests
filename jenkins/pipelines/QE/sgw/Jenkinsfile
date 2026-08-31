@@ -1,6 +1,6 @@
 pipeline {
     agent none
-// This job uses UI defined params and their default values.
+// CBL_VERSION, SGW_VERSION, and TS_TEST_FILTER are UI defined params and their default values.
 // That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
 // The default values in the UI will be used if no parameters are provided at build time.
 // But just for reference, these are the params that are used by the job :
@@ -17,6 +17,7 @@ pipeline {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
                     env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
                     env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
                 }
             }
@@ -48,7 +49,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Tests"
                 timeout(time: 160, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                    sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --test-filter '${env.TS_TEST_FILTER}'"
                 }
                 echo "=== SGW Tests Complete"
             }
