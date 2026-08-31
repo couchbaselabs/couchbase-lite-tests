@@ -13,7 +13,7 @@
     "users": "/home/ec2-user/user/users.json",
     "replications": [
         {
-            "source": "wss://ec2-50-17-124-11.compute-1.amazonaws.com:4984/travel",
+            "source": "wss://sgw.example.com:4984/travel",
             "target": "travel",
             "bidirectional": true,
             "continuous": true,

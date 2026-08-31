@@ -13,7 +13,7 @@
     },
     "replications": [
         {
-            "source": "wss://ec2-50-17-124-11.compute-1.amazonaws.com:4984/db-1",
+            "source": "wss://sgw.example.com:4984/db-1",
             "target": "db",
             "bidirectional": true,
             "continuous": true,
@@ -35,8 +35,7 @@
             "Listener": "info"
         },
         "audit": {
-            "file": "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-            "enable": "*"
+            "file": "/home/ec2-user/audit/EdgeServerAuditLog.txt"
         }
     }
 }
