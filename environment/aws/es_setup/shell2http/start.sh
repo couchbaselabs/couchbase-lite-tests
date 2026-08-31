@@ -11,6 +11,7 @@ setsid /home/ec2-user/shell2http/shell2http -no-index -cgi -500 -port 20001 \
   /firewall $SCRIPT_DIR/firewall.sh \
   /kill-edgeserver $SCRIPT_DIR/kill-edgeserver.sh \
   /reset-db $SCRIPT_DIR/reset-db.sh \
+  /reset-all-dbs $SCRIPT_DIR/reset-all-dbs.sh \
   /start-edgeserver $SCRIPT_DIR/start-edgeserver.sh \
   /collect-logs $SCRIPT_DIR/collect-logs.sh \
   /write-file $SCRIPT_DIR/write-file.sh >/dev/null 2>&1 &
@@ -20,7 +21,7 @@ chmod +x /home/ec2-user/shell2http/start-edgeserver.sh
 chmod +x /home/ec2-user/shell2http/kill-edgeserver.sh
 chmod +x /home/ec2-user/shell2http/firewall.sh
 chmod +x /home/ec2-user/shell2http/reset-db.sh
+chmod +x /home/ec2-user/shell2http/reset-all-dbs.sh
 chmod +x /home/ec2-user/shell2http/common.sh
 chmod +x /home/ec2-user/shell2http/write-file.sh
 chmod +x /home/ec2-user/shell2http/collect-logs.sh
-

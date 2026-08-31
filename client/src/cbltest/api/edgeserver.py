@@ -955,6 +955,33 @@ class EdgeServer:
         await self.start_server(config=cfg)
         return EdgeServer(self.__hostname, config_file=config_file)
 
+    async def reset_to_initial_state(self) -> None:
+        """
+        Return this Edge Server to the state the AWS setup left it in, so a test
+        does not inherit whatever the previous one did to it.
+
+        Tests reconfigure Edge Server freely: they swap in TLS/mTLS or
+        users-less configs, create databases, and the chaos tests kill the
+        process and install iptables rules. None of that is undone on failure,
+        so without this a failing test can strand the host for every test after
+        it.
+
+        Firewall rules are dropped first, since a leftover DROP rule would hide
+        the host. The process is then stopped, every database is wiped back to
+        the provisioned datasets, and it is restarted on the config this object
+        was constructed with (by default the one setup_edge_servers.py
+        installed).
+        """
+        with self.__tracer.start_as_current_span("reset edge server"):
+            await self.reset_firewall()
+            await self.kill_server()
+            await self._send_request("post", "/reset-all-dbs", session=self.__shell_session)
+
+            async with aiofiles.open(self.__config_file) as f:
+                config = json.loads(await f.read())
+
+            await self.start_server(config=config)
+
     async def set_firewall_rules(
         self,
         allow: list[Any] | None = None,

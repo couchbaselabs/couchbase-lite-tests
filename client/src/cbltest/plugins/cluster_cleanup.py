@@ -1,15 +1,18 @@
 """
-Removal of every Couchbase Server bucket and Sync Gateway database between tests.
+Return the backend to a clean slate between tests: every Couchbase Server bucket and
+Sync Gateway database removed, and every Edge Server reset to its provisioned state.
 
 Failures are never swallowed: running against a half-cleaned environment fails later in a
 much harder way to diagnose.
 """
 
 import asyncio
+from collections.abc import Sequence
 
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info, cbl_trace
@@ -18,7 +21,7 @@ from cbltest.logging import cbl_info, cbl_trace
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Remove all Couchbase Server buckets and Sync Gateway databases.
+    Reset Edge Servers and remove all Couchbase Server buckets and Sync Gateway databases.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -34,16 +37,22 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
 
 async def perform_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Remove all Couchbase Server buckets and Sync Gateway databases.
+    Reset every Edge Server, then remove all Sync Gateway databases and Couchbase
+    Server buckets.
 
-    No-ops when no Sync Gateway is configured (e.g. framework unit/smoke tests),
-    since there is nothing to clean up and `SyncGatewayCluster` requires at least
-    one node.
+    Each part no-ops when the corresponding component is absent, so this is safe for
+    framework unit/smoke tests (nothing configured), for an Edge Server topology with
+    no cluster at all, and for a cluster with no Edge Servers.
     """
-    if not cblpytest.clusters:
+    if not cblpytest.clusters and not cblpytest.edge_servers:
         return
 
-    cbl_info("🧹 Couchbase Server and Sync Gateway cleanup started")
+    cbl_info("🧹 Backend cleanup started")
+
+    # Edge Servers are reset first. Their provisioned config declares no replications,
+    # so once they restart nothing is pulling from the Sync Gateway databases that the
+    # next phase deletes.
+    await reset_all_edge_servers(cblpytest.edge_servers)
 
     # Databases are deleted before their backing buckets are dropped, so a failure in
     # the first phase stops the second rather than pulling a bucket out from under a
@@ -56,7 +65,25 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
         for cluster in cblpytest.clusters:
             group.create_task(delete_all_buckets(cluster))
 
-    cbl_info("🧹 Couchbase Server and Sync Gateway cleanup finished")
+    cbl_info("🧹 Backend cleanup finished")
+
+
+async def reset_all_edge_servers(edge_servers: Sequence[EdgeServer]) -> None:
+    """
+    Reset every Edge Server to its provisioned state, in parallel.
+
+    Unlike Sync Gateway and Couchbase Server, an Edge Server is reconfigured by the
+    tests themselves -- swapped onto TLS/users-less configs, killed by the chaos
+    tests, firewalled -- and none of that is undone when a test fails partway. Without
+    this, one failing test can strand the host for every test after it.
+    """
+    if not edge_servers:
+        return
+
+    cbl_trace(f"🧹 resetting {len(edge_servers)} edge server(s)...")
+    async with asyncio.TaskGroup() as group:
+        for edge_server in edge_servers:
+            group.create_task(edge_server.reset_to_initial_state())
 
 
 async def delete_all_databases(cluster: SyncGatewayCluster) -> None:
