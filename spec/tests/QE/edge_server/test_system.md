@@ -25,7 +25,7 @@ Test that create, update, and delete operations replicate correctly between Sync
    * *Verifying {doc_id} on Edge Server.* — GET from `db`; assert exists, `id` matches, `_rev` present; capture revision
    * If `operations` includes update:
      * *Updating {doc_id} on Sync Gateway.* — PUT with `changed: "yes"` and captured revision; verify update succeeds
-     * *Verifying {doc_id} update on Edge Server.* — GET from `db`; assert revision differs; update captured revision
+     * *Verifying {doc_id} update on Edge Server.* — GET from `db`, polling until the revision differs from the captured one (a Sync Gateway write reaches Edge Server by replication, so reading straight back races the replicator); assert revision differs; update captured revision
    * If `operations` includes delete:
      * *Deleting {doc_id} on Edge Server.* — DELETE using captured revision; assert response `ok: true`; assert subsequent GET on Edge Server raises `CblEdgeServerBadResponseError`; sleep 2s
      * *Verifying {doc_id} deleted on Sync Gateway.* — assert GET from `db-1` raises `CblSyncGatewayBadResponseError`
@@ -45,15 +45,15 @@ Test that create, update, and delete operations replicate correctly between Sync
 Test that replication and document counts remain consistent when the Edge Server is periodically killed and restarted (40% chance per iteration, 1-minute down window), with random create/update/delete operations over an extended period.
 
 **Steps:**
-1. **Setup:** Same as `test_system_one_client_l` step 1. Initialise `edge_server_down = False` and chaos window end (far future). Set `doc_counter = 11`.
+1. **Setup:** Same as `test_system_one_client_l` step 1. Initialise `edge_server_down = False` and the pending restart time to none. Set `doc_counter = 11`.
 2. Run loop until 6 hours have elapsed.
-3. **Chaos recovery:** If current time is past the chaos window end:
-   * *Restarting Edge Server after chaos window.* — start ES; sleep 10s; set `edge_server_down = False`
+3. **Chaos recovery:** If a restart is pending and the current time is past it:
+   * *Restarting Edge Server after chaos window.* — start ES; sleep 10s; set `edge_server_down = False`; clear the pending restart time, so a later iteration does not restart an already-running Edge Server
    * *Verifying doc counts match after Edge Server restart.* — assert SG and ES doc counts are equal
 4. Set `doc_id = doc_{doc_counter}`; randomly pick `cycle` and `operations` as in `test_system_one_client_l`.
    * *Cycle: doc {doc_id} via {cycle}, operations: {operations}*
 5. **Chaos trigger:** If `not edge_server_down` and `random.random() <= 0.4`:
-   * *Triggering chaos: killing Edge Server.* — kill ES; set chaos window end to now + 1 minute; sleep 10s; set `edge_server_down = True`
+   * *Triggering chaos: killing Edge Server.* — kill ES; set the pending restart time to now + 1 minute; sleep 10s; set `edge_server_down = True`
 6. **If cycle is `sync_gateway`:**
    * *Creating {doc_id} on Sync Gateway.* — POST to `db-1`; verify create succeeds; sleep 1–5s
    * If `not edge_server_down`:
@@ -62,7 +62,7 @@ Test that replication and document counts remain consistent when the Edge Server
    * If `operations` includes update:
      * *Updating {doc_id} on Sync Gateway.* — PUT with `changed: "yes"` and `rev_id`; verify update succeeds
      * If `not edge_server_down`:
-       * *Verifying {doc_id} update on Edge Server.* — GET from `db`; assert revision differs
+       * *Verifying {doc_id} update on Edge Server.* — GET from `db`, polling until the revision differs from the captured one; assert revision differs
      * Update `rev_id` from updated doc.
    * If `operations` includes delete and `not edge_server_down`:
      * *Deleting {doc_id} on Edge Server.* — DELETE using `rev_id`; assert response `ok: true`; assert subsequent GET raises `CblEdgeServerBadResponseError`; sleep 2s
@@ -92,7 +92,7 @@ Test that 4 concurrent async client coroutines can independently perform create,
    * *[Client {client_id}] Verifying {doc_id} on Edge Server.* — GET from `db`; assert exists, `id` matches, `_rev` present; capture revision
    * If `operations` includes update:
      * *[Client {client_id}] Updating {doc_id} on Sync Gateway.* — PUT with `changed: "yes"` and revision; verify update succeeds
-     * *[Client {client_id}] Verifying {doc_id} update on Edge Server.* — GET from `db`; assert revision differs; update revision
+     * *[Client {client_id}] Verifying {doc_id} update on Edge Server.* — GET from `db`, polling until the revision differs from the captured one; assert revision differs; update revision
    * If `operations` includes delete:
      * *[Client {client_id}] Deleting {doc_id} on Edge Server.* — DELETE using revision; assert response `ok: true`
      * *[Client {client_id}] Verifying {doc_id} deleted on Edge Server and Sync Gateway.* — assert GET from `db` raises `CblEdgeServerBadResponseError`; sleep 2s; assert GET from `db-1` raises `CblSyncGatewayBadResponseError`
@@ -137,7 +137,7 @@ Test that 4 concurrent async client coroutines continue to operate correctly whi
    * If `operations` includes update:
      * *[Client {client_id}] Updating {doc_id} on Sync Gateway.* — PUT with `changed: "yes"` and `rev_id`; verify update succeeds
      * If `not shared["edge_server_down"]`:
-       * *[Client {client_id}] Verifying {doc_id} update on Edge Server.* — GET from `db`; assert revision differs
+       * *[Client {client_id}] Verifying {doc_id} update on Edge Server.* — GET from `db`, polling until the revision differs from the captured one; assert revision differs
      * Update `rev_id` from updated doc.
    * If `operations` includes delete and `not shared["edge_server_down"]`:
      * *[Client {client_id}] Deleting {doc_id} on Edge Server.* — DELETE using `rev_id`; assert response `ok: true`; assert subsequent GET raises `CblEdgeServerBadResponseError`; `await asyncio.sleep(2)`

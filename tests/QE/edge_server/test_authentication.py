@@ -3,11 +3,11 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.error import CblEdgeServerBadResponseError
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 class TestAuthentication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -28,22 +28,13 @@ class TestAuthentication(CBLTestClass):
 
         self.mark_test_step("testing invalid auth")
         await edge_server.set_auth(name=invalid_auth[0], password=invalid_auth[1])
-        failed = False
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_active_tasks()
-        except Exception:
-            failed = True
-            self.mark_test_step("invalid auth failed as expected")
-        assert failed, "invalid auth did not fail as expected"
+
         self.mark_test_step("testing anonymous auth ")
         await edge_server.set_auth(auth=False)
-        failed = False
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_active_tasks()
-        except Exception:
-            failed = True
-            self.mark_test_step("No auth failed as expected")
-        assert failed, "No auth did not fail as expected"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_valid_tls_mtls(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

@@ -183,7 +183,7 @@ class GreenboardUploader:
         # Track if any test has SGW-focused markers
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
             self.__has_sgw_marker = True
-        if item.get_closest_marker("es"):
+        if item.get_closest_marker("min_edge_servers"):
             self.__has_es_marker = True
 
         if report.passed:
@@ -199,7 +199,9 @@ class GreenboardUploader:
 
     def has_es_marker(self) -> bool:
         """
-        Returns True if any test in the session has @pytest.mark.es marker
+        Returns True if any test in the session requires an Edge Server, i.e. carries
+        @pytest.mark.min_edge_servers. That marker is already mandatory for topology
+        validation, so it doubles as the signal that this is an edge-server run.
         """
         return self.__has_es_marker
 

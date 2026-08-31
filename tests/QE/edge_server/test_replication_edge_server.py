@@ -4,17 +4,17 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.asyncfile import read_json_file, write_derived_json_file
+from cbltest.api.error import CblEdgeServerBadResponseError
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_to_sgw_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_edge_to_sgw_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -25,7 +25,8 @@ class TestEdgeServerSync(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Monitor replication progress")
@@ -82,19 +83,14 @@ class TestEdgeServerSync(CBLTestClass):
         assert sgw_doc_new is not None and sgw_doc_new.body["name"] == "Updated Airline", (
             "Document should not have purged from Sync gateway"
         )
-        failed = False
-        edge_doc = None
-        try:
-            edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Document purged on Edge server as expected: {e}")
-        assert failed, f"Document not purged on Edge server {edge_doc}"
+        self.mark_test_step("Document should be purged on Edge Server")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
         await edge_server.stop_replication(1)
 
     @pytest.mark.min_edge_servers(2)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("test_edge_to_edge_replication")
         config_path1 = f"{SCRIPT_DIR}/config/test_primary_edge.json"
         config_path2 = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
@@ -104,7 +100,8 @@ class TestEdgeServerSync(CBLTestClass):
         source_db = edge_server1.replication_url("travel")
         config = await read_json_file(config_path2)
         config["replications"][0]["source"] = source_db
-        config_path2 = await write_derived_json_file(config_path2, config)
+        config_path2 = str(tmp_path / "es2_config.json")
+        await write_json_file(config_path2, config)
 
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path2)
 
@@ -156,11 +153,7 @@ class TestEdgeServerSync(CBLTestClass):
         )
         assert edge_doc is not None
         assert edge_doc.body["name"] == "Updated Airline", "Document should not have purged from Edge server1"
-        failed = False
-        try:
-            edge_doc = await edge_server2.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Document purged on Edge server2 as expected: {e}")
-        assert failed, f"Document not purged on Edge server2 {edge_doc}"
+        self.mark_test_step("Document should be purged on Edge Server 2")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server2.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
         await edge_server2.stop_replication(1)

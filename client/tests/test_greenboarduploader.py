@@ -585,8 +585,8 @@ class TestGreenboardFixture:
 
     @pytest.mark.asyncio
     async def test_es_marker_sets_edge_server_platform(self) -> None:
-        """@pytest.mark.es plus a live Edge Server switches the platform to
-        edge-server and keys the doc on the ES build."""
+        """@pytest.mark.min_edge_servers plus a live Edge Server switches the platform
+        to edge-server and keys the doc on the ES build."""
         es = FakeEdgeServer("1.1.0(45;abc)")
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
@@ -594,7 +594,7 @@ class TestGreenboardFixture:
             gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["es"]))
+            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -614,7 +614,7 @@ class TestGreenboardFixture:
     @pytest.mark.asyncio
     async def test_edge_server_present_without_es_marker_keeps_cbl_platform(self) -> None:
         """An Edge Server in the config is not on its own enough to retarget the
-        doc: without @pytest.mark.es the run stays a CBL run."""
+        doc: without @pytest.mark.min_edge_servers the run stays a CBL run."""
         server = _make_server()
         es = FakeEdgeServer("1.1.0(45;abc)")
         cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])

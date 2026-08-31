@@ -29,7 +29,10 @@ async def run_es_collects(edge_servers: Sequence[EdgeServer], output_dir: Path, 
             )
             return None
 
-    results = await asyncio.gather(*(_collect_one(es) for es in edge_servers))
+    async with asyncio.TaskGroup() as group:
+        tasks = [group.create_task(_collect_one(es)) for es in edge_servers]
+
+    results = [task.result() for task in tasks]
     collected = [path for path in results if path is not None]
     cbl_info(
         f"es-collect: collected {len(collected)}/{len(results)} node(s) to {output_dir}: {[str(p) for p in collected]}"

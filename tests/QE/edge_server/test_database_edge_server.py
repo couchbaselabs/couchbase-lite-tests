@@ -4,16 +4,17 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.asyncfile import read_json_file, write_derived_json_file
+from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 class TestDatabase(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_server_incorrect_db_config(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_edge_server_incorrect_db_config(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         self.mark_test_step("test_edge_server_incorrect_db_config")
         config_path = f"{SCRIPT_DIR}/config/test_edge_server_incorrect_db_config.json"
         self.mark_test_step("Edge server should fail to serve a database it is not allowed to create.")
@@ -23,7 +24,8 @@ class TestDatabase(CBLTestClass):
         config = await read_json_file(config_path)
         config["databases"]["db"]["create"] = True
         config["databases"]["db"]["collections"] = ["test"]
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
 
         edge_server = await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
         resp = await edge_server.get_db_info(db_name="db", collection="test")

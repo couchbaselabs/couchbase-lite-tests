@@ -40,4 +40,4 @@ Test that audit logging respects the database configuration and records or omits
    * Update document `doc_6` with body including `changed: "yes"` and the captured revision; verify update succeeds; capture new revision ID
    * Delete document `doc_6` using the new revision ID; verify delete succeeds
 10. If `audit_mode` is `enabled`, verify CRUD audit entries:
-    * For event IDs 57358 (create document), 57359 (read document), 57360 (update document), 57361 (delete document), call `check_log(event_id)` and verify at least one log entry exists for each
+    * For event IDs 57358 (create document), 57359 (read document), 57360 (update document), 57361 (delete document), poll `check_log(event_id)` until an entry appears, and verify at least one log entry exists for each. Edge Server flushes the audit file asynchronously (a create event lands roughly a second after the request that caused it has returned), so a single read taken immediately after the operations misses them

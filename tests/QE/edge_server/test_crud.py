@@ -10,7 +10,6 @@ from cbltest.api.error import CblEdgeServerBadResponseError
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.es
 @pytest.mark.min_edge_servers(1)
 class TestCrud(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -118,13 +117,8 @@ class TestCrud(CBLTestClass):
         id1 = resp1["id"]
         self.mark_test_step("fetch single doc after ttl 20")
         await asyncio.sleep(20)
-        failed = False
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(db_name, doc_id=id1)
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Fetch doc {doc} failed as expected {e}")
-        assert failed, "Doc fetch successful despite expiry"
 
         self.mark_test_step("create single doc with id of a TTL=50 and update the TTL=20")
         id2 = "test50"
@@ -142,13 +136,8 @@ class TestCrud(CBLTestClass):
         assert doc3.body.get("test2") == new_doc.get("test2")
         self.mark_test_step("fetch update doc after 20 seconds")
         await asyncio.sleep(20)
-        failed = False
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(db_name, doc_id=id1)
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Fetch doc failed as expected {e}")
-        assert failed, "Doc fetch successful despite expiry"
 
         self.mark_test_step("delete a single doc of expiry 60 seconds")
         new_doc = {"test3": "This is new test doc"}

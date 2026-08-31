@@ -18,20 +18,21 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
-from cbltest.asyncfile import read_json_file, write_derived_json_file
+from cbltest.asyncfile import read_json_file, write_json_file
 from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 
 
-@pytest.mark.es
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_jwt_replication_reconnect_false(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_jwt_replication_reconnect_false(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """ES replicates with SGW using a static JWT token (reconnect_on_token_change=false)."""
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -183,7 +184,8 @@ class TestJWTSimple(CBLTestClass):
             "reconnect_on_token_change": False,
         }
 
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
 
         es_manager = cblpytest.edge_servers[0]
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)

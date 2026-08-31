@@ -6,7 +6,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
-from cbltest.asyncfile import read_binary_file, read_json_file, write_derived_json_file
+from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -17,7 +17,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(1)
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -55,7 +55,8 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 
@@ -163,7 +164,7 @@ class TestBlobs(CBLTestClass):
         assert blob.body == empty_blob, "Empty blob data mismatch."
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("Creating a bucket on server.")
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -201,7 +202,8 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         self.mark_test_step("Waiting for idle.")
@@ -461,7 +463,7 @@ class TestBlobs(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("Creating a bucket on server.")
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -500,7 +502,8 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
-        config_path = await write_derived_json_file(config_path, config)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         self.mark_test_step("Waiting for idle.")
         await edge_server.wait_for_idle()
