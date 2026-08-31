@@ -753,6 +753,11 @@ class _SyncGatewayBase:
         return self.__port
 
     @property
+    def public_port(self) -> int:
+        """Gets the public REST/replication port of the Sync Gateway instance"""
+        return self.__public_port
+
+    @property
     def secure(self) -> bool:
         """Gets whether the Sync Gateway instance uses TLS"""
         return self.__secure
@@ -794,9 +799,8 @@ class _SyncGatewayBase:
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
-        body, _ = await self._send_request_with_headers(method, path, payload, params, session)
+        body, _ = await self._send_request_with_headers(method, path, payload, params)
         return body
 
     async def _send_request_with_headers(
@@ -805,15 +809,11 @@ class _SyncGatewayBase:
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> tuple[Any, Mapping[str, str]]:
         """
         As :func:`_send_request`, but also returns the response headers for the callers
         that need them (e.g. to read the ``Etag`` of a database config).
         """
-        if session is None:
-            session = self.__session
-
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
@@ -822,7 +822,7 @@ class _SyncGatewayBase:
             logged_path = f"{path}?{urlencode(params)}" if params else path
             writer = get_next_writer()
             writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {logged_path}", data)
-            resp = await session.request(method, path, data=data, headers=headers, params=params)
+            resp = await self.__session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -1431,6 +1431,7 @@ class _SyncGatewayBase:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
+        revision: str | None = None,
     ) -> RemoteDocument | None:
         """
         Gets a document from Sync Gateway
@@ -1439,6 +1440,7 @@ class _SyncGatewayBase:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :param revision: A specific revision to get, instead of the current one (default None)
         """
         with self._tracer.start_as_current_span(
             "get_document",
@@ -1449,7 +1451,8 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+            params = {"rev": revision} if revision is not None else None
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}", params=params)
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
@@ -1669,54 +1672,6 @@ class _SyncGatewayBase:
         ):
             _, headers = await self._send_request_with_headers("GET", f"/{db_name}/_config")
             return _config_version(headers)
-
-    async def get_document_revision_public(
-        self,
-        db_name: str,
-        doc_id: str,
-        revision: str,
-        *,
-        username: str,
-        password: str,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> dict[str, Any]:
-        """
-        Gets a specific revision of a document using the public API with user authentication.
-
-        Args:
-            db_name: The name of the database
-            doc_id: The document ID
-            revision: The specific revision to retrieve
-            username: The username to authenticate as
-            password: The password for the user
-            scope: The scope name (defaults to "_default")
-            collection: The collection name (defaults to "_default")
-
-        Returns:
-            Dictionary containing the document at the specified revision
-
-        Raises:
-            CblSyncGatewayBadResponseError: If the document or revision is not found
-        """
-        _assert_not_null(db_name, "db_name")
-        _assert_not_null(doc_id, "doc_id")
-        _assert_not_null(revision, "revision")
-        _assert_not_null(username, "username")
-        _assert_not_null(password, "password")
-
-        path = (
-            f"/{db_name}/{scope}.{collection}/{doc_id}"
-            if scope != "_default" or collection != "_default"
-            else f"/{db_name}/{doc_id}"
-        )
-        params = {"rev": revision}
-
-        auth_header = encode_basic_auth(username, password, "ascii")
-        async with self._create_session(
-            self.secure, self.scheme, self.hostname, self.__public_port, auth_header
-        ) as session:
-            return await self._send_request("GET", path, params=params, session=session)
 
     async def _caddy_http_request(
         self,
@@ -2007,7 +1962,6 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure, public_port)
-        self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2328,7 +2282,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, self.__public_port, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
@@ -2439,6 +2393,33 @@ class SyncGateway(_SyncGatewayBase):
         )
 
     @asynccontextmanager
+    async def get_user_client(
+        self,
+        username: str,
+        password: str,
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
+        """
+        Yields a public-API client authenticated as an already existing user (e.g. one the
+        dataset created), closing its session on exit.  Use :func:`create_user_client` when
+        the user has to be created first.
+
+        :param username: The username to authenticate as
+        :param password: The password for the user
+        :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        client = SyncGatewayUserClient(
+            self.hostname,
+            username,
+            password,
+            port=self.public_port,
+            secure=self.secure,
+        )
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @asynccontextmanager
     async def create_user_client(
         self,
         db_name: str,
@@ -2461,17 +2442,8 @@ class SyncGateway(_SyncGatewayBase):
         """
         await self.reset_user(db_name, username, password, channels)
 
-        client = SyncGatewayUserClient(
-            self.hostname,
-            username,
-            password,
-            port=self.__public_port,
-            secure=self.secure,
-        )
-        try:
+        async with self.get_user_client(username, password) as client:
             yield client
-        finally:
-            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """

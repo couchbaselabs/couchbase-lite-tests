@@ -6,6 +6,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -629,46 +630,34 @@ class TestDeltaSync(CBLTestClass):
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
 
-        self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
-        old_rev_doc = await sync_gateway.get_document_revision_public(
-            "short_expiry", "doc1", old_revision, username="user1", password="pass"
-        )
+        async with sync_gateway.get_user_client("user1", "pass") as sg_user:
+            self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
+            old_rev_doc = await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
+            assert old_rev_doc.body.get("type") == "test", "Old revision should have correct content"
 
-        assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
-        assert old_rev_doc.get("type") == "test", "Old revision should have correct content"
-
-        self.mark_test_step("""
-            Update docs in SGW:
-                * Modify content in document "doc1": `"name": "SGW"` (small change)
-        """)
-        await sync_gateway.upsert_documents(
-            "short_expiry",
-            [
-                DocumentUpdateEntry(
-                    "doc1",
-                    old_revision,
-                    {"name": "SGW"},
-                )
-            ],
-        )
-
-        self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
-        await asyncio.sleep(12)
-
-        self.mark_test_step("Verify old revision is not accessible through public API.")
-        try:
-            expired_rev_doc = await sync_gateway.get_document_revision_public(
+            self.mark_test_step("""
+                Update docs in SGW:
+                    * Modify content in document "doc1": `"name": "SGW"` (small change)
+            """)
+            await sync_gateway.upsert_documents(
                 "short_expiry",
-                "doc1",
-                old_revision,
-                username="user1",
-                password="pass",
+                [
+                    DocumentUpdateEntry(
+                        "doc1",
+                        old_revision,
+                        {"name": "SGW"},
+                    )
+                ],
             )
-            assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
-                f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
-            )
-        except Exception as e:
-            assert "404" in str(e) or "not found" in str(e).lower(), f"Expected 404 error, got: {e}"
+
+            self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
+            await asyncio.sleep(12)
+
+            self.mark_test_step("Verify old revision is not accessible through public API.")
+            with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
+                await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert exc_info.value.code == 404, f"Expected 404 for the expired revision, got {exc_info.value.code}"
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()

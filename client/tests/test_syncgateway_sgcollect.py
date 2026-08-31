@@ -7,7 +7,6 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from aiohttp import ClientSession
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.syncgateway import DatabaseConfig, SGCollectRedactLevel, SyncGateway
@@ -41,7 +40,6 @@ class FakeSyncGateway(SyncGateway):
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
         self.sent_requests.append((method, path, payload))
         return self.send_request_result
