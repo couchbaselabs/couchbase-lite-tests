@@ -38,7 +38,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -91,7 +91,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -143,7 +143,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -196,7 +196,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -248,7 +248,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -301,7 +301,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -359,7 +359,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -412,7 +412,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -450,7 +450,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert pre.remote.revid == post.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
@@ -490,7 +490,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -524,7 +524,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert pre.remote.revid == post.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
@@ -566,7 +566,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -599,7 +599,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert post.remote.revid != pre.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
@@ -641,7 +641,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -677,7 +677,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert post.remote.revid and pre.remote.revid != post.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
@@ -725,7 +725,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -758,7 +758,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert post.remote.revid and post.remote.revid != pre.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
@@ -802,7 +802,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def pull_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             # Validate pre-condition:
             assert pre.local.revid is None and pre.local.cv is not None, (
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
@@ -839,7 +839,7 @@ class TestReplicationUpgrade(CBLTestClass):
         def push_validator(
             pre: DocSnapshot,
             post: DocSnapshot,
-        ):
+        ) -> None:
             assert post.remote.revid == pre.remote.revid, (
                 f"Expected remote doc revID to be unchanged after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"

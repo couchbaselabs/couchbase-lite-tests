@@ -1,4 +1,5 @@
 import os
+from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,7 @@ from cbltest.logging import cbl_info, cbl_warning
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config):
+async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> AsyncGenerator[None]:
     if (
         cblpytest.config.greenboard_username is None
         or cblpytest.config.greenboard_password is None

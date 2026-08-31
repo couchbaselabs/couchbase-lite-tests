@@ -1,4 +1,5 @@
 from abc import ABC
+from types import FunctionType
 
 import pytest
 from packaging.specifiers import SpecifierSet
@@ -12,13 +13,13 @@ from cbltest.responses import ServerVariant
 
 
 class CBLTestClass(ABC):
-    def setup_method(self, method) -> None:
+    def setup_method(self, method: FunctionType) -> None:
         CBLPyTestGlobal.running_test_name = method.__name__
         cbl_info(f"Starting test: {method.__name__}")
         self.__step: int = 1
         self.__skipped: bool = False
 
-    def teardown_method(self, method) -> None:
+    def teardown_method(self, method: FunctionType) -> None:
         if self.__step == 1 and not self.__skipped:
             cbl_warning(f"No test steps marked in {method.__name__}, did you forget to use self.mark_test_step()?")
 
@@ -36,7 +37,7 @@ class CBLTestClass(ABC):
 
             cbl_info(f"\t{stripped_line}")
 
-    def skip(self, reason: str):
+    def skip(self, reason: str) -> None:
         """
         Skips the test with the given reason.
 
@@ -45,7 +46,7 @@ class CBLTestClass(ABC):
         self.__skipped = True
         pytest.skip(reason)
 
-    def skip_if_not(self, condition: bool, reason: str):
+    def skip_if_not(self, condition: bool, reason: str) -> None:
         """
         Skips the test if the given condition is not met.
 
@@ -55,7 +56,7 @@ class CBLTestClass(ABC):
         if not condition:
             self.skip(reason)
 
-    async def skip_if_not_platform(self, server: TestServer, allow_platforms: ServerVariant):
+    async def skip_if_not_platform(self, server: TestServer, allow_platforms: ServerVariant) -> None:
         """
         Skips the test if the current platform does not match the specified platform.
 
@@ -67,7 +68,7 @@ class CBLTestClass(ABC):
             f"{variant} is not in the platforms {allow_platforms}",
         )
 
-    async def skip_if_cbl_not(self, server: TestServer, constraint: str):
+    async def skip_if_cbl_not(self, server: TestServer, constraint: str) -> None:
         """
         Skips the test if the CBL version does not match the specified comparison operation and value.
 
@@ -78,7 +79,7 @@ class CBLTestClass(ABC):
         spec = SpecifierSet(constraint)
         self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")
 
-    async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str):
+    async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str) -> None:
         """
         Skips the test if the SGW version does not match the specified comparison operation and value.
 

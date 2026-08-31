@@ -1,5 +1,5 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
     "api-version": 1,
-    "greenboard": {"hostname": "jenkins.mobiledev.couchbase.com", "username": "writer", "password": "couchbase2" }
+    "greenboard": {"hostname": "10.100.150.106", "username": "writer", "password": "couchbase2" }
 }

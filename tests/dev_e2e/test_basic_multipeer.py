@@ -18,7 +18,7 @@ class RapidChangesMode(Enum):
 @pytest.mark.min_test_servers(2)
 class TestMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_medium_mesh_sanity(self, cblpytest: CBLPyTest):
+    async def test_medium_mesh_sanity(self, cblpytest: CBLPyTest) -> None:
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -70,7 +70,7 @@ class TestMultipeer(CBLTestClass):
     async def test_medium_mesh_consistency(
         self,
         cblpytest: CBLPyTest,
-    ):
+    ) -> None:
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)

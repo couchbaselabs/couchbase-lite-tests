@@ -4,6 +4,7 @@ pipeline {
         string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
         string(name: 'SGW_VERSION', defaultValue: '4', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the jak_desktop test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
         booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS Desktop tests')
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Run Windows Desktop tests')
@@ -54,7 +55,7 @@ pipeline {
                     steps {
                         echo "=== Run macOS Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== macOS Desktop Tests Complete"
                     }
@@ -78,6 +79,7 @@ pipeline {
                     environment {
                         TS_ARTIFACTS_DIR = 'java_windows_desktop'
                         TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                        TS_TEST_FILTER = "${params.TS_TEST_FILTER}"
                     }
                     steps {
                         echo "=== Run Windows Desktop Tests"
@@ -89,7 +91,8 @@ pipeline {
                             -File jenkins\\pipelines\\QE\\java\\desktop\\run_test.ps1 ^
                             -Version %CBL_VERSION% ^
                             -SgwVersion %SGW_VERSION% ^
-                            -DatasetVersion %TS_DATASET_VERSION%
+                            -DatasetVersion %TS_DATASET_VERSION% ^
+                            -TestFilter "%TS_TEST_FILTER%"
                             '''                        }
                         echo "=== Windows Desktop Tests Complete"
                     }
@@ -124,7 +127,7 @@ pipeline {
                         checkout scm
                         echo "=== Run Linux Desktop Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}"
+                            sh "jenkins/pipelines/QE/java/desktop/run_test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
                         echo "=== Linux Desktop Tests Complete"
                     }

@@ -1,6 +1,7 @@
 import platform
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import click
 import psutil
@@ -23,7 +24,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 
 class JavascriptBridge(PlatformBridge):
-    def __init__(self, working_dir: str):
+    def __init__(self, working_dir: str) -> None:
         """
         Initialize the JavascriptBridge with the working directory containing the site files
         """
@@ -127,7 +128,7 @@ class JavascriptTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -140,29 +141,28 @@ class JavascriptTestServer(TestServer):
 
     @property
     def latestbuilds_path(self) -> str:
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver.zip"
+        return self.artifact_path("testserver.zip")
 
     def build(self) -> None:
         header(f"Installing CBL JS and dependencies for version {self.version}")
         click.echo("Installing CBL")
         working_dir = DOWNLOADED_TEST_SERVER_DIR / "js" / self.version if self._downloaded else JS_TEST_SERVER_DIR
 
+        install_args = ["bun", "install", f"@couchbase/lite-js@{self.version}"]
+        if not self.is_release:
+            # Prerelease builds only exist on the internal proget npm feed; release
+            # versions are published to the default (public) npm registry.
+            install_args += ["--registry", "https://proget.sc.couchbase.com/npm/cbl-npm/"]
+
         subprocess.run(
-            [
-                "bun",
-                "install",
-                f"@couchbase/lite-js@{self.version}",
-                "--registry",
-                "https://proget.sc.couchbase.com/npm/cbl-npm/",
-            ],
+            install_args,
             check=True,
             cwd=working_dir,
         )
         click.echo("Installing dependencies")
         subprocess.run(["bun", "install"], check=True, cwd=working_dir)
 
-    def compress_package(self):
+    def compress_package(self) -> str:
         header(f"Compressing JS test server for {self.platform}")
         ZIP_DIR.mkdir(parents=True, exist_ok=True)
         zip_path = ZIP_DIR / "testserver.zip"
@@ -173,11 +173,11 @@ class JavascriptTestServer(TestServer):
         )
         return str(zip_path)
 
-    def uncompress_package(self, path):
+    def uncompress_package(self, path: Path) -> None:
         unzip_directory(path, path.parent)
         path.unlink()
 
-    def create_bridge(self, **kwargs):
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         working_dir = DOWNLOADED_TEST_SERVER_DIR / "js" / self.version if self._downloaded else JS_TEST_SERVER_DIR
 
         if self._downloaded:

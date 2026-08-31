@@ -14,7 +14,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_sync_gateways(1)
 class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_to_sgw_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_edge_to_sgw_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -94,7 +94,7 @@ class TestEdgeServerSync(CBLTestClass):
 
     @pytest.mark.min_edge_servers(2)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_edge_to_edge_replication")
         config_path1 = f"{SCRIPT_DIR}/config/test_primary_edge.json"
         config_path2 = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"

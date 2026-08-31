@@ -13,7 +13,7 @@ def _b64url(data: bytes) -> str:
 # Generates a 2048-bit RSA key pair
 # Private key → signs the JWT token (ES uses this token)
 # Public key → given to SGW so it can verify the token's signature
-def generate_rsa_keypair():
+def generate_rsa_keypair() -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
     """Generate an RSA key pair for signing JWTs."""
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     return private_key, private_key.public_key()
@@ -22,7 +22,7 @@ def generate_rsa_keypair():
 from cbltest.api.syncgateway import JWK
 
 
-def public_key_to_jwk(public_key, kid: str = "test-key-1") -> JWK:
+def public_key_to_jwk(public_key: rsa.RSAPublicKey, kid: str = "test-key-1") -> JWK:
     """Convert RSA public key to JWK format for SGW OIDC config."""
     numbers = public_key.public_numbers()
     n = numbers.n.to_bytes((numbers.n.bit_length() + 7) // 8, "big")
@@ -37,7 +37,9 @@ def public_key_to_jwk(public_key, kid: str = "test-key-1") -> JWK:
     )
 
 
-def generate_jwt(private_key, subject="edge", expires_in=300, kid="test-key-1") -> str:
+def generate_jwt(
+    private_key: rsa.RSAPrivateKey, subject: str = "edge", expires_in: int = 300, kid: str = "test-key-1"
+) -> str:
     """Generate a signed RS256 JWT token.
 
     Args:

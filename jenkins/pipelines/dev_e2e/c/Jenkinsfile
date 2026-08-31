@@ -6,6 +6,7 @@ pipeline {
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
     options {
         timeout(time: 90, unit: 'MINUTES')
@@ -59,7 +60,7 @@ pipeline {
                         echo "Run macOS Test"
                         lock("${env.NODE_NAME}") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} macos '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                             }
                         }
                     }
@@ -85,7 +86,7 @@ pipeline {
                         echo "Run iOS Test"
                         lock('mob-e2e-iphone-01') {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ios '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                             }
                         }
                     }
@@ -108,7 +109,7 @@ pipeline {
                         echo "Run Android Test"
                         lock('mob-e2e-android-01') {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} android '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                             }
                         }
                     }
@@ -131,7 +132,7 @@ pipeline {
                         echo "Run linux Test"
                         lock("${env.NODE_NAME}") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} linux_x86_64 '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                                sh "jenkins/pipelines/dev_e2e/c/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} linux_x86_64 '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                             }
                         }
                     }
@@ -150,7 +151,7 @@ pipeline {
                     steps {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 60, unit: 'MINUTES') {
-                                pwsh "jenkins\\pipelines\\dev_e2e\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}"
+                                pwsh "jenkins\\pipelines\\dev_e2e\\c\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
                             }
                         }
                     }

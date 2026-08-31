@@ -1,17 +1,18 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblSyncGatewayBadResponseError,
 )
-from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -21,7 +22,7 @@ def _doc_body(doc_id: str) -> dict[str, Any]:
     return {
         "id": doc_id,
         "channels": ["public"],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -37,7 +38,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestSystem(CBLTestClass):
-    async def _setup_system_test(self, cblpytest: CBLPyTest):
+    async def _setup_system_test(self, cblpytest: CBLPyTest) -> tuple[SyncGateway, EdgeServer, str, str]:
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.
         Returns (sync_gateway, edge_server, sg_db_name, es_db_name).
         """
@@ -61,7 +62,7 @@ class TestSystem(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
         input_data = {"_default._default": ["public"]}
@@ -89,7 +90,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -98,7 +99,7 @@ class TestSystem(CBLTestClass):
         ) = await self._setup_system_test(cblpytest)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
+        while datetime.now(UTC) < end_time:
             doc_id = f"doc_{doc_counter}"
 
             # Randomize whether the operation happens in the Sync Gateway cycle or Edge Server cycle
@@ -143,6 +144,7 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations:
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
+                    assert rev_id is not None, f"Document {doc_id} has no revision ID."
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -198,7 +200,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -206,11 +208,11 @@ class TestSystem(CBLTestClass):
             es_db_name,
         ) = await self._setup_system_test(cblpytest)
         edge_server_down = False
-        end = datetime.now(timezone.utc) + timedelta(minutes=2400)
+        end = datetime.now(UTC) + timedelta(minutes=2400)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
-            if datetime.now(timezone.utc) > end:
+        while datetime.now(UTC) < end_time:
+            if datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
                 await edge_server.start_server()
                 # Allow edge server to stabilize after restart.
@@ -235,7 +237,7 @@ class TestSystem(CBLTestClass):
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
                 await edge_server.kill_server()
-                end = datetime.now(timezone.utc) + timedelta(minutes=1)
+                end = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
                 edge_server_down = True
@@ -279,6 +281,7 @@ class TestSystem(CBLTestClass):
                 if "delete" in operations and not edge_server_down:
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
+                    assert rev_id is not None, f"Document {doc_id} has no revision ID."
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -335,7 +338,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_concurrent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -346,7 +349,7 @@ class TestSystem(CBLTestClass):
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"c{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])
@@ -386,6 +389,7 @@ class TestSystem(CBLTestClass):
 
                     if "delete" in operations:
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
+                        assert rev_id is not None, f"Document {doc_id} has no revision ID."
                         delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                         assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                             f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
@@ -451,7 +455,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -463,10 +467,10 @@ class TestSystem(CBLTestClass):
         recent_docs: list[str] = []
 
         async def chaos_controller() -> None:
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 # Random quiet period of 5–20 minutes between chaos events.
                 await asyncio.sleep(random.uniform(300, 1200))
-                if datetime.now(timezone.utc) >= end_time:
+                if datetime.now(UTC) >= end_time:
                     break
 
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
@@ -504,7 +508,7 @@ class TestSystem(CBLTestClass):
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"cc{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])
@@ -556,6 +560,7 @@ class TestSystem(CBLTestClass):
 
                     if "delete" in operations and not shared["edge_server_down"]:
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
+                        assert rev_id is not None, f"Document {doc_id} has no revision ID."
                         delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                         assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                             f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"

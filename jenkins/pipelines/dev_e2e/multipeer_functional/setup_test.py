@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -9,7 +10,11 @@ import click
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 sys.path.append(str(SCRIPT_DIR.parents[3]))
 
-from jenkins.pipelines.shared.setup_test import setup_test_multi
+from jenkins.pipelines.shared.setup_test import (
+    get_platform_version,
+    setup_test,
+    ts_to_topology,
+)
 
 
 def print_platform_spec(label: str, value: str | None) -> None:
@@ -36,7 +41,7 @@ def main(
     java: str | None,
     c: str | None,
     global_version: str | None,
-):
+) -> None:
     click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
     click.secho("Platform specifications:", fg="cyan")
     print_platform_spec("Global Version", global_version)
@@ -67,9 +72,14 @@ def main(
         # Use the proper multiplatform setup function
         config_file_in = SCRIPT_DIR / "config_multiplatform.json"
         topology_file_in = SCRIPT_DIR / "topology.json"
-        setup_test_multi(
-            platform_map,
-            "3.2.4",  # Doesn't matter, we don't use SGW in these tests
+
+        with open(topology_file_in) as fin:
+            test_servers = json.load(fin)["test_servers"]
+        cbl_versions = [get_platform_version(platform_map, ts_to_topology(ts["platform"])) for ts in test_servers]
+
+        setup_test(
+            cbl_versions,
+            None,  # This pipeline doesn't use Sync Gateway
             topology_file_in,
             config_file_in,
             "multipeer_functional",

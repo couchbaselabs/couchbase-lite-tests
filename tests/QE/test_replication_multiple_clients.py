@@ -19,7 +19,7 @@ class TestReplicationMultipleClients(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replication_with_multiple_client_dbs_and_single_sync_gateway_db(
         self, cblpytest: CBLPyTest, dataset_path: Path
-    ):
+    ) -> None:
         sg = cblpytest.sync_gateways[0]
         sg_db = "names"
 
@@ -150,12 +150,11 @@ class TestReplicationMultipleClients(CBLTestClass):
         sg_changes_ids = {row.id for row in sg_changes.results}
         assert len(sg_changes_ids) == 200, f"SG changes feed should have 200 documents, got {len(sg_changes_ids)}"
 
-        await sg.delete_database(sg_db)
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_with_10_attachments(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_replication_with_10_attachments(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         sg_db = "names"
 
@@ -327,6 +326,5 @@ class TestReplicationMultipleClients(CBLTestClass):
                 f"Document {doc_id} should have source={expected_source}"
             )
 
-        await sg.delete_database(sg_db)
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()

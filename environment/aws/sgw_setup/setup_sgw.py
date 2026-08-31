@@ -80,7 +80,7 @@ class SgwDownloadInfo:
     def url(self) -> str:
         return self.__url
 
-    def _init_release(self, version: str):
+    def _init_release(self, version: str) -> None:
         self.__version = version
         self.__build_no = 0
         self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}_aarch64.rpm"
@@ -88,13 +88,13 @@ class SgwDownloadInfo:
             f"https://packages.couchbase.com/releases/couchbase-sync-gateway/{self.__version}/{self.__local_filename}"
         )
 
-    def _init_internal(self, version: str, build_no: int):
+    def _init_internal(self, version: str, build_no: int) -> None:
         self.__version = version
         self.__build_no = build_no
         self.__local_filename = f"couchbase-sync-gateway-enterprise_{self.__version}-{self.__build_no}_aarch64.rpm"
         self.__url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/sync_gateway/{self.__version}/{self.__build_no}/{self.__local_filename}"
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         if "-" in version:
             version_parts = version.split("-")
             self._init_internal(version_parts[0], int(version_parts[1]))

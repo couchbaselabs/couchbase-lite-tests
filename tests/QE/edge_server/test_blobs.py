@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -30,7 +30,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -43,7 +43,7 @@ class TestBlobs(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
@@ -76,6 +76,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
@@ -141,7 +142,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id}."
@@ -149,6 +150,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         self.mark_test_step("Adding an empty blob to the document.")
         empty_blob = b""
@@ -177,7 +179,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -189,7 +191,7 @@ class TestBlobs(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
         self.mark_test_step("Adding role to Sync Gateway.")
@@ -218,6 +220,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
         attachment_name = "test.png"
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)
@@ -264,7 +267,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -288,7 +291,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -299,6 +302,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         self.mark_test_step("Verify delete nonexistent blob fails.")
         attachment_name = "missing_blob.png"
@@ -319,7 +323,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -335,6 +339,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
@@ -379,7 +384,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -394,6 +399,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test.png"
         response = await edge_server.put_sub_document(doc_id, rev_id, attachment_name, es_db_name, value=image_data)
@@ -410,6 +416,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "test2.png"
 
@@ -430,7 +437,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -445,6 +452,7 @@ class TestBlobs(CBLTestClass):
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
 
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         attachment_name = "20mb.jpg"
 
@@ -470,7 +478,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -482,7 +490,7 @@ class TestBlobs(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         input_data = {"_default._default": ["public"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
@@ -511,6 +519,7 @@ class TestBlobs(CBLTestClass):
         document = await edge_server.get_document(es_db_name, doc_id)
         assert document is not None, f"Document {doc_id} does not exist on the edge server."
         rev_id = document.revid
+        assert rev_id is not None, f"Document {doc_id} has no revision ID."
 
         blob_path = dataset_path.parent / "edge-server" / "blobs" / "test.png"
         image_data = await read_binary_file(blob_path)

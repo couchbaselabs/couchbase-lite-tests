@@ -46,7 +46,7 @@ import importlib
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from pathlib import Path
-from typing import ClassVar, Final
+from typing import Any, ClassVar, Final
 
 import click
 import requests
@@ -245,6 +245,57 @@ class TestServer(ABC):
             str: The path for the latest builds of the test server.
         """
 
+    @property
+    def is_release(self) -> bool:
+        """
+        Whether this test server's CBL version is a public release (no build number).
+        """
+        return "-" not in self.version
+
+    @property
+    def bare_version(self) -> str:
+        """
+        The CBL version with any build-number suffix stripped off.
+        """
+        return self.version.split("-", 1)[0]
+
+    @property
+    def build_number(self) -> str | None:
+        """
+        The CBL build number, or None if this is a release version.
+        """
+        if self.is_release:
+            return None
+
+        return self.version.split("-", 1)[1]
+
+    @property
+    def artifact_root(self) -> str:
+        """
+        Root path (under latestbuilds.service.couchbase.com) that this test server's
+        build artifacts live under. Prerelease CBL builds are ephemeral CI output
+        and live under 'latestbuilds'; release builds are uploaded to the permanent
+        'releases/mobile' area instead.
+        """
+        return "releases/mobile" if self.is_release else "latestbuilds"
+
+    def artifact_path(self, filename: str) -> str:
+        """
+        Build the {product}/{version}[/{build}]/{filename} path for a build
+        artifact of this test server, omitting the build segment for release
+        versions.
+
+        Args:
+            filename (str): The filename of the artifact.
+
+        Returns:
+            str: The artifact path, relative to `artifact_root`.
+        """
+        if self.is_release:
+            return f"{self.product}/{self.bare_version}/{filename}"
+
+        return f"{self.product}/{self.bare_version}/{self.build_number}/{filename}"
+
     @abstractmethod
     def build(self) -> None:
         """
@@ -258,7 +309,7 @@ class TestServer(ABC):
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
-        url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{self.latestbuilds_path}"
+        url = f"https://latestbuilds.service.couchbase.com/builds/{self.artifact_root}/{self.latestbuilds_path}"
         header(f"Downloading {url}")
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
@@ -299,7 +350,7 @@ class TestServer(ABC):
         """
 
     @abstractmethod
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a platform bridge for the test server.
 

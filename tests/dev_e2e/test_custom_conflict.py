@@ -27,7 +27,7 @@ class TestCustomConflict(CBLTestClass):
         dataset_path: Path,
         conflict_resolver: ReplicatorConflictResolver,
         setup_snapshot: Callable[[SnapshotUpdater], str],
-    ):
+    ) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -118,7 +118,7 @@ class TestCustomConflict(CBLTestClass):
         assert verify_result.result is True, f"Conflict resolution resulted in bad data: {verify_result.description}"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path):
+    async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -321,8 +321,8 @@ class TestCustomConflict(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_custom_conflict_remote_wins(self, cblpytest: CBLPyTest, dataset_path: Path):
-        def setup_snapshot(updater: SnapshotUpdater):
+    async def test_custom_conflict_remote_wins(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        def setup_snapshot(updater: SnapshotUpdater) -> str:
             updater.upsert_document("_default._default", "name_101", [{"name.last": "Jones"}])
             return "Check that the names_101 document `name.last` == 'Jones'"
 
@@ -334,8 +334,8 @@ class TestCustomConflict(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_custom_conflict_delete(self, cblpytest: CBLPyTest, dataset_path: Path):
-        def setup_snapshot(updater: SnapshotUpdater):
+    async def test_custom_conflict_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        def setup_snapshot(updater: SnapshotUpdater) -> str:
             updater.delete_document("_default._default", "name_101")
             return "Check that the names_101 document is deleted"
 
@@ -347,8 +347,8 @@ class TestCustomConflict(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_custom_conflict_merge(self, cblpytest: CBLPyTest, dataset_path: Path):
-        def setup_snapshot(updater: SnapshotUpdater):
+    async def test_custom_conflict_merge(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        def setup_snapshot(updater: SnapshotUpdater) -> str:
             updater.upsert_document(
                 "_default._default",
                 "name_101",

@@ -26,6 +26,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Any
 
 from environment.aws.common.io import unzip_directory, zip_directory
 from environment.aws.common.output import header
@@ -55,7 +56,7 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -99,7 +100,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str):
+    def __init__(self, version: str) -> None:
         super().__init__(version)
 
     @property
@@ -120,8 +121,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return self.artifact_path("testserver_ios.zip")
 
     def build(self) -> None:
         self._download_cbl()
@@ -165,7 +165,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         if xcodebuild_rc != 0 or xcpretty_rc != 0:
             raise RuntimeError("Build failed")
 
-    def create_bridge(self, **kwargs) -> PlatformBridge:
+    def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
         Create a bridge for the Swift test server to be able to install, run, etc.
 

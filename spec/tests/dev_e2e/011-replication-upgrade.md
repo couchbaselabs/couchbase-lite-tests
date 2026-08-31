@@ -20,19 +20,18 @@ replicated — a mutation made on CBL before the 4.x upgrade has not yet been pu
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
    * endpoint: '/upgrade'
    * collections : '_default._default'
    * type: pushAndPull
    * document_ids: ['nonconflict_1']
    * continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.   
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #2 test_nonconflict_case_2
 
@@ -54,19 +53,18 @@ replicated — a mutation made on SGW before the 4.x upgrade has not yet been pu
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pushAndPull
 	* document_ids: ['nonconflict_2']
 	* continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #3 test_nonconflict_case_3
 
@@ -89,19 +87,18 @@ been pushed, but was already pushed earlier by another peer.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pushAndPull
 	* document_ids: ['nonconflict_3']
 	* continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #4test_nonconflict_case_4
 
@@ -125,19 +122,18 @@ another peer and already exists in SGW’s revision tree history.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pushAndPull
 	* document_ids: ['nonconflict_4']
 	* continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #5 test_nonconflict_case_5
 
@@ -160,19 +156,18 @@ and CBL should recognize it as non-conflicting and pull the new revision.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['nonconflict_5']
 	* continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #6 test_nonconflict_case_6
 
@@ -196,19 +191,18 @@ the pushed revision.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['nonconflict_6']
 	* continuous: False
-6. Wait until the replicator is stopped.
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
 
 ## #7 test_conflict_case_1
 
@@ -230,11 +224,10 @@ both sides have conflicting legacy revisions created before the 4.x upgrade.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
@@ -265,29 +258,28 @@ with SGW chosen as the winner under the legacy default conflict resolution.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_2']
 	* continuous: False
    * conflict_resolver: remote-wins
-6. Wait until the replicator is stopped.  
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
-9. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
+8. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_2']
 	* continuous: False
-10. Wait until the replicator is stopped.  
-11. Check that the doc is replicated correctly.
-12. Validate revid and HLV of local and remote doc.
+9. Wait until the replicator is stopped.
+10. Check that the doc is replicated correctly.
+11. Validate revid and HLV of local and remote doc.
 
 ## #9 test_conflict_case_3
 
@@ -311,29 +303,28 @@ under the default conflict resolution.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_3']
 	* continuous: False
    * conflict_resolver: remote-wins
-6. Wait until the replicator is stopped.  
-7. Check that the doc is replicated correctly.
-8. Validate revid and HLV of local and remote doc.
-9. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Check that the doc is replicated correctly.
+7. Validate revid and HLV of local and remote doc.
+8. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_3']
 	* continuous: False
-10. Wait until the replicator is stopped.  
-11. Check that the doc is replicated correctly.
-12. Validate revid and HLV of local and remote doc.
+9. Wait until the replicator is stopped.
+10. Check that the doc is replicated correctly.
+11. Validate revid and HLV of local and remote doc.
 
 ## #10 test_conflict_case_4
 
@@ -356,28 +347,27 @@ as a child of the remote revision and push it to SGW.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_4']
 	* continuous: False
    * conflict_resolver: local-wins
-6. Wait until the replicator is stopped.  
-7. Validate revid and HLV of local and remote doc.
-8. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Validate revid and HLV of local and remote doc.
+7. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_4']
 	* continuous: False
-9. Wait until the replicator is stopped.  
-10. Check that the doc is replicated correctly.
-11. Validate revid and HLV of local and remote doc.
+8. Wait until the replicator is stopped.
+9. Check that the doc is replicated correctly.
+10. Validate revid and HLV of local and remote doc.
 
 ## #11 test_conflict_case_5
 
@@ -402,28 +392,27 @@ the local winning revision as a child of the remote revision and push it to SGW.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_5']
 	* continuous: False
    * conflict_resolver: local-wins
-6. Wait until the replicator is stopped.  
-7. Validate revid and HLV of local and remote doc.
-8. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Validate revid and HLV of local and remote doc.
+7. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_5']
 	* continuous: False
-9. Wait until the replicator is stopped.  
-10. Check that the doc is replicated correctly.
-11. Validate revid and HLV of local and remote doc.
+8. Wait until the replicator is stopped.
+9. Check that the doc is replicated correctly.
+10. Validate revid and HLV of local and remote doc.
 
 ## #12 test_conflict_case_6
 
@@ -448,28 +437,27 @@ as a child of the remote revision and push it to SGW.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_6']
 	* continuous: False
    * conflict_resolver: local-wins
-6. Wait until the replicator is stopped.  
-7. Validate revid and HLV of local and remote doc.
-8. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Validate revid and HLV of local and remote doc.
+7. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_6']
 	* continuous: False
-9. Wait until the replicator is stopped.  
-10. Check that the doc is replicated correctly.
-11. Validate revid and HLV of local and remote doc.
+8. Wait until the replicator is stopped.
+9. Check that the doc is replicated correctly.
+10. Validate revid and HLV of local and remote doc.
 
 ## #13 test_conflict_case_7
 
@@ -494,24 +482,23 @@ winning revision as a child of the remote revision and push it to SGW.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Start a replicator:
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
 	* document_ids: ['conflict_6']
 	* continuous: False
    * conflict_resolver: local-wins
-6. Wait until the replicator is stopped.  
-7. Validate revid and HLV of local and remote doc.
-8. Start a replicator:
+5. Wait until the replicator is stopped.
+6. Validate revid and HLV of local and remote doc.
+7. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
 	* document_ids: ['conflict_6']
 	* continuous: False
-9. Wait until the replicator is stopped.  
-10. Validate revid and HLV of local and remote doc.
+8. Wait until the replicator is stopped.
+9. Validate revid and HLV of local and remote doc.

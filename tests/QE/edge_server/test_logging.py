@@ -1,7 +1,8 @@
 import asyncio
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -97,7 +98,7 @@ class TestLogging(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -110,8 +111,7 @@ class TestLogging(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.delete_database(sg_db_name)
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
         input_data = {"_default._default": ["public"]}
@@ -120,8 +120,9 @@ class TestLogging(CBLTestClass):
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
         self.mark_test_step("Empty the audit logging file")
-        await cblpytest.edge_servers[0].write_file_on_es("/home/ec2-user/audit/EdgeServerAuditLog.txt",
-                                                         "_____________\n")
+        await cblpytest.edge_servers[0].write_file_on_es(
+            "/home/ec2-user/audit/EdgeServerAuditLog.txt", "_____________\n"
+        )
 
         self.mark_test_step("Creating a database on Edge Server with audit config.")
         step_descriptions = {
@@ -162,7 +163,7 @@ class TestLogging(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -172,7 +173,7 @@ class TestLogging(CBLTestClass):
             updated_doc_body = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "changed": "yes",
             }
             updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id, es_db_name, rev=rev_id)
