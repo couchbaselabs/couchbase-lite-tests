@@ -4,11 +4,13 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.database import Database
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
+    ReplicatorAuthenticator,
     ReplicatorBasicAuthenticator,
     ReplicatorDocumentFlags,
     WaitForDocumentEventEntry,
@@ -22,9 +24,33 @@ from cbltest.api.syncgateway import (
     SyncGatewayUserClient,
 )
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
-from shared.backfill_after_offline import backfill_after_offline
 
 PUBLIC_PORT = 4984
+
+
+async def _one_shot_pull(
+    db: Database,
+    sync_gateway: SyncGateway,
+    db_name: str,
+    authenticator: ReplicatorAuthenticator,
+) -> Replicator:
+    """
+    Runs a one-shot pull replicator to completion and returns it so the caller can assert
+    on what it pulled via `document_updates`.
+    """
+    replicator = Replicator(
+        db,
+        sync_gateway.replication_url(db_name),
+        replicator_type=ReplicatorType.PULL,
+        authenticator=authenticator,
+        collections=[ReplicatorCollectionEntry()],
+        enable_document_listener=True,
+        pinned_server_cert=sync_gateway.tls_cert(),
+    )
+    await replicator.start()
+    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+    assert status.error is None, f"Pull replicator failed: {status.error}"
+    return replicator
 
 
 async def _setup_db(
@@ -681,39 +707,27 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         self.mark_test_step("Reset a local database and pull as that user so the document replicates to the device")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
-        initial_replicator = await backfill_after_offline(
-            db,
-            sg,
-            db_name,
-            ReplicatorBasicAuthenticator(username, password),
-            while_offline=lambda: asyncio.sleep(0),
-        )
+        authenticator = ReplicatorBasicAuthenticator(username, password)
+        initial_replicator = await _one_shot_pull(db, sg, db_name, authenticator)
         assert any(entry.document_id == doc_id for entry in initial_replicator.document_updates), (
             f"{doc_id} did not replicate to the device on initial sync"
         )
 
-        async def _revoke_and_compact_while_offline() -> None:
-            self.mark_test_step(
-                "While offline, revoke user 'leo's access to channel 'A', then compact channel 'A' out of "
-                "the user's access history before the client reconnects"
-            )
-            await sg.add_user(
-                db_name,
-                username,
-                password=password,
-                collection_access={"_default": {"_default": {"admin_channels": []}}},
-            )
-            compacted = await sg.compact_user_access_history(db_name, username, {"_default": {"_default": ["A"]}})
-            assert "A" in _channels(compacted)
+        self.mark_test_step(
+            "While the client is offline (i.e. between the two one-shot pulls), revoke user 'leo's access to "
+            "channel 'A', then compact channel 'A' out of the user's access history before it reconnects"
+        )
+        await sg.add_user(
+            db_name,
+            username,
+            password=password,
+            collection_access={"_default": {"_default": {"admin_channels": []}}},
+        )
+        compacted = await sg.compact_user_access_history(db_name, username, {"_default": {"_default": ["A"]}})
+        assert "A" in _channels(compacted)
 
         self.mark_test_step("Bring the client back online: start a new pull replicator for the same user")
-        reconnect_replicator = await backfill_after_offline(
-            db,
-            sg,
-            db_name,
-            ReplicatorBasicAuthenticator(username, password),
-            while_offline=_revoke_and_compact_while_offline,
-        )
+        reconnect_replicator = await _one_shot_pull(db, sg, db_name, authenticator)
 
         self.mark_test_step(
             "Check that the device received no notification about 'doc_a' at all -- compacting the user's "
