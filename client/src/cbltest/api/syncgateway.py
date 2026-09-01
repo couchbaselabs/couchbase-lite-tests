@@ -902,17 +902,31 @@ class _SyncGatewayBase:
 
         return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
 
+    async def get_expvars(self) -> dict:
+        """Gets the full stats payload from ``GET /_expvar``."""
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        return cast(dict, resp_data)
+
+    async def get_db_expvars(self, db_name: str, section: str) -> dict:
+        """
+        Gets one per-database stats section from ``GET /_expvar``, or an empty dict if absent.
+
+        :param db_name: The name of the SGW database to inspect
+        :param section: The section name, e.g. 'database', 'cache', 'delta_sync', 'shared_bucket_import'
+        """
+        expvars = await self.get_expvars()
+        db_section = expvars.get("syncgateway", {}).get("per_db", {}).get(db_name, {})
+        stats = db_section.get(section)
+        return stats if isinstance(stats, dict) else {}
+
     async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
         """
         Gets the bytes transferred for a given dataset
 
         :param dataset_name: The name of the dataset to get the bytes transferred for
         """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
+        db_stats = await self.get_db_expvars(dataset_name, "database")
         doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
         doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
         return doc_reads_bytes, doc_writes_bytes
@@ -924,16 +938,7 @@ class _SyncGatewayBase:
 
         :param dataset_name: The name of the SGW database to inspect.
         """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        try:
-            db_section = expvars["syncgateway"]["per_db"][dataset_name]
-        except KeyError:
-            return {}
-        delta = db_section.get("delta_sync")
-        return delta if isinstance(delta, dict) else {}
+        return await self.get_db_expvars(dataset_name, "delta_sync")
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
         """
@@ -1485,6 +1490,95 @@ class _SyncGatewayBase:
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
             return RemoteDocument(cast(dict, response))
+
+    async def get_raw_document(
+        self,
+        db_name: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> dict:
+        """
+        Gets a document together with its Sync Gateway metadata, using ``GET /{db}/_raw/{doc}``.
+
+        The result is the document body with an added ``_xattrs`` key holding the raw xattrs,
+        ``_sync`` among them.  ``_raw`` reads the bucket directly rather than going through the
+        document load path, so it reports what is stored rather than what a load would produce.
+
+        :param db_name: The name of the DB endpoint that the document exists in
+        :param doc_id: The ID of the document to read
+        :param scope: The scope that the document exists in (default '_default')
+        :param collection: The collection that the document exists in (default '_default')
+        """
+        with self._tracer.start_as_current_span(
+            "get_raw_document",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/_raw/{doc_id}")
+            if not isinstance(response, dict):
+                raise ValueError("Inappropriate response from sync gateway get /_raw/doc (not JSON)")
+
+            return cast(dict, response)
+
+    async def get_document_revisions(
+        self,
+        db_name: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> list[str]:
+        """
+        Gets the revision tree history of a document's current revision, newest first, using
+        ``GET /{db}/{doc}?revs=true``.
+
+        Returns an empty list when the history is not usable.  A ``_revisions`` list can only
+        describe a branch whose generations strictly increase, which requires ``start`` to be at
+        least as large as the number of ids - the same rule Sync Gateway applies before sending a
+        revision to a pre-4.0 client.  A document whose rev tree repeats a generation fails it, and
+        so cannot be replicated.
+
+        :param db_name: The name of the DB endpoint that the document exists in
+        :param doc_id: The document ID to get the history of
+        :param scope: The scope that the document exists in (default '_default')
+        :param collection: The collection that the document exists in (default '_default')
+        """
+        with self._tracer.start_as_current_span(
+            "get_document_revisions",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            response = await self._send_request(
+                "get", f"/{db_name}.{scope}.{collection}/{doc_id}", params={"revs": "true"}
+            )
+            if not isinstance(response, dict):
+                raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
+
+            revisions = cast(dict, response).get("_revisions")
+            if not isinstance(revisions, dict):
+                return []
+
+            start = revisions.get("start")
+            ids = revisions.get("ids")
+            if not isinstance(start, int) or not isinstance(ids, list):
+                return []
+
+            if start < len(ids):
+                cbl_info(
+                    f"Revision history for '{doc_id}' is not usable: start {start} is below the "
+                    f"{len(ids)} revision ids it would have to number"
+                )
+                return []
+
+            return [f"{start - i}-{digest}" for i, digest in enumerate(ids)]
 
     async def create_document(
         self,
