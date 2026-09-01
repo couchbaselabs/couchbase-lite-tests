@@ -257,16 +257,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             )
         assert non_integer_seq_exc.value.code == 400
 
-    @pytest.mark.skip(
-        reason=(
-            "Needs new framework plumbing: Sync Gateway's admin API enforces Couchbase-Server-RBAC "
-            "roles (e.g. 'Sync Gateway Application' vs 'Sync Gateway Application Read Only') "
-            "independently of channel access, but the TDK always talks to the admin API as a full "
-            "admin and has no helper to provision a restricted-role caller. Expected behavior once "
-            "supported: a caller without the Application role gets 403 on both GET and compact; an "
-            "Application Read Only caller gets 200 on GET and 403 on compact."
-        )
-    )
+    @pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/CBG-5796")
     @pytest.mark.asyncio(loop_scope="session")
     async def test_get_and_compact_require_application_rbac_role(
         self, cblpytest: CBLPyTest, dataset_path: Path
