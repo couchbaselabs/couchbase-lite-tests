@@ -3,12 +3,10 @@ import asyncio
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
 from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.utils import retry_assert
 from shared.backfill_after_offline import backfill_after_offline
 from tenacity import stop_after_attempt, wait_fixed
@@ -17,57 +15,16 @@ _CHANNEL_SYNC_FUNCTION = (
     "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
 )
 
+_BUCKET = "data-bucket"
 
-async def _configure_channel_tracking_db(
-    cbs: CouchbaseServer,
-    sync_gateway_cluster: SyncGatewayCluster,
-    sg_db: str,
-    bucket_name: str,
-    scopes: dict[str, ScopeConfig] | None = None,
-    import_docs: bool | None = None,
-) -> None:
-    """
-    Creates a bucket (and scopes/collections if specified) and configures a Sync Gateway database whose sync function
-    assigns channel membership directly from each document's `channels` field, so tests can drive channel history
-    purely by editing that field.
-
-    A scope's `collections` may be given either as a `dict[str, Any]` (per-collection config,
-    merged with the sync function below) or a bare `list[str]` (just the collection names to
-    create, normalized to that same sync-tracked config) -- a test that only needs specific
-    named collections created can use whichever form is convenient without any extra plumbing
-    outside this helper.
-
-    Sync Gateway rejects a database-level `sync` shorthand once scopes/collections are specified explicitly, so the
-    sync function is injected into every named collection's own config instead.
-    """
-    cbs.create_bucket(bucket_name)
-    resolved_scopes = scopes if scopes is not None else {"_default": ScopeConfig(collections={"_default": {}})}
-
-    for scope_name, scope_config in resolved_scopes.items():
-        collections = scope_config.collections
-        if isinstance(collections, list):
-            cbs.create_collections(bucket_name, scope_name, collections)
-            scope_config.collections = {name: {} for name in collections}
-        else:
-            assert isinstance(collections, dict), (
-                "_configure_channel_tracking_db only supports the {name: {...}} or [name, ...] collections forms"
-            )
-            cbs.create_collections(bucket_name, scope_name, list(collections.keys()))
-    for scope_config in resolved_scopes.values():
-        collection_configs = scope_config.collections
-        assert isinstance(collection_configs, dict)
-        for collection_config in collection_configs.values():
-            collection_config["sync"] = _CHANNEL_SYNC_FUNCTION
-
-    db_payload = DatabaseConfig(
-        bucket=bucket_name,
-        index=IndexConfig(num_replicas=0),
-        scopes=resolved_scopes,
-        import_docs=import_docs,
-        enable_shared_bucket_access=True if import_docs else None,
-    )
-    await sync_gateway_cluster.create_database(sg_db, db_payload)
-    await sync_gateway_cluster.wait_for_db_online(sg_db)
+# A database with only the _default._default collection. import_docs is left unset, which
+# means Sync Gateway's default of true, so the tests that write directly to Couchbase Server
+# and wait for the document to be imported can use this config too.
+_CHANNEL_TRACKING_CONFIG = DatabaseConfig(
+    bucket=_BUCKET,
+    index=IndexConfig(num_replicas=0),
+    scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
+)
 
 
 @pytest.mark.sgw
@@ -77,11 +34,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_get_history_of_doc_that_never_left_a_channel(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         await sg.create_document(sg_db, "doc1", {"channels": ["ABC"]})
@@ -95,11 +51,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_get_history_after_leaving_a_channel(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, "doc1", {"channels": ["ABC"]})
@@ -120,12 +75,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_get_history_shows_every_historical_seq_for_a_reused_channel_name(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -153,12 +107,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_removes_entry_past_its_seq(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -183,12 +136,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_channel_not_in_history_is_noop(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC' (it has never left any channel)")
         await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -206,11 +158,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_nonexistent_docid_returns_404(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Compact the channel history of a document ID that was never created")
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
@@ -222,12 +173,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_malformed_seq_returns_400(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -262,12 +212,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_all_keyspace_forms_behave_identically(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_ids = {"bare": "doc_bare", "db_collection": "doc_db_collection", "full": "doc_full"}
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step(
             "Create three documents, each assigned to channel 'ABC', one per keyspace form to be tested"
@@ -326,12 +275,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_malformed_keyspace_returns_400(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -357,12 +305,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_does_not_change_all_docs_or_changes_feed(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -396,13 +343,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
-        bucket_name = "data-bucket"
+        bucket_name = _BUCKET
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(
-            cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, bucket_name, import_docs=True
-        )
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step(
             "Create a document assigned to channel 'ABC' directly through Couchbase Server, bypassing "
@@ -435,12 +380,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_enormous_seq_never_removes_an_active_channel_membership(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channels 'ABC' and 'OTHER'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC", "OTHER"]})
@@ -476,12 +420,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_stale_entry_leaves_live_regranted_same_channel_untouched(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -518,19 +461,26 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_collection_isolation_for_same_docid_and_channel_name(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "shared_doc"
 
         self.mark_test_step(
             "Configure a Sync Gateway database with two collections, each with a channel-membership sync function"
         )
-        await _configure_channel_tracking_db(
-            cbs,
-            cblpytest.clusters[0].sync_gateway_cluster,
+        await cblpytest.clusters[0].create_database(
             sg_db,
-            "data-bucket",
-            scopes={"_default": ScopeConfig(collections={"col1": {}, "col2": {}})},
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={
+                    "_default": ScopeConfig(
+                        collections={
+                            "col1": {"sync": _CHANNEL_SYNC_FUNCTION},
+                            "col2": {"sync": _CHANNEL_SYNC_FUNCTION},
+                        }
+                    )
+                },
+            ),
         )
 
         self.mark_test_step(
@@ -568,12 +518,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         self, cblpytest: CBLPyTest
     ) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -618,12 +567,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_response_is_a_flat_compacted_channels_list(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create a document assigned to channel 'ABC'")
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
@@ -653,13 +601,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
-        bucket_name = "data-bucket"
+        bucket_name = _BUCKET
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(
-            cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, bucket_name, import_docs=True
-        )
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step(
             "Write a document directly into the Couchbase Server bucket, bypassing Sync Gateway entirely, "
@@ -685,14 +631,13 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_before_reconnect_still_delivers_revoke(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         doc_id = "doc1"
         username = "leo"
         password = "pass"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await _configure_channel_tracking_db(cbs, cblpytest.clusters[0].sync_gateway_cluster, sg_db, "data-bucket")
+        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'leo' with permanent access to channel 'ABC' (never revoked)")
         await sg.reset_user(sg_db, username, password, ["ABC"])
