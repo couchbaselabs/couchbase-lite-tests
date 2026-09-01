@@ -18,7 +18,6 @@ from cbltest.api.syncgateway import (
     SyncGatewayUserClient,
     UnsupportedSettings,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -284,24 +283,14 @@ class TestMultipleServers(CBLTestClass):
 class TestISGRCollectionMapping(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_explicit_collection_mapping(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        sg_cluster = SyncGatewayCluster(cblpytest.sync_gateways)
-        cbs = cblpytest.couchbase_servers[0]
-        sg1, sg2, sg3 = sg_cluster.sync_gateways[:3]
+        cluster = cblpytest.clusters[0]
+        sg1, sg2, sg3 = cluster.sync_gateways[:3]
         bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
         b2_collections = ["collection4", "collection5"]
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
-
-        self.mark_test_step("Create collections in _default scope for each bucket")
-        for bucket, collections in [
-            (bucket1, b1_collections),
-            (bucket2, b2_collections),
-            (bucket3, b3_collections),
-        ]:
-            cbs.create_bucket(bucket)
-            cbs.create_collections(bucket, "_default", collections)
 
         self.mark_test_step("Configure all SGs with their respective buckets and collections")
         for sg_db, bucket, collections in [
@@ -315,7 +304,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 scopes={"_default": ScopeConfig(collections={"_default": {}, **{c: {} for c in collections}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
             )
-            await sg_cluster.create_database(sg_db, db_payload)
+            await cluster.create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
