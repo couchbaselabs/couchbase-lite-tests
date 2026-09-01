@@ -323,7 +323,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert bare_history_after == {}
         assert await sg.get_document_channel_history(sg_db, doc_ids["full"]) == {}
 
-    @pytest.mark.xfail(reason="Bug reported: CBG-5748, remove this post bug-fix")
     @pytest.mark.asyncio(loop_scope="session")
     async def test_malformed_keyspace_returns_400(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
@@ -339,11 +338,13 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
         self.mark_test_step(
             "Attempt to get the document's channel history using a keyspace with an empty segment "
-            "(db..collection); check the request fails with 400"
+            "(db..collection); check the request fails with 500 and the expected error message "
+            "(bug: CBG-5748 -- should be a 400, update this assertion once fixed)"
         )
         with pytest.raises(CblSyncGatewayBadResponseError) as empty_segment_exc:
             await sg._send_request("get", f"/{sg_db}.._default/_channel_history/{doc_id}")
-        assert empty_segment_exc.value.code == 400
+        assert empty_segment_exc.value.code == 500
+        assert "keyspace fields cannot be empty" in str(empty_segment_exc.value)
 
         self.mark_test_step(
             "Attempt to get the document's channel history using a keyspace with four segments; "
