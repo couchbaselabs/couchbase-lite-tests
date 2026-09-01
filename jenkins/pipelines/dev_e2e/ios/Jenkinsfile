@@ -6,6 +6,7 @@ pipeline {
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
     stages {
         stage('Init') {
@@ -44,7 +45,7 @@ pipeline {
                 echo "Run iOS Test"
                 lock("mob-e2e-iphone-01") {
                     timeout(time: 60, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' ${params.TS_DATASET_VERSION}"
+                        sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                     }
                 }
             }

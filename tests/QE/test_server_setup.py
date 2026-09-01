@@ -22,8 +22,7 @@ class TestServerSetup(CBLTestClass):
         bucket_name = "alternate-addr-bucket"
         num_docs = 5
 
-        cbs.create_bucket(bucket_name)
-        await sg.put_database(
+        await cblpytest.clusters[0].create_database(
             sg_db,
             DatabaseConfig(
                 bucket=bucket_name,
@@ -86,7 +85,7 @@ class TestServerSetup(CBLTestClass):
         assert sg_version is not None, "SGW should start with ca_cert_path x509 config"
 
         self.mark_test_step("Verify SGW can connect to CBS via document sync")
-        await sg.put_database(
+        await cblpytest.sync_gateway_cluster.create_database(
             sg_db,
             DatabaseConfig(
                 bucket=bucket_name,

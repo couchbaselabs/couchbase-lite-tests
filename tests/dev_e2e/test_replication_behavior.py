@@ -13,7 +13,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.utils import assert_not_null, retry_assert
+from cbltest.utils import assert_not_null, async_retry_assert
 
 
 @pytest.mark.min_test_servers(1)
@@ -75,6 +75,8 @@ class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.min_couchbase_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_resurrected_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.2.0")
+
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -157,7 +159,7 @@ class TestReplicationBehavior(CBLTestClass):
                 f"{loc_deleted} on Sync Gateway does not reflect the resurrected content yet"
             )
 
-        await retry_assert(_confirm_resurrected_on_sg, tenacity.wait_fixed(1), tenacity.stop_after_attempt(15))
+        await async_retry_assert(_confirm_resurrected_on_sg, tenacity.wait_fixed(1), tenacity.stop_after_attempt(15))
 
         self.mark_test_step("""
             Start a replicator:

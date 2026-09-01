@@ -2,7 +2,7 @@
 
 import inspect
 from collections.abc import AsyncGenerator, Callable, Sequence
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
@@ -26,8 +26,8 @@ from cbltest.responses import GetRootResponse
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
 
-FIXED_NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=timezone.utc)
-FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
+FIXED_NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=UTC)
+FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
 
 # Importing `greenboard` directly into module scope would expose it as an autouse
 # fixture to pytest. Access via the module and unwrap to get the raw async generator.

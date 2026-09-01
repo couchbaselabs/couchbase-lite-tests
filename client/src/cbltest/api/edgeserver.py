@@ -10,7 +10,7 @@ from urllib.parse import urljoin
 
 import aiofiles
 import pyjson5 as json5
-from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout, TCPConnector
+from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import (
@@ -126,7 +126,7 @@ class EdgeServer:
             self.scheme,
             url,
             port,
-            BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
+            encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
         )
         self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
 
@@ -157,7 +157,10 @@ class EdgeServer:
             enable_anonymous_users,
         )
 
-    def _create_session(self, scheme: str, url: str, port: int, auth: BasicAuth | None) -> ClientSession:
+    def _create_session(self, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+        """Create a session, where `auth_header` is an `Authorization` header value
+        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
+        headers = {"Authorization": auth_header} if auth_header is not None else None
         if self.__secure:
             CERT_DIR = Path.home() / ".cbl_certs"
             ssl_context = ssl.create_default_context(cafile=CERT_DIR / "ca_cert.pem")
@@ -170,10 +173,10 @@ class EdgeServer:
 
             return ClientSession(
                 f"{scheme}{url}:{port}",
-                auth=auth,
+                headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
-        return ClientSession(f"{scheme}{url}:{port}", auth=auth)
+        return ClientSession(f"{scheme}{url}:{port}", headers=headers)
 
     async def _send_request(
         self,
@@ -841,7 +844,7 @@ class EdgeServer:
                 self.scheme,
                 self.__hostname,
                 self.__port,
-                BasicAuth(self.__auth_name, self.__auth_password, "ascii"),
+                encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
             )
 
     async def kill_server(self) -> None:

@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -76,7 +76,7 @@ def create_cert(
     issuer = ca.certificate.subject if ca is not None else subject
     signing_key = ca.private_key if ca is not None else key
 
-    not_valid_before = datetime.now(timezone.utc)
+    not_valid_before = datetime.now(UTC)
     builder = (
         CertificateBuilder()
         .subject_name(subject)

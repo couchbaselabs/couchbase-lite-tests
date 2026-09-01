@@ -12,12 +12,11 @@ Test that a database is gone when its bucket is deleted.
 
 This test verifies that when the Couchbase Server bucket backing a Sync Gateway database is deleted, the database becomes unavailable (“gone” from a client perspective) and REST API endpoints reject requests (typically 403; sometimes 503).
 
-1. Create bucket and default collection
-2. Configure Sync Gateway database endpoint
-3. Create 10 docs via Sync Gateway
-4. Verify database is available - REST endpoints work
-5. Delete bucket to sever connection
-6. Verify database is gone - REST endpoints reject requests (403/503)
+1. Create backing bucket and database endpoint
+2. Create 10 docs via Sync Gateway
+3. Verify database is available - REST endpoints work
+4. Delete bucket to sever connection
+5. Verify database is gone - REST endpoints reject requests (403/503)
 
 ## test_multiple_dbs_bucket_deletion
 

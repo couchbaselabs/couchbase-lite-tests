@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -17,6 +17,7 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     ScopeConfig,
 )
+from shared.upgrade_test_helpers import cleanup_unless_mid_upgrade, is_initial_upgrade_phase
 
 SGW_BUCKET = "rolling_upg_bucket"
 SGW_CONFIG = DatabaseConfig(
@@ -60,6 +61,11 @@ class TestSgwRollingUpgrade(CBLTestClass):
       6. Verify persistence on CBS and CBL
     """
 
+    @pytest_asyncio.fixture(scope="function", autouse=True)
+    async def cluster_cleanup(self, cblpytest: CBLPyTest) -> None:
+        """Only the `initial` phase starts clean."""
+        await cleanup_unless_mid_upgrade(cblpytest)
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_rolling_upgrade_sgw_cluster(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg_nodes = cblpytest.sync_gateways[:3]
@@ -76,21 +82,17 @@ class TestSgwRollingUpgrade(CBLTestClass):
         self.mark_test_step(f"Phase: {upgrade_phase} | SGW version: {current_version}")
         doc_id_prefix = f"rolling_{upgrade_phase}_{current_version}"
 
-        self.mark_test_step("Ensure bucket exists on CBS")
-        if bucket not in cbs.get_bucket_names():
-            cbs.create_bucket(bucket)
-
         self.mark_test_step("Reset CBL database")
         db = (await cblpytest.test_servers[0].create_and_reset_db([cbl_db]))[0]
 
         self.mark_test_step("Configure SGW database on all nodes")
         db_payload = SGW_CONFIG
-        for sg in sg_nodes:
-            try:
-                await sg.put_database(sg_db, db_payload)
-            except CblSyncGatewayBadResponseError as e:
-                if e.code != 412:
-                    raise e
+        if is_initial_upgrade_phase():
+            # Also creates the backing bucket and collections.
+            await cblpytest.clusters[0].create_database(sg_db, db_payload)
+        else:
+            # Later phases inherit the bucket and database, so just wait for the nodes.
+            await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Ensure user exists on all SGW nodes")
         for sg in sg_nodes:

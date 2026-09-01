@@ -14,19 +14,23 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
-from jenkins.pipelines.shared.setup_test import setup_test
+from jenkins.pipelines.shared.setup_test import VersionType, setup_test
 
 
 @click.command()
-@click.argument("cbl_version")
-@click.argument("sgw_version")
+@click.argument("cbl_versions", type=VersionType())
+@click.argument("sgw_versions", type=VersionType())
 def cli_entry(
-    cbl_version: str,
-    sgw_version: str,
+    cbl_versions: list[str],
+    sgw_versions: list[str],
 ) -> None:
+    """CBL_VERSIONS and SGW_VERSIONS are comma-separated version lists, e.g. "4.0.0,4.1.0".
+
+    A single value is also accepted, e.g. "4.0.0".
+    """
     setup_test(
-        cbl_version,
-        sgw_version,
+        cbl_versions,
+        sgw_versions,
         SCRIPT_DIR / "topology_single_host.json",
         SCRIPT_DIR / "config.json",
         "js",

@@ -7,6 +7,7 @@ import pytest
 import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import (
     DatabaseConfig,
@@ -14,7 +15,6 @@ from cbltest.api.syncgateway import (
     IndexConfig,
     ISGRPayload,
     ScopeConfig,
-    SyncGateway,
     SyncGatewayUserClient,
     UnsupportedSettings,
 )
@@ -69,8 +69,7 @@ def _set_alternate_addresses(cbs_servers: Sequence) -> None:
 
 @asynccontextmanager
 async def _setup_database_and_user(
-    sg: SyncGateway,
-    cbs: CouchbaseServer,
+    cluster: CouchbaseCluster,
     sg_db: str,
     bucket_name: str,
     user_name: str,
@@ -78,16 +77,17 @@ async def _setup_database_and_user(
     channels: list,
 ) -> AsyncIterator[SyncGatewayUserClient]:
     """Setup bucket, database, and user."""
-    cbs.create_bucket(bucket_name, num_replicas=1)
-    await sg.put_database(
+    await cluster.create_database(
         sg_db,
         DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=1),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         ),
+        bucket_replicas=1,
     )
 
+    sg = cluster.sync_gateways[0]
     await sg.delete_user(sg_db, user_name)
     await sg.add_user(
         sg_db,
@@ -115,9 +115,9 @@ class TestMultipleServers(CBLTestClass):
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
 
-        self.mark_test_step("Clean up and setup test environment")
+        self.mark_test_step("Setup test environment")
         async with _setup_database_and_user(
-            sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
+            cblpytest.clusters[0], sg_db, bucket_name, sg_user_name, sg_user_password, channels
         ) as sg_user:
             self.mark_test_step(f"Add {num_docs} docs to Sync Gateway")
             docs_to_add = [
@@ -239,7 +239,7 @@ class TestMultipleServers(CBLTestClass):
         sg_user_name, sg_user_password = "vipul", "pass"
         channels = ["ABC", "CBS"]
         async with _setup_database_and_user(
-            sg, cbs_one, sg_db, bucket_name, sg_user_name, sg_user_password, channels
+            cblpytest.clusters[0], sg_db, bucket_name, sg_user_name, sg_user_password, channels
         ) as sg_user:
             self.mark_test_step(f"Add {num_docs} docs to Sync Gateway before failover")
             docs_to_add = [
@@ -315,7 +315,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
 
-        self.mark_test_step("Clean up and setup test environment")
+        self.mark_test_step("Set alternate addresses on all CBS nodes")
         _set_alternate_addresses(cblpytest.couchbase_servers)
 
         self.mark_test_step("Create collections in _default scope for each bucket")
@@ -328,10 +328,10 @@ class TestISGRCollectionMapping(CBLTestClass):
             cbs.create_collections(bucket, "_default", collections)
 
         self.mark_test_step("Configure all SGs with their respective buckets and collections")
-        for sg, sg_db, bucket, collections in [
-            (sg1, sg_db1, bucket1, b1_collections),
-            (sg2, sg_db2, bucket2, b2_collections),
-            (sg3, sg_db3, bucket3, b3_collections),
+        for sg_db, bucket, collections in [
+            (sg_db1, bucket1, b1_collections),
+            (sg_db2, bucket2, b2_collections),
+            (sg_db3, bucket3, b3_collections),
         ]:
             db_payload = DatabaseConfig(
                 bucket=bucket,
@@ -339,8 +339,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 scopes={"_default": ScopeConfig(collections={"_default": {}, **{c: {} for c in collections}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
             )
-            await sg.put_database(sg_db, db_payload)
-            await sg_cluster.wait_for_db_online(sg_db)
+            await sg_cluster.create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
@@ -362,7 +361,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         """)
         isgr_1_payload = ISGRPayload(
             replication_id="isgr_sg1_to_sg2",
-            remote_url=f"https://{sg2.hostname}:4985",
+            remote_url=sg2.http_url,
             remote_db=sg_db2,
             direction="push",
             remote_username="admin",
@@ -386,7 +385,7 @@ class TestISGRCollectionMapping(CBLTestClass):
         """)
         isgr_2_payload = ISGRPayload(
             replication_id="isgr_sg3_from_sg1",
-            remote_url=f"https://{sg1.hostname}:4985",
+            remote_url=sg1.http_url,
             remote_db=sg_db1,
             direction="pull",
             remote_username="admin",

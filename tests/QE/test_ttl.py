@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -28,21 +28,18 @@ class TestTTL(CBLTestClass):
         username = "vipul"
         password = "pass"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:
             self.mark_test_step("Create documents with different expiry times")
-            current_time = datetime.now(timezone.utc)
+            current_time = datetime.now(UTC)
             expire_5s = int((current_time + timedelta(seconds=5)).timestamp())
             expire_years = int((current_time + timedelta(days=365)).timestamp())
             await sg.update_documents(
@@ -112,16 +109,13 @@ class TestTTL(CBLTestClass):
         username = "vipul"
         password = "pass"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels}")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:

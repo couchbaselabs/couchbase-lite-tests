@@ -1,7 +1,7 @@
 import json
 import os
 from collections.abc import Generator
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -161,7 +161,7 @@ class GreenboardUploader:
         self.__has_sgw_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any, None]:
+    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any]:
         outcome = yield
         report: TestReport = outcome.get_result()
         if report.when != "call":
@@ -496,8 +496,8 @@ class GreenboardUploader:
 
     def _upsert(self, doc: dict) -> None:
         """Add timestamp fields and write one document to the greenboard bucket."""
-        now = datetime.now(timezone.utc)
-        unix_timestamp = (now - datetime(1970, 1, 1, tzinfo=timezone.utc)).total_seconds()
+        now = datetime.now(UTC)
+        unix_timestamp = (now - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
 
         # Do not add to RunResult since this code will go away shortly
         doc["uploaded"] = unix_timestamp

@@ -25,8 +25,8 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 
 ### Python (client/, tests/, environment/, jenkins/)
 
-- **Python 3.10+ required** — use `X | Y` syntax, not `Union[X, Y]` or `Optional[X]`
-- `ruff` for linting + formatting; `ty` for type checking; `pyupgrade --py310-plus`
+- **Python 3.13+ required** — modern syntax is auto-enforced by ruff `UP` rules and pyupgrade
+- `ruff` for linting + formatting; `ty` for type checking; `pyupgrade --py313-plus`
 - All test code is **async** (`pytest-asyncio`, `aiohttp`)
 - Package manager: `uv` (workspace: root `pyproject.toml` + `client/pyproject.toml`)
 
@@ -36,7 +36,7 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 - Use `cblpytest` fixture (auto-injected) and `dataset_path` fixture
 - Mark tests: `@pytest.mark.sgw`, `@pytest.mark.cbl`, `@pytest.mark.upg_sgw`
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`
-- QE tests get auto-cleanup via `cleanup_after_test` fixture in conftest.py
+- All tests get auto-cleanup via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`)
 
 ### API Versioning (client/src/cbltest/)
 
@@ -73,7 +73,6 @@ For domain-specific AI agent guidance, check the `AGENTS.md` files in each subdi
 
 ## What NOT To Do
 
-- Don't use `Union[X, Y]` or `Optional[X]` — use `X | Y` and `X | None`
 - Don't hardcode server URLs in tests — use config fixtures
 - Don't hand-edit `config.json` or `topology.json` in test dirs — they are generated
 - Don't commit `terraform.tfstate`, `testserver.log`, `session.log`, `http_log/`, `.venv/`
