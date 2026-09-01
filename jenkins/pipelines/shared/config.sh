@@ -134,7 +134,17 @@ section_start() {
   echo -e "${_section_color}=== ${_section_label} START ===${COLOR_RESET}"
 }
 
-trap _section_close EXIT
+# Append to any existing EXIT trap instead of overwriting it (some pipeline scripts
+# install their own EXIT traps before sourcing this file).
+_existing_exit_trap=$(trap -p EXIT | awk -F"'" '{print $2}')
+if [ -n "$_existing_exit_trap" ]; then
+  if [[ "$_existing_exit_trap" != *"_section_close"* ]]; then
+    trap "${_existing_exit_trap}; _section_close" EXIT
+  fi
+else
+  trap _section_close EXIT
+fi
+unset _existing_exit_trap
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "Installing uv..."
