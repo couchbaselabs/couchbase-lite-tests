@@ -659,7 +659,7 @@ class CouchbaseServer:
             },
         ):
             try:
-                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
                 col.mutate_in(
                     doc_id,
                     [upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
@@ -699,7 +699,7 @@ class CouchbaseServer:
             try:
                 from couchbase.subdocument import remove
 
-                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
                 col.mutate_in(
                     doc_id,
                     [remove(xattr_key, xattr=True)],
