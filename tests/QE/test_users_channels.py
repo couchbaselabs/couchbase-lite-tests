@@ -10,7 +10,6 @@ from cbltest.api.syncgateway import (
     IndexConfig,
     ScopeConfig,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 @pytest.mark.sgw
@@ -20,8 +19,6 @@ class TestUsersChannels(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_single_user_multiple_channels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sgs = cblpytest.sync_gateways
-        sg_cluster = SyncGatewayCluster(sgs)
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["ABC", "CBS", "NBC", "FOX"]
@@ -32,17 +29,13 @@ class TestUsersChannels(CBLTestClass):
         total_docs = num_batches * batch_size
         num_sgs = len(sgs)
 
-        self.mark_test_step("Create single shared bucket for all SGW nodes")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step(f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sgs[0].put_database(sg_db, db_payload)
-        await sg_cluster.wait_for_db_online(sg_db)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels} (stored in shared bucket)")
         async with sgs[0].create_user_client(sg_db, username, password, channels) as sg_user:

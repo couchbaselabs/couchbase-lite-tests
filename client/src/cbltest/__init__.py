@@ -7,6 +7,7 @@ from .api.cluster import CouchbaseCluster
 from .api.couchbaseserver import CouchbaseServer
 from .api.edgeserver import EdgeServer
 from .api.syncgateway import SyncGateway
+from .api.syncgatewaycluster import SyncGatewayCluster
 from .api.testserver import TestServer
 from .configparser import (
     CouchbaseServerInfo,
@@ -103,6 +104,11 @@ class CBLPyTest:
         return self.clusters[0].sync_gateways if self.clusters else []
 
     @property
+    def sync_gateway_cluster(self) -> SyncGatewayCluster:
+        """Gets the Sync Gateway cluster view of the first cluster"""
+        return self.clusters[0].sync_gateway_cluster
+
+    @property
     def couchbase_servers(self) -> Sequence[CouchbaseServer]:
         """Gets the list of Couchbase Servers available in the first cluster"""
         return self.clusters[0].couchbase_servers if self.clusters else []
@@ -175,6 +181,7 @@ class CBLPyTest:
                         sgw_info.rbac_password,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
+                        sgw_info.port,
                     ),
                     sgw_info.cluster_index,
                 )

@@ -30,7 +30,7 @@ The system consists of 4 components:
 
 ### Requirements
 
-1. [Python 3.10+](https://www.python.org/downloads) (via uv is ok)
+1. [Python 3.13+](https://www.python.org/downloads) (via uv is ok)
 2. [uv](https://docs.astral.sh/uv/getting-started/installation/)
 3. [Git LFS](https://git-lfs.com) (install _before_ cloning to avoid confusion)
 
@@ -86,10 +86,10 @@ This repo uses [pre-commit](https://pre-commit.com/#intro) hooks to enforce code
 
 | Hook | What it checks |
 |---|---|
-| **ruff** | Lint + import sorting (Python 3.10+ style) |
+| **ruff** | Lint + import sorting (Python 3.13+ style) |
 | **ruff-format** | Code formatting |
 | **ty check** | Type checking |
-| **pyupgrade** | Python 3.10+ syntax upgrades |
+| **pyupgrade** | Python 3.13+ syntax upgrades |
 | **check-merge-conflict** | Detects unresolved merge markers |
 | **detect-secrets** | Installed by `setup-hooks.sh` and maintains `.secrets.baseline`. Not wired into pre-commit yet — run `detect-secrets scan --baseline .secrets.baseline` manually before pushing changes that touch credentials. |
 

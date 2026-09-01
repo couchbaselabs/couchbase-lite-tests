@@ -1,6 +1,6 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,7 @@ def _doc_body(doc_id: str) -> dict[str, Any]:
     return {
         "id": doc_id,
         "channels": ["public"],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -61,7 +61,7 @@ class TestSystem(CBLTestClass):
             },
             num_index_replicas=0,
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         self.mark_test_step("Adding role and user to Sync Gateway.")
         input_data = {"_default._default": ["public"]}
@@ -89,7 +89,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -98,7 +98,7 @@ class TestSystem(CBLTestClass):
         ) = await self._setup_system_test(cblpytest)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
+        while datetime.now(UTC) < end_time:
             doc_id = f"doc_{doc_counter}"
 
             # Randomize whether the operation happens in the Sync Gateway cycle or Edge Server cycle
@@ -199,7 +199,7 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -207,11 +207,11 @@ class TestSystem(CBLTestClass):
             es_db_name,
         ) = await self._setup_system_test(cblpytest)
         edge_server_down = False
-        end = datetime.now(timezone.utc) + timedelta(minutes=2400)
+        end = datetime.now(UTC) + timedelta(minutes=2400)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
-            if datetime.now(timezone.utc) > end:
+        while datetime.now(UTC) < end_time:
+            if datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
                 await edge_server.start_server()
                 # Allow edge server to stabilize after restart.
@@ -236,7 +236,7 @@ class TestSystem(CBLTestClass):
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
                 await edge_server.kill_server()
-                end = datetime.now(timezone.utc) + timedelta(minutes=1)
+                end = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
                 edge_server_down = True
@@ -337,7 +337,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_concurrent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -348,7 +348,7 @@ class TestSystem(CBLTestClass):
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"c{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])
@@ -454,7 +454,7 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
@@ -466,10 +466,10 @@ class TestSystem(CBLTestClass):
         recent_docs: list[str] = []
 
         async def chaos_controller() -> None:
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 # Random quiet period of 5–20 minutes between chaos events.
                 await asyncio.sleep(random.uniform(300, 1200))
-                if datetime.now(timezone.utc) >= end_time:
+                if datetime.now(UTC) >= end_time:
                     break
 
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
@@ -507,7 +507,7 @@ class TestSystem(CBLTestClass):
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"cc{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])

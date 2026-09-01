@@ -1,10 +1,11 @@
+import inspect
 import json
 import os
 import subprocess
 import sys
 import time
 from collections.abc import Awaitable, Callable
-from typing import Any, NoReturn, TypeVar, cast
+from typing import Any, NoReturn, cast
 
 import tenacity
 import tenacity._utils
@@ -12,15 +13,30 @@ import tenacity.asyncio
 
 from .api.error import CblTimeoutError
 
-T = TypeVar("T")
-
 # Hide tenacity's retry-loop frames so failures show the actual assertion, not
-# AsyncRetrying plumbing.
+# Retrying/AsyncRetrying plumbing.
+tenacity.__dict__["__tracebackhide__"] = True
 tenacity.asyncio.__dict__["__tracebackhide__"] = True
 tenacity._utils.__dict__["__tracebackhide__"] = True
 
 
-async def retry_assert(
+def _on_retry_assert_exhausted(retry_state: tenacity.RetryCallState) -> NoReturn:
+    __tracebackhide__ = True
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    elapsed = retry_state.seconds_since_start
+    raise TimeoutError(f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)") from exc
+
+
+def _retry_assert_policy(wait: tenacity.wait.wait_base, stop: tenacity.stop.stop_base) -> dict[str, Any]:
+    return {
+        "wait": wait,
+        "stop": stop,
+        "retry": tenacity.retry_if_exception_type(AssertionError),
+        "retry_error_callback": _on_retry_assert_exhausted,
+    }
+
+
+async def async_retry_assert[T](
     function: Callable[[], Awaitable[T]],
     wait: tenacity.wait.wait_base,
     stop: tenacity.stop.stop_base,
@@ -29,22 +45,41 @@ async def retry_assert(
     as TimeoutError with elapsed time."""
     __tracebackhide__ = True
 
-    def _on_exhausted(retry_state: tenacity.RetryCallState) -> NoReturn:
-        __tracebackhide__ = True
-        exc = retry_state.outcome.exception() if retry_state.outcome else None
-        elapsed = retry_state.seconds_since_start
-        raise TimeoutError(f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)") from exc
-
-    retrying = tenacity.AsyncRetrying(
-        wait=wait,
-        stop=stop,
-        retry=tenacity.retry_if_exception_type(AssertionError),
-        retry_error_callback=_on_exhausted,
-    )
+    retrying = tenacity.AsyncRetrying(**_retry_assert_policy(wait, stop))
     return await retrying(function)
 
 
-def _try_n_times(
+def retry_assert[T](
+    function: Callable[[], T],
+    wait: tenacity.wait.wait_base,
+    stop: tenacity.stop.stop_base,
+) -> T:
+    """Retries function while it raises AssertionError; on exhaustion, re-raises
+    as TimeoutError with elapsed time.
+
+    :raises TypeError: if function is async.  An async callable returns its
+        coroutine without running any assertions, which would look like success on
+        the first attempt and silently skip the retry loop.  Use
+        :func:`async_retry_assert` instead.
+    """
+    __tracebackhide__ = True
+
+    def checked_function() -> T:
+        __tracebackhide__ = True
+        result = function()
+        if inspect.isawaitable(result):
+            close = getattr(result, "close", None)
+            if close is not None:
+                close()
+            name = getattr(function, "__name__", repr(function))
+            raise TypeError(f"{name} is async, use async_retry_assert instead of retry_assert")
+        return result
+
+    retrying = tenacity.Retrying(**_retry_assert_policy(wait, stop))
+    return retrying(checked_function)
+
+
+def _try_n_times[T](
     num_times: int,
     seconds_between: float,
     wait_before_first_try: bool,
@@ -69,7 +104,7 @@ def _try_n_times(
     raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
 
 
-def assert_not_null(input: T | None, msg: str) -> T:
+def assert_not_null[T](input: T | None, msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
 

@@ -7,6 +7,7 @@ pipeline {
         string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
     stages {
         stage('Init') {
@@ -63,7 +64,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}
+                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -93,7 +94,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 pwsh """
-                                    jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}
+                                    jenkins\\pipelines\\dev_e2e\\java\\desktop\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -121,7 +122,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}
+                                    jenkins/pipelines/dev_e2e/java/desktop/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -151,7 +152,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}
+                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -181,7 +182,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 pwsh """
-                                    jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION}
+                                    jenkins\\pipelines\\dev_e2e\\java\\webservice\\run_test.ps1 -Version ${params.CBL_VERSION}-${params.CBL_BUILD} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }
@@ -211,7 +212,7 @@ pipeline {
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh """
-                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} ${params.TS_DATASET_VERSION}
+                                    jenkins/pipelines/dev_e2e/java/webservice/run_test.sh ${params.CBL_VERSION}-${params.CBL_BUILD} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                                 """
                             }
                         }

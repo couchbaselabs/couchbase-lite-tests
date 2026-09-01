@@ -19,9 +19,7 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 @pytest.mark.min_load_balancers(1)
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_high_availability_with_load_balancer(
-        self, cblpytest: CBLPyTest, cleanup_after_test: None
-    ) -> None:
+    async def test_sgw_high_availability_with_load_balancer(self, cblpytest: CBLPyTest) -> None:
         sgs = cblpytest.sync_gateways
         sg_cluster = SyncGatewayCluster(sgs)
         cbs = cblpytest.couchbase_servers[0]
@@ -32,11 +30,8 @@ class TestHighAvailability(CBLTestClass):
         channels = ["*"]
         username = "vipul"
         password = "pass"
-        sg1, sg2, _ = sgs[0], sgs[1], sgs[2]
+        sg2 = sgs[1]
         await sg2.start()
-
-        self.mark_test_step("Create shared bucket for all SGW nodes")
-        cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
@@ -44,12 +39,12 @@ class TestHighAvailability(CBLTestClass):
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg1.put_database(sg_db, db_payload)
-        await sg_cluster.wait_for_db_online(sg_db)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
         await sgs[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
+        # Hardcoded because `load_balancers` config carries no port of its own.
         lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")

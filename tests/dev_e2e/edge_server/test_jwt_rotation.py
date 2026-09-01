@@ -1,7 +1,6 @@
 import asyncio
 from pathlib import Path
 
-import aiohttp
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -53,23 +52,6 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Configure SGW travel database with local_jwt provider")
         cloud = cblpytest.clusters[0]
         sgw = cloud.sync_gateways[0]
-        cbs = cloud.couchbase_servers[0]
-
-        # Clean up any existing travel database from previous runs
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass  # Database may not exist
-
-        # Flush CBS bucket to clear stale documents
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                f"http://{cbs.hostname}:8091/pools/default/buckets/travel/controller/doFlush",
-                headers={"Authorization": aiohttp.encode_basic_auth("Administrator", "password")},
-            ) as resp,
-        ):
-            await resp.read()
 
         # Build the SGW database config with local_jwt for JWT validation
         payload = DatabaseConfig(
@@ -106,11 +88,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        if not sgw.using_rosmar:
-            cbs.create_bucket("travel")
-            cloud._create_collections(payload)
-
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         # Create user1 with channel access to all travel collections
         collection_access_input = {
@@ -197,21 +175,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        # Clean up
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-
-        try:
-            cbs.drop_bucket("travel")
-            await cbs.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass
-
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
-
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -226,7 +189,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         # Create JWT user with channel access
         collection_access_input = {"travel.airlines": ["*"]}
@@ -338,14 +301,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        # Cleanup
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -360,7 +315,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
@@ -469,13 +424,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -490,7 +438,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
@@ -609,18 +557,6 @@ class TestJWTReplication(CBLTestClass):
         sgw = cloud.sync_gateways[0]
         cbs = cloud.couchbase_servers[0]
 
-        try:
-            await sgw.delete_database("travel")
-        except Exception:
-            pass
-        try:
-            cbs.drop_bucket("travel")
-            await cbs.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass
-
-        cbs.create_bucket("travel")
-        cbs.create_collections("travel", "travel", ["airlines"])
         payload = DatabaseConfig(
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
@@ -635,7 +571,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
         )
-        await sgw.put_database("travel", payload)
+        await cloud.create_database("travel", payload)
 
         collection_access_input = {"travel.airlines": ["*"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)

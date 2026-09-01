@@ -12,26 +12,27 @@ This test runs after each SGW upgrade iteration. It validates two critical aspec
 ### Steps
 
 1. Get current SGW version from `SGW_VERSION_UNDER_TEST` environment variable
-2. Create bucket on CBS (reuse across iterations)
-3. Reset CBL database (persistent across upgrade iterations)
-4. Configure SGW database with:
+2. Reset CBL database (persistent across upgrade iterations)
+3. Configure SGW database (the `initial` upgrade phase creates the backing bucket,
+   scopes/collections, and database; later phases inherit them and only wait for the
+   database to come online) with:
    - `revs_limit: 1000`
    - `enable_shared_bucket_access: true`
    - `delta_sync: enabled`
    - Simple sync function: `channel("upgrade")`
-5. Create user `user1` with full access to `_default._default` collection
-6. Create 10 new documents via SGW with metadata:
+4. Create user `user1` with full access to `_default._default` collection
+5. Create 10 new documents via SGW with metadata:
    - `type: upgrade_test_doc`
    - `version: <current_sgw_version>`
    - `index: 0-9`
-7. Start PULL replicator from SGW to CBL:
+6. Start PULL replicator from SGW to CBL:
    - `endpoint: /upg_db`
    - `collections: _default._default`
    - `type: pull`
    - `continuous: false`
    - `credentials: user1/pass`
-8. Wait until replicator stops with `STOPPED` activity level and no errors
-9. For each document on SGW:
+7. Wait until replicator stops with `STOPPED` activity level and no errors
+8. For each document on SGW:
    - Verify document exists on CBS with correct metadata
    - Verify document exists on CBL with correct metadata
    - Verify `type`, `version`, and `index` fields match

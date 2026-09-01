@@ -36,22 +36,6 @@ class TestJWTSimple(CBLTestClass):
         sync_gateway = cblpytest.sync_gateways[0]
 
         # =====================================================================
-        # STEP 0: Cleanup stale resources from previous test runs.
-        # This ensures a fresh state even if a prior run crashed mid-test.
-        # The @pytest.mark.sgw marker triggers auto-cleanup AFTER the test too.
-        # =====================================================================
-        try:
-            await sync_gateway.delete_database("travel")
-        except Exception:
-            pass  # Database may not exist
-
-        try:
-            server.drop_bucket("travel")
-            await server.wait_for_bucket_deleted("travel")
-        except Exception:
-            pass  # Bucket may not exist
-
-        # =====================================================================
         # STEP 1: Generate RSA key pair and JWT token.
         # - Private key signs the JWT token
         # - Public key (as JWK) goes into SGW's local_jwt config for validation
@@ -95,7 +79,7 @@ class TestJWTSimple(CBLTestClass):
                 )
             },
         )
-        await sync_gateway.put_database(sg_db_name, payload)
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
 
         # =====================================================================
         # STEP 4: Pre-create JWT user with channel access.
@@ -145,11 +129,10 @@ class TestJWTSimple(CBLTestClass):
         # If this fails, the JWT/key configuration is wrong.
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
-        sgw_public_url = f"https://{sync_gateway.hostname}:4984/{sg_db_name}/"
         async with (
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
             session.get(
-                sgw_public_url,
+                f"{sync_gateway.public_url}/{sg_db_name}/",
                 headers={"Authorization": f"Bearer {jwt_token}"},
             ) as resp,
         ):
@@ -179,7 +162,7 @@ class TestJWTSimple(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
         config = await read_json_file(config_path)
 
-        # Set the real SGW replication URL (wss://hostname:4984/travel)
+        # Set the real SGW replication URL (e.g. wss://hostname:<public_port>/travel)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
 
         # Set auth to inline JWT token string (oneOf: string form).
