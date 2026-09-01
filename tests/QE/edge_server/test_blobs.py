@@ -87,7 +87,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is replicated to Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -123,7 +122,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is removed on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert sg_doc is not None
 
         assert "_attachments" not in sg_doc.body, "'_attachments' field is present in the document response"
 
@@ -227,7 +225,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -531,7 +528,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"

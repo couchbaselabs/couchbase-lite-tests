@@ -248,8 +248,7 @@ class TestXattrs(CBLTestClass):
 
             self.mark_test_step("Verify non-deleted docs still accessible")
             for doc_id in remaining_docs:
-                sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                assert sg_doc is not None, f"Non-deleted doc {doc_id} should still be accessible"
+                await sg.get_document(sg_db, doc_id, "_default", "_default")
 
             if supports_version_vectors:
                 self.mark_test_step("Verify new version vectors for deleted docs (optional)")
@@ -561,7 +560,6 @@ class TestXattrs(CBLTestClass):
 
                 # Verify from SG side
                 sg_doc = await sg.get_document(sg_db, doc_id)
-                assert sg_doc is not None, f"Doc {doc_id} should exist in SG"
                 assert (
                     sg_doc.body["updates"] == num_updates * 2
                     and sg_doc.body["sdk_updates"] == num_updates

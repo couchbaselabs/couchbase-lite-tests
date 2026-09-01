@@ -133,7 +133,6 @@ class TestNoConflicts(CBLTestClass):
         assert cbl_doc is not None, "Document not found"
         assert cbl_doc.id == "post_1000", f"Incorrect document ID (expected post_1000; got {cbl_doc.id})"
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert sg_doc is not None, "Document not found"
         assert sg_doc.id == "post_1000", f"Incorrect document ID (expected post_1000; got {sg_doc.id})"
         assert sg_doc.body.get("title") == cbl_doc.body.get("title"), (
             f"Mismatch in document title, SG: {sg_doc.body.get('title')}, CBL: {cbl_doc.body.get('title')}"
@@ -157,7 +156,6 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Verify docs got replicated to SGW with CBL updates.")
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert sg_doc is not None, "Document not found"
         assert sg_doc.body.get("title") == "CBL Update 2", (
             f"Wrong title in SG doc (expected 'CBL Update 2'; got {sg_doc.body.get('title')}"
         )
@@ -287,7 +285,6 @@ class TestNoConflicts(CBLTestClass):
 
         self.mark_test_step("Verify replication was successful and document content in SGW.")
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert sg_doc is not None, "Document should exist in SGW"
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
@@ -431,7 +428,6 @@ class TestNoConflicts(CBLTestClass):
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert sg_doc is not None, "Document should exist in SGW"
         assert (
             cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
@@ -477,7 +473,6 @@ class TestNoConflicts(CBLTestClass):
         cbl2_doc = await db2.get_document(DocumentEntry("_default.posts", "post_1000"))
         cbl3_doc = await db3.get_document(DocumentEntry("_default.posts", "post_1000"))
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert sg_doc is not None, "Document should exist in SGW"
         assert (
             cbl1_doc.body.get("title")
             == cbl2_doc.body.get("title")
