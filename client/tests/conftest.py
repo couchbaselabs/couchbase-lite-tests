@@ -11,9 +11,11 @@ def fake_sync_gateways(count: int) -> Iterator[list[syncgateway.SyncGateway]]:
         patch("cbltest.api.syncgateway.ClientSession", autospec=True),
         patch("cbltest.api.syncgateway.requests.get", autospec=True),
     ):
+        # A bare host, as the config supplies: SyncGateway builds its own URLs from this,
+        # and a scheme here produces nonsense like "http://https://example.com:20001".
         yield [
             syncgateway.SyncGateway(
-                url="https://example.com",
+                url="sgw.example.com",
                 username="user",
                 password="pass",
             )

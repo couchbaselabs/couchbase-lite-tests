@@ -2233,46 +2233,8 @@ class SyncGateway(_SyncGatewayBase):
 
             await self._send_request("put", f"/{db_name}/_role/{role}", JSONDictionary(body))
 
-    async def upload_certificate(self, cert_content: bytes, cert_name: str) -> str:
-        """
-        Upload a certificate file to SGW instance.
-
-        :param cert_content: Certificate content as bytes (PEM format)
-        :param cert_name: Name for the certificate file (e.g., 'ca.pem', 'server.crt')
-        :return: Path to uploaded certificate on SGW instance
-        :raises Exception: If upload fails
-        """
-        with self._tracer.start_as_current_span(
-            "upload_certificate",
-            attributes={"cbl.cert.name": cert_name},
-        ):
-            # Use simple line-based protocol: first line is name, rest is content
-            body = f"{cert_name}\n{cert_content.decode('utf-8')}"
-
-            async with (
-                ClientSession() as session,
-                session.post(
-                    f"http://{self.hostname}:20001/upload-cert",
-                    data=body,
-                    headers={"Content-Type": "text/plain"},
-                    timeout=ClientTimeout(total=30),
-                ) as resp,
-            ):
-                if resp.status != 200:
-                    resp_body = await resp.text()
-                    raise Exception(f"Failed to upload certificate: {resp.status} - {resp_body}")
-
-                # Return the path where certificate was stored
-                cert_path = f"/home/ec2-user/cert/{cert_name}"
-                print(f"Certificate '{cert_name}' uploaded successfully to {cert_path}")
-                return cert_path
-
-    async def _wait_for_rest_api(self) -> None:
-        """
-        Wait until the SGW node's REST API is responding, polling /_ping until it
-        returns 200. /_ping endpoint is not responsive on startup until the all
-        databases are loaded and active.
-        """
+    async def wait_for_rest_api(self) -> None:
+        """Wait until this node's REST API responds, which is not until its databases load."""
 
         async def _wait_for_rest_api_poll() -> None:
             try:
@@ -2286,92 +2248,16 @@ class SyncGateway(_SyncGatewayBase):
             tenacity.stop_after_delay(70),
         )
 
-    async def restart_with_config(self, config_name: str = "bootstrap") -> None:
-        """
-        Restart Sync Gateway with a specific bootstrap configuration.
-
-        This method calls the shell2http management endpoint to restart SGW
-        with the specified config file. The config file should exist at
-        /home/ec2-user/config/{config_name}.json on the SGW host.
-
-        :param config_name: Name of the config file (without .json extension).
-                           Default is "bootstrap" for the standard config.
-                           Use "bootstrap-alternate" for alternate address testing.
-        :raises Exception: If the restart fails
-        """
-        with self._tracer.start_as_current_span(
-            "restart_with_config",
-            attributes={
-                "cbl.config.name": config_name,
-            },
-        ):
-            async with ClientSession() as session:
-                async with session.post(
-                    f"http://{self.hostname}:20001/restart-sgw",
-                    data=config_name,
-                    headers={"Content-Type": "text/plain"},
-                    timeout=ClientTimeout(total=120),
-                ) as resp:
-                    if resp.status != 200:
-                        body = await resp.text()
-                        raise Exception(f"Failed to restart SGW: {resp.status} - {body}")
-        await self._wait_for_rest_api()
-
-    async def stop(self) -> None:
-        """
-        Stop the Sync Gateway process.
-
-        This method calls the shell2http management endpoint to stop SGW.
-
-        :raises Exception: If the stop fails
-        """
-        with self._tracer.start_as_current_span("stop_sgw"):
-            async with ClientSession() as session:
-                async with session.get(
-                    f"http://{self.hostname}:20001/stop-sgw",
-                    timeout=ClientTimeout(total=60),
-                ) as resp:
-                    if resp.status != 200:
-                        body = await resp.text()
-                        raise Exception(f"Failed to stop SGW: {resp.status} - {body}")
-
-    async def start(self, config_name: str = "bootstrap") -> None:
-        """
-        Start the Sync Gateway process.
-
-        This method calls the shell2http management endpoint to start SGW.
-
-        :param config_name: Name of the config file (without .json extension).
-        :raises Exception: If the start fails
-        """
-        # Check if SGW is already running by probing its public endpoint
+    async def is_serving(self) -> bool:
+        """Whether this node's public REST API answers right now. Reports rather than raises."""
         try:
-            # Use a short timeout to distinguish "not running" from "slow"
             async with (
                 self._create_session(self.secure, self.scheme, self.hostname, self.__public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
-                if resp.status == 200:
-                    cbl_info("SGW is already running, skipping start")
-                    return
+                return resp.status == 200
         except (ClientConnectorError, TimeoutError):
-            # SGW is not reachable or slow, proceed with start
-            pass
-
-        # Proceed with shell2http start call...
-        with self._tracer.start_as_current_span(
-            "start_sgw",
-            attributes={"cbl.config.name": config_name},
-        ):
-            async with ClientSession() as session:
-                async with session.get(
-                    f"http://{self.hostname}:20001/start-sgw?config={config_name}",
-                    timeout=ClientTimeout(total=120),
-                ) as resp:
-                    if resp.status != 200:
-                        body = await resp.text()
-                        raise Exception(f"Failed to start SGW: {resp.status} - {body}")
-        await self._wait_for_rest_api()
+            return False
 
     async def _wait_for_db_online(
         self,
