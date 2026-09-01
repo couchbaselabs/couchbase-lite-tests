@@ -86,6 +86,56 @@ print_box() {
   echo "$border"
 }
 
+# Colored, timed section banners for Jenkins console output (rendered by the
+# ansiColor('xterm') pipeline option; the raw escape codes are harmless on a
+# plain terminal too). Usage: section_start "$COLOR_CYAN" "INFRA SETUP" ...
+# work... ; the next section_start call (or script exit, via the EXIT trap
+# below) closes the previous section and prints how long it took.
+readonly COLOR_RESET='\033[0m'
+readonly COLOR_CYAN='\033[1;36m'
+readonly COLOR_YELLOW='\033[1;33m'
+readonly COLOR_GREEN='\033[1;32m'
+
+_section_color=""
+_section_label=""
+_section_start_ts=""
+
+_format_duration() {
+  local total=$1 h m s
+  h=$((total / 3600))
+  m=$(((total % 3600) / 60))
+  s=$((total % 60))
+  if [ "$h" -gt 0 ]; then
+    printf '%dh%dm%ds' "$h" "$m" "$s"
+  elif [ "$m" -gt 0 ]; then
+    printf '%dm%ds' "$m" "$s"
+  else
+    printf '%ds' "$s"
+  fi
+}
+
+# Closes whichever section is currently open (no-op if none is). Registered
+# as an EXIT trap so the closing banner -- and the duration -- still prints
+# even if the section's work fails (set -e / the caller's ERR trap exits the
+# script from inside the section), not just on a clean finish.
+_section_close() {
+  [ -z "$_section_label" ] && return 0
+  local end_ts
+  end_ts=$(date +%s)
+  echo -e "${_section_color}=== ${_section_label} END (took $(_format_duration $((end_ts - _section_start_ts)))) ===${COLOR_RESET}"
+  _section_label=""
+}
+
+section_start() {
+  _section_close
+  _section_color="$1"
+  _section_label="$2"
+  _section_start_ts=$(date +%s)
+  echo -e "${_section_color}=== ${_section_label} START ===${COLOR_RESET}"
+}
+
+trap _section_close EXIT
+
 if ! command -v uv >/dev/null 2>&1; then
   echo "Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh
