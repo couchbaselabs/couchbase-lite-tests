@@ -1,5 +1,4 @@
 import asyncio
-from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
@@ -76,7 +75,7 @@ async def _configure_channel_tracking_db(
 @pytest.mark.min_couchbase_servers(1)
 class TestDocumentChannelHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_history_of_doc_that_never_left_a_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_get_history_of_doc_that_never_left_a_channel(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -94,7 +93,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert history == {}
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_history_after_leaving_a_channel(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_get_history_after_leaving_a_channel(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -119,9 +118,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert history == {"ABC": [leave_seq]}
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_history_shows_every_historical_seq_for_a_reused_channel_name(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_get_history_shows_every_historical_seq_for_a_reused_channel_name(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -154,7 +151,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert history == {"ABC": [second_leave_seq, first_leave_seq]}
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_removes_entry_past_its_seq(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_compact_removes_entry_past_its_seq(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -184,7 +181,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert history == {}
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_channel_not_in_history_is_noop(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_compact_channel_not_in_history_is_noop(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -207,7 +204,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert second_result == first_result == []
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_nonexistent_docid_returns_404(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_compact_nonexistent_docid_returns_404(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -223,7 +220,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert exc_info.value.code == 404
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_malformed_seq_returns_400(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_compact_malformed_seq_returns_400(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -259,13 +256,11 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/CBG-5796")
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_and_compact_require_application_rbac_role(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_get_and_compact_require_application_rbac_role(self, cblpytest: CBLPyTest) -> None:
         pass
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_all_keyspace_forms_behave_identically(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_all_keyspace_forms_behave_identically(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -330,7 +325,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.xfail(reason="Bug reported: CBG-5748, remove this post bug-fix")
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_malformed_keyspace_returns_400(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_malformed_keyspace_returns_400(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -359,9 +354,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert four_segment_exc.value.code == 400
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_does_not_change_all_docs_or_changes_feed(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_does_not_change_all_docs_or_changes_feed(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -398,7 +391,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.min_couchbase_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_legacy_pre_schema_document_has_no_history(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_legacy_pre_schema_document_has_no_history(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -439,9 +432,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert history == {"ABC": [leave_seq]}
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_enormous_seq_never_removes_an_active_channel_membership(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_enormous_seq_never_removes_an_active_channel_membership(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -482,9 +473,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert current.body.get("channels") == ["ABC"]
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_stale_entry_leaves_live_regranted_same_channel_untouched(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_stale_entry_leaves_live_regranted_same_channel_untouched(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -526,9 +515,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert current.body.get("channels") == ["ABC"]
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_collection_isolation_for_same_docid_and_channel_name(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_collection_isolation_for_same_docid_and_channel_name(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -577,7 +564,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_concurrent_compact_racing_a_document_edit_surfaces_a_clean_conflict(
-        self, cblpytest: CBLPyTest, dataset_path: Path
+        self, cblpytest: CBLPyTest
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
@@ -628,9 +615,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         assert isinstance(final_history, dict)
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_response_is_a_flat_compacted_channels_list(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_response_is_a_flat_compacted_channels_list(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -663,9 +648,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.min_couchbase_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_imports_a_not_yet_imported_document_first(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_imports_a_not_yet_imported_document_first(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
@@ -699,9 +682,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
     @pytest.mark.min_test_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_compact_before_reconnect_still_delivers_revoke(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_compact_before_reconnect_still_delivers_revoke(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
