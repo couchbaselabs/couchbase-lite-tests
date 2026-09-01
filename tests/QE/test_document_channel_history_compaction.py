@@ -3,12 +3,20 @@ import asyncio
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database import Database
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator, ReplicatorDocumentFlags
-from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig
-from cbltest.utils import retry_assert
-from shared.backfill_after_offline import backfill_after_offline
+from cbltest.api.replicator import Replicator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorAuthenticator,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorDocumentFlags,
+    ReplicatorType,
+)
+from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig, SyncGateway
+from cbltest.utils import async_retry_assert
 from tenacity import stop_after_attempt, wait_fixed
 
 _CHANNEL_SYNC_FUNCTION = (
@@ -25,6 +33,31 @@ _CHANNEL_TRACKING_CONFIG = DatabaseConfig(
     index=IndexConfig(num_replicas=0),
     scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
 )
+
+
+async def _one_shot_pull(
+    db: Database,
+    sync_gateway: SyncGateway,
+    db_name: str,
+    authenticator: ReplicatorAuthenticator,
+) -> Replicator:
+    """
+    Runs a one-shot pull replicator to completion and returns it so the caller can assert
+    on what it pulled via `document_updates`.
+    """
+    replicator = Replicator(
+        db,
+        sync_gateway.replication_url(db_name),
+        replicator_type=ReplicatorType.PULL,
+        authenticator=authenticator,
+        collections=[ReplicatorCollectionEntry()],
+        enable_document_listener=True,
+        pinned_server_cert=sync_gateway.tls_cert(),
+    )
+    await replicator.start()
+    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+    assert status.error is None, f"Pull replicator failed: {status.error}"
+    return replicator
 
 
 @pytest.mark.sgw
@@ -361,7 +394,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             remote_doc = await sg.get_document(sg_db, doc_id)
             assert remote_doc is not None, f"{doc_id} not yet visible on Sync Gateway"
 
-        await retry_assert(_confirm_imported, wait_fixed(1), stop_after_attempt(15))
+        await async_retry_assert(_confirm_imported, wait_fixed(1), stop_after_attempt(15))
 
         self.mark_test_step("Get the document's channel history and check it is empty, with no error")
         history = await sg.get_document_channel_history(sg_db, doc_id)
@@ -647,39 +680,27 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
         self.mark_test_step("Reset a local database and pull as that user so the document replicates to the device")
         db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
-        initial_replicator = await backfill_after_offline(
-            db,
-            sg,
-            sg_db,
-            ReplicatorBasicAuthenticator(username, password),
-            while_offline=lambda: asyncio.sleep(0),
-        )
+        authenticator = ReplicatorBasicAuthenticator(username, password)
+        initial_replicator = await _one_shot_pull(db, sg, sg_db, authenticator)
         assert any(entry.document_id == doc_id for entry in initial_replicator.document_updates), (
             f"{doc_id} did not replicate to the device on initial sync"
         )
 
-        async def _leave_channel_and_compact_while_offline() -> None:
-            self.mark_test_step(
-                "While offline, update the document to leave channel 'ABC' for 'OTHER', then compact the "
-                "document's channel history for 'ABC' before the client reconnects"
-            )
-            assert doc.revid is not None
-            updated_doc = await sg.update_document(
-                sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True
-            )
-            leave_seq = updated_doc.seq
-            compacted = await sg.compact_document_channel_history(sg_db, doc_id, leave_seq)
-            assert compacted == ["ABC"]
-            assert await sg.get_document_channel_history(sg_db, doc_id) == {}
+        self.mark_test_step(
+            "While the client is offline (i.e. between the two one-shot pulls), update the document to leave "
+            "channel 'ABC' for 'OTHER', then compact the document's channel history for 'ABC' before it reconnects"
+        )
+        assert doc.revid is not None
+        updated_doc = await sg.update_document(
+            sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True
+        )
+        leave_seq = updated_doc.seq
+        compacted = await sg.compact_document_channel_history(sg_db, doc_id, leave_seq)
+        assert compacted == ["ABC"]
+        assert await sg.get_document_channel_history(sg_db, doc_id) == {}
 
         self.mark_test_step("Bring the client back online: start a new pull replicator for the same user")
-        reconnect_replicator = await backfill_after_offline(
-            db,
-            sg,
-            sg_db,
-            ReplicatorBasicAuthenticator(username, password),
-            while_offline=_leave_channel_and_compact_while_offline,
-        )
+        reconnect_replicator = await _one_shot_pull(db, sg, sg_db, authenticator)
 
         self.mark_test_step(
             "Check that the device still received the document with the access-removed flag set --  (unlike the "
