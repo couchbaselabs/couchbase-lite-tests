@@ -142,7 +142,7 @@ if [ -n "$_existing_exit_trap" ]; then
     trap "${_existing_exit_trap}; _section_close" EXIT
   fi
 else
-  trap _section_close EXIT
+  trap '_section_close' EXIT
 fi
 unset _existing_exit_trap
 
