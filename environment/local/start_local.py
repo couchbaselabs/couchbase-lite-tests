@@ -15,12 +15,14 @@ import concurrent.futures
 import json
 import os
 import pathlib
+import re
 import shlex
+import socket
 import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import click
@@ -56,25 +58,92 @@ SG_INSTANCE_STEM = "sync_gateway_instance"
 # Matches the per-instance logs of any run, plus the single sync_gateway.log written before instances
 # were numbered -- that name is never written now, so left behind it would only ever mislead.
 SG_LOG_GLOB = "sync_gateway*.log"
-# Sync Gateway's own default ports, which instance 1 keeps so a single-instance run is unchanged.
+# Sync Gateway's own default ports, which the first instance takes whenever they are free.
 SG_BASE_PUBLIC_PORT = 4984
 SG_BASE_ADMIN_PORT = 4985
 SG_BASE_METRICS_PORT = 4986
-# Instance N's ports are the defaults plus (N - 1) * stride, leaving room between instances.
+# A port block is the default ports plus block * stride, leaving room between instances.
 SG_PORT_STRIDE = 10
 # How long a terminated Sync Gateway gets to release its ports before it is killed outright.
 SG_STOP_TIMEOUT_SECONDS = 10
-# Highest instance number probed when working out what an earlier run left running.
-SG_MAX_DISCOVERED_INSTANCES = 10
+# How many port blocks are scanned for free ones before giving up.
+SG_MAX_PORT_BLOCKS = 20
+# Recovers the instance number from a generated instance config's filename.
+SG_INSTANCE_CONFIG_RE = re.compile(rf"^{SG_INSTANCE_STEM}(\d+)_")
 
 
-# Instances are numbered from 1 everywhere -- ports, filenames and console output alike -- so the
-# number printed at startup is the number naming that instance's files. Every name below is derived
-# from sync_gateway_instance_name() rather than spelled out, which is what keeps them in step.
-def sync_gateway_ports(number: int) -> tuple[int, int, int]:
-    """Return the (public, admin, metrics) ports for the given 1-based Sync Gateway instance."""
-    offset = (number - 1) * SG_PORT_STRIDE
-    return SG_BASE_PUBLIC_PORT + offset, SG_BASE_ADMIN_PORT + offset, SG_BASE_METRICS_PORT + offset
+class SyncGatewayPorts(NamedTuple):
+    """The three ports a single Sync Gateway instance listens on."""
+
+    public: int
+    admin: int
+    metrics: int
+
+
+def port_block(block: int) -> SyncGatewayPorts:
+    """Return the ports of the given 0-based block: Sync Gateway's defaults plus block * stride."""
+    offset = block * SG_PORT_STRIDE
+    return SyncGatewayPorts(SG_BASE_PUBLIC_PORT + offset, SG_BASE_ADMIN_PORT + offset, SG_BASE_METRICS_PORT + offset)
+
+
+def _port_free(port: int) -> bool:
+    """Whether port can be bound right now. The wildcard address is used so that a listener on any
+    single interface, loopback included, counts as taken."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("0.0.0.0", port))
+        except OSError:
+            return False
+    return True
+
+
+def allocate_sync_gateway_ports(count: int) -> list[SyncGatewayPorts]:
+    """
+    Choose a port block per instance, stepping over any block something else already holds.
+
+    The first instance keeps Sync Gateway's default ports whenever they are free, so the ordinary
+    single-instance run still lands where everything expects it. When they are not free -- a Sync
+    Gateway from a second checkout, or anything else on 4984 -- binding them anyway only fails at
+    startup, and it fails inside that instance's log while this script goes on to report success.
+    Moving to the next free block costs nothing instead: every generated config and the topology
+    config handed to pytest carry whatever ports were chosen.
+
+    Blocks are taken whole. Filling in around a partly-used block would split one instance's three
+    ports across two of them, and the numbering that names logs and configs assumes it can talk
+    about a block as one thing.
+
+    Call this only once the instances from a previous run have been stopped, or they will be found
+    holding their own ports and every run will walk further up the range than the last.
+    """
+    allocated: list[SyncGatewayPorts] = []
+    for block in range(SG_MAX_PORT_BLOCKS):
+        if len(allocated) == count:
+            break
+
+        ports = port_block(block)
+        taken = [str(port) for port in ports if not _port_free(port)]
+        if taken:
+            click.secho(
+                f"Skipping ports {ports.public}-{ports.metrics}: {', '.join(taken)} already in use",
+                fg="yellow",
+            )
+            continue
+
+        allocated.append(ports)
+
+    if len(allocated) < count:
+        raise click.ClickException(
+            f"Found only {len(allocated)} free port block(s) for {count} Sync Gateway instance(s) "
+            f"within {SG_MAX_PORT_BLOCKS} blocks of {SG_BASE_PUBLIC_PORT}. Stop whatever is holding "
+            "them and try again."
+        )
+
+    return allocated
+
+
+# Instances are numbered from 1 everywhere -- filenames and console output alike -- so the number
+# printed at startup is the number naming that instance's files. Every name below is derived from
+# sync_gateway_instance_name() rather than spelled out, which is what keeps them in step.
 
 
 def sync_gateway_instance_name(number: int) -> str:
@@ -92,13 +161,12 @@ def sync_gateway_log_name(number: int) -> str:
     return f"{sync_gateway_instance_name(number)}.log"
 
 
-def sync_gateway_api_config(number: int) -> dict[str, str]:
-    """The Sync Gateway `api` config block pinning the given 1-based instance to its own ports."""
-    public, admin, metrics = sync_gateway_ports(number)
+def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
+    """The Sync Gateway `api` config block pinning an instance to the given ports."""
     return {
-        "public_interface": f":{public}",
-        "admin_interface": f"127.0.0.1:{admin}",
-        "metrics_interface": f"127.0.0.1:{metrics}",
+        "public_interface": f":{ports.public}",
+        "admin_interface": f"127.0.0.1:{ports.admin}",
+        "metrics_interface": f"127.0.0.1:{ports.metrics}",
     }
 
 
@@ -260,11 +328,11 @@ def main(
         connstr = cbs_future.result()
 
     if not skip_sync_gateway_start:
-        start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
+        instance_ports = start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
     else:
-        sync_gateways = resolve_skipped_sync_gateway_count(sync_gateways)
+        instance_ports = resolve_skipped_sync_gateway_ports(sync_gateways)
 
-    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password, sync_gateways)
+    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password, instance_ports)
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
 
@@ -563,31 +631,62 @@ def stop_all_sync_gateways() -> None:
     _wait_for_exit(terminated)
 
 
-def discover_running_sync_gateways() -> int:
-    """
-    Count the Sync Gateway instances already listening, by probing consecutive admin ports.
+def _generated_instance_configs() -> list[tuple[int, pathlib.Path]]:
+    """The generated instance configs on disk, each paired with its instance number, in that order."""
+    numbered = []
+    for path in SYNC_GATEWAY_CONFIG_DIR.glob(f"{SG_INSTANCE_STEM}*.json"):
+        match = SG_INSTANCE_CONFIG_RE.match(path.name)
+        if match:
+            numbered.append((int(match.group(1)), path))
 
-    Any response at all means something is bound there; only a refused connection ends the count.
+    return sorted(numbered)
+
+
+def _ports_from_instance_config(config_path: pathlib.Path) -> SyncGatewayPorts | None:
+    """Read back the ports pinned in a generated instance config, or None if it cannot be read."""
+    keys = ("public_interface", "admin_interface", "metrics_interface")
+    try:
+        api = json.loads(config_path.read_text())["api"]
+        return SyncGatewayPorts(*(int(str(api[key]).rsplit(":", 1)[-1]) for key in keys))
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def discover_running_sync_gateways() -> list[SyncGatewayPorts]:
     """
-    for number in range(1, SG_MAX_DISCOVERED_INSTANCES + 1):
-        _, admin_port, _ = sync_gateway_ports(number)
+    Find the Sync Gateway instances an earlier run left running, and the ports they are on.
+
+    The ports are read back from that run's own generated configs rather than recomputed from the
+    block arithmetic: a run that stepped over a busy block did not put its instances where
+    recomputing would go looking. An instance whose admin port answers nothing is dropped -- it has
+    exited, or never started -- and any response at all counts as an answer.
+    """
+    running: list[SyncGatewayPorts] = []
+    for _, config_path in _generated_instance_configs():
+        ports = _ports_from_instance_config(config_path)
+        if ports is None:
+            continue
+
         try:
-            requests.get(f"http://localhost:{admin_port}/", timeout=2)
+            requests.get(f"http://localhost:{ports.admin}/", timeout=2)
         except requests.RequestException:
-            return number - 1
+            continue
 
-    return SG_MAX_DISCOVERED_INSTANCES
+        running.append(ports)
+
+    return running
 
 
-def resolve_skipped_sync_gateway_count(requested: int) -> int:
+def resolve_skipped_sync_gateway_ports(requested: int) -> list[SyncGatewayPorts]:
     """
-    Decide how many instances to describe when --skip-sync-gateway-start started none of them.
+    Decide which instances to describe when --skip-sync-gateway-start started none of them.
 
-    The count drives the topology, so taking --sync-gateways at face value here would advertise nodes
+    These drive the topology, so taking --sync-gateways at face value here would advertise nodes
     that may not exist -- or, at its default of 1, quietly drop the extra nodes an earlier run left
     running. Probe for the truth instead, and only accept an explicit --sync-gateways that agrees.
     """
-    running = discover_running_sync_gateways()
+    instance_ports = discover_running_sync_gateways()
+    running = len(instance_ports)
     explicit = click.get_current_context().get_parameter_source("sync_gateways") == ParameterSource.COMMANDLINE
     if explicit and running != requested:
         raise click.UsageError(
@@ -605,28 +704,26 @@ def resolve_skipped_sync_gateway_count(requested: int) -> int:
     else:
         click.echo(f"Describing the {running} already-running Sync Gateway instance(s) in the topology config")
 
-    return running
+    return instance_ports
 
 
-def _pin_api_ports(number: int) -> Callable[[dict[str, Any]], None]:
-    """Return a patch pinning a config's `api` block to the instance's ports, keeping any other api keys."""
+def _pin_api_ports(ports: SyncGatewayPorts) -> Callable[[dict[str, Any]], None]:
+    """Return a patch pinning a config's `api` block to the given ports, keeping any other api keys."""
 
     def patch(config: dict[str, Any]) -> None:
-        config["api"] = {**config.get("api", {}), **sync_gateway_api_config(number)}
+        config["api"] = {**config.get("api", {}), **sync_gateway_api_config(ports)}
 
     return patch
 
 
-def sync_gateway_instance_configs(base_config_path: str, count: int) -> list[str]:
+def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[SyncGatewayPorts]) -> list[str]:
     """
     Write one copy of base_config_path per instance, each pinned to that instance's ports.
 
     Every previously generated instance config is swept first: the filenames carry the instance
     number, so a run asking for fewer instances than the last would otherwise leave the surplus
-    ones on disk.
-
-    Instance 1 lands on Sync Gateway's own default ports, so a single-instance run still reaches
-    Sync Gateway where everything expects to find it.
+    ones on disk. The ones written here are also what a later --skip-sync-gateway-start run reads
+    the running instances' ports back out of, so they must describe this run and only this run.
     """
     _remove_generated(SYNC_GATEWAY_CONFIG_DIR, f"{SG_INSTANCE_STEM}*.json")
 
@@ -635,19 +732,29 @@ def sync_gateway_instance_configs(base_config_path: str, count: int) -> list[str
             pathlib.Path(base_config_path),
             SYNC_GATEWAY_CONFIG_DIR,
             sync_gateway_config_prefix(number),
-            _pin_api_ports(number),
+            _pin_api_ports(ports),
             clean_stale=False,
         )
-        for number in range(1, count + 1)
+        for number, ports in enumerate(instance_ports, start=1)
     ]
 
 
-def start_sync_gateways(server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1) -> None:
-    """Stop any running sync_gateway processes and start `count` new ones for the given server type."""
+def start_sync_gateways(
+    server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1
+) -> list[SyncGatewayPorts]:
+    """
+    Stop any running sync_gateway processes, start `count` new ones for the given server type, and
+    return the ports each was given.
+
+    Ports are allocated after the stop, not before: the instances being replaced hold the ports this
+    run wants back, and allocating first would see them taken and walk up the range every time.
+    """
     base_config_path = resolve_sync_gateway_config(server, connstr, admin_user, admin_password)
-    config_paths = sync_gateway_instance_configs(base_config_path, count)
 
     stop_all_sync_gateways()
+
+    instance_ports = allocate_sync_gateway_ports(count)
+    config_paths = sync_gateway_instance_configs(base_config_path, instance_ports)
 
     # Wipe every Sync Gateway log before launching. ExeBridge truncates the log of each instance it
     # starts anyway, so this only really matters for the logs this run has no instance for -- left
@@ -655,10 +762,9 @@ def start_sync_gateways(server: str, connstr: str | None, admin_user: str, admin
     header("Removing previous Sync Gateway logs")
     _remove_generated(SCRIPT_DIR, SG_LOG_GLOB)
 
-    for number, config_path in enumerate(config_paths, start=1):
-        public_port, admin_port, _ = sync_gateway_ports(number)
+    for number, (config_path, ports) in enumerate(zip(config_paths, instance_ports, strict=True), start=1):
         click.echo(
-            f"Sync Gateway instance {number}/{count}: public {public_port}, admin {admin_port}, "
+            f"Sync Gateway instance {number}/{count}: public {ports.public}, admin {ports.admin}, "
             f"log {sync_gateway_log_name(number)}"
         )
         ExeBridge(
@@ -667,9 +773,15 @@ def start_sync_gateways(server: str, connstr: str | None, admin_user: str, admin
             log_filename=sync_gateway_log_name(number),
         ).run("localhost")
 
+    return instance_ports
+
 
 def resolve_topology_config(
-    server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1
+    server: str,
+    connstr: str | None,
+    admin_user: str,
+    admin_password: str,
+    instance_ports: list[SyncGatewayPorts],
 ) -> pathlib.Path:
     """
     Resolve the cbltest topology config to use.
@@ -687,7 +799,9 @@ def resolve_topology_config(
 
     config_path = TEST_CONFIG[server]
     override_cbs = server == "cbs" and bool(connstr)
-    if not override_cbs and count == 1:
+    # The checked-in template already describes a single instance on the default ports, so it only
+    # stands in for one that actually landed there.
+    if not override_cbs and instance_ports == [port_block(0)]:
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
@@ -698,10 +812,7 @@ def resolve_topology_config(
             cbs["admin_password"] = admin_password
 
         template = c["sync-gateways"][0]
-        c["sync-gateways"] = []
-        for number in range(1, count + 1):
-            public_port, admin_port, _ = sync_gateway_ports(number)
-            c["sync-gateways"].append({**template, "port": public_port, "admin_port": admin_port})
+        c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]
 
     return pathlib.Path(
         _write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, f"{server}_config_", patch, clean_stale=False)
