@@ -1029,7 +1029,7 @@ class _SyncGatewayBase:
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def wait_for_all_documents(
+    async def wait_for_document_count(
         self,
         db_name: str,
         min_count: int,
@@ -1062,7 +1062,7 @@ class _SyncGatewayBase:
         present and not a tombstone, then return the response.  Raises TimeoutError
         if they have not all arrived within 60s.
 
-        Use this rather than wait_for_all_documents when the collection also holds
+        Use this rather than wait_for_document_count when the collection also holds
         unrelated documents.
         """
         wanted = set(doc_ids)

@@ -50,7 +50,7 @@ class TestServerSetup(CBLTestClass):
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         self.mark_test_step("Verify documents were imported via SGW")
-        all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
+        all_docs = await sg.wait_for_document_count(sg_db, num_docs)
         imported_count = len(all_docs.rows)
         assert imported_count == num_docs, f"Expected {num_docs} imported docs, got {imported_count}"
 
