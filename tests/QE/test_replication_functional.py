@@ -11,6 +11,7 @@ from cbltest.api.replicator_types import (
     ReplicatorBasicAuthenticator,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
 
 
 @pytest.mark.cbl
@@ -19,6 +20,14 @@ from cbltest.api.syncgateway import DocumentUpdateEntry
 class TestReplicationFunctional(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_roles_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        """
+        PAR-01: role-derived channel access must be identical under every auth method.
+
+        The roles and channels are set up exactly as before; only how the replicator
+        proves who it is changes. A difference between runs would mean authorization
+        depends on the authentication mechanism, which it should not.
+        """
+        auth_mode = auth_mode_for(cblpytest)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -126,12 +135,22 @@ class TestReplicationFunctional(CBLTestClass):
                 * continuous: false
                 * credentials: testuser/testpass
         """)
+        authenticator = await make_authenticator(
+            sync_gateway,
+            "posts",
+            "testuser",
+            "testpass",
+            auth_mode,
+            collection_access={"_default": {"posts": {"admin_channels": []}}},
+            admin_roles=["role1"],
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'testuser')}")
         replicator = Replicator(
             db,
             sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("testuser", "testpass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -491,6 +510,16 @@ class TestReplicationFunctional(CBLTestClass):
     async def test_replication_behavior_with_channelRole_modification(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
+        """
+        PAR-02: revoking access mid-replication must behave the same under every auth
+        method.
+
+        This is the more interesting of the two parity tests: the grant changes while a
+        continuous replicator is running, so it exercises whether Sync Gateway
+        re-resolves channel access for an already-authenticated connection regardless of
+        how that connection authenticated.
+        """
+        auth_mode = auth_mode_for(cblpytest)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -555,13 +584,23 @@ class TestReplicationFunctional(CBLTestClass):
                 * continuous: true
                 * credentials: testuser/testpass
         """)
+        authenticator = await make_authenticator(
+            sync_gateway,
+            "posts",
+            "testuser",
+            "testpass",
+            auth_mode,
+            collection_access={"_default": {"posts": {"admin_channels": []}}},
+            admin_roles=["testrole"],
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'testuser')}")
         pull_replicator = Replicator(
             db,
             sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("testuser", "testpass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await pull_replicator.start()
