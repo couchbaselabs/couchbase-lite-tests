@@ -11,4 +11,3 @@ Test behavior when Edge Server is configured with an incorrect database config.
 3. Reconfigure Edge Server and fetch database info for collection `test`.
 4. Verify the collection is present in the response.
 5. Attempt a REST write to the collection and verify it fails.
-6. Reset the config to remove the invalid collection settings.
