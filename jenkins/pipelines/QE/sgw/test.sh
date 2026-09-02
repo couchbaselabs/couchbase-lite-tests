@@ -69,3 +69,4 @@ else
     --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure
 fi
+section_end
