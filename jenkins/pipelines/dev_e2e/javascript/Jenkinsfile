@@ -43,7 +43,7 @@ pipeline {
                 }
             }
             post { 
-                always { 
+                always {
                     echo "Teardown JavaScript Test"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh 'jenkins/pipelines/dev_e2e/javascript/teardown.sh'

@@ -66,6 +66,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "Teardown macOS Test"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
@@ -92,6 +104,18 @@ pipeline {
                     }
                     post { 
                         always { 
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "Teardown iOS Test"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
@@ -115,6 +139,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "Teardown Android Test"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
@@ -138,6 +174,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "Teardown linux Test"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/dev_e2e/c/teardown.sh'
@@ -157,6 +205,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/dev_e2e/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/dev_e2e/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "Teardown Windows Test"
                             timeout(time: 5, unit: 'MINUTES') {
                                 pwsh 'jenkins\\pipelines\\dev_e2e\\c\\teardown.ps1'
