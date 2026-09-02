@@ -15,9 +15,7 @@ from cbltest.api.replicator_types import (
     ReplicatorDocumentFlags,
     ReplicatorType,
 )
-from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig, SyncGateway
-from cbltest.utils import async_retry_assert
-from tenacity import stop_after_attempt, wait_fixed
+from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, RemoteDocument, ScopeConfig, SyncGateway
 
 _CHANNEL_SYNC_FUNCTION = (
     "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
@@ -25,9 +23,6 @@ _CHANNEL_SYNC_FUNCTION = (
 
 _BUCKET = "data-bucket"
 
-# A database with only the _default._default collection. import_docs is left unset, which
-# means Sync Gateway's default of true, so the tests that write directly to Couchbase Server
-# and wait for the document to be imported can use this config too.
 _CHANNEL_TRACKING_CONFIG = DatabaseConfig(
     bucket=_BUCKET,
     index=IndexConfig(num_replicas=0),
@@ -178,7 +173,9 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         self.mark_test_step("Create a document assigned to channel 'ABC' (it has never left any channel)")
         await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
-        self.mark_test_step("Compact the document's channel history for channel 'OTHER'")
+        self.mark_test_step(
+            "Compact the document's channel history with a sequence number that has no matching history entry"
+        )
         first_result = await sg.compact_document_channel_history(sg_db, doc_id, 1_000_000)
 
         self.mark_test_step("Check the response reports no channels compacted")
@@ -380,7 +377,15 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
+        await cblpytest.clusters[0].create_database(
+            sg_db,
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
+                enable_shared_bucket_access=True,
+            ),
+        )
 
         self.mark_test_step(
             "Create a document assigned to channel 'ABC' directly through Couchbase Server, bypassing "
@@ -663,8 +668,19 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         bucket_name = _BUCKET
         doc_id = "doc1"
 
-        self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
-        await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
+        self.mark_test_step(
+            "Configure a Sync Gateway database with a channel-membership sync function and automatic import disabled"
+        )
+        await cblpytest.clusters[0].create_database(
+            sg_db,
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
+                import_docs=False,
+                enable_shared_bucket_access=True,
+            ),
+        )
 
         self.mark_test_step(
             "Write a document directly into the Couchbase Server bucket, bypassing Sync Gateway entirely, "

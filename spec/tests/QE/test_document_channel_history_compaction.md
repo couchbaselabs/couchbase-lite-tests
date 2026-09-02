@@ -18,11 +18,6 @@ convention of keeping test intent visible even when it can't run yet:
   provisioning a restricted (non-"Application") Couchbase Server RBAC caller against the
   Sync Gateway admin API; this needs new framework plumbing before it can run for real.
 
-A `seq=0` compact test was considered but dropped entirely (not kept as a skip): the REST
-handler 400s on `seq=0` before reaching the documented no-op code path, making the
-documented no-op behavior unreachable through this REST-only suite. The existing
-malformed-`seq` test already covers the real (400) behavior, so nothing is lost.
-
 ## test_get_history_of_doc_that_never_left_a_channel
 
 A document that has always lived in the same channel has no channel history yet.
@@ -66,11 +61,11 @@ endpoints share a shape.
 
 ## test_compact_channel_not_in_history_is_noop
 
-Compacting a channel name that was never in the document's history is not an error.
+Compacting with a sequence number that has no matching history entry is not an error.
 
 1. Configure a Sync Gateway database with a channel-membership sync function.
 2. Create a document assigned to channel `ABC` (it has never left any channel).
-3. Compact the document's channel history for channel `OTHER`.
+3. Compact the document's channel history with a sequence number that has no matching history entry.
 4. Check the response reports no channels compacted.
 5. Repeat the same compact call and check the response is identical (idempotent).
 
@@ -96,7 +91,7 @@ Read Only") independently of channel access, and the TDK currently always talks 
 admin API as a full admin. There is no existing helper to provision a restricted-role
 caller, so `get`/`compact` RBAC enforcement (expect: a caller without the Application role
 gets 403 on both; an Application Read Only caller gets 200 on GET and 403 on compact)
-cannot be exercised yet.
+cannot be exercised yet. https://jira.issues.couchbase.com/browse/CBG-5796
 
 ## test_all_keyspace_forms_behave_identically
 
@@ -200,8 +195,8 @@ dropping one of the two operations.
 
 ## test_compact_response_is_a_flat_compacted_channels_list
 
-The OpenAPI spec documents a nested-by-docid response shape for this endpoint, but the
-real handler returns a flat list; the TDK parser must trust the implementation.
+The compact endpoint returns a flat `{"compacted_channels": [...]}` object, not nested
+under the document ID.
 
 1. Configure a Sync Gateway database with a channel-membership sync function.
 2. Create a document assigned to channel `ABC`.
@@ -214,7 +209,7 @@ real handler returns a flat list; the TDK parser must trust the implementation.
 A document written straight into the Couchbase Server bucket has no Sync Gateway metadata
 yet. Compacting it must not error or silently skip it — Sync Gateway must import it first.
 
-1. Configure a Sync Gateway database with a channel-membership sync function.
+1. Configure a Sync Gateway database with a channel-membership sync function and automatic import disabled.
 2. Write a document directly into the Couchbase Server bucket, bypassing Sync Gateway entirely, so it has no Sync Gateway metadata yet.
 3. Compact the document's channel history without first waiting for it to be imported.
 4. Check the compact call succeeded rather than erroring or silently skipping the document.
