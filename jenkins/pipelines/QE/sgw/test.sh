@@ -41,7 +41,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source "$SCRIPT_DIR"/../../shared/config.sh
 
-echo "Setup backend..."
+section_start "$COLOR_CYAN" "INFRA SETUP"
 pushd "$AWS_ENVIRONMENT_DIR" >/dev/null
 uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 popd >/dev/null
@@ -56,7 +56,7 @@ fi
 # this single-cluster topology does not provide; it is deferred until the
 # multi-cluster topology is sorted out rather than left to fail every night. See CBL-8686
 
-echo "Run tests..."
+section_start "$COLOR_YELLOW" "RUN TESTS"
 pushd "$TESTS_DIR" >/dev/null
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header --config QE/config.json \
@@ -69,3 +69,4 @@ else
     --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure
 fi
+section_end

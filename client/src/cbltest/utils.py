@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from collections.abc import Awaitable, Callable
 from typing import Any, NoReturn, cast
 
@@ -11,8 +10,6 @@ import requests
 import tenacity
 import tenacity._utils
 import tenacity.asyncio
-
-from .api.error import CblTimeoutError
 
 # Hide tenacity's retry-loop frames so failures show the actual assertion, not
 # Retrying/AsyncRetrying plumbing.
@@ -78,31 +75,6 @@ def retry_assert[T](
 
     retrying = tenacity.Retrying(**_retry_assert_policy(wait, stop))
     return retrying(checked_function)
-
-
-def _try_n_times[T](
-    num_times: int,
-    seconds_between: float,
-    wait_before_first_try: bool,
-    func: Callable[..., T],
-    *args: Any,
-    **kwargs: dict[str, Any],
-) -> T:
-    function_name = getattr(func, "__name__", "<unknown function>")
-    for i in range(num_times):
-        try:
-            if i == 0 and wait_before_first_try:
-                time.sleep(seconds_between)
-            ret = func(*args, **kwargs)
-            return ret
-        except Exception as e:
-            if i < num_times - 1:
-                print(f"Trying {function_name} failed (reason='{e}'), retry in {seconds_between} seconds ...")
-                time.sleep(seconds_between)
-            else:
-                print(f"Trying {function_name} failed (reason='{e}')")
-
-    raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
 
 
 def is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:

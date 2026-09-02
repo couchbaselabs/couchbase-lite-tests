@@ -3,7 +3,7 @@ import re
 import ssl
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Collection, Mapping
 from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
@@ -1169,7 +1169,7 @@ class _SyncGatewayBase:
         reraise=True,
         retry=tenacity.retry_if_exception_type(AssertionError),
     )
-    async def wait_for_all_documents(
+    async def wait_for_document_count(
         self,
         db_name: str,
         min_count: int,
@@ -1189,6 +1189,36 @@ class _SyncGatewayBase:
             f"Expected at least {min_count} docs in {db_name}.{scope}.{collection}, got {len(all_docs.rows)}"
         )
         return all_docs
+
+    async def wait_for_documents(
+        self,
+        db_name: str,
+        doc_ids: Collection[str],
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> ChangesResponse:
+        """
+        Retry the _doc_ids filtered changes feed until every doc in doc_ids is
+        present and not a tombstone, then return the response.  Raises TimeoutError
+        if they have not all arrived within 60s.
+
+        Use this rather than wait_for_document_count when the collection also holds
+        unrelated documents.
+        """
+        wanted = set(doc_ids)
+
+        async def _wait_for_documents_poll() -> ChangesResponse:
+            changes = await self.get_changes(db_name, scope, collection, doc_ids=sorted(wanted))
+            missing = wanted - {entry.id for entry in changes.results if not entry.deleted}
+            assert not missing, f"Documents missing from {db_name}.{scope}.{collection}: {sorted(missing)}"
+            return changes
+
+        # Import lands on SGW's polling cadence, not sub-second.
+        return await async_retry_assert(
+            _wait_for_documents_poll,
+            tenacity.wait_fixed(2),
+            tenacity.stop_after_delay(60),
+        )
 
     async def get_changes(
         self,
@@ -1423,7 +1453,7 @@ class _SyncGatewayBase:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> RemoteDocument | None:
+    ) -> RemoteDocument:
         """
         Gets a document from Sync Gateway
 
@@ -1431,32 +1461,22 @@ class _SyncGatewayBase:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :raises CblSyncGatewayBadResponseError: If Sync Gateway does not return the document. Returns a 404 for a non existent or tombstoned document.
         """
         with self._tracer.start_as_current_span(
             "get_document",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
             },
         ):
             response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
-                    return None
-
-                raise CblSyncGatewayBadResponseError(
-                    500,
-                    f"Get doc from sync gateway had error '{cast_resp['reason']}'",
-                    body=dumps(cast_resp),
-                )
-
-            return RemoteDocument(cast_resp)
+            return RemoteDocument(cast(dict, response))
 
     async def create_document(
         self,
@@ -2251,31 +2271,24 @@ class SyncGateway(_SyncGatewayBase):
             tenacity.stop_after_attempt(max_retries),
         )
 
-    @tenacity.retry(
-        # Import count flips on SGW's polling cadence, not sub-second, so poll at
-        # a steady interval; give up after 60s.
-        wait=tenacity.wait_fixed(2),
-        stop=tenacity.stop_after_delay(60),
-        reraise=True,
-        retry=tenacity.retry_if_exception_type(AssertionError),
-    )
-    async def wait_for_import_count(self, db_name: str, min_count: int) -> int:
+    async def get_import_count(self, db_name: str) -> int:
         """
-        Retry the shared_bucket_import expvar until import_count >= min_count, then
-        return it. Raises AssertionError if not reached within 60s.
+        Gets this node's shared_bucket_import import_count expvar for the given
+        database.  Each import is handled by exactly one node, so a zero here does
+        not mean the cluster imported nothing.
+
+        :param db_name: The database to read the stat for
         """
         resp_data = await self._send_request("get", "/_expvar")
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
-        import_count = (
+        return (
             expvars.get("syncgateway", {})
             .get("per_db", {})
             .get(db_name, {})
             .get("shared_bucket_import", {})
             .get("import_count", 0)
         )
-        assert import_count >= min_count, f"Expected import_count >= {min_count} for {db_name}, got {import_count}"
-        return import_count
 
     async def reset_user(
         self,

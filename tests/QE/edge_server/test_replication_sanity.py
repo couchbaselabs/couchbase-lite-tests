@@ -114,7 +114,6 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
-        assert sg_doc is not None
         assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
         rev_id = sg_doc.revid
 
@@ -144,7 +143,6 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
-        assert sg_doc is not None, f"Document {doc_id_es} does not exist on the sync gateway."
         assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
         rev_id = sg_doc.revid

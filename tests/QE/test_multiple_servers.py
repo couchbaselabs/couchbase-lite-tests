@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -18,7 +18,6 @@ from cbltest.api.syncgateway import (
     SyncGatewayUserClient,
     UnsupportedSettings,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool, bool]:
@@ -44,27 +43,6 @@ def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> 
     else:
         cbs_one.add_node(cbs_two)
     cbs_one.rebalance()
-
-
-def _set_alternate_addresses(cbs_servers: Sequence) -> None:
-    """Set alternate addresses with all service ports for all CBS nodes."""
-    session = requests.Session()
-    session.auth = ("Administrator", "password")
-    for cbs_node in cbs_servers:
-        session.put(
-            f"http://{cbs_node.hostname}:8091/node/controller/setupAlternateAddresses/external",
-            data={
-                "hostname": cbs_node.hostname,
-                "kv": "11210",
-                "kvSSL": "11207",
-                "mgmt": "8091",
-                "mgmtSSL": "18091",
-                "capi": "8092",
-                "capiSSL": "18092",
-                "n1ql": "8093",
-                "n1qlSSL": "18093",
-            },
-        )
 
 
 @asynccontextmanager
@@ -305,27 +283,14 @@ class TestMultipleServers(CBLTestClass):
 class TestISGRCollectionMapping(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_explicit_collection_mapping(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        sg_cluster = SyncGatewayCluster(cblpytest.sync_gateways)
-        cbs = cblpytest.couchbase_servers[0]
-        sg1, sg2, sg3 = sg_cluster.sync_gateways[:3]
+        cluster = cblpytest.clusters[0]
+        sg1, sg2, sg3 = cluster.sync_gateways[:3]
         bucket1, bucket2, bucket3 = "isgr-bucket1", "isgr-bucket2", "isgr-bucket3"
         sg_db1, sg_db2, sg_db3 = "db1", "db2", "db3"
         b1_collections = ["collection1", "collection2", "collection3"]
         b2_collections = ["collection4", "collection5"]
         b3_collections = ["collection6", "collection7", "collection8", "collection9"]
         num_docs = 3
-
-        self.mark_test_step("Set alternate addresses on all CBS nodes")
-        _set_alternate_addresses(cblpytest.couchbase_servers)
-
-        self.mark_test_step("Create collections in _default scope for each bucket")
-        for bucket, collections in [
-            (bucket1, b1_collections),
-            (bucket2, b2_collections),
-            (bucket3, b3_collections),
-        ]:
-            cbs.create_bucket(bucket)
-            cbs.create_collections(bucket, "_default", collections)
 
         self.mark_test_step("Configure all SGs with their respective buckets and collections")
         for sg_db, bucket, collections in [
@@ -339,7 +304,7 @@ class TestISGRCollectionMapping(CBLTestClass):
                 scopes={"_default": ScopeConfig(collections={"_default": {}, **{c: {} for c in collections}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
             )
-            await sg_cluster.create_database(sg_db, db_payload)
+            await cluster.create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Upload {num_docs} docs to each collection in SG1")
         for collection in b1_collections:
@@ -412,8 +377,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * collection4 should have docs from collection1
                 * collection5 should have docs from collection2
         """)
-        sg2_collection4_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[0])
-        sg2_collection5_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[1])
+        sg2_collection4_docs = await sg2.wait_for_document_count(sg_db2, num_docs, "_default", b2_collections[0])
+        sg2_collection5_docs = await sg2.wait_for_document_count(sg_db2, num_docs, "_default", b2_collections[1])
         sg2_collection4_ids = {row.id for row in sg2_collection4_docs.rows}
         sg2_collection5_ids = {row.id for row in sg2_collection5_docs.rows}
         for i in range(num_docs):
@@ -430,9 +395,9 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * collection7 should have docs from collection2
                 * collection8 should have docs from collection3
         """)
-        sg3_collection6_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[0])
-        sg3_collection7_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[1])
-        sg3_collection8_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[2])
+        sg3_collection6_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[0])
+        sg3_collection7_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[1])
+        sg3_collection8_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[2])
         sg3_collection6_ids = {row.id for row in sg3_collection6_docs.rows}
         sg3_collection7_ids = {row.id for row in sg3_collection7_docs.rows}
         sg3_collection8_ids = {row.id for row in sg3_collection8_docs.rows}
