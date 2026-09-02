@@ -114,24 +114,22 @@ _format_duration() {
   fi
 }
 
-# Closes whichever section is currently open (no-op if none is). Registered
-# as an EXIT trap so the closing banner -- and the duration -- still prints
-# even if the section's work fails (set -e / the caller's ERR trap exits the
-# script from inside the section), not just on a clean finish.
-_section_close() {
-  [ -z "$_section_label" ] && return 0
-  local end_ts
-  end_ts=$(date +%s)
-  echo -e "${_section_color}=== ${_section_label} END (took $(_format_duration $((end_ts - _section_start_ts)))) ===${COLOR_RESET}"
-  _section_label=""
-}
-
 section_start() {
-  _section_close
   _section_color="$1"
   _section_label="$2"
   _section_start_ts=$(date +%s)
   echo -e "${_section_color}=== ${_section_label} START ===${COLOR_RESET}"
+}
+
+# No-op if no section is open, so a stray call can't emit a bogus banner.
+section_end() {
+  [ -z "$_section_label" ] && return 0
+  local end_ts
+  end_ts=$(date +%s)
+  echo -e "${_section_color}=== ${_section_label} END (took $(_format_duration $((end_ts - _section_start_ts)))) ===${COLOR_RESET}"
+  _section_color=""
+  _section_label=""
+  _section_start_ts=""
 }
 
 # Append to any existing EXIT trap instead of overwriting it (some pipeline scripts
