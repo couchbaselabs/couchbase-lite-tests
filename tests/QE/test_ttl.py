@@ -76,27 +76,21 @@ class TestTTL(CBLTestClass):
             )
 
             self.mark_test_step("Verify both documents exist initially")
-            doc_exp_5 = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
-            doc_exp_years = await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
-            assert doc_exp_5 is not None, "exp_5 should exist"
-            assert doc_exp_years is not None, "exp_years should exist"
+            await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
+            await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
 
             self.mark_test_step("Wait for exp_5 document to expire")
             await asyncio.sleep(10)
 
             self.mark_test_step("Verify exp_5 document is expired (not accessible)")
-            try:
-                expired_doc = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
-                if expired_doc is not None:
-                    pytest.fail("exp_5 should be expired/inaccessible")
-            except CblSyncGatewayBadResponseError as e:
-                assert e.code in [403, 404], f"Expected 403/404 for expired doc, got {e.code}"
+            with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
+                await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
+            assert excinfo.value.code in [403, 404], f"Expected 403/404 for expired doc, got {excinfo.value.code}"
             sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
             assert sdk_doc is None, "exp_5 should be purged"
 
             self.mark_test_step("Verify exp_years document is still accessible")
             doc_still_valid = await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
-            assert doc_still_valid is not None, "exp_years should still be accessible"
             assert doc_still_valid.id == "exp_years"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -158,25 +152,19 @@ class TestTTL(CBLTestClass):
             )
 
             self.mark_test_step("Verify both documents exist initially")
-            doc_exp_5 = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
-            doc_exp_years = await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
-            assert doc_exp_5 is not None, "exp_5 should exist"
-            assert doc_exp_years is not None, "exp_years should exist"
+            await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
+            await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
 
             self.mark_test_step("Wait for exp_5 document to expire")
             await asyncio.sleep(10)
 
             self.mark_test_step("Verify exp_5 document is expired (not accessible)")
-            try:
-                expired_doc = await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
-                if expired_doc is not None:
-                    pytest.fail("exp_5 should be expired/inaccessible")
-            except CblSyncGatewayBadResponseError as e:
-                assert e.code in [403, 404], f"Expected 403/404 for expired doc, got {e.code}"
+            with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
+                await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
+            assert excinfo.value.code in [403, 404], f"Expected 403/404 for expired doc, got {excinfo.value.code}"
             sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
             assert sdk_doc is None, "exp_5 should be purged from bucket"
 
             self.mark_test_step("Verify exp_years document is still accessible")
             doc_still_valid = await sg_user.get_document(sg_db, "exp_years", "_default", "_default")
-            assert doc_still_valid is not None, "exp_years should still be accessible"
             assert doc_still_valid.id == "exp_years"

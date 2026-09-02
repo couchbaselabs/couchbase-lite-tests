@@ -173,12 +173,13 @@ class GreenboardUploader:
         # collected zero tests (and no setup crash occurred).
         self.__test_ran = True
 
-        if self.__overall_fail:
-            return
-
-        # Track if any test has SGW-focused markers
+        # Above the short-circuit: tests that still run after the latch must
+        # set this, or an SGW run gets filed under the CBL platform.
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
             self.__has_sgw_marker = True
+
+        if self.__overall_fail:
+            return
 
         if report.passed:
             self.__pass_count += 1
@@ -216,9 +217,13 @@ class GreenboardUploader:
             value is used instead.
         :param fail_count: Optional override for the fail count. Same
             semantics as ``pass_count``.
+
+        A setup/teardown failure skips the upload unless *both* counts are
+        supplied: the in-process counter stops tallying at the failure, so
+        anything falling back to it publishes a partial result.
         """
-        if self.__overall_fail:
-            cbl_warning("Overall result is failure, skipping upload...")
+        if self.__overall_fail and (pass_count is None or fail_count is None):
+            cbl_warning("Setup/teardown failure, skipping upload")
             return
 
         resolved_pass = pass_count if pass_count is not None else self.__pass_count

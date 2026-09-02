@@ -1,4 +1,3 @@
-import asyncio
 import os
 import platform
 import subprocess
@@ -8,7 +7,6 @@ import zipfile
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
-from time import sleep
 from typing import TypeVar, cast
 
 import aiohttp
@@ -20,6 +18,7 @@ from urllib.parse import quote_plus, urlparse
 import requests
 import tenacity
 from couchbase.auth import PasswordAuthenticator
+from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
@@ -38,7 +37,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
-from cbltest.utils import _try_n_times, async_retry_assert, retry_assert
+from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
 
@@ -62,7 +61,7 @@ class CouchbaseServer:
             resp.raise_for_status()
             cluster_data = resp.json()
         except Exception as e:
-            raise CblTestError(f"Cannot connect to CBS cluster: {e}")
+            raise CblTestError("Cannot connect to CBS cluster") from e
 
         nodes_in_cluster = cluster_data.get("nodes", [])
 
@@ -154,6 +153,21 @@ class CouchbaseServer:
         """
         return self.__hostname
 
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(1),
+        stop=tenacity.stop_after_attempt(10),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(CouchbaseException),
+    )
+    def get_bucket(self, name: str) -> Bucket:
+        """
+        Opens a bucket on the cluster, retrying while it is not yet available
+        (e.g. shortly after creation).
+
+        :param name: The name of the bucket to open
+        """
+        return self.__cluster.bucket(name)
+
     def create_collections(self, bucket: str, scope: str, names: list[str]) -> None:
         """
         A function that will create a specified set of collections in the specified scope
@@ -168,7 +182,7 @@ class CouchbaseServer:
             "Create Scope",
             attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
         ):
-            bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+            bucket_obj = self.get_bucket(bucket)
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
@@ -191,19 +205,29 @@ class CouchbaseServer:
                     except CollectionAlreadyExistsException:
                         pass
 
-                success = False
-                for _ in range(10):
-                    try:
-                        bucket_obj.scope(scope).collection(name).get("_nonexistent")
-                    except DocumentNotFoundException:
-                        success = True
-                        break
-                    except Exception:
-                        cbl_warning(f"{bucket}.{scope}.{name} appears to not be ready yet, waiting for 1 second...")
-                        sleep(1.0)
+                self._wait_for_collection_ready(bucket_obj, scope, name)
 
-                if not success:
-                    raise CblTestError(f"Unable to properly create {bucket}.{scope}.{name} in Couchbase Server")
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(1),
+        stop=tenacity.stop_after_attempt(10),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(CblTestError),
+    )
+    def _wait_for_collection_ready(self, bucket: Bucket, scope: str, name: str) -> None:
+        """
+        Probes a freshly created collection by reading a nonexistent document from it,
+        retrying until the collection responds.
+
+        :param bucket: The bucket the collection resides in
+        :param scope: The scope the collection resides in
+        :param name: The name of the collection to probe
+        """
+        try:
+            bucket.scope(scope).collection(name).get("_nonexistent")
+        except DocumentNotFoundException:
+            pass
+        except Exception as e:
+            raise CblTestError(f"Unable to properly create {bucket.name}.{scope}.{name} in Couchbase Server") from e
 
     def create_bucket(
         self,
@@ -237,11 +261,22 @@ class CouchbaseServer:
 
             # Bucket creation is asynchronous in the cluster. Wait until it is healthy
             # and responding before returning so callers can safely proceed.
-            for _ in range(retries):
-                if self.bucket_healthy(name) and self.bucket_kv_responding(name) and self.collections_ready(name):
-                    return newly_created
-                sleep(interval)
-            raise TimeoutError(f"Bucket {name} did not become ready")
+            retry_assert(
+                lambda: self._check_bucket_ready(name),
+                tenacity.wait_fixed(interval),
+                tenacity.stop_after_attempt(retries),
+            )
+            return newly_created
+
+    def _check_bucket_ready(self, name: str) -> None:
+        """
+        Asserts that a bucket is ready to use, naming the first condition it fails.
+
+        :param name: The bucket to check
+        """
+        assert self.bucket_healthy(name), f"bucket '{name}' is not healthy on all nodes"
+        assert self.bucket_kv_responding(name), f"bucket '{name}' is not responding to KV stats requests"
+        assert self.collections_ready(name), f"bucket '{name}' collection manifest is not available"
 
     def wait_for_indexes_removed(self, bucket: str) -> None:
         """
@@ -338,20 +373,24 @@ class CouchbaseServer:
         Waits for a bucket to be fully deleted from the Couchbase cluster.
         Async because deletion is eventual and requires polling remote state.
         """
+
+        async def _wait_for_bucket_deleted_poll() -> None:
+            try:
+                # If bucket no longer exists, deletion is complete
+                still_present = self.bucket_healthy(bucket_name)
+            except Exception:
+                # Treat errors as "bucket gone"
+                return
+            assert not still_present, f"bucket '{bucket_name}' is still present"
+
         with self.__tracer.start_as_current_span(
             "wait_for_bucket_deleted", attributes={"cbl.bucket.name": bucket_name}
         ):
-            for _ in range(max_retries):
-                try:
-                    # If bucket no longer exists, deletion is complete
-                    if not self.bucket_healthy(bucket_name):
-                        return
-                except Exception:
-                    # Treat errors as "bucket gone"
-                    return
-                await asyncio.sleep(retry_delay)
-
-            raise CblTestError(f"Bucket '{bucket_name}' was not deleted after {max_retries * retry_delay} seconds")
+            await async_retry_assert(
+                _wait_for_bucket_deleted_poll,
+                tenacity.wait_fixed(retry_delay),
+                tenacity.stop_after_attempt(max_retries),
+            )
 
     async def wait_for_no_buckets(
         self,
@@ -417,7 +456,7 @@ class CouchbaseServer:
                     with zipfile.ZipFile(data_filepath, "r") as zf:
                         zf.extractall(extract_path)
                 except zipfile.BadZipFile as e:
-                    raise CblTestError(f"Backup zip '{data_filepath}' is invalid: {e}") from e
+                    raise CblTestError(f"Backup zip '{data_filepath}' is invalid") from e
 
                 restore_args = [
                     cbbackupmgr_path,
@@ -521,11 +560,11 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 coll.upsert(doc_id, document)
             except Exception as e:
-                raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}: {e}")
+                raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}") from e
 
     def delete_document(
         self,
@@ -547,13 +586,13 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 coll.remove(doc_id)
             except DocumentNotFoundException:
                 pass
             except Exception as e:
-                raise CblTestError(f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}: {e}")
+                raise CblTestError(f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}") from e
 
     def get_document(
         self,
@@ -581,14 +620,14 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = _try_n_times(10, 1, False, self.__cluster.bucket, bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
                 result = coll.get(doc_id)
                 return result.content_as[dict] if result else None
             except DocumentNotFoundException:
                 return None
             except Exception as e:
-                raise CblTestError(f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}: {e}")
+                raise CblTestError(f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}") from e
 
     def upsert_document_xattr(
         self,
@@ -620,15 +659,15 @@ class CouchbaseServer:
             },
         ):
             try:
-                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
                 col.mutate_in(
                     doc_id,
                     [upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
                 )
             except Exception as e:
                 raise CblTestError(
-                    f"Failed to upsert xattr '{xattr_key}' on document '{doc_id}' in {bucket}.{scope}.{collection}: {e}"
-                )
+                    f"Failed to upsert xattr '{xattr_key}' on document '{doc_id}' in {bucket}.{scope}.{collection}"
+                ) from e
 
     def delete_document_xattr(
         self,
@@ -660,7 +699,7 @@ class CouchbaseServer:
             try:
                 from couchbase.subdocument import remove
 
-                col = self.__cluster.bucket(bucket).scope(scope).collection(collection)
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
                 col.mutate_in(
                     doc_id,
                     [remove(xattr_key, xattr=True)],

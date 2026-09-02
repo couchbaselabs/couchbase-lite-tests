@@ -195,7 +195,7 @@ class TestXattrs(CBLTestClass):
             all_doc_ids = sg_doc_ids + sdk_doc_ids
 
             self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-            sg_all_docs = await sg_user.wait_for_all_documents(sg_db, num_docs * 2)
+            sg_all_docs = await sg_user.wait_for_document_count(sg_db, num_docs * 2)
             assert len(sg_all_docs.rows) == num_docs * 2, (
                 f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
             )
@@ -248,8 +248,7 @@ class TestXattrs(CBLTestClass):
 
             self.mark_test_step("Verify non-deleted docs still accessible")
             for doc_id in remaining_docs:
-                sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                assert sg_doc is not None, f"Non-deleted doc {doc_id} should still be accessible"
+                await sg.get_document(sg_db, doc_id, "_default", "_default")
 
             if supports_version_vectors:
                 self.mark_test_step("Verify new version vectors for deleted docs (optional)")
@@ -561,7 +560,6 @@ class TestXattrs(CBLTestClass):
 
                 # Verify from SG side
                 sg_doc = await sg.get_document(sg_db, doc_id)
-                assert sg_doc is not None, f"Doc {doc_id} should exist in SG"
                 assert (
                     sg_doc.body["updates"] == num_updates * 2
                     and sg_doc.body["sdk_updates"] == num_updates
@@ -705,7 +703,7 @@ class TestXattrs(CBLTestClass):
                 )
 
             self.mark_test_step("Wait for SG to import all docs (as admin)")
-            sg_all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
+            sg_all_docs = await sg.wait_for_document_count(sg_db, num_docs)
             assert len(sg_all_docs.rows) >= num_docs, (
                 f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
             )

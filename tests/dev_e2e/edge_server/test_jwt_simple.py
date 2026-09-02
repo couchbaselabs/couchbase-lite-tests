@@ -112,25 +112,15 @@ class TestJWTSimple(CBLTestClass):
 
         # =====================================================================
         # STEP 6: Wait for SGW to import docs from CBS.
-        # CBS→SGW import is async. We poll SGW's _all_docs endpoint until our
-        # documents appear (max 30s). This prevents the race condition where
-        # ES starts replicating before SGW has the docs in its feed.
+        # CBS→SGW import is async; ES must not start replicating before the docs
+        # are in SGW's feed.
         # =====================================================================
         self.mark_test_step("Waiting for SGW to import documents from CBS.")
-        max_wait = 30
-        poll_interval = 2
-        elapsed = 0
-        docs_ready = False
-        while elapsed < max_wait:
-            sgw_docs = await sync_gateway.get_all_documents(sg_db_name, scope="travel", collection="airlines")
-            sgw_doc_ids = [row.id for row in sgw_docs.rows]
-            if all(f"jwt_test_airline_{i}" in sgw_doc_ids for i in range(1, 6)):
-                docs_ready = True
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-        assert docs_ready, (
-            f"SGW did not import all 5 docs within {max_wait}s. Found: {[d for d in sgw_doc_ids if 'jwt_test' in d]}"
+        await sync_gateway.wait_for_documents(
+            sg_db_name,
+            [f"jwt_test_airline_{i}" for i in range(1, 6)],
+            scope="travel",
+            collection="airlines",
         )
 
         # =====================================================================
