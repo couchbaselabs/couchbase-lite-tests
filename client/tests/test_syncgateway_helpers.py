@@ -13,34 +13,37 @@ import asyncio
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
+from typing import get_origin
 
 import pytest
 import pytest_asyncio
 from aiohttp import encode_basic_auth, web
 from aiohttp.test_utils import TestServer
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DatabaseState,
     ScopeConfig,
     SyncGateway,
 )
+from cbltest.api.syncgatewaystats import (
+    AuditStat,
+    CacheStats,
+    CBLReplicationPullStats,
+    CBLReplicationPushStats,
+    ConfigStat,
+    DatabaseStats,
+    DeltaSyncStats,
+    ResourceUtilization,
+    SecurityStats,
+    SharedBucketImportStats,
+)
 from cbltest.httplog import _HttpLogWriter
-from pydantic import ValidationError
+from conftest import bootstrap_response
+from pydantic import BaseModel, ValidationError
 
 # (SyncGateway, response specs the test server serves, headers the server saw)
 SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
-
-
-class _FakeConfigResponse:
-    """Stands in for requests.Response from the sync GET /_config bootstrap
-    call in SyncGateway.__init__ - unrelated to the async helpers under test."""
-
-    def json(self) -> dict:
-        return {"bootstrap": {"server": "rosmar"}}
-
-    def raise_for_status(self) -> None:
-        return None
 
 
 @pytest_asyncio.fixture(loop_scope="function")
@@ -55,7 +58,7 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
-        lambda *args, **kwargs: _FakeConfigResponse(),
+        lambda *args, **kwargs: bootstrap_response(),
     )
 
     specs: list[dict] = []
@@ -433,3 +436,221 @@ class TestDeleteDatabase:
             await sg._delete_database("db2")
 
         assert len(received) == 4  # Initial attempt plus three retries.
+
+
+def _section(model: type[BaseModel], **stats: object) -> dict:
+    """Every stat the section requires, at zero, with the given ones set."""
+    required = {
+        name: {} if get_origin(field.annotation) is dict else 0
+        for name, field in model.model_fields.items()
+        if field.is_required()
+    }
+    return required | stats
+
+
+def _stats_specs(*expvars: dict, version: str = "3.3.0") -> list[dict]:
+    """The responses a run of stats reads makes: the node's version, which one read remembers
+    for the rest, then an ``/_expvar`` payload per read."""
+    status = {
+        "status": 200,
+        "json": {
+            "version": f"Couchbase Sync Gateway/{version}(1;abc123) EE",
+            "vendor": {"name": "Couchbase Sync Gateway", "version": version},
+        },
+    }
+    return [status, *expvars]
+
+
+def _expvar(db_name: str, **sections: dict) -> dict:
+    """A ``GET /_expvar`` payload holding the node's global stats and the sections Sync Gateway
+    sends for every database, with the given ones replacing the per-database ones."""
+    always: dict[str, dict] = {
+        "cache": _section(CacheStats),
+        "cbl_replication_pull": _section(CBLReplicationPullStats),
+        "cbl_replication_push": _section(CBLReplicationPushStats),
+        "database": _section(DatabaseStats),
+        "security": _section(SecurityStats),
+        "gsi_views": {},
+    }
+    global_stats = {
+        "resource_utilization": _section(ResourceUtilization),
+        "config": _section(ConfigStat),
+        "audit": _section(AuditStat),
+    }
+    return {
+        "status": 200,
+        "json": {"syncgateway": {"global": global_stats, "per_db": {db_name: always | sections}}},
+    }
+
+
+class TestExpvarStats:
+    """A stat Sync Gateway 3.2.0 already declared is required, and reading a stat that a later
+    release added raises when this node sent none.  A whole section is absent when the database
+    does not run the feature it counts, which raises as well."""
+
+    @pytest.mark.asyncio
+    async def test_reads_the_database_section(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(
+            _expvar("db1", database=_section(DatabaseStats, doc_reads_bytes_blip=120, doc_writes_bytes_blip=45))
+        )
+
+        stats = (await sg.get_database_stats("db1")).database
+
+        assert (stats.doc_reads_bytes_blip, stats.doc_writes_bytes_blip) == (120, 45)
+
+    @pytest.mark.asyncio
+    async def test_ignores_stats_the_model_does_not_declare(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(
+            _expvar(
+                "db1",
+                database=_section(
+                    DatabaseStats, doc_reads_bytes_blip=1, doc_writes_bytes_blip=2, stat_added_in_a_later_release=3
+                ),
+            )
+        )
+
+        stats = (await sg.get_database_stats("db1")).database
+
+        assert (stats.doc_reads_bytes_blip, stats.doc_writes_bytes_blip) == (1, 2)
+
+    @pytest.mark.asyncio
+    async def test_raises_when_the_payload_has_no_global_section(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        payload = _expvar("db1")
+        del payload["json"]["syncgateway"]["global"]
+        specs[:] = _stats_specs(payload)
+
+        with pytest.raises(CblTestError, match="unexpected payload"):
+            await sg.get_database_stats("db1")
+
+    @pytest.mark.asyncio
+    async def test_reads_a_stat_a_later_release_added(self, sync_gateway: SyncGatewayFixture) -> None:
+        """tombstone_count arrived in 4.0.0, so it is no field of the model."""
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1", database=_section(DatabaseStats, tombstone_count=12)))
+
+        assert (await sg.get_database_stats("db1")).database.tombstone_count == 12
+
+    @pytest.mark.asyncio
+    async def test_raises_on_a_stat_the_node_should_have_sent(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A 4.2.0 node has every stat, so an absent one was renamed or removed."""
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1"), version="4.2.0")
+
+        stats = (await sg.get_database_stats("db1")).database
+
+        with pytest.raises(CblTestError, match="this node reports 4.2.0, so the stat was renamed or removed"):
+            _ = stats.tombstone_count
+
+    @pytest.mark.asyncio
+    async def test_raises_on_a_stat_the_payload_does_not_carry(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1"))
+
+        stats = (await sg.get_database_stats("db1")).database
+
+        with pytest.raises(CblTestError, match="no 'tombstone_count' stat: Sync Gateway 4.0.0 added it"):
+            _ = stats.tombstone_count
+
+    @pytest.mark.asyncio
+    async def test_raises_when_a_required_stat_is_missing(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        payload = _expvar("db1")
+        del payload["json"]["syncgateway"]["per_db"]["db1"]["database"]["doc_writes_bytes_blip"]
+        specs[:] = _stats_specs(payload)
+
+        with pytest.raises(CblTestError, match="doc_writes_bytes_blip"):
+            await sg.get_database_stats("db1")
+
+    @pytest.mark.asyncio
+    async def test_raises_when_the_database_has_no_stats(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1"))
+
+        with pytest.raises(CblTestError, match="no stats for a database named 'db2'"):
+            await sg.get_database_stats("db2")
+
+    @pytest.mark.asyncio
+    async def test_raises_when_the_payload_has_no_syncgateway_section(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs({"status": 200, "json": {"memstats": {}}})
+
+        with pytest.raises(CblTestError, match="unexpected payload"):
+            await sg.get_database_stats("db1")
+
+    @pytest.mark.asyncio
+    async def test_raises_when_the_payload_has_no_per_db_section(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs({"status": 200, "json": {"syncgateway": {"global": {}}}})
+
+        with pytest.raises(CblTestError, match="unexpected payload"):
+            await sg.get_database_stats("db1")
+
+    @pytest.mark.asyncio
+    async def test_delta_sync_stats(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1", delta_sync=_section(DeltaSyncStats, deltas_requested=9, deltas_sent=7)))
+
+        stats = (await sg.get_database_stats("db1")).delta_sync
+
+        assert (stats.deltas_requested, stats.deltas_sent) == (9, 7)
+
+    @pytest.mark.asyncio
+    async def test_reads_a_section_once(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1", delta_sync=_section(DeltaSyncStats)))
+
+        stats = await sg.get_database_stats("db1")
+
+        assert stats.delta_sync is stats.delta_sync
+
+    @pytest.mark.asyncio
+    async def test_raises_on_a_section_it_cannot_read(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1", delta_sync={"deltas_sent": "seven"}))
+
+        stats = await sg.get_database_stats("db1")
+
+        with pytest.raises(CblTestError, match="unexpected 'delta_sync' section"):
+            _ = stats.delta_sync
+
+    @pytest.mark.asyncio
+    async def test_raises_on_a_stat_that_is_not_a_number(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1", database=_section(DatabaseStats, tombstone_count="twelve")))
+
+        stats = (await sg.get_database_stats("db1")).database
+
+        with pytest.raises(CblTestError, match="sent the 'tombstone_count' stat as str"):
+            _ = stats.tombstone_count
+
+    @pytest.mark.asyncio
+    async def test_raises_when_delta_sync_is_off(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1"))
+
+        stats = await sg.get_database_stats("db1")
+
+        with pytest.raises(CblTestError, match="no 'delta_sync' stats for the database 'db1'"):
+            _ = stats.delta_sync
+
+    @pytest.mark.asyncio
+    async def test_import_count(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(
+            _expvar("db1", shared_bucket_import=_section(SharedBucketImportStats, import_count=4)),
+            _expvar("db1", shared_bucket_import=_section(SharedBucketImportStats)),
+        )
+
+        assert await sg.get_import_count("db1") == 4
+        assert await sg.get_import_count("db1") == 0
+
+    @pytest.mark.asyncio
+    async def test_raises_when_import_is_off(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = _stats_specs(_expvar("db1"))
+
+        with pytest.raises(CblTestError, match="no 'shared_bucket_import' stats for the database 'db1'"):
+            await sg.get_import_count("db1")

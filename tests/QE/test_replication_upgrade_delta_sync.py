@@ -17,25 +17,17 @@ from shared.upgrade_test_helpers import (
     setup_upgrade_env,
 )
 
-# A real delta send is only distinguishable from a full-body fallback by a
-# per-rev "deltas sent" counter under syncgateway.per_db.<db>.delta_sync;
-# session-level counters increment even when SGW falls back to a full body.
-_DELTAS_SENT_KEYS: tuple[str, ...] = ("deltas_sent", "delta_sent", "deltas_sent_count")
+
+async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
+    """A real delta send is only distinguishable from a full-body fallback by this per-rev
+    counter; the session-level counters increment either way."""
+    return (await sg.get_database_stats(db_name)).delta_sync.deltas_sent
 
 
-def _deltas_sent(stats: dict) -> int | None:
-    for key in _DELTAS_SENT_KEYS:
-        value = stats.get(key)
-        if isinstance(value, int):
-            return value
-    return None
-
-
-async def _assert_delta_sync_participated(sg: SyncGateway, db_name: str, deltas_sent_before: int | None) -> None:
+async def _assert_delta_sync_participated(sg: SyncGateway, db_name: str, deltas_sent_before: int) -> None:
     """Assert SGW sent the revision as a delta, not a full-body fallback."""
-    deltas_sent_after = _deltas_sent(await sg.get_delta_sync_stats(db_name))
-    assert deltas_sent_after is not None, f"No per-rev delta counter in SGW expvar (tried {_DELTAS_SENT_KEYS})."
-    assert deltas_sent_after - (deltas_sent_before or 0) > 0, "SGW fell back to a full-body send instead of a delta."
+    deltas_sent_after = await _deltas_sent(sg, db_name)
+    assert deltas_sent_after > deltas_sent_before, "SGW fell back to a full-body send instead of a delta."
 
 
 _DELTA_SYNC_UPGRADE_CONFIG = DatabaseConfig(
@@ -96,7 +88,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
         assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
-        deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
+        deltas_sent_before = await _deltas_sent(sg, "upgrade")
         await sg.update_documents(
             "upgrade",
             [
@@ -145,7 +137,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
         await self._prepare_sg_with_delta_sync(cblpytest)
         sg = cblpytest.sync_gateways[0]
 
-        deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
+        deltas_sent_before = await _deltas_sent(sg, "upgrade")
 
         def validator(pre: DocSnapshot, post: DocSnapshot) -> None:
             assert pre.local.revid is not None and pre.local.cv is None, (

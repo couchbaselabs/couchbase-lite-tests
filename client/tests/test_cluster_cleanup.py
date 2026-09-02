@@ -24,7 +24,7 @@ def _stub_node(
 
     monkeypatch.setattr(sg, "get_all_databases_verbose", get_all_databases_verbose)
     monkeypatch.setattr(sg, "_delete_database", delete_database)
-    # requests.get is patched out, so using_rosmar defaults to a truthy mock.
+    # The bootstrap fake reports Rosmar, and this test wants the other path.
     monkeypatch.setattr(sg, "using_rosmar", False)
 
 

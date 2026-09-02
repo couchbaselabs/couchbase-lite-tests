@@ -12,6 +12,7 @@ from typing import Any, cast
 from urllib.parse import urlencode, urljoin
 
 import aiofiles
+import asyncstdlib
 import packaging.version
 import requests
 import tenacity
@@ -23,6 +24,7 @@ from pydantic import BaseModel, Field, TypeAdapter
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
+from cbltest.api.syncgatewaystats import Expvars, PerDatabaseStats
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
@@ -849,6 +851,11 @@ class _SyncGatewayBase:
 
     async def get_version(self) -> SyncGatewayVersion:
         """Return version of Sync Gateway"""
+        return await self._version
+
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def _version(self) -> SyncGatewayVersion:
+        """Reads the version, once per node however many callers ask at once."""
         resp = await self._send_request("get", "/_status")
         assert isinstance(resp, dict)
         model = SyncGatewayStatusResponse.model_validate(resp)
@@ -902,38 +909,18 @@ class _SyncGatewayBase:
 
         return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
 
-    async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
+    async def get_database_stats(self, db_name: str) -> PerDatabaseStats:
         """
-        Gets the bytes transferred for a given dataset
+        Gets one database's stats from ``GET /_expvar``, every section of them.
 
-        :param dataset_name: The name of the dataset to get the bytes transferred for
+        The node's version comes along, so a stat the node should have sent but did not reads
+        as a rename rather than as a feature the node is too old for.
+
+        :param db_name: The name of the SGW database to inspect
         """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
-        doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
-        doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
-        return doc_reads_bytes, doc_writes_bytes
-
-    async def get_delta_sync_stats(self, dataset_name: str) -> dict:
-        """
-        Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
-        Returns an empty dict if the section is absent.
-
-        :param dataset_name: The name of the SGW database to inspect.
-        """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        try:
-            db_section = expvars["syncgateway"]["per_db"][dataset_name]
-        except KeyError:
-            return {}
-        delta = db_section.get("delta_sync")
-        return delta if isinstance(delta, dict) else {}
+        version = await self.get_version()
+        resp = await self._send_request("get", "/_expvar")
+        return Expvars.from_response(resp, version.version).database(db_name)
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
         """
@@ -2316,6 +2303,8 @@ class SyncGateway(_SyncGatewayBase):
                         body = await resp.text()
                         raise Exception(f"Failed to restart SGW: {resp.status} - {body}")
         await self._wait_for_rest_api()
+        # A restart can bring up a different build, so the remembered version is stale.
+        self.__dict__.pop("_version", None)
 
     async def stop(self) -> None:
         """
@@ -2417,16 +2406,7 @@ class SyncGateway(_SyncGatewayBase):
 
         :param db_name: The database to read the stat for
         """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-        return (
-            expvars.get("syncgateway", {})
-            .get("per_db", {})
-            .get(db_name, {})
-            .get("shared_bucket_import", {})
-            .get("import_count", 0)
-        )
+        return (await self.get_database_stats(db_name)).shared_bucket_import.import_count
 
     async def reset_user(
         self,

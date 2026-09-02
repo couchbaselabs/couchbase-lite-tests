@@ -12,6 +12,7 @@ from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.syncgateway import DatabaseConfig, SGCollectRedactLevel, SyncGateway
 from cbltest.plugins.sgcollect_fixture import run_sgcollects
+from conftest import patch_bootstrap
 
 
 class FakeSyncGateway(SyncGateway):
@@ -24,7 +25,7 @@ class FakeSyncGateway(SyncGateway):
     def __init__(self, hostname: str = "sg.example.com") -> None:
         with (
             patch("cbltest.api.syncgateway.ClientSession", autospec=True),
-            patch("cbltest.api.syncgateway.requests.get", autospec=True),
+            patch_bootstrap(),
         ):
             super().__init__(url=hostname, username="user", password="pass")
 
