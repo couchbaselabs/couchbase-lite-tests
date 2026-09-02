@@ -16,3 +16,4 @@ move_artifacts "$TESTS_DIR"
 
 uv run ./stop_backend.py --topology topology_setup/topology.json
 popd
+section_end
