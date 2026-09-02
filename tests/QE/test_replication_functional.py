@@ -358,7 +358,6 @@ class TestReplicationFunctional(CBLTestClass):
 
         self.mark_test_step("Verify doc_1 exists in SGW.")
         sgw_doc = await sync_gateway.get_document("short_expiry", "doc_1", "_default", "_default")
-        assert sgw_doc is not None, "doc_1 should exist in SGW after push replication"
         assert sgw_doc.body["type"] == "test_doc", "doc_1 should have correct content"
 
         self.mark_test_step("Purge doc_1 from SGW.")
@@ -753,8 +752,6 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step("Create conflicts by having both users update the same documents.")
         doc1 = await sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")
         doc2 = await sync_gateway.get_document("posts", "shared_doc2", "_default", "posts")
-        assert doc1 is not None, "Document shared_doc1 not found in SGW"
-        assert doc2 is not None, "Document shared_doc2 not found in SGW"
         assert doc1.revid is not None, "Document shared_doc1 has no revision ID"
         assert doc2.revid is not None, "Document shared_doc2 has no revision ID"
 
@@ -904,8 +901,6 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step("Verify documents in Sync Gateway have the latest updates.")
         sgw_doc1 = await sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")
         sgw_doc2 = await sync_gateway.get_document("posts", "shared_doc2", "_default", "posts")
-        assert sgw_doc1 is not None, "Document shared_doc1 not found in SGW"
-        assert sgw_doc2 is not None, "Document shared_doc2 not found in SGW"
         assert sgw_doc1.body["title"] == "Shared Document 1 - Updated by CBL User1", (
             f"Document 1 in SG does not have user1's CBL update. Found: {sgw_doc1.body['title']}"
         )

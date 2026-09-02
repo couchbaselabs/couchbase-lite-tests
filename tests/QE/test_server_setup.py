@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -40,6 +38,7 @@ class TestServerSetup(CBLTestClass):
         await sg.restart_with_config("bootstrap-alternate")
 
         self.mark_test_step(f"Create {num_docs} documents via SDK")
+        counts_before = [await node.get_import_count(sg_db) for node in cblpytest.sync_gateways]
         for i in range(num_docs):
             doc_id = f"sdk_doc_{i}"
             doc_body = {
@@ -50,13 +49,15 @@ class TestServerSetup(CBLTestClass):
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         self.mark_test_step("Verify documents were imported via SGW")
-        all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
+        all_docs = await sg.wait_for_document_count(sg_db, num_docs)
         imported_count = len(all_docs.rows)
         assert imported_count == num_docs, f"Expected {num_docs} imported docs, got {imported_count}"
 
-        self.mark_test_step("Verify import_count in expvars")
-        import_count = await sg.wait_for_import_count(sg_db, 1)
-        assert import_count != 0, f"Expected import_count > 0, got {import_count}"
+        self.mark_test_step("Verify at least one SGW node reports an import in expvars")
+        counts_after = [await node.get_import_count(sg_db) for node in cblpytest.sync_gateways]
+        assert any(after > before for before, after in zip(counts_before, counts_after, strict=True)), (
+            f"Expected at least one SGW node to report a new import, got {counts_before} -> {counts_after}"
+        )
         await sg.restart_with_config("bootstrap")
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -97,9 +98,8 @@ class TestServerSetup(CBLTestClass):
         doc_id = "test_cacert_auth"
         doc_body = {"type": "test", "message": "x509 ca_cert_path auth works"}
         cbs.upsert_document(bucket_name, doc_id, doc_body)
-        await asyncio.sleep(3)
+        await sg.wait_for_documents(sg_db, [doc_id])
         sg_doc = await sg.get_document(sg_db, doc_id)
-        assert sg_doc is not None, "SGW should import document from CBS"
         assert sg_doc.body["message"] == "x509 ca_cert_path auth works"
 
         await sg.restart_with_config()

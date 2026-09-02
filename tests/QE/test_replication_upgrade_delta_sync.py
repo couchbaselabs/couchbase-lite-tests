@@ -95,7 +95,6 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
-        assert current is not None, f"Expected '{doc_id}' imported from bucket"
         assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
         deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
         await sg.update_documents(

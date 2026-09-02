@@ -177,13 +177,10 @@ class GreenboardUploader:
         # collected zero tests (and no setup crash occurred).
         self.__test_ran = True
 
-        # __overall_fail latches on the first setup or teardown failure and is never
-        # cleared, so gating the tallies on it here froze them from that point on.
-        # upload() refuses to upload at all once it is set, so the ordinary path never
-        # noticed; record_upgrade_step does run in that state and writes
-        # "passCount": self.__pass_count, which understated the passes in the batch doc.
-
-        # Track if any test has SGW-focused markers
+        # Nothing below is gated on __overall_fail: the latch is never cleared, and
+        # record_upgrade_step still runs once it is set, so gating here would file an
+        # SGW run under the CBL platform and understate passCount. upload() keeps its
+        # own guard on the latch.
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
             self.__has_sgw_marker = True
         if item.get_closest_marker("min_edge_servers"):
@@ -234,9 +231,13 @@ class GreenboardUploader:
             value is used instead.
         :param fail_count: Optional override for the fail count. Same
             semantics as ``pass_count``.
+
+        A setup/teardown failure skips the upload unless *both* counts are
+        supplied: the in-process counter stops tallying at the failure, so
+        anything falling back to it publishes a partial result.
         """
-        if self.__overall_fail:
-            cbl_warning("Overall result is failure, skipping upload...")
+        if self.__overall_fail and (pass_count is None or fail_count is None):
+            cbl_warning("Setup/teardown failure, skipping upload")
             return
 
         resolved_pass = pass_count if pass_count is not None else self.__pass_count

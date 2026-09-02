@@ -229,7 +229,6 @@ class TestSystem(CBLTestClass):
                 await asyncio.sleep(5)
                 self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                 sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                assert sg_doc is not None, f"Document {doc_id} does not exist on the sync gateway"
                 assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
                 assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
@@ -370,7 +369,6 @@ class TestSystem(CBLTestClass):
                     assert created_doc is not None, f"Failed to create document {doc_id} via Edge Server"
                     self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc is not None, f"Document {doc_id} does not exist on the sync gateway"
                     assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
                     assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
@@ -482,7 +480,6 @@ class TestSystem(CBLTestClass):
 
                     self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc is not None, f"[Client {client_id}] {doc_id} missing on Sync Gateway"
                     assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
                     assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                     rev_id = sg_doc.revid
@@ -657,7 +654,6 @@ class TestSystem(CBLTestClass):
 
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert sg_doc is not None, f"[Client {client_id}] {doc_id} missing on Sync Gateway"
                         assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
                         assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                         rev_id = sg_doc.revid

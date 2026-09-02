@@ -173,10 +173,8 @@ class TestReplicationFilter(CBLTestClass):
         """
         )
         remote_airport_10 = await sync_gateway.get_document("travel", "airport_10", "travel", "airports")
-        assert remote_airport_10 is not None, "Missing airport_10 from sync gateway"
 
         remote_landmark_10 = await sync_gateway.get_document("travel", "landmark_10", "travel", "landmarks")
-        assert remote_landmark_10 is not None, "Missing landmark_10 from sync gateway"
         landmark_10_revid = assert_not_null(remote_landmark_10.revid, "Missing landmark_10 revid")
 
         updates = [
@@ -260,20 +258,15 @@ class TestReplicationFilter(CBLTestClass):
         """
         )
         remote_airport_11 = await sync_gateway.get_document("travel", "airport_11", "travel", "airports")
-        assert remote_airport_11 is not None, "Missing airport_11 from sync gateway"
 
         remote_airport_1 = await sync_gateway.get_document("travel", "airport_1", "travel", "airports")
-        assert remote_airport_1 is not None, "Missing airport_1 from sync gateway"
 
         remote_airport_17 = await sync_gateway.get_document("travel", "airport_17", "travel", "airports")
-        assert remote_airport_17 is not None, "Missing airport_17 from sync gateway"
 
         remote_landmark_1 = await sync_gateway.get_document("travel", "landmark_1", "travel", "landmarks")
-        assert remote_landmark_1 is not None, "Missing landmark_1 from sync gateway"
         landmark_1_revid = assert_not_null(remote_landmark_1.revid, "Missing landmark_1 revid")
 
         remote_landmark_601 = await sync_gateway.get_document("travel", "landmark_601", "travel", "landmarks")
-        assert remote_landmark_601 is not None, "Missing landmark_601 from sync gateway"
         landmark_601_revid = assert_not_null(remote_landmark_601.revid, "Missing landmark_601 revid")
 
         updates = [
@@ -422,7 +415,6 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Verify that the document on Sync Gateway was updated")
         sgw_doc = await sync_gateway.get_document("names", "test_public")
-        assert sgw_doc is not None, "test_public missing from SGW"
         assert "see you later" in sgw_doc.body, "updated key missing from test_public in SGW"
         assert sgw_doc.body["see you later"] == "world", "incorrect data in updated key from test_public in SGW"
 
@@ -569,11 +561,9 @@ class TestReplicationFilter(CBLTestClass):
         updates = [DocumentUpdateEntry("name_1000", None, {"answer": 42})]
 
         remote_name_10 = await sync_gateway.get_document("names", "name_105")
-        assert remote_name_10 is not None, "Missing name_105 from sync gateway"
         name_10_revid = assert_not_null(remote_name_10.revid, "Missing name_105 revid")
 
         remote_name_20 = await sync_gateway.get_document("names", "name_193")
-        assert remote_name_20 is not None, "Missing name_193 from sync gateway"
         name_20_revid = assert_not_null(remote_name_20.revid, "Missing name_193 revid")
 
         await sync_gateway.update_documents("names", updates)
