@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# Wipe every Edge Server database and restore the datasets setup_edge_servers.py
-# provisioned. Unlike /reset-db this takes no request body, so it works even when
-# Edge Server is stopped or running a config the caller cannot authenticate against.
+# Wipe every Edge Server database and restore the provisioned datasets. Unlike /reset-db
+# this takes no request body, so it needs no name and no working Edge Server.
 
 set -euo pipefail
 

@@ -49,8 +49,8 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
 
     cbl_info("🧹 Backend cleanup started")
 
-    # Edge Servers first: their provisioned config declares no replications, so nothing
-    # is pulling from the Sync Gateway databases the next phase deletes.
+    # Edge Servers first: their initial config declares no replications, so nothing is
+    # pulling from the Sync Gateway databases the next phase deletes.
     await reset_all_edge_servers(cblpytest.edge_servers)
 
     # Databases are deleted before their backing buckets are dropped, so a failure in
@@ -68,12 +68,7 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
 
 
 async def reset_all_edge_servers(edge_servers: Sequence[EdgeServer]) -> None:
-    """
-    Reset every Edge Server to its provisioned state, in parallel.
-
-    Unlike Sync Gateway and Couchbase Server, an Edge Server is reconfigured by the
-    tests themselves: swapped onto other configs, killed, firewalled.
-    """
+    """Reset every Edge Server to its provisioned state, in parallel."""
     if not edge_servers:
         return
 

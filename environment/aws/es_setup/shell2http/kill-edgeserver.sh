@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Stop Edge Server and do not return until it has let go of its listening port, so
-# that the next /start-edgeserver does not race it and die with "Address already in use".
+# Stop Edge Server and do not return until it has let go of its listening port, so that
+# the next /start-edgeserver does not race it.
 
 ES_BIN="/opt/couchbase-edge-server/bin/couchbase-edge-server"
 PORT="${ES_PORT:-59840}"
@@ -19,9 +19,8 @@ stopped() {
   [[ -z "$(es_pids)" ]] && ! port_busy
 }
 
-# The RPM installs and starts a systemd unit, so on a freshly provisioned host systemd
-# respawns the process unless the service is stopped first. The tests then run Edge
-# Server by hand with setsid, so the signal escalation below is still needed.
+# The RPM starts a systemd unit that respawns the process unless the service is stopped
+# first. Tests then run Edge Server by hand, so the signal escalation below still applies.
 if systemctl cat couchbase-edge-server.service >/dev/null 2>&1; then
   sudo systemctl stop couchbase-edge-server.service >/dev/null 2>&1 || true
 fi

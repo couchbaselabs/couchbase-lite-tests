@@ -278,8 +278,8 @@ def _find_pyproject(start: Path) -> Path | None:
     return None
 
 
-# Helpers that act on whatever topology the environment provides and require nothing
-# of it. Tracing into them would demand a min_* marker from every test that cleans up.
+# Helpers that act on whatever topology the environment provides and require nothing of
+# it, so their topology access must not be traced into their callers.
 TOPOLOGY_AGNOSTIC_HELPERS: frozenset[tuple[str, str]] = frozenset(
     {
         ("cbltest.plugins.cluster_cleanup", "perform_cleanup"),

@@ -113,9 +113,8 @@ class EdgeServer:
         self.__auth_password = admin_password
         self.__anonymous_session: ClientSession | None = None
         self.__admin_session: ClientSession | None = None
-        # What this Edge Server was provisioned with. configure_dataset() moves
-        # __config_file on and set_auth() overwrites the credentials, so
-        # reset_to_initial_state() needs its own record of what to return to.
+        # The live config and credentials move on as tests run; reset_to_initial_state()
+        # restores these.
         self.__initial_config_file: str = config_file
         self.__initial_auth_name: str = admin_user
         self.__initial_auth_password: str = admin_password
@@ -127,8 +126,8 @@ class EdgeServer:
         Adopt `config_file` as this Edge Server's current config, rebuilding the
         sessions whose port, scheme and auth it determines.
 
-        Any sessions being replaced are dropped here. Callers that can await should
-        go through :func:`reconfigure`, which closes the old ones first.
+        Any sessions being replaced are dropped here. Callers that can await should go
+        through :func:`reconfigure`, which closes the sessions it replaces.
         """
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
         self.__secure: bool = secure
@@ -152,11 +151,9 @@ class EdgeServer:
         """
         Adopt `config_file`, closing the sessions it replaces.
 
-        The shell2http session is left alone: it always talks plain HTTP to port
-        20001, whatever the Edge Server config says.
-
-        The old sessions are closed only once the new config has been applied, so a
-        config this cannot decode leaves the object usable.
+        The shell2http session is left alone: it always talks plain HTTP to port 20001,
+        whatever the Edge Server config says. Applying the new config before closing the
+        old sessions leaves the object usable if `config_file` cannot be decoded.
         """
         replaced = (self.__admin_session, self.__anonymous_session)
         self._apply_config(config_file)
@@ -1003,12 +1000,10 @@ class EdgeServer:
 
     async def reset_to_initial_state(self) -> None:
         """
-        Return this Edge Server to the state the AWS setup left it in.
+        Restore the config, admin credentials and databases this Edge Server started with.
 
-        Restores the config, the admin credentials and the databases. Firewall
-        rules are dropped first, since a leftover DROP rule hides the host. Files
-        written through /write-file, and users added through add_user, are left
-        as they are.
+        Firewall rules are dropped first, since a leftover DROP rule hides the host.
+        Files written through /write-file, and users added through add_user, remain.
         """
         with self.__tracer.start_as_current_span("reset edge server"):
             await self.reset_firewall()
