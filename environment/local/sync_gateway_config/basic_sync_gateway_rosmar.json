@@ -6,6 +6,13 @@
     "username": "Administrator",
     "password": "password"
   },
+  "api": {
+    "cors": {
+      "origin": ["http://localhost:5173"],
+      "login_origin": ["http://localhost:5173"],
+      "headers": ["Authorization"]
+    }
+  },
   "logging": {
     "console": {
       "enabled": true,

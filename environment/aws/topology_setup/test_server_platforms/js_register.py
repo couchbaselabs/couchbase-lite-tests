@@ -1,5 +1,5 @@
-import platform
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +21,8 @@ JS_TEST_SERVER_DIR = TEST_SERVER_DIR / "javascript"
 ZIP_FOLDER_NAME = "compressed"
 ZIP_DIR = JS_TEST_SERVER_DIR / ZIP_FOLDER_NAME
 SCRIPT_DIR = Path(__file__).resolve().parent
+PID_FILENAME = "server.pid"
+LOG_FILENAME = "server.log"
 
 
 class JavascriptBridge(PlatformBridge):
@@ -28,7 +30,8 @@ class JavascriptBridge(PlatformBridge):
         """
         Initialize the JavascriptBridge with the working directory containing the site files
         """
-        self.__working_dir = working_dir
+        self.__working_dir = Path(working_dir)
+        self.__pid_file = self.__working_dir / PID_FILENAME
 
     def validate(self, location: str) -> None:
         """
@@ -59,7 +62,7 @@ class JavascriptBridge(PlatformBridge):
         """
         header("Running bun run dev")
 
-        log_file = JS_TEST_SERVER_DIR / "server.log"
+        log_file = self.__working_dir / LOG_FILENAME
         with open(log_file, "w") as log_fd:
             process = subprocess.Popen(
                 ["bun", "run", "dev"],
@@ -69,6 +72,7 @@ class JavascriptBridge(PlatformBridge):
                 stderr=log_fd,
                 cwd=self.__working_dir,
             )
+        self.__pid_file.write_text(str(process.pid))
         click.echo(f"Started bun with PID {process.pid}")
 
     def stop(self, location: str) -> None:
@@ -78,24 +82,49 @@ class JavascriptBridge(PlatformBridge):
         Args:
             location (str): The location of the Javascript (e.g., "localhost").
         """
-        proc_name = "bun.exe" if platform.system() == "Windows" else "bun"
-        node_name = "node.exe" if platform.system() == "Windows" else "node"
         header("Stopping test server")
-        for proc in psutil.process_iter():
-            if proc.name() == proc_name:
-                try:
-                    # For some reason terminating bun leaves this child behind
-                    node_process = next(p for p in proc.children(True) if p.name() == node_name)
-                    node_process.terminate()
-                    click.secho(f"Stopped node child PID {node_process.pid}", fg="green")
-                except StopIteration:
-                    click.secho("No child node process found...", fg="yellow")
+        stopped = False
+        for proc in self.__dev_server_processes():
+            # Terminating the launcher leaves the node process running vite behind,
+            # so take the children down first.
+            for child in proc.children(recursive=True):
+                self.__terminate(child)
+            self.__terminate(proc)
+            stopped = True
 
-                proc.terminate()
-                click.secho(f"Stopped PID {proc.pid}", fg="green")
+        self.__pid_file.unlink(missing_ok=True)
+        if not stopped:
+            click.secho("No running JS test server found to stop", fg="yellow")
+
+    def __dev_server_processes(self) -> Iterator[psutil.Process]:
+        """
+        Yield the launcher process recorded in the pid file, or, if that is gone, any
+        vite process running out of this bridge's working directory.
+        """
+        if self.__pid_file.exists():
+            try:
+                yield psutil.Process(int(self.__pid_file.read_text().strip()))
                 return
+            except (ValueError, psutil.NoSuchProcess):
+                click.secho(f"Stale pid in {self.__pid_file}, searching for vite instead", fg="yellow")
 
-        click.secho(f"Unable to find process to stop ({proc_name})", fg="yellow")
+        for proc in psutil.process_iter(["cmdline"]):
+            cmdline = proc.info["cmdline"] or []
+            if not any("vite" in arg for arg in cmdline):
+                continue
+            try:
+                if Path(proc.cwd()) == self.__working_dir:
+                    yield proc
+            except (psutil.AccessDenied, psutil.NoSuchProcess):
+                continue
+
+    @staticmethod
+    def __terminate(proc: psutil.Process) -> None:
+        try:
+            proc.terminate()
+            click.secho(f"Stopped PID {proc.pid}", fg="green")
+        except psutil.NoSuchProcess:
+            pass
 
     def uninstall(self, location: str) -> None:
         """
@@ -169,7 +198,7 @@ class JavascriptTestServer(TestServer):
         zip_directory(
             JS_TEST_SERVER_DIR,
             zip_path,
-            excludes=[f"{ZIP_FOLDER_NAME}/**", ".gitignore", "bun.lock*"],
+            excludes=[f"{ZIP_FOLDER_NAME}/**", ".gitignore", "bun.lock*", PID_FILENAME, LOG_FILENAME],
         )
         return str(zip_path)
 

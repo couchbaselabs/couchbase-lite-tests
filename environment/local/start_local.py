@@ -11,6 +11,12 @@
 #   cd tests/dev_e2e
 #   uv run pytest --config "$(cat ../../environment/local/topology_config)"
 #
+# The JavaScript test server runs in a browser, so it needs its CBL JS version named
+# explicitly::
+#
+#   uv run environment/local/start_local.py --server rosmar --testserver-platform js \
+#       --build-testserver 1.1.0-8
+#
 import concurrent.futures
 import json
 import os
@@ -48,6 +54,10 @@ TEST_CONFIG = {
     "rosmar": TOPOLOGY_CONFIG_DIR / "rosmar_config.json",
     "cbs": TOPOLOGY_CONFIG_DIR / "cbs_config.json",
 }
+JS_TEST_SERVER_URL = "http://localhost:5173"
+# Stopping a locally built test server never consults its version, so --stop-testserver
+# does not need the caller to repeat the one they started with.
+STOP_ONLY_VERSION = "0.0.0-1"
 
 
 @click.command()
@@ -73,8 +83,17 @@ TEST_CONFIG = {
     "running.",
 )
 @click.option(
+    "--testserver-platform",
+    type=click.Choice(["c", "js"]),
+    default="c",
+    show_default=True,
+    help="Which test server to run. 'js' runs the browser test server under the Vite dev "
+    "server and requires --build-testserver to name a CBL JS version (e.g., 1.1.0-8).",
+)
+@click.option(
     "--build-testserver",
-    help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
+    help="Build the test server from source rather than downloading it. Takes a version string "
+    "(e.g., 4.0.3, or 1.1.0-8 for --testserver-platform js).",
 )
 @click.option("--repo-path", help="Path to an existing sync_gateway repo to build from.")
 @click.option(
@@ -115,10 +134,16 @@ TEST_CONFIG = {
     is_flag=True,
     help="Stop the running Sync Gateway process and exit, skipping all other stages.",
 )
+@click.option(
+    "--stop-testserver",
+    is_flag=True,
+    help="Stop the running test server (of --testserver-platform) and exit, skipping all other stages.",
+)
 def main(
     server: str,
     connstr: str | None,
     start_cbs: bool,
+    testserver_platform: str,
     build_testserver: str | None,
     repo_path: str | None,
     git_tag: str | None,
@@ -128,17 +153,21 @@ def main(
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
     stop_sync_gateway: bool,
+    stop_testserver: bool,
 ) -> None:
+    if stop_testserver:
+        stop_test_server(testserver_platform)
     if stop_sync_gateway:
         ExeBridge(
             exe_path=str(SYNC_GATEWAY_BIN),
             extra_args=[],
             log_filename="sync_gateway.log",
         ).stop("localhost")
+    if stop_sync_gateway or stop_testserver:
         return
 
     if not server:
-        raise click.UsageError("--server is required unless --stop-sync-gateway is set.")
+        raise click.UsageError("--server is required unless a --stop-* flag is set.")
 
     if connstr and server != "cbs":
         # --connstr defaults from $SG_TEST_COUCHBASE_SERVER_URL, so it may be set in the
@@ -161,6 +190,9 @@ def main(
     if connstr:
         _validate_single_node_connstr(connstr)
 
+    if testserver_platform == "js" and not skip_testserver and not build_testserver:
+        raise click.UsageError("--testserver-platform js requires --build-testserver <CBL JS version>, e.g. 1.1.0-8.")
+
     if (not skip_sync_gateway_build or start_cbs) and bool(repo_path) == bool(git_tag):
         raise click.UsageError(
             "Exactly one of --repo-path or --git-tag must be provided, unless "
@@ -176,7 +208,7 @@ def main(
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if not skip_testserver:
-            futures.append(executor.submit(run_test_server, build_testserver))
+            futures.append(executor.submit(run_test_server, testserver_platform, build_testserver))
         if not skip_sync_gateway_build:
             assert repo_dir is not None
             futures.append(executor.submit(build_sync_gateway, repo_dir))
@@ -193,7 +225,7 @@ def main(
     if not skip_sync_gateway_start:
         start_sync_gateway(server, connstr, admin_user, admin_password)
 
-    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password)
+    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password, testserver_platform)
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
 
@@ -210,26 +242,42 @@ def _validate_single_node_connstr(connstr: str) -> None:
         raise click.UsageError(f"--connstr must specify exactly one Couchbase Server node; got {len(hosts)}: {connstr}")
 
 
-def run_test_server(build_testserver: str | None) -> None:
-    """Download/build and run the local CBL test server based on --build-testserver."""
-    if build_testserver:
-        cbl_version = f"{build_testserver}-0"
-        download = False
-    else:
-        cbl_version = get_latest_released_cbl_c_version()
-        download = True
+def _test_server_topology(platform: str, cbl_version: str, download: bool) -> setup_topology.TopologyConfig:
+    """Build a single-test-server topology config for the local machine."""
+    return setup_topology.TopologyConfig(
+        config_input={
+            "test_servers": [
+                {
+                    "location": "localhost",
+                    "download": download,
+                    "platform": platform,
+                    "cbl_version": cbl_version,
+                }
+            ],
+        }
+    )
 
-    config = {
-        "test_servers": [
-            {
-                "location": "localhost",
-                "download": download,
-                "platform": get_cbl_platform(),
-                "cbl_version": cbl_version,
-            }
-        ],
-    }
-    topology_config = setup_topology.TopologyConfig(config_input=config)
+
+def stop_test_server(testserver_platform: str) -> None:
+    """Stop the locally running test server for the given platform."""
+    platform = "js" if testserver_platform == "js" else get_cbl_platform()
+    _test_server_topology(platform, STOP_ONLY_VERSION, False).stop_test_servers()
+
+
+def run_test_server(testserver_platform: str, build_testserver: str | None) -> None:
+    """Download/build and run the local CBL test server based on --build-testserver."""
+    if testserver_platform == "js":
+        assert build_testserver is not None
+        # The JS test server is the checkout in servers/javascript; "building" it just
+        # installs the requested @couchbase/lite-js into it, so there is nothing to download.
+        platform, cbl_version, download = "js", build_testserver, False
+    elif build_testserver:
+        platform, cbl_version, download = get_cbl_platform(), f"{build_testserver}-0", False
+    else:
+        platform, cbl_version, download = get_cbl_platform(), get_latest_released_cbl_c_version(), True
+
+    topology_config = _test_server_topology(platform, cbl_version, download)
+    topology_config.stop_test_servers()
     topology_config.run_test_servers()
 
 
@@ -406,19 +454,33 @@ def start_sync_gateway(server: str, connstr: str | None, admin_user: str, admin_
     bridge.run("localhost")
 
 
-def resolve_topology_config(server: str, connstr: str | None, admin_user: str, admin_password: str) -> pathlib.Path:
-    """Resolve the cbltest topology config to use, patching in a CBS connstr override if given."""
+def resolve_topology_config(
+    server: str,
+    connstr: str | None,
+    admin_user: str,
+    admin_password: str,
+    testserver_platform: str,
+) -> pathlib.Path:
+    """
+    Resolve the cbltest topology config to use, patching in a CBS connstr override and/or
+    the JS test server's URL and WebSocket transport if either is called for.
+    """
     config_path = TEST_CONFIG[server]
-    if server != "cbs" or not connstr:
+    patch_cbs = server == "cbs" and connstr is not None
+    patch_js = testserver_platform == "js"
+    if not patch_cbs and not patch_js:
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
-        cbs = c["couchbase-servers"][0]
-        cbs["hostname"] = connstr
-        cbs["admin_user"] = admin_user
-        cbs["admin_password"] = admin_password
+        if patch_cbs:
+            cbs = c["couchbase-servers"][0]
+            cbs["hostname"] = connstr
+            cbs["admin_user"] = admin_user
+            cbs["admin_password"] = admin_password
+        if patch_js:
+            c["test-servers"] = [{"url": JS_TEST_SERVER_URL, "transport": "ws"}]
 
-    return pathlib.Path(_write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, "cbs_config_", patch))
+    return pathlib.Path(_write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, f"{config_path.stem}_", patch))
 
 
 def get_cbl_platform() -> str:

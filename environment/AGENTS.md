@@ -74,11 +74,7 @@ environment/
 │           ├── android_bridge.py       # ADB
 │           └── ios_bridge.py           # XHarness
 │
-├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
-│   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
-│   ├── sync_gateway_config/             # basic_sync_gateway_{rosmar,cbs}.json
-│   ├── topology_configs/                # rosmar_config.json, cbs_config.json (TDK config output)
-│   └── sync_gateway_clone/              # Git checkout of sync-gateway, built by start_local.py
+├── local/                               # Local test server + SGW runner — see local/README.md
 │
 ├── LogSlurp/                           # C# log aggregation service
 │   ├── LogSlurp.sln
@@ -173,7 +169,7 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 | `dotnet_register.py` | `dotnet_macos`, `dotnet_windows`, `dotnet_ios`, `dotnet_android` | `ExeBridge`, `macOSBridge`, `iOSBridge`, `AndroidBridge` |
 | `swift_register.py`  | `swift_ios`                                                      | `iOSBridge`                                              |
 | `java_register.py`   | `jak_android`, `jak_desktop`, `jak_webservice`                   | `AndroidBridge`, `ExeBridge`                             |
-| `js_register.py`     | `js`                                                             | `ExeBridge`                                              |
+| `js_register.py`     | `js`                                                             | `JavascriptBridge` (Vite dev server via `bun`)           |
 
 ### Topology JSON Shape
 
@@ -194,24 +190,9 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 
 ## Local Environment
 
-No AWS — runs the test server and Sync Gateway as native processes. Docker is only needed for the optional `--start-cbs` path below. See [environment/local/README.md](local/README.md) for full usage.
-
-`--server rosmar` uses Sync Gateway's in-memory storage engine — no Couchbase Server needed, starts almost instantly, best for fast iteration. `--server cbs` runs against a real Couchbase Server and is slower to set up, but covers more of the test suite (e.g. any test that requires a Couchbase Server SDK write). For `--server cbs`, point at an existing Couchbase Server with `--connstr`, or have `start_local.py` start one for you locally with `--start-cbs` (drives `cbdinocluster` via the Sync Gateway checkout's `integration-test/start_cbs.py`; requires Docker + Go) — the two are mutually exclusive.
-
-```bash
-uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway
-uv run environment/local/start_local.py --server cbs --repo-path /path/to/sync-gateway --connstr couchbase://127.0.0.1
-uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
-```
-
-- Writes the TDK config path to `environment/local/topology_config` — `topology_config` holds a *path*, not the config itself, so run tests with:
-  ```bash
-  cd tests/dev_e2e
-  uv run pytest --config "$(cat ../../environment/local/topology_config)"
-  ```
-- `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
-- `--stop-sync-gateway` stops the background Sync Gateway process. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
-- `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
+`environment/local/start_local.py` runs the test server and Sync Gateway as native processes,
+with no AWS involved. It is documented in [environment/local/README.md](local/README.md) —
+keep its usage notes there rather than duplicating them here.
 
 ## Prerequisites (AWS)
 
@@ -257,11 +238,6 @@ cd environment/aws && uv run python stop_backend.py \
 # Build & upload a test server
 cd environment/aws && uv run python topology_setup/build_test_server.py \
   --platform swift_ios --version 4.0.0
-
-# Local (no Docker/AWS): test server + Sync Gateway
-# Pick one: rosmar for fast in-memory iteration, cbs for real Couchbase Server coverage
-uv run environment/local/start_local.py --server rosmar --git-tag main
-uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 ```
 
 ## Cross-References

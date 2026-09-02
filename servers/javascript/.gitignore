@@ -1,3 +1,7 @@
 node_modules/
 compressed/
 bun.lock*
+
+# Written by the JS platform bridge when it starts the dev server
+server.pid
+server.log

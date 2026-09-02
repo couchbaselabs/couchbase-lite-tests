@@ -77,13 +77,16 @@ without touching the test server:
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --skip-testserver
 ```
 
-To stop the background Sync Gateway process independently:
+To stop the background Sync Gateway or test server process independently:
 
 ```bash
 uv run environment/local/start_local.py --stop-sync-gateway
+uv run environment/local/start_local.py --stop-testserver
 ```
 
 - **Logs:** Written to `environment/local/sync_gateway.log`.
+- **`sync_gateway_clone/`:** the working checkout `--git-tag` clones into. It follows the
+  `sync-gateway` repo's own conventions, not this repo's.
 - **Configuration:**
   - `--server rosmar`: uses `environment/local/sync_gateway_config/basic_sync_gateway_rosmar.json`
   - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json` (with `bootstrap.server` overridden by `--connstr`/`--start-cbs`, if given)
@@ -94,6 +97,37 @@ instead, pass `--build-testserver` with a version string:
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --build-testserver 4.0.3
 ```
+
+## JavaScript Test Server
+
+`--testserver-platform js` runs the browser test server in `servers/javascript` instead of
+the C one. It needs `--build-testserver` to name the `@couchbase/lite-js` version to install
+(prerelease versions come from the internal proget npm feed):
+
+```bash
+uv run environment/local/start_local.py --server rosmar --git-tag main \
+    --testserver-platform js --build-testserver 1.1.0-8
+```
+
+That installs the requested CBL JS into `servers/javascript` with [`bun`](https://bun.sh),
+starts the Vite dev server on port 5173, and writes a config whose test-server entry uses the
+WebSocket transport. Notes specific to this platform:
+
+- **`bun` must be on `PATH`.** It is what CI uses and what the platform bridge shells out to.
+- **The test server lives in a browser tab.** The test client hosts the WebSocket endpoint
+  and opens `http://localhost:5173/tdk.html` in your default browser at the start of the run,
+  so the run needs a desktop session. Closing that tab kills the test server.
+- **Sync Gateway needs CORS.** The replicator runs inside the page, so
+  `sync_gateway_config/basic_sync_gateway_{rosmar,cbs}.json` allow the `http://localhost:5173`
+  origin. Without that the replicator fails with `CBL-JS / 502 Server connection failed`.
+- **Datasets are fetched over the network** from `couchbase-lite-tests` `main` on GitHub, not
+  from your checkout, so local `dataset/` edits do not apply.
+- **Logs:** `servers/javascript/server.log` (Vite). The test server's own logs go to the
+  browser JavaScript console.
+- **Stopping it:** `--stop-testserver` (it stays running after a test run otherwise):
+  ```bash
+  uv run environment/local/start_local.py --testserver-platform js --stop-testserver
+  ```
 
 ## Running Tests
 
