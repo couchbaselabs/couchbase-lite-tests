@@ -166,7 +166,6 @@ def _make_cblpytest(
     cblpytest = CBLPyTest.__new__(CBLPyTest)
     cblpytest._CBLPyTest__config = config
     cblpytest._CBLPyTest__test_servers = test_servers if test_servers is not None else []
-    cblpytest._CBLPyTest__sync_gateways = sync_gateways if sync_gateways is not None else []
     cblpytest._CBLPyTest__edge_servers = edge_servers if edge_servers is not None else []
     cluster = SimpleNamespace(
         sync_gateways=sync_gateways if sync_gateways is not None else [],
@@ -219,6 +218,32 @@ async def _run_fixture(gen: AsyncGenerator) -> None:
         await gen.__anext__()
     except StopAsyncIteration:
         pass
+
+
+class TestCblpytestHelperFidelity:
+    """Guard the shape of ``_make_cblpytest`` against ``CBLPyTest`` itself.
+
+    ``CBLPyTest.sync_gateways`` is derived from ``clusters[0].sync_gateways``,
+    not from an attribute of its own, so the helper has to populate a cluster.
+    These tests fail loudly if that wiring drifts, instead of silently handing
+    the fixture an empty gateway list.
+    """
+
+    @pytest.mark.asyncio
+    async def test_sync_gateways_surface_through_cluster(self) -> None:
+        sgw = FakeSyncGateway("4.0.0(350;def)")
+        assert list(_make_cblpytest(sync_gateways=[sgw]).sync_gateways) == [sgw]
+
+    def test_sync_gateways_default_to_empty(self) -> None:
+        assert list(_make_cblpytest().sync_gateways) == []
+
+    @pytest.mark.asyncio
+    async def test_test_servers_and_edge_servers_surface(self) -> None:
+        server = _make_server()
+        es = FakeEdgeServer("1.1.0(45;abc)")
+        cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])
+        assert list(cblpytest.test_servers) == [server]
+        assert list(cblpytest.edge_servers) == [es]
 
 
 class TestGreenboardUploaderDocument:
@@ -740,6 +765,73 @@ class TestGreenboardFixture:
             os="iOS",
             jobUrl="local",
         )
+
+    @pytest.mark.asyncio
+    async def test_edge_server_only_without_es_marker_skips_upload(self) -> None:
+        """An Edge-Server-only topology whose tests never carried
+        @pytest.mark.min_edge_servers has no version to key a doc on: there is
+        no CBL library version and no SGW version. Skip rather than file the
+        run under the default sync-gateway platform."""
+        es = FakeEdgeServer("1.1.0(45;abc)")
+        cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
+        config = _make_pytestconfig()
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            gen = _raw_greenboard(cblpytest, config)
+            await gen.__anext__()
+            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
+            drive_hook(uploader, make_report("call", passed=True), make_item())
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+        mock_upload.assert_not_called()
+        assert not config.pluginmanager.is_registered(uploader)
+
+    @pytest.mark.asyncio
+    async def test_sync_gateway_with_unmarked_edge_server_still_uploads(self) -> None:
+        """The Edge-Server-only skip must not swallow a plain SGW run that
+        happens to have an Edge Server in the topology: the SGW version is a
+        valid key, so the doc is uploaded under sync-gateway."""
+        sgw = FakeSyncGateway("4.0.0(350;def)")
+        es = FakeEdgeServer("1.1.0(45;abc)")
+        cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw], edge_servers=[es])
+        config = _make_pytestconfig()
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+        assert mock_upload.call_args[0][0] == RunResult(
+            build=350,
+            version="4.0.0",
+            sgwVersion="4.0.0-350",
+            esVersion="n/a",
+            failCount=0,
+            passCount=0,
+            platform="sync-gateway",
+            os="n/a",
+            jobUrl="local",
+        )
+
+    @pytest.mark.asyncio
+    async def test_es_marker_with_unreachable_edge_server_skips_upload(self) -> None:
+        """An ES-marked run whose get_version() fails has no ES build to key on;
+        the platform is still edge-server, and upload() skips instead of
+        publishing a 0.0.0 doc."""
+
+        class UnreachableEdgeServer:
+            async def get_version(self) -> EdgeServerVersion:
+                raise RuntimeError("connection refused")
+
+        cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[UnreachableEdgeServer()])
+        config = _make_pytestconfig()
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            gen = _raw_greenboard(cblpytest, config)
+            await gen.__anext__()
+            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
+            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+        mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_upload_exception_propagates_and_plugin_unregistered(self) -> None:

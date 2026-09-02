@@ -118,8 +118,8 @@ class RunResult(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    build: int  # build number of CBL build
-    version: str  # major.minor.patch version of CBL
+    build: int  # build number of the component the run is keyed on (CBL, SGW or ES)
+    version: str  # major.minor.patch version of the component the run is keyed on
     sgw_version: str = Field(alias="sgwVersion")  # Sync Gateway version, optional
     es_version: str = Field(alias="esVersion")  # Edge Server version, optional
     fail_count: int = Field(alias="failCount")  # number of failing tests

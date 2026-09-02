@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import GreenboardUploader, resolve_branch
+from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
 # This plugin provides an automatic (i.e. not used directly by tests)
@@ -116,11 +116,26 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
             # filed under edge-server.
             if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
                 if len(cblpytest.test_servers) == 0:
-                    test_platform = "edge-server"
+                    test_platform = EDGE_SERVER_PLATFORM
                 try:
                     es_version = await cblpytest.edge_servers[0].get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
+            # An Edge-Server-only run whose tests carry no min_edge_servers
+            # marker has nothing to key the doc on: no CBL version, no SGW
+            # version. Skip it instead of filing it under the default
+            # sync-gateway platform.
+            if (
+                test_platform == "sync-gateway"
+                and len(cblpytest.sync_gateways) == 0
+                and len(cblpytest.test_servers) == 0
+            ):
+                cbl_warning(
+                    "Greenboard upload skipped: only Edge Servers are configured but no test "
+                    "carried the min_edge_servers marker, so the run has no platform to file under"
+                )
+                return
+
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
                 uploader.upload_from_junit_file(
