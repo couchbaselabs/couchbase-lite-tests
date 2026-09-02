@@ -32,7 +32,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
         cbl_info("Greenboard uploading disabled by flag")
         yield
         return
-    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0:
+    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0 and len(cblpytest.edge_servers) == 0:
         yield
         return
 
@@ -93,6 +93,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
             )
         else:
             sgw_version: CouchbaseVersion | None = None
+            es_version: CouchbaseVersion | None = None
             test_platform: str = "sync-gateway"
             os_name: str = "n/a"
             library_version: str = "n/a"
@@ -111,6 +112,15 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     sgw_version = await cblpytest.sync_gateways[0].get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
+            # A mixed run keeps the test server's platform, so its CBL results are not
+            # filed under edge-server.
+            if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
+                if len(cblpytest.test_servers) == 0:
+                    test_platform = "edge-server"
+                try:
+                    es_version = await cblpytest.edge_servers[0].get_version()
+                except Exception as e:
+                    cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
                 uploader.upload_from_junit_file(
@@ -119,6 +129,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     os_name,
                     library_version,
                     sgw_version,
+                    es_version,
                 )
             else:
                 # No --junitxml configured. Normally our pytest_configure
@@ -127,7 +138,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 # pytest.Config.fromdictargs in unit tests). Fall back to
                 # the in-process counter — mirrors upload_from_junit_file's
                 # file-missing branch.
-                uploader.upload(test_platform, os_name, library_version, sgw_version)
+                uploader.upload(test_platform, os_name, library_version, sgw_version, es_version)
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 
