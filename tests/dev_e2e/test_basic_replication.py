@@ -871,7 +871,7 @@ class TestBasicReplication(CBLTestClass):
                     ReplicatorDocumentFlags.DELETED,
                 ),
             },
-            max_retries=100,
+            timeout=timedelta(seconds=120),
         )
 
         self.mark_test_step("Check that all updates are replicated correctly.")

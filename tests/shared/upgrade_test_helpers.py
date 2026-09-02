@@ -1,5 +1,6 @@
 import os
 from collections.abc import Callable
+from datetime import timedelta
 from pathlib import Path
 
 from cbltest import CBLPyTest, CouchbaseServer
@@ -148,7 +149,7 @@ async def do_upgrade_replication_test(
         test_case.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events(
             events=doc_events,
-            max_retries=100,
+            timeout=timedelta(seconds=120),
         )
     else:
         test_case.mark_test_step("Wait until the replicator is stopped.")

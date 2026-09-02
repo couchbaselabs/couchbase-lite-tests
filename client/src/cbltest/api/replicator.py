@@ -26,6 +26,11 @@ from cbltest.response_types import (
 from cbltest.version import VERSION
 
 
+def _describe_events(events: set[WaitForDocumentEventEntry]) -> str:
+    """Render document events for a timeout message, so a failure names what never arrived."""
+    return ", ".join(sorted(str(e) for e in events))
+
+
 class Replicator:
     """
     A class representing a Couchbase Lite replicator inside a test server
@@ -242,25 +247,27 @@ class Replicator:
     async def wait_for_all_doc_events(
         self,
         events: set[WaitForDocumentEventEntry],
-        max_retries: int = 5,
+        timeout: timedelta = timedelta(seconds=60),
         ping_interval: timedelta = timedelta(seconds=1),
-        idle_timeout: timedelta = timedelta(seconds=30),
     ) -> ReplicatorStatus:
         """
-        This function will wait for a continuous replicator to become idle and then check for document
-        replication events.  It will return when it has seen all the events in 'events'
+        This function polls a continuous replicator every 'ping_interval' until it has seen all the
+        events in 'events'
 
-        ... note:: This method can time out.  It will wait for up to 'idle_timeout' seconds for the replicator
-                  to become idle.  If the timeout is reached it will raise an exception.
-                  If the replicator becomes idle before all the expected doc events have been seen
-                  it will try to wait again for idle (with the aforementioned timeout).  It will repeat this process
-                   up to 'max_retries' number of times.  If the doc events still have not come
-                   the replicator is considered stuck and this method will raise a CblTimeoutError exception
+        ... note:: This does not wait for the replicator to go idle, and must not be changed to.
+                  IDLE only means the replicator has nothing in flight at that moment, which is
+                  just as true when it has caught up as when Sync Gateway is still holding a
+                  document back from its changes feed -- waiting on a channel grant to reach the
+                  feed, or on a sequence gap in the change cache, which alone can take 5 seconds.
+                  Waiting on IDLE therefore stops early on a replication that is working fine.
+
+        ... note:: This method can time out.  If 'timeout' passes with events still unseen it
+                  raises a CblTimeoutError naming them, so a CI failure says which document never
+                  turned up.
 
         :param events: The events to check for on the replicator
-        :param max_retries: The max number of retries before giving up (default 5)
-        :param ping_interval: The interval to ping for the replicator state (default 1s)
-        :param idle_timeout: The timeout to use when waiting for the next idle state (default 30s)
+        :param timeout: How long to keep waiting before giving up (default 60s)
+        :param ping_interval: How often to poll the replicator (default 1s)
         """
         with self.__tracer.start_as_current_span("wait_for_all_doc_events"):
             assert self.continuous, "wait_for_all_doc_events not applicable for a non-continuous replicator"
@@ -268,10 +275,10 @@ class Replicator:
 
             events = events.copy()
             processed = 0
+            deadline = time() + timeout.total_seconds()
 
-            iteration = 0
-            while iteration < max_retries:
-                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
+            while True:
+                status = await self.get_status()
                 repl_err = status.error
                 assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
@@ -294,10 +301,13 @@ class Replicator:
                 if len(events) == 0:
                     return status
 
-                await asyncio.sleep(0.5)
-                iteration += 1
+                if time() >= deadline:
+                    raise CblTimeoutError(
+                        f"Timed out after {timeout.total_seconds():.0f}s waiting for "
+                        f"{len(events)} document event(s): {_describe_events(events)}"
+                    )
 
-            raise CblTimeoutError("Timeout waiting for document update events")
+                await asyncio.sleep(ping_interval.total_seconds())
 
     async def wait_for_any_doc_event(
         self,
