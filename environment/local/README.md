@@ -129,6 +129,10 @@ WebSocket transport. Notes specific to this platform:
   uv run environment/local/start_local.py --testserver-platform js --stop-testserver
   ```
 
+To point the same test server at Couchbase Server and Sync Gateway in AWS instead of a local
+Sync Gateway, see [servers/javascript/README.md](../../servers/javascript/README.md). That
+path needs one extra step: your browser must trust the Sync Gateway CA.
+
 ## Running Tests
 
 After starting the environment, run tests against the config path `start_local.py` wrote to
