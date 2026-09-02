@@ -905,26 +905,32 @@ class CouchbaseServer:
             )
 
             if hostname_to_use != node_to_add.__hostname:
-                # Set alternate address so external clients can connect via public IP
-                # This is critical for AWS VPC where nodes use private IPs internally
-                try:
+                # Leaving the cluster discards a node's alternate address, so external clients
+                # (the TDK) lose their route to it until it is republished.  Sending no ports
+                # publishes every port the node runs, matching what provisioning sets up.
+                def do_set_alternate_address() -> None:
                     self.__http_session.put(
                         f"http://{node_to_add.__hostname}:8091/node/controller/setupAlternateAddresses/external",
-                        data={"hostname": node_to_add.__hostname, "mgmt": "8091"},
+                        data={"hostname": node_to_add.__hostname},
                     ).raise_for_status()
-                    span.add_event(
-                        "alternate_address_set",
-                        attributes={"hostname": node_to_add.__hostname},
+
+                try:
+                    self._retry(
+                        do_set_alternate_address,
+                        max_attempts=5,
+                        wait_seconds=2,
+                        operation_name=f"Set alternate address for {node_to_add.__hostname}",
                     )
                 except Exception as e:
-                    # Node is already added to cluster, but external SDK connections may fail
-                    # Common causes: Node not fully initialized, auth issues, network problems
-                    cbl_warning(
-                        f"Failed to set alternate address for {node_to_add.__hostname}: {e}. "
-                        f"Node added successfully, but external SDK connections (from TDK) may fail. "
-                        f"Internal cluster communication will work normally."
-                    )
-                    span.add_event("alternate_address_failed", attributes={"error": str(e)})
+                    raise CblTestError(
+                        f"Failed to set alternate address for {node_to_add.__hostname}, "
+                        f"external SDK connections to it will time out"
+                    ) from e
+
+                span.add_event(
+                    "alternate_address_set",
+                    attributes={"hostname": node_to_add.__hostname},
+                )
 
     def rebalance(
         self,
