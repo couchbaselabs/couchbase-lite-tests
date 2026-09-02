@@ -412,8 +412,8 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * collection4 should have docs from collection1
                 * collection5 should have docs from collection2
         """)
-        sg2_collection4_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[0])
-        sg2_collection5_docs = await sg2.wait_for_all_documents(sg_db2, num_docs, "_default", b2_collections[1])
+        sg2_collection4_docs = await sg2.wait_for_document_count(sg_db2, num_docs, "_default", b2_collections[0])
+        sg2_collection5_docs = await sg2.wait_for_document_count(sg_db2, num_docs, "_default", b2_collections[1])
         sg2_collection4_ids = {row.id for row in sg2_collection4_docs.rows}
         sg2_collection5_ids = {row.id for row in sg2_collection5_docs.rows}
         for i in range(num_docs):
@@ -430,9 +430,9 @@ class TestISGRCollectionMapping(CBLTestClass):
                 * collection7 should have docs from collection2
                 * collection8 should have docs from collection3
         """)
-        sg3_collection6_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[0])
-        sg3_collection7_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[1])
-        sg3_collection8_docs = await sg3.wait_for_all_documents(sg_db3, num_docs, "_default", b3_collections[2])
+        sg3_collection6_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[0])
+        sg3_collection7_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[1])
+        sg3_collection8_docs = await sg3.wait_for_document_count(sg_db3, num_docs, "_default", b3_collections[2])
         sg3_collection6_ids = {row.id for row in sg3_collection6_docs.rows}
         sg3_collection7_ids = {row.id for row in sg3_collection7_docs.rows}
         sg3_collection8_ids = {row.id for row in sg3_collection8_docs.rows}
