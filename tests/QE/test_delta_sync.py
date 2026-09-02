@@ -77,7 +77,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -185,7 +184,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -297,7 +295,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -406,7 +403,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -498,7 +494,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
-        assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -624,7 +619,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get the current document state and revision before update.")
         sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
-        assert sgw_doc_before_update is not None, "Document should exist in SGW"
         assert sgw_doc_before_update.body.get("type") == "test", "Expected doc to have `type` as `test`"
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
@@ -747,7 +741,6 @@ class TestDeltaSync(CBLTestClass):
                 * Update the same hotel document with identical content (no real change)
         """)
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         await sync_gateway.update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
@@ -820,7 +813,6 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("Get delta stats.")
         bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")

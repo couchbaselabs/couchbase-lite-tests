@@ -99,7 +99,6 @@ class TestServerSetup(CBLTestClass):
         cbs.upsert_document(bucket_name, doc_id, doc_body)
         await asyncio.sleep(3)
         sg_doc = await sg.get_document(sg_db, doc_id)
-        assert sg_doc is not None, "SGW should import document from CBS"
         assert sg_doc.body["message"] == "x509 ca_cert_path auth works"
 
         await sg.restart_with_config()

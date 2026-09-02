@@ -1431,7 +1431,7 @@ class _SyncGatewayBase:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> RemoteDocument | None:
+    ) -> RemoteDocument:
         """
         Gets a document from Sync Gateway
 
@@ -1439,32 +1439,22 @@ class _SyncGatewayBase:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :raises CblSyncGatewayBadResponseError: If Sync Gateway does not return the document. Returns a 404 for a non existent or tombstoned document.
         """
         with self._tracer.start_as_current_span(
             "get_document",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-                "cbl.document.id": doc_id,
+                "sg.database.name": db_name,
+                "sg.scope.name": scope,
+                "sg.collection.name": collection,
+                "sg.document.id": doc_id,
             },
         ):
             response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
-                    return None
-
-                raise CblSyncGatewayBadResponseError(
-                    500,
-                    f"Get doc from sync gateway had error '{cast_resp['reason']}'",
-                    body=dumps(cast_resp),
-                )
-
-            return RemoteDocument(cast_resp)
+            return RemoteDocument(cast(dict, response))
 
     async def create_document(
         self,

@@ -318,7 +318,6 @@ class TestReplicationMultipleClients(CBLTestClass):
         self.mark_test_step("Verify document content in Sync Gateway")
         for doc_id in all_doc_ids:
             sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-            assert sg_doc is not None, f"Document {doc_id} not found in SG"
             assert sg_doc.body.get("type") == "attachment_test_doc", f"Document {doc_id} has incorrect type"
             assert sg_doc.body.get("attachment_count") == 20, f"Document {doc_id} should have attachment_count=20"
             expected_source = "db1" if doc_id.startswith("db1_") else "db2"

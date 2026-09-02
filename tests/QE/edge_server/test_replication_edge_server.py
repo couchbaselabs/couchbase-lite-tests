@@ -69,7 +69,7 @@ class TestEdgeServerSync(CBLTestClass):
             doc_id="airline_10000",
         )
 
-        assert sgw_doc_new is not None and sgw_doc_new.body["name"] == "Updated Airline", "Update not propagated"
+        assert sgw_doc_new.body["name"] == "Updated Airline", "Update not propagated"
         await asyncio.sleep(60)
         self.mark_test_step("Verify TTL document purged on Edge server and not Sync Gateway")
         sgw_doc_new = await sync_gateway.get_document(
@@ -78,9 +78,7 @@ class TestEdgeServerSync(CBLTestClass):
             collection="airlines",
             doc_id="airline_10000",
         )
-        assert sgw_doc_new is not None and sgw_doc_new.body["name"] == "Updated Airline", (
-            "Document should not have purged from Sync gateway"
-        )
+        assert sgw_doc_new.body["name"] == "Updated Airline", "Document should not have purged from Sync gateway"
         failed = False
         edge_doc = None
         try:
