@@ -343,10 +343,14 @@ def write_client_certs() -> CertKeyPair:
     client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
 
     cert_dir = Path.home() / ".cbl_certs"
-    cert_dir.mkdir(exist_ok=True)
-    (cert_dir / "ca_cert.pem").write_bytes(ca.pem_bytes())
-    (cert_dir / "client_cert.pem").write_bytes(client.pem_bytes())
-    (cert_dir / "client_key.pem").write_bytes(client.private_pem_bytes())
+    cert_dir.mkdir(mode=0o700, exist_ok=True)
+    ca_cert_path = cert_dir / "ca_cert.pem"
+    client_cert_path = cert_dir / "client_cert.pem"
+    client_key_path = cert_dir / "client_key.pem"
+    ca_cert_path.write_bytes(ca.pem_bytes())
+    client_cert_path.write_bytes(client.pem_bytes())
+    client_key_path.write_bytes(client.private_pem_bytes())
+    client_key_path.chmod(0o600)
     click.echo(f"Wrote CA and client identity to {cert_dir}")
 
     return ca
