@@ -7,6 +7,7 @@ sgcollect archive, an Edge Server audit log -- without needing SSH.
 """
 
 import re
+import time
 from json import loads
 from pathlib import Path
 from types import TracebackType
@@ -180,11 +181,15 @@ class Caddy:
         chunks: list[bytes] = []
         received = 0
         expected: int | None = None
+        # A test polling a growing log file was handed the response it first got, so no
+        # request may be answered from cache: hence the headers and the unique query string.
+        request_headers = {"Cache-Control": "no-cache", "Pragma": "no-cache"} | (headers or {})
+        url = f"{url}{'&' if '?' in url else '?'}_={time.time_ns()}"
         with _tracer.start_as_current_span(
             "caddy_request", attributes={"cbl.caddy.url": url, "cbl.caddy.operation": operation}
         ):
             try:
-                async with self.__session.get(url, headers=headers) as response:
+                async with self.__session.get(url, headers=request_headers) as response:
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
                     if response.status != 200:
