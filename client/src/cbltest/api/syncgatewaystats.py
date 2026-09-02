@@ -445,7 +445,7 @@ class DatabaseStats(_StatsModel):
     total_sync_time: int
     # The total number of times that a sync function encountered an exception (across all collections).
     sync_function_exception_count: int
-    # The total number of times a replication connection is rejected due ot it being over the threshold
+    # The total number of times a replication connection is rejected due to it being over the threshold
     num_replications_rejected_limit: int
     # The total number of processed documents for resync on this database.
     resync_num_processed = OptionalStat("3.3.0")
