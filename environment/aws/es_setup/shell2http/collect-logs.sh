@@ -58,11 +58,19 @@ cp -a /opt/couchbase-edge-server/etc/config.json "$STAGE/config/" 2>/dev/null ||
   sudo iptables -L ES_RULES -n --line-numbers
 } >"$STAGE/system/info.txt" 2>&1
 
-tar czf "$OUT_DIR/$FILENAME" -C "$STAGE" . 2>/dev/null
+TAR_ERR=$(tar czf "$OUT_DIR/$FILENAME" -C "$STAGE" . 2>&1)
+TAR_RC=$?
 
-if [ -f "$OUT_DIR/$FILENAME" ]; then
-  echo "{\"file\":\"collect/$FILENAME\",\"size\":$(stat -c%s "$OUT_DIR/$FILENAME")}"
-else
-  echo "{\"error\":\"failed to create archive\"}"
+# tar exit 1 means it skipped or could not fully read something, which still leaves
+# a usable bundle. Exit 2 and above is fatal, and so is a zero byte archive.
+if [ "$TAR_RC" -ge 2 ] || [ ! -s "$OUT_DIR/$FILENAME" ]; then
+  rm -f "$OUT_DIR/$FILENAME"
+  jq -nc --arg err "$TAR_ERR" --argjson rc "$TAR_RC" \
+    '{error: "failed to create archive", rc: $rc, stderr: $err}'
   exit 1
 fi
+
+jq -nc --arg file "collect/$FILENAME" \
+  --argjson size "$(stat -c%s "$OUT_DIR/$FILENAME")" \
+  --arg warnings "$([ "$TAR_RC" -eq 0 ] || echo "$TAR_ERR")" \
+  '{file: $file, size: $size} + (if $warnings == "" then {} else {warnings: $warnings} end)'

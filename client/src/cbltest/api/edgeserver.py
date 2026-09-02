@@ -27,7 +27,7 @@ from cbltest.api.syncgateway import (
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_trace, cbl_warning
+from cbltest.logging import cbl_info, cbl_trace, cbl_warning
 from cbltest.version import VERSION
 
 
@@ -871,8 +871,9 @@ class EdgeServer:
         Each request carries a unique query string and no-cache headers.
 
         :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
-        :return: Full log file content, or "" if the Edge Server has not written the file yet.
-        :raises CblTestError: If the fetch fails
+        :return: Full log file content as string.
+        :raises FileNotFoundError: If the log file does not exist on the host.
+        :raises CblTestError: If the fetch fails for any other reason.
         """
         with self.__tracer.start_as_current_span(
             "get_log_content",
@@ -880,13 +881,7 @@ class EdgeServer:
         ):
             prefix = "/home/ec2-user/"
             path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-            try:
-                return await self._caddy.fetch(path)
-            except FileNotFoundError:
-                # A log the Edge Server has not written is empty, but a fetch that failed for
-                # any other reason must not read as one.
-                cbl_warning(f"{log_file} does not exist on {self.hostname}, treating as empty")
-                return ""
+            return await self._caddy.fetch(path)
 
     async def check_log(
         self,
@@ -899,7 +894,8 @@ class EdgeServer:
 
         :param search_string: String to search for (e.g. audit event id).
         :param log_file: Path to the log file on the Edge Server host.
-        :return: List of matching lines, or empty list if none or on error.
+        :return: List of matching lines, empty if the log file does not exist or nothing matches.
+        :raises CblTestError: If the log file exists but cannot be fetched.
         """
         with self.__tracer.start_as_current_span(
             "check_log",
@@ -908,7 +904,11 @@ class EdgeServer:
                 "cbl.log_file": log_file,
             },
         ):
-            content = await self.get_log_content(log_file)
+            try:
+                content = await self.get_log_content(log_file)
+            except FileNotFoundError:
+                cbl_info(f"Edge Server [{self.__hostname}] has no {log_file}, treating as no matches")
+                return []
             cbl_trace(f"Edge Server [{self.__hostname}] {log_file}:\n{content}")
             return [line for line in content.splitlines() if search_string in line]
 
