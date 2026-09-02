@@ -5,6 +5,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import BulkDocOperation
+from cbltest.api.error import CblEdgeServerBadResponseError
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -70,10 +71,8 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("delete single doc")
         await edge_server.delete_document(doc_id=id2, revid=rev3, db_name=db_name)
         self.mark_test_step("fetch deleted doc")
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(db_name, doc_id=id2)
-        except Exception as e:
-            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -118,13 +117,8 @@ class TestCrud(CBLTestClass):
         id1 = resp1["id"]
         self.mark_test_step("fetch single doc after ttl 20")
         await asyncio.sleep(20)
-        failed = False
-        try:
+        with pytest.raises(CblEdgeServerBadResponseError):
             await edge_server.get_document(db_name, doc_id=id1)
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Fetch doc {doc} failed as expected {e}")
-        assert failed, "Doc fetch successful despite expiry"
 
         self.mark_test_step("create single doc with id of a TTL=50 and update the TTL=20")
         id2 = "test50"
@@ -142,13 +136,8 @@ class TestCrud(CBLTestClass):
         assert doc3.body.get("test2") == new_doc.get("test2")
         self.mark_test_step("fetch update doc after 20 seconds")
         await asyncio.sleep(20)
-        failed = False
-        try:
-            await edge_server.get_document(db_name, doc_id=id1)
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Fetch doc failed as expected {e}")
-        assert failed, "Doc fetch successful despite expiry"
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document(db_name, doc_id=id2)
 
         self.mark_test_step("delete a single doc of expiry 60 seconds")
         new_doc = {"test3": "This is new test doc"}
@@ -157,10 +146,8 @@ class TestCrud(CBLTestClass):
         rev3 = update["rev"]
         await edge_server.delete_document(doc_id=id3, revid=rev3, db_name=db_name)
         self.mark_test_step("fetch deleted doc")
-        try:
-            await edge_server.get_document(db_name, doc_id=id2)
-        except Exception as e:
-            self.mark_test_step(f"Deleted doc successfully threw exception on retrieval: {e}")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document(db_name, doc_id=id3)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

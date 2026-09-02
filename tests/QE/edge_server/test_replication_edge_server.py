@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -79,14 +80,9 @@ class TestEdgeServerSync(CBLTestClass):
             doc_id="airline_10000",
         )
         assert sgw_doc_new.body["name"] == "Updated Airline", "Document should not have purged from Sync gateway"
-        failed = False
-        edge_doc = None
-        try:
-            edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Document purged on Edge server as expected: {e}")
-        assert failed, f"Document not purged on Edge server {edge_doc}"
+        self.mark_test_step("Document should be purged on Edge Server")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
         await edge_server.stop_replication(1)
 
     @pytest.mark.min_edge_servers(2)
@@ -153,11 +149,7 @@ class TestEdgeServerSync(CBLTestClass):
         )
         assert edge_doc is not None
         assert edge_doc.body["name"] == "Updated Airline", "Document should not have purged from Edge server1"
-        failed = False
-        try:
-            edge_doc = await edge_server2.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
-        except Exception as e:
-            failed = True
-            self.mark_test_step(f"Document purged on Edge server2 as expected: {e}")
-        assert failed, f"Document not purged on Edge server2 {edge_doc}"
+        self.mark_test_step("Document should be purged on Edge Server 2")
+        with pytest.raises(CblEdgeServerBadResponseError):
+            await edge_server2.get_document("travel", collection="travel.airlines", doc_id="airline_10000")
         await edge_server2.stop_replication(1)
