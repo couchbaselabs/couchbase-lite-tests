@@ -88,9 +88,13 @@ print_box() {
 
 # Colored, timed section banners for Jenkins console output (rendered by the
 # ansiColor('xterm') pipeline option; the raw escape codes are harmless on a
-# plain terminal too). Usage: section_start "$COLOR_CYAN" "INFRA SETUP" ...
-# work... ; the next section_start call (or script exit, via the EXIT trap
-# below) closes the previous section and prints how long it took.
+# plain terminal too). Sections are explicitly paired:
+#   section_start "$COLOR_CYAN" "INFRA SETUP"
+#   ...work...
+#   section_end
+# section_end prints how long the section took and clears the state, so a
+# script that exits mid-section (a failed test, a Jenkins timeout) simply
+# leaves that banner unprinted rather than needing an EXIT trap here.
 readonly COLOR_RESET='\033[0m'
 readonly COLOR_CYAN='\033[1;36m'
 readonly COLOR_YELLOW='\033[1;33m'
