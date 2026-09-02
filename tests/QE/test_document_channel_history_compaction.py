@@ -547,50 +547,81 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         sg_db = "db"
-        doc_id = "doc1"
 
         self.mark_test_step("Configure a Sync Gateway database with a channel-membership sync function")
         await cblpytest.clusters[0].create_database(sg_db, _CHANNEL_TRACKING_CONFIG)
 
-        self.mark_test_step("Create a document assigned to channel 'ABC'")
-        doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
-
-        self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
-        doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
-        leave_seq = doc.seq
+        # Only the compact can lose: it never retries a CAS mismatch.
+        # The update goes first so its write lands inside the compact's window.
+        race_offset_seconds = 0.0005
+        race_attempts = 120
 
         self.mark_test_step(
-            "Concurrently: compact the document's channel history for 'ABC', and update the document's body again"
+            f"Race a compact against an update of the same document {race_attempts} times, "
+            "checking after every attempt that the state Sync Gateway is left in matches what each of "
+            "the two operations reported -- never both 'succeeding' while only one actually applied"
         )
-        assert doc.revid is not None
-        results = await asyncio.gather(
-            sg.compact_document_channel_history(sg_db, doc_id, leave_seq),
-            sg.update_document(sg_db, doc_id, {"channels": ["OTHER"], "marker": "raced"}, doc.revid),
-            return_exceptions=True,
-        )
-
-        self.mark_test_step(
-            "Check that at least one of the two concurrent operations either succeeded cleanly or "
-            "failed with a surfaced conflict error -- never both silently 'succeeding' while only one "
-            "actually applied"
-        )
-        errors = [r for r in results if isinstance(r, BaseException)]
-        assert len(errors) <= 1, f"Both concurrent operations failed, nothing succeeded cleanly: {results}"
-        for err in errors:
-            assert isinstance(err, CblSyncGatewayBadResponseError), (
-                f"Expected a clean Sync Gateway error on conflict, got: {err!r}"
+        for attempt in range(race_attempts):
+            doc_id = f"doc{attempt}"
+            doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
+            assert doc.revid is not None
+            doc = await sg.update_document(
+                sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True
             )
-            assert err.code == 409, f"Expected a conflict-style error code, got {err.code}"
+            leave_seq = doc.seq
+            assert doc.revid is not None
 
-        self.mark_test_step(
-            "Get the document's channel history and directly from Sync Gateway, and check the final "
-            "state is internally consistent"
-        )
-        final_history = await sg.get_document_channel_history(sg_db, doc_id)
-        final_doc = await sg.get_document(sg_db, doc_id)
-        assert final_doc is not None
-        assert isinstance(final_history, dict)
+            updating = asyncio.create_task(
+                sg.update_document(sg_db, doc_id, {"channels": ["OTHER"], "marker": "raced"}, doc.revid)
+            )
+            # The await starts the update; the delay holds the compact back.
+            await asyncio.sleep(race_offset_seconds)
+            # A lost race is a 409.
+            compact_result: list[str] | None
+            try:
+                compact_result = await sg.compact_document_channel_history(sg_db, doc_id, leave_seq)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 409:
+                    raise
+                compact_result = None
+            update_result: RemoteDocument | None
+            try:
+                update_result = await updating
+            except CblSyncGatewayBadResponseError as e:
+                if e.code != 409:
+                    raise
+                update_result = None
+
+            assert compact_result or update_result, (
+                f"[attempt {attempt}] both the compact and the update lost the race, so neither of them applied"
+            )
+
+            final_history = await sg.get_document_channel_history(sg_db, doc_id)
+            final_doc = await sg.get_document(sg_db, doc_id)
+            assert final_doc is not None
+
+            # The entry is gone if and only if the compact reported removing it.
+            if compact_result:
+                assert final_history == {}, (
+                    f"[attempt {attempt}] the compact reported compacting {compact_result}, but the "
+                    f"channel history is {final_history}"
+                )
+            else:
+                assert final_history == {"ABC": [leave_seq]}, (
+                    f"[attempt {attempt}] the compact lost the race, so the channel history should "
+                    f"still be {{'ABC': [{leave_seq}]}}, but it is {final_history}"
+                )
+
+            # The body change lands if and only if the update reported success.
+            if update_result:
+                assert final_doc.body == {"channels": ["OTHER"], "marker": "raced"}, (
+                    f"[attempt {attempt}] the update reported success, but the document body is {final_doc.body}"
+                )
+            else:
+                assert final_doc.body == {"channels": ["OTHER"]}, (
+                    f"[attempt {attempt}] the update lost the race, so the document body should still "
+                    f"be {{'channels': ['OTHER']}}, but it is {final_doc.body}"
+                )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_response_is_a_flat_compacted_channels_list(self, cblpytest: CBLPyTest) -> None:
