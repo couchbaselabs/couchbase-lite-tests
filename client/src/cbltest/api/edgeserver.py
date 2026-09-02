@@ -108,27 +108,70 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
+        self.__hostname: str = url
+        self.__auth_name = admin_user
+        self.__auth_password = admin_password
+        self.__anonymous_session: ClientSession | None = None
+        self.__admin_session: ClientSession | None = None
+        # What this Edge Server was provisioned with. configure_dataset() moves
+        # __config_file on and set_auth() overwrites the credentials, so
+        # reset_to_initial_state() needs its own record of what to return to.
+        self.__initial_config_file: str = config_file
+        self.__initial_auth_name: str = admin_user
+        self.__initial_auth_password: str = admin_password
+        self._apply_config(config_file)
+        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
+
+    def _apply_config(self, config_file: str) -> None:
+        """
+        Adopt `config_file` as this Edge Server's current config, rebuilding the
+        sessions whose port, scheme and auth it determines.
+
+        Any sessions being replaced are dropped here. Callers that can await should
+        go through :func:`reconfigure`, which closes the old ones first.
+        """
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
-        self.__hostname: str = url
         self.__port: int = port
         self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth_name = admin_user
-        self.__auth_password = admin_password
         self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
-        self.__replication_url = f"{ws_scheme}{url}:{port}"
+        self.__replication_url = f"{ws_scheme}{self.__hostname}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session = self._create_session(self.scheme, url, port, None)
+        self.__anonymous_session = self._create_session(self.scheme, self.__hostname, port, None)
         self.__admin_session = self._create_session(
             self.scheme,
-            url,
+            self.__hostname,
             port,
             encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
         )
-        self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
+
+    async def reconfigure(self, config_file: str) -> None:
+        """
+        Adopt `config_file`, closing the sessions it replaces.
+
+        The shell2http session is left alone: it always talks plain HTTP to port
+        20001, whatever the Edge Server config says.
+
+        The old sessions are closed only once the new config has been applied, so a
+        config this cannot decode leaves the object usable.
+        """
+        replaced = (self.__admin_session, self.__anonymous_session)
+        self._apply_config(config_file)
+        for session in replaced:
+            if session is not None and not session.closed:
+                await session.close()
+
+    async def _close_client_sessions(self) -> None:
+        """Close the anonymous and admin sessions, leaving the shell2http one open."""
+        for session in (self.__admin_session, self.__anonymous_session):
+            if session is not None and not session.closed:
+                await session.close()
+
+        self.__admin_session = None
+        self.__anonymous_session = None
 
     @property
     def hostname(self) -> str:
@@ -191,6 +234,9 @@ class EdgeServer:
                 session = self.__admin_session
             else:
                 session = self.__anonymous_session
+
+        if session is None:
+            raise CblTestError(f"Edge Server [{self.__hostname}] session is closed, cannot {method.upper()} {path}")
 
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
@@ -840,6 +886,8 @@ class EdgeServer:
         else:
             self.__auth_name = name
             self.__auth_password = password
+            if self.__admin_session is not None and not self.__admin_session.closed:
+                await self.__admin_session.close()
             self.__admin_session = self._create_session(
                 self.scheme,
                 self.__hostname,
@@ -950,7 +998,30 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
-        return EdgeServer(self.__hostname, config_file=config_file)
+        await self.reconfigure(config_file)
+        return self
+
+    async def reset_to_initial_state(self) -> None:
+        """
+        Return this Edge Server to the state the AWS setup left it in.
+
+        Restores the config, the admin credentials and the databases. Firewall
+        rules are dropped first, since a leftover DROP rule hides the host. Files
+        written through /write-file, and users added through add_user, are left
+        as they are.
+        """
+        with self.__tracer.start_as_current_span("reset edge server"):
+            await self.reset_firewall()
+            await self.kill_server()
+            await self._send_request("post", "/reset-all-dbs", session=self.__shell_session)
+
+            async with aiofiles.open(self.__initial_config_file) as f:
+                config = json.loads(await f.read())
+
+            await self.start_server(config=config)
+            self.__auth_name = self.__initial_auth_name
+            self.__auth_password = self.__initial_auth_password
+            await self.reconfigure(self.__initial_config_file)
 
     async def set_firewall_rules(
         self,
@@ -1008,3 +1079,11 @@ class EdgeServer:
                 is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def close(self) -> None:
+        """Close every session this Edge Server holds."""
+        await self._close_client_sessions()
+        if self.__shell_session is not None:
+            if not self.__shell_session.closed:
+                await self.__shell_session.close()
+            self.__shell_session = None
