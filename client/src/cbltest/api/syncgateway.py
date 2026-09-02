@@ -920,6 +920,7 @@ class _SyncGatewayBase:
         """
         version = await self.get_version()
         resp = await self._send_request("get", "/_expvar")
+        assert isinstance(resp, dict)
         return Expvars.from_response(resp, version.version).database(db_name)
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
