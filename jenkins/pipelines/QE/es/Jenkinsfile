@@ -7,6 +7,8 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        string(name: 'TEST_TIMEOUT', defaultValue: '60', description: 'Timeout in minutes for the test run, system test runs need higher timeout')
+        booleanParam(name: 'ES_COLLECT', defaultValue: true, description: 'Collect Edge Server logs from every ES node if any test fails')
     }
     stages {
         stage('Init') {
@@ -24,14 +26,15 @@ pipeline {
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe')
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
-                TS_ARTIFACTS_DIR = 'es'
+                TS_ARTIFACTS_DIR = "${WORKSPACE}/artifacts"
                 TS_DATASET_VERSION = "${params.TS_DATASET_VERSION}"
+                ES_COLLECT = "${params.ES_COLLECT}"
             }
             steps {
-                // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                sh 'mkdir -p "${TS_ARTIFACTS_DIR}"'
                 echo "=== Run Edge server Tests"
-                timeout(time: 60, unit: 'MINUTES') {
+                timeout(time: params.TEST_TIMEOUT.toInteger(), unit: 'MINUTES') {
                     sh """
                         jenkins/pipelines/QE/es/test.sh \
                             ${params.ES_VERSION} \
@@ -50,7 +53,23 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/es/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/es/**/*', fingerprint: true, allowEmptyArchive: true
+
+                    sh '''
+                        mkdir -p "${TS_ARTIFACTS_DIR}"
+                        find "${WORKSPACE}" -name "es-collect-*.tar.gz" \
+                            -exec mv {} "${TS_ARTIFACTS_DIR}/" \\; 2>/dev/null || true
+                        echo "=== artifacts collected ==="
+                        ls -la "${TS_ARTIFACTS_DIR}" || true
+                    '''
+
+                    junit testResults: 'tests/QE/edge_server/junit_result.xml',
+                          allowEmptyResults: false,
+                          skipPublishingChecks: true
+
+                    archiveArtifacts artifacts: 'artifacts/**/*, tests/QE/edge_server/junit_result.xml',
+                                     fingerprint: true,
+                                     allowEmptyArchive: true
+
                     echo "=== Edge server Test Teardown Complete"
                 }
             }

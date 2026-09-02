@@ -56,5 +56,5 @@ Test the stability and consistency of Edge Server under a randomized concurrent 
 1. Configure Edge Server with a database named `db`.
 2. Seed the database with 10,000 documents using bulk create operations.
 3. Verify the initial document load is successful and document counts match.
-4. Run a randomized CRUD workload for 1,000 iterations containing a mix of create, update, delete, and read operations.
+4. Run a randomized CRUD workload for 1,000 iterations containing a mix of create, update, delete, and read operations. Each operation reports whether Edge Server applied it, and errors propagate rather than being reported as a plain failure, so a fault identifies itself. Locally tracked document bodies are stored in the same shape `generate_all_documents` produces, so a document created mid-workload can be updated later.
 5. Perform final data consistency validation by verifying the documents on Edge Server match the expected state tracked locally.

@@ -8,32 +8,42 @@ TEST_NAME="${2:-test_crud.py}"
 TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
 SGW_VERSION="${4:-}"
 CBS_VERSION="${5:-}"
-DATASET_VERSION="${5:-4.0}"
+DATASET_VERSION="${6:-4.0}"
 TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
 
 if [ -z "$SGW_VERSION" ]; then
   echo "Skipping sync gateway and cb server provisioning"
 fi
 
-source $SCRIPT_DIR/../../shared/config.sh
-#
-echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+source "$SCRIPT_DIR/../../shared/config.sh"
 
-# Run Tests :
+echo "Setup backend..."
+uv run "$SCRIPT_DIR/setup_test.py" "$ES_VERSION" "$TOPOLOGY_FILE" \
+  --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+
 echo "RUNNING COORDINATED TEST"
 
 pushd "${QE_TESTS_DIR}/edge_server" >/dev/null
+trap 'popd >/dev/null 2>&1 || true' EXIT
 export COLUMNS=200
 
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config ../config.json --dataset-version "$DATASET_VERSION" "$TEST_NAME"; then
-  echo "========== PYTEST OUTPUT END =========="
-  echo ""
+PYTEST_ARGS=(-v --no-header -W ignore::DeprecationWarning
+  --config ../config.json
+  --dataset-version "$DATASET_VERSION"
+  "$TEST_NAME")
+[ "${ES_COLLECT:-true}" = "true" ] && PYTEST_ARGS+=(--es-collect)
+
+set +e
+uv run pytest "${PYTEST_ARGS[@]}"
+TEST_RESULT=$?
+set -e
+
+echo "========== PYTEST OUTPUT END =========="
+echo ""
+if [ "$TEST_RESULT" -eq 0 ]; then
   echo "🎉 COORDINATED TEST PASSED!"
-  TEST_RESULT=0
 else
-  echo "========== PYTEST OUTPUT END =========="
-  echo ""
-  echo "💥 COORDINATED TEST FAILED!"
-  TEST_RESULT=1
+  echo "💥 COORDINATED TEST FAILED (pytest exit $TEST_RESULT)!"
 fi
+
+exit "$TEST_RESULT"

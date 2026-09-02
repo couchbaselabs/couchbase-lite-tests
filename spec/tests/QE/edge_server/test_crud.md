@@ -60,4 +60,4 @@ Test bulk CRUD operations combining document creations, updates, and deletions i
 4. Execute the bulk document operations on the Edge Server.
 5. Fetch the specifically created documents by key and verify all 10 exist.
 6. Fetch the updated documents by key and verify they exist with updated revisions.
-7. Fetch the deleted documents by key and verify they are no longer returned.
+7. Fetch the deleted documents by key and assert each raises `CblEdgeServerBadResponseError`; Edge Server answers 404 for a deleted document, which the framework surfaces as an error rather than as `None`.

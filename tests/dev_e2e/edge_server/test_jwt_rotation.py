@@ -30,7 +30,7 @@ class TestJWTReplication(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_with_jwt_file(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_replication_with_jwt_file(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         """
         Verify that ES can replicate with SGW using a JWT token read from a file.
 
@@ -108,7 +108,7 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 3: Write JWT to file on ES ---
         self.mark_test_step("Write JWT token to file on Edge Server")
         es_manager = cblpytest.edge_servers[0]
-        await self._write_file_on_es(es_manager, JWT_FILE, token)
+        await es_manager.write_file_on_es(JWT_FILE, token)
 
         # --- Step 4: Configure ES with JWT file auth ---
         self.mark_test_step("Configure ES with openid_token.path auth")
@@ -122,6 +122,7 @@ class TestJWTReplication(CBLTestClass):
             "travel.landmarks",
             "travel.routes",
         ]
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
@@ -147,7 +148,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("PASSED — Replication works with JWT file-based authentication")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_token_rotation_reconnect(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_token_rotation_reconnect(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         """
         Verify that ES detects a JWT file change and reconnects with the new token.
 
@@ -211,13 +212,14 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 3: Write Token-A to file and start ES ---
         self.mark_test_step("Write Token-A to file and start ES")
         es_manager = cblpytest.edge_servers[0]
-        await self._write_file_on_es(es_manager, JWT_FILE, token_a)
+        await es_manager.write_file_on_es(JWT_FILE, token_a)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         # Only sync airlines for this test
         config["replications"][0]["collections"] = ["travel.airlines"]
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
@@ -234,7 +236,7 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 5: Rotate token — write Token-B to the same file ---
         self.mark_test_step("Rotating token: writing Token-B to file")
-        await self._write_file_on_es(es_manager, JWT_FILE, token_b)
+        await es_manager.write_file_on_es(JWT_FILE, token_b)
 
         # --- Step 6: Wait for ES to detect file change and reconnect ---
         self.mark_test_step("Waiting for ES to detect token change and reconnect")
@@ -273,7 +275,9 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step(f"PASSED — Token rotation works: {final_count} docs after rotating to Token-B")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_invalid_token_rotation_causes_401_stop(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_invalid_token_rotation_causes_401_stop(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """
         Overwrite the JWT file with an invalid token (signed by unknown key)
         while replication is active. ES detects the change via FileWatcher,
@@ -335,12 +339,13 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT token")
         es_manager = cblpytest.edge_servers[0]
-        await self._write_file_on_es(es_manager, JWT_FILE, token_valid)
+        await es_manager.write_file_on_es(JWT_FILE, token_valid)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
@@ -353,7 +358,7 @@ class TestJWTReplication(CBLTestClass):
         # the file change via inotify, disconnect the current replicator, and
         # reconnect with the invalid token. SGW rejects it with 401.
         self.mark_test_step("Writing INVALID token to JWT file")
-        await self._write_file_on_es(es_manager, JWT_FILE, token_invalid)
+        await es_manager.write_file_on_es(JWT_FILE, token_invalid)
 
         # --- Step 4: Wait for ES to detect change, reconnect, and fail auth ---
         self.mark_test_step("Waiting for automatic token change detection and auth failure")
@@ -402,7 +407,9 @@ class TestJWTReplication(CBLTestClass):
             self.mark_test_step("PASSED — Invalid token correctly causes auth failure")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_corrupt_token_file_content_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_corrupt_token_file_content_mid_replication(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """
         Overwrite the JWT token file with corrupt content while replication is active.
 
@@ -458,12 +465,13 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT file")
         es_manager = cblpytest.edge_servers[0]
-        await self._write_file_on_es(es_manager, JWT_FILE, token)
+        await es_manager.write_file_on_es(JWT_FILE, token)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
@@ -475,7 +483,7 @@ class TestJWTReplication(CBLTestClass):
         # write-file.sh rejects empty content, so write a single space
         # which is an invalid JWT token (not valid base64url format)
         self.mark_test_step("Overwriting JWT file with invalid content on ES")
-        await self._write_file_on_es(es_manager, JWT_FILE, " ")
+        await es_manager.write_file_on_es(JWT_FILE, " ")
 
         # --- Step 4: Poll until replication stops or wait times out ---
         self.mark_test_step("Polling for ES to detect corrupt token")
@@ -521,7 +529,9 @@ class TestJWTReplication(CBLTestClass):
                 pytest.fail(f"Unexpected status after JWT file deletion: {status}, error: {error}")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_valid_invalid_valid_token_cycle(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_valid_invalid_valid_token_cycle(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """
         Test cycle: valid token → invalid token → valid token.
 
@@ -592,12 +602,13 @@ class TestJWTReplication(CBLTestClass):
         # --- Step 3: Start with valid Token-A ---
         self.mark_test_step("Phase 1: Start ES with valid Token-A")
         es_manager = cblpytest.edge_servers[0]
-        await self._write_file_on_es(es_manager, JWT_FILE, token_a)
+        await es_manager.write_file_on_es(JWT_FILE, token_a)
 
         config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
@@ -617,7 +628,7 @@ class TestJWTReplication(CBLTestClass):
         # (401 is NOT transient, NOT network-dependent → no retry)
         # → ReplicationTask destroyed → FileWatcher destroyed
         self.mark_test_step("Phase 2: Writing INVALID token to file")
-        await self._write_file_on_es(es_manager, JWT_FILE, token_invalid)
+        await es_manager.write_file_on_es(JWT_FILE, token_invalid)
 
         # Poll until the replicator stops or task is removed
         max_wait = 60
@@ -675,7 +686,7 @@ class TestJWTReplication(CBLTestClass):
             "Phase 3: Writing valid Token-C and re-triggering _replicate "
             "(FileWatcher destroyed after 401 → manual restart required)"
         )
-        await self._write_file_on_es(es_manager, JWT_FILE, token_c)
+        await es_manager.write_file_on_es(JWT_FILE, token_c)
 
         # Re-trigger replication via configure_dataset (calls _replicate)
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)

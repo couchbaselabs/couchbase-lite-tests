@@ -1,5 +1,12 @@
+from json import dumps, loads
+
 import pytest
 import tenacity
+from cbltest.api.edgeserver import _error_detail
+from cbltest.api.error import (
+    CblEdgeServerBadResponseError,
+    CblSyncGatewayBadResponseError,
+)
 from cbltest.utils import async_retry_assert, retry_assert
 
 
@@ -93,3 +100,46 @@ class TestRetryAssert:
 
         assert "async_retry_assert" in str(exc_info.value)
         assert calls["n"] == 0
+
+
+class TestBadResponseErrors:
+    """Edge Server and Sync Gateway errors should expose the same detail."""
+
+    def test_edge_server_error_exposes_code_and_body(self) -> None:
+        body = '{"status": 404, "error": "Not Found"}'
+        err = CblEdgeServerBadResponseError(404, "get /db/nope returned 404", body=body)
+
+        assert err.code == 404
+        assert err.body == body
+        assert loads(err.body)["error"] == "Not Found"
+        assert str(err) == "get /db/nope returned 404"
+
+    def test_edge_server_error_requires_a_body(self) -> None:
+        """body is keyword-only and mandatory, so no raise site can quietly omit it."""
+        with pytest.raises(TypeError):
+            CblEdgeServerBadResponseError(404, "no body given")  # ty: ignore[missing-argument]
+
+    def test_edge_server_error_matches_sync_gateway_error(self) -> None:
+        es = CblEdgeServerBadResponseError(500, "es", body="es body")
+        sg = CblSyncGatewayBadResponseError(500, "sg", body="sg body")
+
+        assert (es.code, es.body) == (500, "es body")
+        assert (sg.code, sg.body) == (500, "sg body")
+
+
+class TestEdgeServerErrorDetail:
+    """Edge Server sends `reason` only sometimes; indexing it used to raise KeyError."""
+
+    def test_prefers_reason(self) -> None:
+        body = {"status": 404, "error": "Not Found", "reason": "No such collection"}
+        assert _error_detail(body) == "No such collection"
+
+    def test_falls_back_to_error_when_reason_is_absent(self) -> None:
+        """The real shape of an Edge Server 401 -- no `reason` key at all."""
+        assert _error_detail({"status": 401, "error": "Unauthorized"}) == "Unauthorized"
+
+    def test_falls_back_to_the_whole_body_when_neither_is_present(self) -> None:
+        assert _error_detail({"status": 500}) == dumps({"status": 500})
+
+    def test_treats_an_empty_reason_as_absent(self) -> None:
+        assert _error_detail({"error": "Conflict", "reason": ""}) == "Conflict"

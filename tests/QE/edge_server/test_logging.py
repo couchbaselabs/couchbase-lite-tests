@@ -1,3 +1,5 @@
+import asyncio
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -5,6 +7,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 
@@ -64,6 +67,29 @@ def _apply_audit_config_enabled(config: dict) -> None:
     config["logging"]["audit"].pop("disable", None)
 
 
+async def _wait_for_audit_event(
+    edge_server: EdgeServer,
+    event_id: str,
+    *,
+    timeout: float = 30.0,
+) -> list[str]:
+    """
+    Poll the audit log until `event_id` shows up, returning the matching lines
+    (empty if it never does).
+
+    Edge Server flushes the audit file asynchronously: a create event lands
+    roughly a second after the request that caused it has already returned, so
+    reading once straight afterwards reliably misses it.
+    """
+    deadline = time.monotonic() + timeout
+    log = await edge_server.check_log(event_id)
+    while not log and time.monotonic() < deadline:
+        await asyncio.sleep(0.5)
+        log = await edge_server.check_log(event_id)
+
+    return log
+
+
 AUDIT_CONFIG_APPLIERS: dict[str, Callable[[dict], None]] = {
     "default": _apply_audit_config_default,
     "disabled": _apply_audit_config_disabled,
@@ -82,12 +108,14 @@ class TestLogging(CBLTestClass):
         cblpytest: CBLPyTest,
         dataset_path: Path,
         audit_mode: str,
+        tmp_path: Path,
     ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
+        server.drop_bucket(bucket_name)
         server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
@@ -116,6 +144,11 @@ class TestLogging(CBLTestClass):
         await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
+        self.mark_test_step("Empty the audit logging file")
+        await cblpytest.edge_servers[0].write_file_on_es(
+            "/home/ec2-user/audit/EdgeServerAuditLog.txt", "_____________\n"
+        )
+
         self.mark_test_step("Creating a database on Edge Server with audit config.")
         step_descriptions = {
             "default": "Creating a database on Edge Server with default audit config.",
@@ -128,7 +161,9 @@ class TestLogging(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
+
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
 
@@ -139,7 +174,7 @@ class TestLogging(CBLTestClass):
         response = await edge_server.get_all_documents(es_db_name)
         self.mark_test_step("Checking that Edge Server has 5 documents.")
         assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
-
+        await asyncio.sleep(5)
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
             log = await edge_server.check_log(event_id)
@@ -176,7 +211,7 @@ class TestLogging(CBLTestClass):
             )
 
             self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
-            for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
+            for event_id, _, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
-                log = await edge_server.check_log(event_id)
-                assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"
+                log = await _wait_for_audit_event(edge_server, event_id)
+                assert len(log) > 0, f"Audit log for {step_name} event not found"

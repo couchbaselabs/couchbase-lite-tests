@@ -10,16 +10,40 @@ from cryptography.hazmat.primitives.serialization import (
     pkcs12,
 )
 from cryptography.x509 import (
+    AuthorityKeyIdentifier,
     BasicConstraints,
     Certificate,
     CertificateBuilder,
     ExtendedKeyUsage,
+    KeyUsage,
     Name,
     NameAttribute,
     NameOID,
     ObjectIdentifier,
+    SubjectKeyIdentifier,
     random_serial_number,
 )
+
+
+def _key_usage(
+    *,
+    digital_signature: bool = False,
+    key_encipherment: bool = False,
+    key_cert_sign: bool = False,
+    crl_sign: bool = False,
+) -> KeyUsage:
+    """Build a KeyUsage extension, defaulting every bit this codebase does not use to False."""
+    return KeyUsage(
+        digital_signature=digital_signature,
+        content_commitment=False,
+        key_encipherment=key_encipherment,
+        data_encipherment=False,
+        key_agreement=False,
+        key_cert_sign=key_cert_sign,
+        crl_sign=crl_sign,
+        encipher_only=False,
+        decipher_only=False,
+    )
 
 
 class CertKeyPair:
@@ -87,8 +111,27 @@ def create_cert(
         .not_valid_after(not_valid_before + timedelta(days=valid_days))
     )
 
+    # Python 3.13 turns on ssl.VERIFY_X509_STRICT by default, which enforces the
+    # RFC 5280 key-identifier and keyUsage rules: a CA needs a subjectKeyIdentifier
+    # and a keyUsage with keyCertSign, and a CA-issued certificate needs an
+    # authorityKeyIdentifier. Without these, verification fails with errors like
+    # "Missing Authority Key Identifier".
+    builder = builder.add_extension(SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+
     if is_ca:
-        builder = builder.add_extension(BasicConstraints(ca=True, path_length=None), critical=True)
+        builder = builder.add_extension(BasicConstraints(ca=True, path_length=None), critical=True).add_extension(
+            _key_usage(digital_signature=True, key_cert_sign=True, crl_sign=True), critical=True
+        )
+
+    if ca is not None:
+        builder = builder.add_extension(
+            AuthorityKeyIdentifier.from_issuer_public_key(ca.private_key.public_key()),
+            critical=False,
+        )
+        if not is_ca:
+            builder = builder.add_extension(BasicConstraints(ca=False, path_length=None), critical=True).add_extension(
+                _key_usage(digital_signature=True, key_encipherment=True), critical=True
+            )
 
     if usages:
         builder = builder.add_extension(ExtendedKeyUsage(list(usages)), critical=False)

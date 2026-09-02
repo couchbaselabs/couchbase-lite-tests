@@ -1,8 +1,10 @@
 import asyncio
 import json
 import ssl
+import time
 import urllib.parse
 import uuid
+from datetime import UTC, datetime
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
@@ -27,7 +29,7 @@ from cbltest.api.syncgateway import (
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
-from cbltest.logging import cbl_warning
+from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.version import VERSION
 
 
@@ -93,6 +95,17 @@ class BulkDocOperation(JSONSerializable):
         return self._body
 
 
+def _error_detail(response: dict) -> str:
+    """
+    Best available description of an Edge Server error body.
+
+    Edge Server sends `reason` only sometimes -- a 404 on a missing collection has
+    one, a 401 does not -- so indexing it raises KeyError instead of reporting the
+    error it was called about. Falls back to `error`, then to the whole body.
+    """
+    return response.get("reason") or response.get("error") or dumps(response)
+
+
 class EdgeServer:
     """
     A class for interacting with a given Edge Server instance
@@ -108,27 +121,64 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
+        self.__hostname: str = url
+        self.__auth_name = admin_user
+        self.__auth_password = admin_password
+        self.__anonymous_session: ClientSession | None = None
+        self.__admin_session: ClientSession | None = None
+        # What this Edge Server was provisioned with. configure_dataset() moves
+        # __config_file on and set_auth() overwrites the credentials, so
+        # reset_to_initial_state() needs its own record of what to return to.
+        self.__initial_config_file: str = config_file
+        self.__initial_auth_name: str = admin_user
+        self.__initial_auth_password: str = admin_password
+        self._apply_config(config_file)
+        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
+
+    def _apply_config(self, config_file: str) -> None:
+        """
+        Adopt `config_file` as this Edge Server's current config, rebuilding the
+        sessions whose port, scheme and auth it determines.
+
+        Any sessions being replaced are dropped here; callers that can await should
+        go through :func:`reconfigure` so the old ones are closed first.
+        """
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
-        self.__hostname: str = url
         self.__port: int = port
         self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth_name = admin_user
-        self.__auth_password = admin_password
         self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
-        self.__replication_url = f"{ws_scheme}{url}:{port}"
+        self.__replication_url = f"{ws_scheme}{self.__hostname}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session = self._create_session(self.scheme, url, port, None)
+        self.__anonymous_session = self._create_session(self.scheme, self.__hostname, port, None)
         self.__admin_session = self._create_session(
             self.scheme,
-            url,
+            self.__hostname,
             port,
             encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
         )
-        self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
+
+    async def reconfigure(self, config_file: str) -> None:
+        """
+        Adopt `config_file`, closing the sessions it replaces.
+
+        The shell2http session is left alone: it always talks plain HTTP to port
+        20001, whatever the Edge Server config says.
+        """
+        await self._close_client_sessions()
+        self._apply_config(config_file)
+
+    async def _close_client_sessions(self) -> None:
+        """Close the anonymous and admin sessions, leaving the shell2http one open."""
+        for session in (self.__admin_session, self.__anonymous_session):
+            if session is not None and not session.closed:
+                await session.close()
+
+        self.__admin_session = None
+        self.__anonymous_session = None
 
     @property
     def hostname(self) -> str:
@@ -187,10 +237,10 @@ class EdgeServer:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            if self.__auth:
-                session = self.__admin_session
-            else:
-                session = self.__anonymous_session
+            session = self.__admin_session if self.__auth else self.__anonymous_session
+
+        if session is None:
+            raise CblTestError(f"Edge Server [{self.__hostname}] session is closed, cannot {method.upper()} {path}")
 
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
@@ -212,8 +262,7 @@ class EdgeServer:
 
             if not resp.ok:
                 raise CblEdgeServerBadResponseError(
-                    resp.status,
-                    f"{method} {path} returned {resp.status} for payload {data}",
+                    resp.status, f"{method} {path} returned {resp.status} for payload {data}", body=data
                 )
 
             return ret_val
@@ -232,13 +281,9 @@ class EdgeServer:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            if "/" in raw_version:
-                version_part = raw_version.rsplit("/", 1)[1]
-            else:
-                cbl_warning(f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'")
-                version_part = raw_version
-            return EdgeServerVersion(version_part)
+            vendor = _get_typed_required(resp_dict, "vendor", dict)
+            raw_version = _get_typed_required(vendor, "version", str)
+            return EdgeServerVersion(raw_version)
 
     async def get_all_documents(
         self,
@@ -334,7 +379,9 @@ class EdgeServer:
                 if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
                     return None
 
-                raise CblEdgeServerBadResponseError(500, f"Get doc from edge server had error '{cast_resp['reason']}'")
+                raise CblEdgeServerBadResponseError(
+                    500, f"Get doc from edge server had error '{_error_detail(cast_resp)}'", body=dumps(cast_resp)
+                )
 
             return RemoteDocument(cast_resp)
 
@@ -345,12 +392,10 @@ class EdgeServer:
                 return response
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"_all_dbs with Edge Server had error '{response.get('reason')}'",
+                    500, f"_all_dbs with Edge Server had error '{_error_detail(response)}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from adhoc query: {type(response)}",
+                500, f"Unexpected response type from adhoc query: {type(response)}", body=str(response)
             )
 
     async def get_active_tasks(self) -> list:
@@ -362,11 +407,11 @@ class EdgeServer:
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get_active_tasks with Edge Server had error '{response.get('reason')}'",
+                    f"get_active_tasks with Edge Server had error '{_error_detail(response)}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from get_active_tasks: {type(response)}",
+                500, f"Unexpected response type from get_active_tasks: {type(response)}", body=str(response)
             )
 
     async def get_db_info(self, db_name: str, scope: str = "", collection: str = "") -> dict:
@@ -386,7 +431,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get database info  from edge server had error '{cast_resp['reason']}'",
+                    f"get database info  from edge server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -453,7 +499,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"start replication with edge server had error '{cast_resp['reason']}'",
+                    f"start replication with edge server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp.get("session_id")
 
@@ -470,7 +517,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get replication status with Edge Server had error '{cast_resp['reason']}'",
+                    f"get replication status with Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -482,11 +530,11 @@ class EdgeServer:
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"all_replication_status with Edge Server had error '{response.get('reason')}'",
+                    f"all_replication_status with Edge Server had error '{_error_detail(response)}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from all_replication_status: {type(response)}",
+                500, f"Unexpected response type from all_replication_status: {type(response)}", body=str(response)
             )
 
     async def stop_replication(self, replicator_id: int) -> None:
@@ -503,7 +551,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"stop replication  with Edge Server had error '{cast_resp['reason']}'",
+                    f"stop replication  with Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
 
     def replication_url(self, db_name: str) -> str:
@@ -557,7 +606,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get changes feed with Edge Server had error '{cast_resp['reason']}'",
+                    f"get changes feed with Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -589,12 +639,10 @@ class EdgeServer:
 
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"named query with Edge Server had error '{response.get('reason')}'",
+                    500, f"named query with Edge Server had error '{_error_detail(response)}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from named query: {type(response)}",
+                500, f"Unexpected response type from named query: {type(response)}", body=str(response)
             )
 
     async def adhoc_query(
@@ -624,12 +672,10 @@ class EdgeServer:
 
             if isinstance(response, dict) and "error" in response:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"adhoc query with Edge Server had error '{response.get('reason')}'",
+                    500, f"adhoc query with Edge Server had error '{_error_detail(response)}'", body=dumps(response)
                 )
             raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from adhoc query: {type(response)}",
+                500, f"Unexpected response type from adhoc query: {type(response)}", body=str(response)
             )
 
     async def add_document_auto_id(
@@ -665,7 +711,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"add document with auto ID Edge Server had error '{cast_resp['reason']}'",
+                    f"add document with auto ID Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -711,7 +758,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"add document with ID Edge Server had error '{cast_resp['reason']}'",
+                    f"add document with ID Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -742,7 +790,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"delete sub-document Edge Server had error '{cast_resp['reason']}'",
+                    f"delete sub-document Edge Server had error '{_error_detail(cast_resp)}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -776,8 +825,7 @@ class EdgeServer:
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
-                    500,
-                    f"put sub-document Edge Server had error '{cast_resp['reason']}'",
+                    500, f"put sub-document Edge Server had error '{_error_detail(cast_resp)}'", body=dumps(cast_resp)
                 )
             return cast_resp
 
@@ -798,7 +846,8 @@ class EdgeServer:
                 if "error" in cast_resp:
                     raise CblEdgeServerBadResponseError(
                         500,
-                        f"get sub-document Edge Server had error '{cast_resp['reason']}'",
+                        f"get sub-document Edge Server had error '{_error_detail(cast_resp)}'",
+                        body=dumps(cast_resp),
                     )
                 return cast_resp
             else:
@@ -829,7 +878,8 @@ class EdgeServer:
                 if "error" in cast_resp:
                     raise CblEdgeServerBadResponseError(
                         500,
-                        f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                        f"bulk_documents_operation Edge Server had error '{_error_detail(cast_resp)}'",
+                        body=dumps(cast_resp),
                     )
             if isinstance(resp, list):
                 return cast(list, resp)
@@ -840,6 +890,8 @@ class EdgeServer:
         else:
             self.__auth_name = name
             self.__auth_password = password
+            if self.__admin_session is not None and not self.__admin_session.closed:
+                await self.__admin_session.close()
             self.__admin_session = self._create_session(
                 self.scheme,
                 self.__hostname,
@@ -864,7 +916,11 @@ class EdgeServer:
             try:
                 async with (
                     ClientSession() as session,
-                    session.get(url, timeout=ClientTimeout(total=timeout)) as response,
+                    session.get(
+                        url,
+                        timeout=ClientTimeout(total=timeout),
+                        headers={"Cache-Control": "no-cache", "Pragma": "no-cache"},
+                    ) as response,
                 ):
                     if response.status == 404:
                         raise FileNotFoundError(f"{operation} not found at {url}")
@@ -892,11 +948,11 @@ class EdgeServer:
             try:
                 prefix = "/home/ec2-user/"
                 path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                caddy_url = f"http://{self.hostname}:20000/{path}"
+                caddy_url = f"http://{self.hostname}:20000/{path}?_={time.time_ns()}"
                 content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
                 return content.decode("utf-8")
-            except Exception:
-                return ""
+            except Exception as e:
+                raise Exception("Failed to fetch log content from %s: %s", caddy_url, e)
 
     async def check_log(
         self,
@@ -919,6 +975,7 @@ class EdgeServer:
             },
         ):
             content = await self.get_log_content(log_file)
+            cbl_trace(f"Edge Server [{self.__hostname}] {log_file}:\n{content}")
             return [line for line in content.splitlines() if search_string in line]
 
     async def start_server(self, config: dict | None = None) -> None:
@@ -950,7 +1007,46 @@ class EdgeServer:
         async with aiofiles.open(config_file) as f:
             cfg = json.loads(await f.read())
         await self.start_server(config=cfg)
-        return EdgeServer(self.__hostname, config_file=config_file)
+        # Reconfigure in place and hand back self. Returning a fresh EdgeServer left
+        # this one's sessions open with nobody holding a reference, which is what
+        # filled test output with "Unclosed client session".
+        await self.reconfigure(config_file)
+        return self
+
+    async def reset_to_initial_state(self) -> None:
+        """
+        Return this Edge Server to the state the AWS setup left it in, so a test
+        does not inherit whatever the previous one did to it.
+
+        Tests reconfigure Edge Server freely: they swap in TLS/mTLS or
+        users-less configs, create databases, and the chaos tests kill the
+        process and install iptables rules. None of that is undone on failure,
+        so without this a failing test can strand the host for every test after
+        it.
+
+        Firewall rules are dropped first, since a leftover DROP rule would hide
+        the host. The process is then stopped, every database is wiped back to
+        the provisioned datasets, and it is restarted on the config this object
+        was constructed with (by default the one setup_edge_servers.py
+        installed).
+
+        The admin credentials are restored too. set_auth() overwrites them
+        permanently, and a test that leaves bad ones behind (test_basic_auth
+        deliberately ends on an invalid user) would otherwise have every later
+        admin request on this host answered with 401.
+        """
+        with self.__tracer.start_as_current_span("reset edge server"):
+            await self.reset_firewall()
+            await self.kill_server()
+            await self._send_request("post", "/reset-all-dbs", session=self.__shell_session)
+
+            async with aiofiles.open(self.__initial_config_file) as f:
+                config = json.loads(await f.read())
+
+            await self.start_server(config=config)
+            self.__auth_name = self.__initial_auth_name
+            self.__auth_password = self.__initial_auth_password
+            await self.reconfigure(self.__initial_config_file)
 
     async def set_firewall_rules(
         self,
@@ -1008,3 +1104,59 @@ class EdgeServer:
                 is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def close(self) -> None:
+        if self.__admin_session is not None and not self.__admin_session.closed:
+            await self.__admin_session.close()
+            self.__admin_session = None
+        if self.__anonymous_session is not None and not self.__anonymous_session.closed:
+            await self.__anonymous_session.close()
+            self.__anonymous_session = None
+        if self.__shell_session is not None and not self.__shell_session.closed:
+            await self.__shell_session.close()
+            self.__shell_session = None
+
+    async def collect_logs(self, output_dir: Path, label: str | None = None) -> Path:
+        """
+        Ask the Edge Server host to bundle its logs, audit logs, config and
+        system info into a tarball, then download it into output_dir.
+
+        Uses short-lived sessions rather than the instance's own sessions so
+        that this still works on an instance whose sessions were closed by a
+        prior configure_dataset() call.
+
+        :param output_dir: Local directory to download the archive into
+        :param label: Optional suffix (e.g. test name) for the archive filename
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span("collect_logs", attributes={"cbl.edge_server.host": self.__hostname}):
+            ts = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.__hostname.replace(".", "-").replace(":", "-")
+            safe_label = "-" + "".join(c if c.isalnum() or c in "-_" else "_" for c in label) if label else ""
+            filename = f"es-collect-{safe_host}-{ts}{safe_label}.tar.gz"
+
+            async with ClientSession(f"http://{self.__hostname}:20001") as s:
+                await self._send_request(
+                    "post",
+                    "/collect-logs",
+                    JSONDictionary({"filename": filename}),
+                    session=s,
+                )
+
+            caddy_url = f"http://{self.__hostname}:20000/collect/{filename}"
+            content = await self._caddy_http_request(caddy_url, f"Download {filename}", timeout=300)
+
+            output_dir.mkdir(parents=True, exist_ok=True)
+            local_path = output_dir / filename
+            async with aiofiles.open(local_path, "wb") as f:
+                await f.write(content)
+            return local_path
+
+    async def write_file_on_es(self, path: str, content: str) -> None:
+        """Write content to a file on the ES host via shell2http."""
+        await self._send_request(
+            "post",
+            "write-file",
+            JSONDictionary({"path": path, "content": content}),
+            session=self.__shell_session,
+        )

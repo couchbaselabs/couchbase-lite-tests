@@ -2031,7 +2031,10 @@ class SyncGateway(_SyncGatewayBase):
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
-            # disable hostname verification as we do in _create_session
+            # Skips verification entirely, which is not what _create_session does: that
+            # trusts the bundled CA and relaxes only the hostname check. Harmless against
+            # a per-environment test Sync Gateway, but it is why urllib3 raises one
+            # InsecureRequestWarning per session, attributed to whichever test runs first.
             verify=False,
             timeout=10,
         )
