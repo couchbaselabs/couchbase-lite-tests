@@ -123,11 +123,9 @@ class TestEdgeServerChaos(CBLTestClass):
             assert len(all_docs.rows) == docgen.size, "Inserted document count mismatch"
 
         #     start kill_servers
-        for server in kill_server:
-            await server.start_server()
+        restarted = [await server.start_server() for server in kill_server]
         self.mark_test_step("Edge servers started")
-        for server in kill_server:
-            edge_server = server.edge_server
+        for edge_server in restarted:
             for doc_id in random.sample(list(update_docs.keys()), 50):
                 await edge_server.get_document(db_name="travel", scope="travel", collection="hotels", doc_id=doc_id)
             all_docs = await edge_server.get_all_documents(db_name="travel", scope="travel", collection="hotels")

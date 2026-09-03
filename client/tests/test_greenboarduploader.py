@@ -132,10 +132,13 @@ class FakeEdgeServer:
 
 
 class FakeEdgeServerManager:
-    """``CBLPyTest.edge_servers`` holds managers, and greenboard reads the client off one."""
+    """``CBLPyTest.edge_servers`` holds managers, and greenboard takes a client from one."""
 
     def __init__(self, edge_server: Any) -> None:
-        self.edge_server = edge_server
+        self._edge_server = edge_server
+
+    def get_admin_client(self) -> Any:
+        return self._edge_server
 
 
 class FakeTestServer(testserver.TestServer):

@@ -13,7 +13,7 @@ class TestAuthentication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_basic_auth(self, cblpytest: CBLPyTest) -> None:
         self.mark_test_step("test_basic_auth")
-        edge_server = await cblpytest.edge_servers[0].configure_dataset(
+        await cblpytest.edge_servers[0].configure_dataset(
             db_name="names", config_file=f"{SCRIPT_DIR}/config/test_basic_auth.json"
         )
         valid_auth = ("username8", "password8")
@@ -25,12 +25,12 @@ class TestAuthentication(CBLTestClass):
             self.mark_test_step(f"Active Tasks: {active_tasks}")
 
         self.mark_test_step("testing invalid auth")
-        async with edge_server.get_user_client(invalid_auth[0], invalid_auth[1]) as invalid_client:
+        async with cblpytest.edge_servers[0].get_user_client(invalid_auth[0], invalid_auth[1]) as invalid_client:
             with pytest.raises(CblEdgeServerBadResponseError):
                 await invalid_client.get_active_tasks()
 
         self.mark_test_step("testing anonymous auth ")
-        async with edge_server.get_anonymous_client() as anonymous_client:
+        async with cblpytest.edge_servers[0].get_anonymous_client() as anonymous_client:
             with pytest.raises(CblEdgeServerBadResponseError):
                 await anonymous_client.get_active_tasks()
 

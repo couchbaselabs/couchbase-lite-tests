@@ -3,8 +3,6 @@ import json
 import ssl
 import urllib.parse
 import uuid
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
@@ -130,45 +128,15 @@ class EdgeServer:
         # A config that declares no users turns credentials away, so send none against one.
         self.__needs_auth = needs_auth
         credentials = encode_basic_auth(user, password or "", "ascii") if needs_auth and user else None
-        self.__session = self._create_session(self.scheme, url, port, credentials)
+        self.__session = self._create_session(credentials)
 
-    def _require_user_config(self) -> None:
-        """Reject a user client when the running config declares no users to authenticate as."""
-        if not self.__needs_auth:
-            raise CblTestError(
-                f"Edge Server [{self.__hostname}] is running a config that declares no users, "
-                "so a user client would send no credentials and prove nothing"
-            )
-
-    @asynccontextmanager
-    async def get_user_client(self, username: str, password: str) -> AsyncIterator["EdgeServer"]:
-        """
-        Yields a client that authenticates as an existing `username`, closing it on exit.
-        `EdgeServerManager.create_user_client` adds the user first.
-
-        :param username: The user to authenticate as
-        :param password: That user's password
-        """
-        self._require_user_config()
-        client = EdgeServer(self.__hostname, username, password, self.__config_file)
-        try:
-            yield client
-        finally:
-            await client.close()
-
-    @asynccontextmanager
-    async def get_anonymous_client(self) -> AsyncIterator["EdgeServer"]:
-        """Yields a client that sends no credentials, closing it on exit."""
-        client = EdgeServer(self.__hostname, config_file=self.__config_file)
-        try:
-            yield client
-        finally:
-            await client.close()
+    @property
+    def needs_auth(self) -> bool:
+        """Whether the running config declares users, so a client can authenticate as one."""
+        return self.__needs_auth
 
     async def close(self) -> None:
-        """
-        Closes the aiohttp session this Edge Server requests on, and its Caddy's
-        """
+        """Close the session this client requests on, and its Caddy's."""
         if not self.__session.closed:
             await self.__session.close()
         await self._caddy.close()
@@ -204,7 +172,7 @@ class EdgeServer:
             users,
         )
 
-    def _create_session(self, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+    def _create_session(self, auth_header: str | None) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
         from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
         headers = {"Authorization": auth_header} if auth_header is not None else None
@@ -219,29 +187,24 @@ class EdgeServer:
                 )
 
             return ClientSession(
-                f"{scheme}{url}:{port}",
+                f"{self.scheme}{self.__hostname}:{self.__port}",
                 headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
-        return ClientSession(f"{scheme}{url}:{port}", headers=headers)
+        return ClientSession(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
 
     async def _send_request(
         self,
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
-        params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
-        if session is None:
-            session = self.__session
-
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await session.request(method, path, data=data, headers=headers, params=params)
+            resp = await self.__session.request(method, path, data=data, headers=headers)
 
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -272,14 +235,12 @@ class EdgeServer:
         return keyspace
 
     async def get_version(self) -> CouchbaseVersion:
-        scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(scheme, self.__hostname, self.__port, None) as s:
-            resp = await self._send_request("get", "/", session=s)
-            assert isinstance(resp, dict)
-            resp_dict = cast(dict, resp)
-            vendor = _get_typed_required(resp_dict, "vendor", dict)
-            raw_version = _get_typed_required(vendor, "version", str)
-            return EdgeServerVersion(raw_version)
+        resp = await self._send_request("get", "/")
+        assert isinstance(resp, dict)
+        resp_dict = cast(dict, resp)
+        vendor = _get_typed_required(resp_dict, "vendor", dict)
+        raw_version = _get_typed_required(vendor, "version", str)
+        return EdgeServerVersion(raw_version)
 
     async def get_all_documents(
         self,

@@ -26,8 +26,8 @@ stopped() {
   [[ -z "$(es_pids)" ]] && ! port_busy
 }
 
-# The RPM starts a systemd unit that respawns the process unless the service is stopped
-# first. Tests then run Edge Server by hand, so the signal escalation below still applies.
+# Stop the packaged service, if the RPM installed one. Tests run Edge Server by hand, so
+# the signal escalation below covers that case.
 if systemctl cat couchbase-edge-server.service >/dev/null 2>&1; then
   sudo systemctl stop couchbase-edge-server.service >/dev/null 2>&1 || true
 fi

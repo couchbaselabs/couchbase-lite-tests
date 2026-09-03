@@ -106,22 +106,32 @@ async def test_configure_dataset_returns_an_edge_server_on_the_new_config(
     async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
         manager = managers[0]
         stub_sidecar(monkeypatch, manager)
-        replaced = manager.edge_server
-
-        closed = False
-
-        async def close() -> None:
-            nonlocal closed
-            closed = True
-
-        monkeypatch.setattr(replaced, "close", close)
+        replaced = manager.get_admin_client()
 
         edge_server = await manager.configure_dataset(config_file=write_config(tmp_path, "tls.json", 60000, https=True))
 
         assert edge_server is not replaced, "a config change is a new Edge Server, not a mutated one"
-        assert edge_server is manager.edge_server
         assert edge_server.replication_url("db") == f"wss://{HOSTNAME}:60000/db"
-        assert closed, "the Edge Server left behind is closed"
+
+
+@pytest.mark.asyncio
+async def test_close_closes_every_client_handed_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    closed = []
+
+    async def close_one(client: object) -> None:
+        closed.append(client)
+
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        manager = managers[0]
+        stub_sidecar(monkeypatch, manager)
+        handed_out = [
+            manager.get_admin_client(),
+            await manager.configure_dataset(config_file=write_config(tmp_path, "tls.json", 60000, https=True)),
+        ]
+        for client in handed_out:
+            monkeypatch.setattr(client, "close", lambda client=client: close_one(client))
+
+    assert closed == handed_out, "every client the manager handed out is closed with it"
 
 
 @pytest.mark.asyncio
@@ -134,7 +144,7 @@ async def test_reset_returns_to_the_provisioned_config(tmp_path: Path, monkeypat
 
         await manager.reset_to_initial_state()
 
-        assert manager.edge_server.replication_url("db") == f"ws://{HOSTNAME}:59840/db"
+        assert manager.get_admin_client().replication_url("db") == f"ws://{HOSTNAME}:59840/db"
 
     assert [(method, path) for method, path, _ in calls] == [
         ("post", "/firewall"),
@@ -227,7 +237,7 @@ async def test_create_user_client_adds_the_user_and_authenticates_as_them(
         calls = stub_sidecar(monkeypatch, manager)
 
         async with manager.create_user_client("username8", "password8") as client:
-            assert client is not manager.edge_server, "the user gets a client of its own"
+            assert client is not manager.get_admin_client(), "the user gets a client of its own"
             await client.get_all_dbs()
             assert client_session(client).headers["Authorization"] == encode_basic_auth(
                 "username8", "password8", "ascii"
@@ -247,7 +257,7 @@ async def test_create_user_client_adds_the_user_and_authenticates_as_them(
 async def test_user_client_needs_a_config_that_declares_users(tmp_path: Path) -> None:
     async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
         with pytest.raises(CblTestError, match="declares no users"):
-            async with manager.edge_server.get_user_client("username8", "password8"):
+            async with manager.get_user_client("username8", "password8"):
                 pass
 
 
@@ -255,7 +265,7 @@ async def test_user_client_needs_a_config_that_declares_users(tmp_path: Path) ->
 async def test_anonymous_client_sends_no_credentials(tmp_path: Path) -> None:
     async with (
         fake_session_manager(write_config(tmp_path, "initial.json", 59840, users=True)) as manager,
-        manager.edge_server.get_anonymous_client() as client,
+        manager.get_anonymous_client() as client,
     ):
         await client.get_all_dbs()
         assert "Authorization" not in client_session(client).headers
