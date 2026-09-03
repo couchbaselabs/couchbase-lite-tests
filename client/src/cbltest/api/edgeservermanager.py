@@ -116,6 +116,9 @@ class EdgeServerManager:
         :param password: That user's password
         :param role: The role to give the user
         """
+        # Checked before the restart add_user does, so a config that cannot use the user
+        # leaves the Edge Server alone.
+        self.__edge_server._require_user_config()
         await self.add_user(username, password, role)
         async with self.__edge_server.get_user_client(username, password) as client:
             yield client

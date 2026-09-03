@@ -107,14 +107,14 @@ class TestEdgeServerChaos(CBLTestClass):
     ) -> dict[str, Any]:
         for server in kill_server:
             await server.kill_server()
-        self.mark_test_step(f"Edge servers in {kill_server} killed")
+        self.mark_test_step(f"Edge servers in {[str(server) for server in kill_server]} killed")
         primary_server = ops_server[0]
         update_docs = docgen.update_all_documents(docs_list)
         bulk_ops = [
             BulkDocOperation(body=doc, _id=id, optype="update", rev=revmap.get(id)) for id, doc in update_docs.items()
         ]
         await primary_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        self.mark_test_step(f"Docs updated in {ops_server}")
+        self.mark_test_step(f"Docs updated in {[server.hostname for server in ops_server]}")
         # validate in op_list
         all_docs_list = []
         for server in ops_server:

@@ -128,8 +128,17 @@ class EdgeServer:
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
         # A config that declares no users turns credentials away, so send none against one.
+        self.__needs_auth = needs_auth
         credentials = encode_basic_auth(user, password or "", "ascii") if needs_auth and user else None
         self.__session = self._create_session(self.scheme, url, port, credentials)
+
+    def _require_user_config(self) -> None:
+        """Reject a user client when the running config declares no users to authenticate as."""
+        if not self.__needs_auth:
+            raise CblTestError(
+                f"Edge Server [{self.__hostname}] is running a config that declares no users, "
+                "so a user client would send no credentials and prove nothing"
+            )
 
     @asynccontextmanager
     async def get_user_client(self, username: str, password: str) -> AsyncIterator["EdgeServer"]:
@@ -140,6 +149,7 @@ class EdgeServer:
         :param username: The user to authenticate as
         :param password: That user's password
         """
+        self._require_user_config()
         client = EdgeServer(self.__hostname, username, password, self.__config_file)
         try:
             yield client

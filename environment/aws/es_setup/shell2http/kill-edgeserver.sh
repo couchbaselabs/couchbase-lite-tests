@@ -4,8 +4,15 @@
 # the next /start-edgeserver does not race it.
 
 ES_BIN="/opt/couchbase-edge-server/bin/couchbase-edge-server"
-PORT="${ES_PORT:-59840}"
+CONFIG="/opt/couchbase-edge-server/etc/config.json"
 WAIT_PER_SIGNAL=20 # x 0.5s
+
+# The port comes from the config the server was started on, since a test is free to
+# configure any port it likes.
+PORT="$(jq -r '(.interface // "0.0.0.0:59840") | split(":") | last' "$CONFIG" 2>/dev/null)"
+if [[ -z "$PORT" || "$PORT" == "null" ]]; then
+  PORT=59840
+fi
 
 es_pids() {
   pgrep -f "$ES_BIN" || true

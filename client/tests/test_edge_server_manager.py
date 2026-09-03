@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 from aiohttp import encode_basic_auth
 from cbltest.api.edgeservermanager import EdgeServerManager
+from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.configparser import EdgeServerInfo
 from cbltest.plugins.cluster_cleanup import reset_all_edge_servers
@@ -26,6 +27,10 @@ def no_network() -> Iterator[None]:
         patch("cbltest.api.edgeserver.ClientSession", autospec=True),
         patch("cbltest.api.caddy.ClientSession", autospec=True),
         patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
+        # machine that has provisioned an Edge Server topology.
+        patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
+        patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
     ):
         yield
 
@@ -190,6 +195,10 @@ def fake_sessions() -> Iterator[None]:
         patch("cbltest.api.edgeserver.ClientSession", FakeSession),
         patch("cbltest.api.caddy.ClientSession", autospec=True),
         patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
+        # machine that has provisioned an Edge Server topology.
+        patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
+        patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
     ):
         yield
 
@@ -232,6 +241,14 @@ async def test_create_user_client_adds_the_user_and_authenticates_as_them(
         ("post", "/start-edgeserver"),
     ]
     assert calls[1][2] == {"name": "username8", "password": "password8", "role": "admin"}
+
+
+@pytest.mark.asyncio
+async def test_user_client_needs_a_config_that_declares_users(tmp_path: Path) -> None:
+    async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
+        with pytest.raises(CblTestError, match="declares no users"):
+            async with manager.edge_server.get_user_client("username8", "password8"):
+                pass
 
 
 @pytest.mark.asyncio
