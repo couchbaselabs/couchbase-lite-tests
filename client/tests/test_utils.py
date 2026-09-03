@@ -88,8 +88,10 @@ class TestRetryAssert:
             calls["n"] += 1
             raise AssertionError("still not ready")
 
+        # Passing an async poll is the error case under test, so the ignore is deliberate:
+        # retry_assert raises TypeError rather than returning the coroutine ty sees here.
         with pytest.raises(TypeError) as exc_info:
-            retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
+            retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))  # ty: ignore[unused-awaitable]
 
         assert "async_retry_assert" in str(exc_info.value)
         assert calls["n"] == 0
