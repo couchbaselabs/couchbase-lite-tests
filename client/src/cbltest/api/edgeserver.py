@@ -1010,6 +1010,15 @@ class EdgeServer:
         await self.start_server(config=cfg)
         return EdgeServer(self.__hostname, config_file=config_file)
 
+    async def write_file(self, path: str, content: str) -> None:
+        with self.__tracer.start_as_current_span("write_file", attributes={"cbl.file.path": path}):
+            await self._send_request(
+                "post",
+                "/write-file",
+                JSONDictionary({"path": path, "content": content}),
+                session=self.__shell_session,
+            )
+
     async def set_firewall_rules(
         self,
         allow: list[Any] | None = None,
