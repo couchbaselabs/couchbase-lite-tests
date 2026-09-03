@@ -150,7 +150,7 @@ class TestLogRedaction(CBLTestClass):
                 except FileNotFoundError:
                     continue
                 except Exception as e:
-                    raise Exception(f"Failed to fetch sg_{log_type}.log via Caddy: {e}") from e
+                    raise Exception(f"Failed to fetch sg_{log_type}.log via Caddy: {e!r}") from e
 
             assert len(all_violations) == 0, (
                 f"Found {len(all_violations)} log redaction violations across all logs: Showing first 10:\n"
@@ -220,7 +220,7 @@ class TestLogRedaction(CBLTestClass):
 
             self.mark_test_step("Discover redacted SGCollect zip file via Caddy")
             try:
-                files = await sg.list_files_via_caddy(pattern=r"sgcollect.*redacted.*\.zip")
+                files = await sg.caddy.list(pattern=r"sgcollect.*redacted.*\.zip")
                 assert len(files) > 0, (
                     "No redacted SGCollect zip files found. "
                     "Make sure SGCollect was run with redaction enabled and Caddy has 'browse' enabled."
@@ -236,7 +236,7 @@ class TestLogRedaction(CBLTestClass):
             self.mark_test_step(f"Download redacted zip: {redacted_zip_filename}")
             with tempfile.TemporaryDirectory() as tmpdir:
                 local_zip_path = Path(tmpdir) / redacted_zip_filename
-                await sg.download_file_via_caddy(redacted_zip_filename, str(local_zip_path))
+                await sg.caddy.download(redacted_zip_filename, local_zip_path)
 
                 assert local_zip_path.exists(), f"Downloaded zip not found at {local_zip_path}"
 

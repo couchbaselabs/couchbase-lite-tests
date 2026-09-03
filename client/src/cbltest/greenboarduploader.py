@@ -17,6 +17,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
+EDGE_SERVER_PLATFORM = "edge-server"
+
 
 def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
     """Return ``(passed, failed, errored)`` summed across every
@@ -116,9 +118,10 @@ class RunResult(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True)
 
-    build: int  # build number of CBL build
-    version: str  # major.minor.patch version of CBL
+    build: int  # build number of the component the run is keyed on (CBL, SGW or ES)
+    version: str  # major.minor.patch version of the component the run is keyed on
     sgw_version: str = Field(alias="sgwVersion")  # Sync Gateway version, optional
+    es_version: str = Field(alias="esVersion")  # Edge Server version, optional
     fail_count: int = Field(alias="failCount")  # number of failing tests
     pass_count: int = Field(alias="passCount")  # number of passing tests
     platform: str  # CBL platform
@@ -159,6 +162,7 @@ class GreenboardUploader:
         self.__overall_fail = False
         self.__test_ran = False
         self.__has_sgw_marker = False
+        self.__has_es_marker = False
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any]:
@@ -177,6 +181,8 @@ class GreenboardUploader:
         # set this, or an SGW run gets filed under the CBL platform.
         if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
             self.__has_sgw_marker = True
+        if item.get_closest_marker("min_edge_servers"):
+            self.__has_es_marker = True
 
         if self.__overall_fail:
             return
@@ -192,12 +198,19 @@ class GreenboardUploader:
         """
         return self.__has_sgw_marker
 
+    def has_es_marker(self) -> bool:
+        """
+        Returns True if any test in the session has @pytest.mark.min_edge_servers
+        """
+        return self.__has_es_marker
+
     def upload(
         self,
         platform: str,
         os_name: str,
-        version: str,
+        version: str | None,
         sgw_version: CouchbaseVersion | None,
+        es_version: CouchbaseVersion | None,
         *,
         pass_count: int | None = None,
         fail_count: int | None = None,
@@ -232,11 +245,15 @@ class GreenboardUploader:
         parsed_version = "0.0.0"
         parsed_build = 0
         sgw_version_str = "n/a"
+        es_version_str = "n/a"
 
         if sgw_version is not None:
             sgw_ver = sgw_version.version
             sgw_build = sgw_version.build_number
             sgw_version_str = f"{sgw_ver}-{sgw_build}"
+
+        if es_version is not None:
+            es_version_str = f"{es_version.version}-{es_version.build_number}"
 
         if platform == "sync-gateway" and sgw_version is not None:
             # For SGW jobs, use the SGW version directly from the parsed object
@@ -245,8 +262,15 @@ class GreenboardUploader:
                 sgw_version.version if sgw_version.version and sgw_version.version != "unknown" else "0.0.0"
             )
             parsed_build = sgw_version.build_number
+        elif platform == EDGE_SERVER_PLATFORM:
+            # An ES run is keyed on the ES build, and may not involve CBL at all.
+            if es_version is None:
+                cbl_warning("Greenboard: platform is edge-server but no ES version was available; skipping upload")
+                return
+            parsed_version = es_version.version if es_version.version and es_version.version != "unknown" else "0.0.0"
+            parsed_build = es_version.build_number
         else:
-            version_components = version.split("-")
+            version_components = (version or "").split("-")
 
             if len(version_components) > 0 and version_components[0]:
                 parsed_version = version_components[0]
@@ -264,6 +288,7 @@ class GreenboardUploader:
                 build=parsed_build,
                 version=parsed_version,
                 sgwVersion=sgw_version_str,
+                esVersion=es_version_str,
                 failCount=resolved_fail,
                 passCount=resolved_pass,
                 platform=platform,
@@ -277,8 +302,9 @@ class GreenboardUploader:
         junit_output: Path,
         platform: str,
         os_name: str,
-        version: str,
+        version: str | None,
         sgw_version: CouchbaseVersion | None,
+        es_version: CouchbaseVersion | None = None,
     ) -> None:
         """
         Upload one greenboard doc whose pass/fail counts come from a JUnit
@@ -311,7 +337,7 @@ class GreenboardUploader:
         if not junit_output.is_file():
             # Pytest didn't write an XML for this session; use the in-process
             # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version)
+            self.upload(platform, os_name, version, sgw_version, es_version)
             return
 
         junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
@@ -327,6 +353,7 @@ class GreenboardUploader:
             os_name,
             version,
             sgw_version,
+            es_version,
             pass_count=junit_pass,
             fail_count=junit_fail + junit_error,
         )
