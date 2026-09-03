@@ -20,21 +20,19 @@ class TestAuthentication(CBLTestClass):
         invalid_auth = ("invalid_user", "wrong_password")
 
         self.mark_test_step("testing valid auth")
-        await edge_server.add_user(name=valid_auth[0], password=valid_auth[1])
-        await edge_server.set_auth(name=valid_auth[0], password=valid_auth[1])
-
-        active_tasks = await edge_server.get_active_tasks()
-        self.mark_test_step(f"Active Tasks: {active_tasks}")
+        async with cblpytest.edge_servers[0].create_user_client(valid_auth[0], valid_auth[1]) as valid_client:
+            active_tasks = await valid_client.get_active_tasks()
+            self.mark_test_step(f"Active Tasks: {active_tasks}")
 
         self.mark_test_step("testing invalid auth")
-        await edge_server.set_auth(name=invalid_auth[0], password=invalid_auth[1])
-        with pytest.raises(CblEdgeServerBadResponseError):
-            await edge_server.get_active_tasks()
+        async with edge_server.get_user_client(invalid_auth[0], invalid_auth[1]) as invalid_client:
+            with pytest.raises(CblEdgeServerBadResponseError):
+                await invalid_client.get_active_tasks()
 
         self.mark_test_step("testing anonymous auth ")
-        await edge_server.set_auth(auth=False)
-        with pytest.raises(CblEdgeServerBadResponseError):
-            await edge_server.get_active_tasks()
+        async with edge_server.get_anonymous_client() as anonymous_client:
+            with pytest.raises(CblEdgeServerBadResponseError):
+                await anonymous_client.get_active_tasks()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_valid_tls_mtls(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

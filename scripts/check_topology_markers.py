@@ -278,15 +278,6 @@ def _find_pyproject(start: Path) -> Path | None:
     return None
 
 
-# Helpers that act on whatever topology the environment provides and require nothing of
-# it, so their topology access must not be traced into their callers.
-TOPOLOGY_AGNOSTIC_HELPERS: frozenset[tuple[str, str]] = frozenset(
-    {
-        ("cbltest.plugins.cluster_cleanup", "perform_cleanup"),
-    }
-)
-
-
 @functools.cache
 def _resolve_import_path(module: str, importing_dir: Path) -> Path | None:
     """Locate the source file behind an absolute ``from <module> import ...``.
@@ -346,8 +337,6 @@ def _resolve_call(
     if imported is None:
         return None
     module, original_name = imported
-    if (module, original_name) in TOPOLOGY_AGNOSTIC_HELPERS:
-        return None
     resolved_path = _resolve_import_path(module, scope.dir)
     if resolved_path is None:
         return None

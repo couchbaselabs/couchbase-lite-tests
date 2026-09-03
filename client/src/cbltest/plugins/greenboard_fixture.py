@@ -118,7 +118,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 if len(cblpytest.test_servers) == 0:
                     test_platform = EDGE_SERVER_PLATFORM
                 try:
-                    es_version = await cblpytest.edge_servers[0].get_version()
+                    es_version = await cblpytest.edge_servers[0].edge_server.get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
             # An Edge-Server-only run whose tests carry no min_edge_servers

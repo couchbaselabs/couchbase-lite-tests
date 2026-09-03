@@ -3,12 +3,13 @@ import json
 import ssl
 import urllib.parse
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import aiofiles
 import pyjson5 as json5
 from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
@@ -102,83 +103,64 @@ class EdgeServer:
     def __init__(
         self,
         url: str,
-        admin_user: str = "admin_user",
-        admin_password: str = "password",
+        user: str | None = None,
+        password: str | None = None,
         config_file: str | None = None,
     ) -> None:
+        """
+        :param url: Hostname of the Edge Server
+        :param user: User to authenticate as, or None for a client that sends no credentials
+        :param password: That user's password
+        :param config_file: Config the Edge Server is running on, which decides the port,
+            the scheme, and whether it asks for credentials at all
+        """
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
-        self.__hostname: str = url
-        self.__auth_name = admin_user
-        self.__auth_password = admin_password
-        self.__anonymous_session: ClientSession | None = None
-        self.__admin_session: ClientSession | None = None
-        # The live config and credentials move on as tests run; reset_to_initial_state()
-        # restores these.
-        self.__initial_config_file: str = config_file
-        self.__initial_auth_name: str = admin_user
-        self.__initial_auth_password: str = admin_password
-        self._apply_config(config_file)
-        self.__shell_session: ClientSession | None = self._create_session("http://", url, 20001, None)
-
-    def _apply_config(self, config_file: str) -> None:
-        """
-        Adopt `config_file` as this Edge Server's current config, rebuilding the
-        sessions whose port, scheme and auth it determines.
-
-        Any sessions being replaced are dropped here. Callers that can await should go
-        through :func:`reconfigure`, which closes the sessions it replaces.
-        """
-        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
+        port, secure, mtls, needs_auth = self._decode_config_file(config_file)
         self._caddy = caddy.Caddy(url)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
+        self.__hostname: str = url
         self.__port: int = port
-        self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
-        self.__replication_url = f"{ws_scheme}{self.__hostname}:{port}"
+        self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session = self._create_session(self.scheme, self.__hostname, port, None)
-        self.__admin_session = self._create_session(
-            self.scheme,
-            self.__hostname,
-            port,
-            encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
-        )
+        # A config that declares no users turns credentials away, so send none against one.
+        credentials = encode_basic_auth(user, password or "", "ascii") if needs_auth and user else None
+        self.__session = self._create_session(self.scheme, url, port, credentials)
 
-    async def reconfigure(self, config_file: str) -> None:
+    @asynccontextmanager
+    async def get_user_client(self, username: str, password: str) -> AsyncIterator["EdgeServer"]:
         """
-        Adopt `config_file`, closing the sessions it replaces.
+        Yields a client that authenticates as an existing `username`, closing it on exit.
+        `EdgeServerManager.create_user_client` adds the user first.
 
-        The shell2http session is left alone: it always talks plain HTTP to port 20001,
-        whatever the Edge Server config says. Applying the new config before closing the
-        old sessions leaves the object usable if `config_file` cannot be decoded.
+        :param username: The user to authenticate as
+        :param password: That user's password
         """
-        replaced = (self.__admin_session, self.__anonymous_session)
-        self._apply_config(config_file)
-        for session in replaced:
-            if session is not None and not session.closed:
-                await session.close()
+        client = EdgeServer(self.__hostname, username, password, self.__config_file)
+        try:
+            yield client
+        finally:
+            await client.close()
 
-    async def _close_client_sessions(self) -> None:
-        """Close the anonymous and admin sessions, leaving the shell2http one open."""
-        for session in (self.__admin_session, self.__anonymous_session):
-            if session is not None and not session.closed:
-                await session.close()
-
-        self.__admin_session = None
-        self.__anonymous_session = None
+    @asynccontextmanager
+    async def get_anonymous_client(self) -> AsyncIterator["EdgeServer"]:
+        """Yields a client that sends no credentials, closing it on exit."""
+        client = EdgeServer(self.__hostname, config_file=self.__config_file)
+        try:
+            yield client
+        finally:
+            await client.close()
 
     async def close(self) -> None:
         """
-        Closes every aiohttp session this Edge Server holds, including its Caddy's
+        Closes the aiohttp session this Edge Server requests on, and its Caddy's
         """
-        for session in (self.__anonymous_session, self.__admin_session, self.__shell_session):
-            if not session.closed:
-                await session.close()
+        if not self.__session.closed:
+            await self.__session.close()
         await self._caddy.close()
 
     @property
@@ -190,14 +172,14 @@ class EdgeServer:
         """Gets the Caddy file server running alongside this Edge Server"""
         return self._caddy
 
-    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool, bool]:
+    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool]:
+        """Read the port, whether it is TLS, whether it is mTLS, and whether it wants users."""
         with open(config_file, encoding="utf-8") as file:
             config_content = file.read()
         config = json5.loads(config_content)
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
         port = int(interface.split(":")[1])
-        enable_anonymous_users = config.get("enable_anonymous_users", False)
         mtls = False
         if https:
             client_cert_path = https.get("client_cert_path", False)
@@ -210,7 +192,6 @@ class EdgeServer:
             https,
             mtls,
             users,
-            enable_anonymous_users,
         )
 
     def _create_session(self, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
@@ -243,13 +224,7 @@ class EdgeServer:
         session: ClientSession | None = None,
     ) -> Any:
         if session is None:
-            if self.__auth:
-                session = self.__admin_session
-            else:
-                session = self.__anonymous_session
-
-        if session is None:
-            raise CblTestError(f"Edge Server [{self.__hostname}] session is closed, cannot {method.upper()} {path}")
+            session = self.__session
 
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
@@ -915,25 +890,6 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def set_auth(self, auth: bool = True, name: str = "admin_user", password: str = "password") -> None:
-        if not auth:
-            self.__auth = False
-        else:
-            self.__auth_name = name
-            self.__auth_password = password
-            if self.__admin_session is not None and not self.__admin_session.closed:
-                await self.__admin_session.close()
-            self.__admin_session = self._create_session(
-                self.scheme,
-                self.__hostname,
-                self.__port,
-                encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
-            )
-
-    async def kill_server(self) -> None:
-        with self.__tracer.start_as_current_span("kill edge server"):
-            await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
-
     async def get_log_content(
         self,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
@@ -981,98 +937,6 @@ class EdgeServer:
             content = await self.get_log_content(log_file)
             return [line for line in content.splitlines() if search_string in line]
 
-    async def start_server(self, config: dict | None = None) -> None:
-        if config is None:
-            config = {}
-        with self.__tracer.start_as_current_span("start edge server"):
-            await self._send_request(
-                "post",
-                "/start-edgeserver",
-                JSONDictionary(config),
-                session=self.__shell_session,
-            )
-
-    async def configure_dataset(self, db_name: str = "db", config_file: str | None = None) -> "EdgeServer":
-        if not config_file:
-            repo_root = next(
-                p
-                for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-                if p.name == "couchbase-lite-tests"
-            )
-            config_file = f"{repo_root}/environment/aws/es_setup/config/config.json"
-        await self.kill_server()
-        await self._send_request(
-            "post",
-            "/reset-db",
-            JSONDictionary({"filename": f"{db_name}.cblite2"}),
-            session=self.__shell_session,
-        )
-        async with aiofiles.open(config_file) as f:
-            cfg = json.loads(await f.read())
-        await self.start_server(config=cfg)
-        await self.reconfigure(config_file)
-        return self
-
-    async def reset_to_initial_state(self) -> None:
-        """
-        Restore the config, admin credentials and databases this Edge Server started with.
-
-        Firewall rules are dropped first, since a leftover DROP rule hides the host.
-        Files written through /write-file, and users added through add_user, remain.
-        """
-        with self.__tracer.start_as_current_span("reset edge server"):
-            await self.reset_firewall()
-            await self.kill_server()
-            await self._send_request("post", "/reset-all-dbs", session=self.__shell_session)
-
-            async with aiofiles.open(self.__initial_config_file) as f:
-                config = json.loads(await f.read())
-
-            await self.start_server(config=config)
-            self.__auth_name = self.__initial_auth_name
-            self.__auth_password = self.__initial_auth_password
-            await self.reconfigure(self.__initial_config_file)
-
-    async def set_firewall_rules(
-        self,
-        allow: list[Any] | None = None,
-        deny: list[Any] | None = None,
-    ) -> None:
-        """
-        Add firewall rules to the edge server host. Can be used to block SGW connection to ES.
-
-        :param allow: The IPs allowed to access edge-server. Used to accept incoming SGW connection.
-        :param deny: The IPs denied from accessing edge-server. Used to deny incoming SGW connection.
-        """
-        with self.__tracer.start_as_current_span("go online offline"):
-            payload: dict[str, Any] = {}
-            if allow:
-                payload["allow"] = allow
-            if deny:
-                payload["deny"] = deny
-            await self._send_request(
-                "post",
-                "firewall",
-                JSONDictionary(payload),
-                session=self.__shell_session,
-            )
-
-    async def reset_firewall(self) -> None:
-        with self.__tracer.start_as_current_span("reset firewall"):
-            await self._send_request("post", "firewall", session=self.__shell_session)
-
-    async def add_user(self, name: str, password: str, role: str = "admin") -> None:
-        with self.__tracer.start_as_current_span("Add user"):
-            await self.kill_server()
-            payload = {"name": name, "password": password, "role": role}
-            await self._send_request(
-                "post",
-                "add-user",
-                JSONDictionary(payload),
-                session=self.__shell_session,
-            )
-            await self.start_server()
-
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
         retry = 6
@@ -1089,11 +953,3 @@ class EdgeServer:
                 is_idle = True
         if not is_idle and retry == 0:
             raise CblTimeoutError("Timeout waiting for replicator status")
-
-    async def close(self) -> None:
-        """Close every session this Edge Server holds."""
-        await self._close_client_sessions()
-        if self.__shell_session is not None:
-            if not self.__shell_session.closed:
-                await self.__shell_session.close()
-            self.__shell_session = None

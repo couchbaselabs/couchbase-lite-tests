@@ -123,9 +123,9 @@ class TestFeatureName(CBLTestClass):
 
 | Fixture | Scope | Provided By | Purpose |
 |---|---|---|---|
-| `cblpytest` | session (auto) | `cbltest.plugins.cblpytest_fixture` | Top-level entry: `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers`, `.load_balancers`, `.request_factory` |
+| `cblpytest` | session (auto) | `cbltest.plugins.cblpytest_fixture` | Top-level entry: `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers` (each an `EdgeServerManager`), `.load_balancers`, `.request_factory` |
 | `dataset_path` | session | per-suite `conftest.py` | `Path` to `dataset/sg/` |
-| `cluster_cleanup` | function (autouse) | `cbltest.plugins.cluster_cleanup` (framework-wide entry point) | Removes all SGW databases + CBS/Rosmar buckets before every test |
+| `cluster_cleanup` | function (autouse) | `cbltest.plugins.cluster_cleanup` (framework-wide entry point) | Resets every Edge Server, then removes all SGW databases + CBS/Rosmar buckets, before every test |
 
 ## Markers
 

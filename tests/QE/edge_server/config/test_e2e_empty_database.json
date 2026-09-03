@@ -13,7 +13,7 @@
     },
     "replications": [
         {
-            "source": "wss://sgw.example.com:4984/db-1",
+            "source": "wss://ec2-18-232-87-176.compute-1.amazonaws.com:4984/db-1",
             "target": "db",
             "bidirectional": true,
             "continuous": true,

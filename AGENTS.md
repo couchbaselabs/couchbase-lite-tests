@@ -105,6 +105,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`, etc.
 - Behavior markers: `@pytest.mark.sgw`, `.cbl`, `.upg_sgw`.
 - All tests auto-clean via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`).
+- `cblpytest.edge_servers` holds `EdgeServerManager` objects: `.configure_dataset(...)` and the other state changes live there, and `.edge_server` is the REST client. `cluster_cleanup` resets them all before each test.
 
 ## Config Files (Generated — Do Not Hand-Edit)
 
