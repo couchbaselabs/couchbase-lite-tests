@@ -226,11 +226,13 @@ class CBLPyTest:
 
     async def close(self) -> None:
         """
-        Closes all the clusters
+        Closes all the clusters and edge servers
         """
         await self.request_factory.close()
         for cluster in self.__clusters:
             await cluster.close()
+        for edge_server in self.__edge_servers:
+            await edge_server.close()
 
     def __str__(self) -> str:
         ret_val = "Configuration:" + "\n" + str(self.__config) + "\n\n" + "Log Level: " + str(self.__log_level)

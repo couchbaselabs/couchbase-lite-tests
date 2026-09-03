@@ -36,8 +36,8 @@ public final class Log {
         public abstract void close();
     }
 
+    private static final TestLogger CONSOLE_LOGGER = new DefaultLogger(LogLevel.VERBOSE);
     private static final AtomicReference<TestLogger> LOGGER = new AtomicReference<>();
-
 
     public static void init() {
         LogSinks.get().setConsole(new ConsoleLogSink(LogLevel.VERBOSE, LogDomain.ALL));
@@ -66,7 +66,16 @@ public final class Log {
         }
     }
 
-    public static void installDefaultLogger() { installLogger(new DefaultLogger(LogLevel.VERBOSE)); }
+    // Write directly to the console which is logcat or system's console.
+    public static void logToConsole(
+        @NonNull LogLevel level,
+        @NonNull String tag,
+        @NonNull String msg,
+        @Nullable Exception err) {
+        CONSOLE_LOGGER.writeLog(level, tag, msg, err);
+    }
+
+    public static void installDefaultLogger() { installLogger(CONSOLE_LOGGER); }
 
     public static void installRemoteLogger(@NonNull String url, @NonNull String sessionId, @NonNull String tag) {
         Log.err(TAG, "Remote logging not yet supported");

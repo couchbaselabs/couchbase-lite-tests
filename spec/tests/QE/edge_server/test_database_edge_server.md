@@ -6,7 +6,7 @@ This document describes database configuration validation tests for Couchbase Li
 
 Test behavior when Edge Server is configured with an incorrect database config.
 
-1. Configure Edge Server using an invalid DB config and verify version retrieval fails.
+1. Configure Edge Server using an invalid DB config and verify configuration fails.
 2. Update the config to create database `db` with collection `test`.
 3. Reconfigure Edge Server and fetch database info for collection `test`.
 4. Verify the collection is present in the response.
