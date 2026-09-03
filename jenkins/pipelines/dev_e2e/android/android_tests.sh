@@ -53,7 +53,7 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 echo "Start logcat"
 pushd $SCRIPT_DIR
-python3 logcat.py &
+uv run python logcat.py &
 echo $! >logcat.pid
 
 pushd $DEV_E2E_TESTS_DIR >/dev/null

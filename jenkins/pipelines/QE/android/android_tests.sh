@@ -67,7 +67,7 @@ fi
 
 echo "Start logcat"
 pushd $SCRIPT_DIR
-python3 logcat.py &
+uv run python logcat.py &
 echo $! >logcat.pid
 
 echo "Run tests..."
