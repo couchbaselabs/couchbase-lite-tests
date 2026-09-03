@@ -51,6 +51,7 @@ if [ "$SETUP_ONLY" = true ]; then
   echo "Setup completed. Exiting due to --setup-only flag."
   exit 0
 fi
+section_end
 
 # test_replication_xdcr.py needs two separate Couchbase Server clusters, which
 # this single-cluster topology does not provide; it is deferred until the
