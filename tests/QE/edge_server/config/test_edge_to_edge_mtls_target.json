@@ -1,0 +1,46 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": false,
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "users": "/home/ec2-user/user/users.json",
+    "https": {
+        "tls_cert_path": "/home/ec2-user/cert/es_cert.pem",
+        "tls_key_path": "/home/ec2-user/cert/es_key.pem",
+        "client_cert_path": "/home/ec2-user/cert/ca_cert.pem"
+    },
+    "replications": [
+        {
+            "source": "wss://54.224.163.3:59840/travel",
+            "target": "travel",
+            "bidirectional": true,
+            "continuous": true,
+            "collections": [
+                "travel.airlines",
+                "travel.routes",
+                "travel.airports",
+                "travel.landmarks",
+                "travel.hotels"
+            ],
+            "trusted_root_certs": "/home/ec2-user/cert/peer_ca_cert.pem",
+            "auth": {}
+        }
+    ],
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}
