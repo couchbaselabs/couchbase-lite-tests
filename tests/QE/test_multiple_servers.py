@@ -38,6 +38,8 @@ def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> 
     resp.raise_for_status()
     cluster_data = resp.json()
     node_in_cluster, _ = _check_node_in_cluster(cbs_two.hostname, cluster_data.get("nodes", []))
+    # Rebalancing after a failover ejects the failed node, so callers that failover first
+    # always land on add_node; recover() only applies while the node is still a member.
     if node_in_cluster:
         cbs_one.recover(cbs_two)
     else:

@@ -7,12 +7,30 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from aiohttp import ClientSession
+from cbltest.api.caddy import Caddy
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.syncgateway import DatabaseConfig, SGCollectRedactLevel, SyncGateway
 from cbltest.plugins.sgcollect_fixture import run_sgcollects
 from conftest import patch_bootstrap
+
+
+class FakeCaddy(Caddy):
+    """
+    Test-only Caddy. Serves the owning FakeSyncGateway's in-memory snapshots instead of
+    listing a real directory; reads them lazily so tests can set them after construction.
+    """
+
+    def __init__(self, owner: "FakeSyncGateway") -> None:
+        with patch("cbltest.api.caddy.ClientSession", autospec=True):
+            super().__init__(owner.hostname)
+        self.__owner = owner
+
+    async def list(self, pattern: str | None = None) -> list[str]:
+        return self.__owner.caddy_snapshots.pop(0)
+
+    async def download(self, filename: str, local_path: str | Path) -> None:
+        self.__owner.downloaded.append((filename, str(local_path)))
 
 
 class FakeSyncGateway(SyncGateway):
@@ -25,6 +43,7 @@ class FakeSyncGateway(SyncGateway):
     def __init__(self, hostname: str = "sg.example.com") -> None:
         with (
             patch("cbltest.api.syncgateway.ClientSession", autospec=True),
+            patch("cbltest.api.caddy.ClientSession", autospec=True),
             patch_bootstrap(),
         ):
             super().__init__(url=hostname, username="user", password="pass")
@@ -35,6 +54,7 @@ class FakeSyncGateway(SyncGateway):
         # tests configure [before, after] (or more, for run_sgcollects()).
         self.caddy_snapshots: list[list[str]] = [[]]
         self.downloaded: list[tuple[str, str]] = []
+        self._caddy = FakeCaddy(self)
 
     async def _send_request(
         self,
@@ -42,19 +62,12 @@ class FakeSyncGateway(SyncGateway):
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
         self.sent_requests.append((method, path, payload))
         return self.send_request_result
 
     async def wait_for_sgcollect_to_complete(self, max_attempts: int = 60, wait_time: int = 2) -> None:
         return None
-
-    async def list_files_via_caddy(self, pattern: str | None = None) -> list[str]:
-        return self.caddy_snapshots.pop(0)
-
-    async def download_file_via_caddy(self, remote_filename: str, local_path: str) -> None:
-        self.downloaded.append((remote_filename, local_path))
 
 
 class TestSGCollectRedactLevel:

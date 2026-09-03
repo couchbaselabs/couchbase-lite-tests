@@ -27,6 +27,7 @@ def patch_bootstrap(server: str = "rosmar") -> Iterator[None]:
 def fake_sync_gateways(count: int) -> Iterator[list[syncgateway.SyncGateway]]:
     with (
         patch("cbltest.api.syncgateway.ClientSession", autospec=True),
+        patch("cbltest.api.caddy.ClientSession", autospec=True),
         patch_bootstrap(),
     ):
         yield [
