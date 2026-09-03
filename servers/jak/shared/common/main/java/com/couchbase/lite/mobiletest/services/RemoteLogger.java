@@ -53,14 +53,14 @@ public class RemoteLogger extends Log.TestLogger {
 
         @Override
         public void onMessage(@NonNull WebSocket webSocket, @NonNull String text) {
-            Log.p(TAG, "Unexpected message from LogSlurper: " + text);
+            Log.logToConsole(LogLevel.WARNING, TAG, "Unexpected message from LogSlurper: " + text, null);
         }
 
         @Override
         public void onFailure(@NonNull WebSocket webSocket, @NonNull Throwable t, @Nullable Response resp) {
             stopLatch.countDown();
             startLatch.countDown();
-            fail("WebSocket error", t);
+            Log.logToConsole(LogLevel.ERROR, TAG, "WebSocket error: " + t, null);
         }
 
         @Override
@@ -143,7 +143,12 @@ public class RemoteLogger extends Log.TestLogger {
     public void close() { close(1001, "Closed by client"); }
 
     private void sendLogMessage(@NonNull WebSocket socket, @NonNull String message) {
-        if (!socket.send(message)) { Log.p(TAG, "Failed to send log message"); }
+        // CBL-8860 : Do not report a failure through Log.p: while this logger is installed,
+        // Log.p routes straight back here and recurses until stack is overflow. Redirect
+        // the message to the console logger instead.
+        if (!socket.send(message)) {
+            Log.logToConsole(LogLevel.WARNING, TAG, "Unsent: " + message, null);
+        }
     }
 
     private void fail(String message) { fail(message, null); }
@@ -163,6 +168,6 @@ public class RemoteLogger extends Log.TestLogger {
             if (stopLatch.await(TIMEOUT_SECS, TimeUnit.SECONDS)) { return; }
         }
         catch (InterruptedException ignore) { }
-        Log.p(TAG, "Failed closing LogSlurper websocket");
+        Log.logToConsole(LogLevel.WARNING, TAG, "Failed closing LogSlurper websocket", null);
     }
 }

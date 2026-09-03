@@ -10,9 +10,10 @@ from urllib.parse import urljoin
 
 import aiofiles
 import pyjson5 as json5
-from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
 
+from cbltest.api import caddy
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
@@ -130,6 +131,7 @@ class EdgeServer:
         through :func:`reconfigure`, which closes the sessions it replaces.
         """
         port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
+        self._caddy = caddy.Caddy(url)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__port: int = port
@@ -170,9 +172,23 @@ class EdgeServer:
         self.__admin_session = None
         self.__anonymous_session = None
 
+    async def close(self) -> None:
+        """
+        Closes every aiohttp session this Edge Server holds, including its Caddy's
+        """
+        for session in (self.__anonymous_session, self.__admin_session, self.__shell_session):
+            if not session.closed:
+                await session.close()
+        await self._caddy.close()
+
     @property
     def hostname(self) -> str:
         return self.__hostname
+
+    @property
+    def caddy(self) -> caddy.Caddy:
+        """Gets the Caddy file server running alongside this Edge Server"""
+        return self._caddy
 
     def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool, bool]:
         with open(config_file, encoding="utf-8") as file:
@@ -257,6 +273,7 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     resp.status,
                     f"{method} {path} returned {resp.status} for payload {data}",
+                    body=data,
                 )
 
             return ret_val
@@ -275,13 +292,9 @@ class EdgeServer:
             resp = await self._send_request("get", "/", session=s)
             assert isinstance(resp, dict)
             resp_dict = cast(dict, resp)
-            raw_version = _get_typed_required(resp_dict, "version", str)
-            if "/" in raw_version:
-                version_part = raw_version.rsplit("/", 1)[1]
-            else:
-                cbl_warning(f"Unexpected Edge Server version format (no '/' separator): '{raw_version}'")
-                version_part = raw_version
-            return EdgeServerVersion(version_part)
+            vendor = _get_typed_required(resp_dict, "vendor", dict)
+            raw_version = _get_typed_required(vendor, "version", str)
+            return EdgeServerVersion(raw_version)
 
     async def get_all_documents(
         self,
@@ -374,10 +387,14 @@ class EdgeServer:
 
             cast_resp = cast(dict, response)
             if "error" in cast_resp:
-                if cast_resp["reason"] == "missing" or cast_resp["reason"] == "deleted":
+                if cast_resp.get("reason") == "missing" or cast_resp.get("reason") == "deleted":
                     return None
 
-                raise CblEdgeServerBadResponseError(500, f"Get doc from edge server had error '{cast_resp['reason']}'")
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"Get doc from edge server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
+                )
 
             return RemoteDocument(cast_resp)
 
@@ -390,10 +407,12 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"_all_dbs with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from adhoc query: {type(response)}",
+                body=str(response),
             )
 
     async def get_active_tasks(self) -> list:
@@ -406,10 +425,12 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"get_active_tasks with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from get_active_tasks: {type(response)}",
+                body=str(response),
             )
 
     async def get_db_info(self, db_name: str, scope: str = "", collection: str = "") -> dict:
@@ -429,7 +450,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get database info  from edge server had error '{cast_resp['reason']}'",
+                    f"get database info  from edge server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -496,7 +518,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"start replication with edge server had error '{cast_resp['reason']}'",
+                    f"start replication with edge server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp.get("session_id")
 
@@ -513,7 +536,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get replication status with Edge Server had error '{cast_resp['reason']}'",
+                    f"get replication status with Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -526,10 +550,12 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"all_replication_status with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from all_replication_status: {type(response)}",
+                body=str(response),
             )
 
     async def stop_replication(self, replicator_id: int) -> None:
@@ -546,7 +572,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"stop replication  with Edge Server had error '{cast_resp['reason']}'",
+                    f"stop replication  with Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
 
     def replication_url(self, db_name: str) -> str:
@@ -600,7 +627,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"get changes feed with Edge Server had error '{cast_resp['reason']}'",
+                    f"get changes feed with Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -634,10 +662,12 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"named query with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from named query: {type(response)}",
+                body=str(response),
             )
 
     async def adhoc_query(
@@ -669,10 +699,12 @@ class EdgeServer:
                 raise CblEdgeServerBadResponseError(
                     500,
                     f"adhoc query with Edge Server had error '{response.get('reason')}'",
+                    body=dumps(response),
                 )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from adhoc query: {type(response)}",
+                body=str(response),
             )
 
     async def add_document_auto_id(
@@ -708,7 +740,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"add document with auto ID Edge Server had error '{cast_resp['reason']}'",
+                    f"add document with auto ID Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -754,7 +787,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"add document with ID Edge Server had error '{cast_resp['reason']}'",
+                    f"add document with ID Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -785,7 +819,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"delete sub-document Edge Server had error '{cast_resp['reason']}'",
+                    f"delete sub-document Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -820,7 +855,8 @@ class EdgeServer:
             if "error" in cast_resp:
                 raise CblEdgeServerBadResponseError(
                     500,
-                    f"put sub-document Edge Server had error '{cast_resp['reason']}'",
+                    f"put sub-document Edge Server had error '{cast_resp.get('reason')}'",
+                    body=dumps(cast_resp),
                 )
             return cast_resp
 
@@ -841,7 +877,8 @@ class EdgeServer:
                 if "error" in cast_resp:
                     raise CblEdgeServerBadResponseError(
                         500,
-                        f"get sub-document Edge Server had error '{cast_resp['reason']}'",
+                        f"get sub-document Edge Server had error '{cast_resp.get('reason')}'",
+                        body=dumps(cast_resp),
                     )
                 return cast_resp
             else:
@@ -872,7 +909,8 @@ class EdgeServer:
                 if "error" in cast_resp:
                     raise CblEdgeServerBadResponseError(
                         500,
-                        f"bulk_documents_operation Edge Server had error '{cast_resp['reason']}'",
+                        f"bulk_documents_operation Edge Server had error '{cast_resp.get('reason')}'",
+                        body=dumps(cast_resp),
                     )
             if isinstance(resp, list):
                 return cast(list, resp)
@@ -896,36 +934,12 @@ class EdgeServer:
         with self.__tracer.start_as_current_span("kill edge server"):
             await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
 
-    async def _caddy_http_request(
-        self,
-        url: str,
-        operation: str,
-        timeout: int = 30,
-    ) -> bytes:
-        with self.__tracer.start_as_current_span(
-            "caddy_http_request",
-            attributes={"cbl.caddy.url": url},
-        ):
-            try:
-                async with (
-                    ClientSession() as session,
-                    session.get(url, timeout=ClientTimeout(total=timeout)) as response,
-                ):
-                    if response.status == 404:
-                        raise FileNotFoundError(f"{operation} not found at {url}")
-                    if response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(f"{operation} failed: HTTP {response.status} - {error_text}")
-                    return await response.read()
-            except ClientError as e:
-                raise Exception(f"Network error during {operation}: {e}") from e
-
     async def get_log_content(
         self,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
     ) -> str:
         """
-        Fetch raw log file content from the Edge Server host via Caddy (port 20000).
+        Fetch raw log file content from the Edge Server host via Caddy (port :data:`~cbltest.api.caddy.DEFAULT_PORT`).
 
         :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
         :return: Full log file content as string, or empty string on error.
@@ -937,10 +951,11 @@ class EdgeServer:
             try:
                 prefix = "/home/ec2-user/"
                 path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                caddy_url = f"http://{self.hostname}:20000/{path}"
-                content = await self._caddy_http_request(caddy_url, f"Fetch {path}", timeout=30)
-                return content.decode("utf-8")
-            except Exception:
+                return await self._caddy.fetch(path)
+            except Exception as e:
+                # Callers treat "" as "nothing in the log", which is indistinguishable from
+                # a fetch that failed -- so say which one this was.
+                cbl_warning(f"Failed to fetch {log_file} via Caddy, treating as empty: {e}")
                 return ""
 
     async def check_log(

@@ -24,12 +24,16 @@ from cbltest.api.syncgateway import (
     DatabaseState,
     ScopeConfig,
     SyncGateway,
+    SyncGatewayUserClient,
 )
 from cbltest.httplog import _HttpLogWriter
 from pydantic import ValidationError
 
 # (SyncGateway, response specs the test server serves, headers the server saw)
 SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
+
+# Key under which each `received` entry carries the request target (path plus query string).
+_URL_KEY = "__url__"
 
 
 class _FakeConfigResponse:
@@ -51,7 +55,8 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online). `received` accumulates the headers of
-    every request the server saw, so tests can assert on what went out on the wire."""
+    every request the server saw (plus its target under `_URL_KEY`), so tests can assert on
+    what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
@@ -62,7 +67,7 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     received: list[dict[str, str]] = []
 
     async def handle(request: web.Request) -> web.Response:
-        received.append(dict(request.headers))
+        received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url)})
         spec = specs.pop(0) if len(specs) > 1 else specs[0]
         if "text" in spec:
             return web.Response(
@@ -101,35 +106,46 @@ class TestSessionAuth:
         assert received[0].get("Content-Type") == "application/json"
 
     @pytest.mark.asyncio
-    async def test_anonymous_session_sends_no_auth_header(self, sync_gateway: SyncGatewayFixture) -> None:
-        sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"ok": True}}]
+    async def test_create_session_sets_the_auth_header_only_when_given_credentials(
+        self, sync_gateway: SyncGatewayFixture
+    ) -> None:
+        """The public-port reachability probe in start_sgw builds an anonymous session, so
+        _create_session has to leave the Authorization header off when handed no credentials."""
+        sg, _, _ = sync_gateway
 
-        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, None) as session:
-            await sg._send_request("get", "/_status", session=session)
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None) as session:
+            assert "Authorization" not in session.headers
 
-        assert "Authorization" not in received[0]
+        auth_header = encode_basic_auth("alice", "s3cret", "ascii")
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, auth_header) as session:
+            assert session.headers["Authorization"] == auth_header
 
     @pytest.mark.asyncio
-    async def test_get_document_revision_public_authenticates_as_given_user(
+    async def test_user_client_get_document_revision_authenticates_as_given_user(
         self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}}]
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc", "type": "test"}}]
 
-        # get_document_revision_public hardcodes the public port, so redirect its
-        # session to the test server while leaving the credentials it builds alone.
+        # A user client talks to the public port, so redirect its session to the test
+        # server while leaving the credentials it builds alone.
         create_session = sg._create_session
         monkeypatch.setattr(
-            sg,
+            SyncGatewayUserClient,
             "_create_session",
-            lambda secure, scheme, url, port, auth_header: create_session(secure, scheme, url, sg.port, auth_header),
+            lambda self, secure, scheme, url, port, auth_header: create_session(
+                secure, scheme, url, sg.port, auth_header
+            ),
         )
 
-        doc = await sg.get_document_revision_public("db1", "doc1", "1-abc", username="alice", password="s3cret")
+        async with sg.get_user_client("alice", "s3cret") as user_client:
+            doc = await user_client.get_document("db1", "doc1", revision="1-abc")
 
-        assert doc == {"_id": "doc1", "_rev": "1-abc"}
-        # Authenticated as the passed-in user, not as the admin the session was built with.
+        assert doc is not None
+        assert doc.revid == "1-abc"
+        assert doc.body == {"type": "test"}
+        assert received[0][_URL_KEY] == "/db1._default._default/doc1?rev=1-abc"
+        # Authenticated as the passed-in user, not as the admin the sg session was built with.
         assert received[0].get("Authorization") == encode_basic_auth("alice", "s3cret", "ascii")
 
 
@@ -327,6 +343,17 @@ class TestWaitForDbUp:
             assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
         assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.asyncio
+    async def test_get_user_client_makes_no_admin_calls(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, _, received = sync_gateway
+
+        async with sg.get_user_client("test_user", "test_pass") as client:
+            assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+
+        assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+        # Unlike create_user_client, this does not create the user.
+        assert received == []
 
 
 class TestDatabaseConfig:

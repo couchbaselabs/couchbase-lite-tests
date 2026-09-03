@@ -15,18 +15,19 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import ClientError, ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
+from cbltest.api import caddy
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import assert_not_null, async_retry_assert
+from cbltest.utils import assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -64,17 +65,7 @@ fvJMZ8kpMTvrHDXO1G4EHiI48bzvQIJCKD6e2ZElimn25ZUJXSKL5ICsRij4
 -----END CERTIFICATE-----
 """
 
-CADDY_PORT = 20000
 SHELL2HTTP_PORT = 20001
-
-
-def _is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
-    """Whether anything responds on hostname:port (any status counts)."""
-    try:
-        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
-        return True
-    except requests.RequestException:
-        return False
 
 
 class ScopeConfig(BaseModel):
@@ -728,6 +719,7 @@ class _SyncGatewayBase:
         self.__public_port: int = public_port if public_port is not None else port
         self.__replication_url = f"{ws_scheme}{url}:{self.__public_port}"
         self._tracer = get_tracer(__name__, VERSION)
+        self._caddy = caddy.Caddy(url)
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
@@ -751,6 +743,11 @@ class _SyncGatewayBase:
     def port(self) -> int:
         """Gets the HTTP API port of the Sync Gateway instance"""
         return self.__port
+
+    @property
+    def public_port(self) -> int:
+        """Gets the public REST/replication port of the Sync Gateway instance"""
+        return self.__public_port
 
     @property
     def secure(self) -> bool:
@@ -794,9 +791,8 @@ class _SyncGatewayBase:
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
-        body, _ = await self._send_request_with_headers(method, path, payload, params, session)
+        body, _ = await self._send_request_with_headers(method, path, payload, params)
         return body
 
     async def _send_request_with_headers(
@@ -805,15 +801,11 @@ class _SyncGatewayBase:
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> tuple[Any, Mapping[str, str]]:
         """
         As :func:`_send_request`, but also returns the response headers for the callers
         that need them (e.g. to read the ``Etag`` of a database config).
         """
-        if session is None:
-            session = self.__session
-
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
@@ -822,7 +814,7 @@ class _SyncGatewayBase:
             logged_path = f"{path}?{urlencode(params)}" if params else path
             writer = get_next_writer()
             writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {logged_path}", data)
-            resp = await session.request(method, path, data=data, headers=headers, params=params)
+            resp = await self.__session.request(method, path, data=data, headers=headers, params=params)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -1461,6 +1453,7 @@ class _SyncGatewayBase:
         doc_id: str,
         scope: str = "_default",
         collection: str = "_default",
+        revision: str | None = None,
     ) -> RemoteDocument:
         """
         Gets a document from Sync Gateway
@@ -1469,6 +1462,7 @@ class _SyncGatewayBase:
         :param doc_id: The document ID to get
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
+        :param revision: A specific revision to get, instead of the current one (default None)
         :raises CblSyncGatewayBadResponseError: If Sync Gateway does not return the document. Returns a 404 for a non existent or tombstoned document.
         """
         with self._tracer.start_as_current_span(
@@ -1480,7 +1474,8 @@ class _SyncGatewayBase:
                 "sg.document.id": doc_id,
             },
         ):
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}")
+            params = {"rev": revision} if revision is not None else None
+            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}", params=params)
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
@@ -1655,10 +1650,11 @@ class _SyncGatewayBase:
 
     async def close(self) -> None:
         """
-        Closes the Sync Gateway session
+        Closes this Sync Gateway's aiohttp session, and its Caddy's
         """
         if not self.__session.closed:
             await self.__session.close()
+        await self._caddy.close()
 
     async def get_database_config(self, db_name: str) -> DatabaseConfig:
         """
@@ -1690,89 +1686,10 @@ class _SyncGatewayBase:
             _, headers = await self._send_request_with_headers("GET", f"/{db_name}/_config")
             return _config_version(headers)
 
-    async def get_document_revision_public(
-        self,
-        db_name: str,
-        doc_id: str,
-        revision: str,
-        *,
-        username: str,
-        password: str,
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> dict[str, Any]:
-        """
-        Gets a specific revision of a document using the public API with user authentication.
-
-        Args:
-            db_name: The name of the database
-            doc_id: The document ID
-            revision: The specific revision to retrieve
-            username: The username to authenticate as
-            password: The password for the user
-            scope: The scope name (defaults to "_default")
-            collection: The collection name (defaults to "_default")
-
-        Returns:
-            Dictionary containing the document at the specified revision
-
-        Raises:
-            CblSyncGatewayBadResponseError: If the document or revision is not found
-        """
-        _assert_not_null(db_name, "db_name")
-        _assert_not_null(doc_id, "doc_id")
-        _assert_not_null(revision, "revision")
-        _assert_not_null(username, "username")
-        _assert_not_null(password, "password")
-
-        path = (
-            f"/{db_name}/{scope}.{collection}/{doc_id}"
-            if scope != "_default" or collection != "_default"
-            else f"/{db_name}/{doc_id}"
-        )
-        params = {"rev": revision}
-
-        auth_header = encode_basic_auth(username, password, "ascii")
-        async with self._create_session(
-            self.secure, self.scheme, self.hostname, self.__public_port, auth_header
-        ) as session:
-            return await self._send_request("GET", path, params=params, session=session)
-
-    async def _caddy_http_request(
-        self,
-        url: str,
-        operation: str,
-        timeout: int = 30,
-        headers: dict[str, str] | None = None,
-    ) -> tuple[int, bytes]:
-        """
-        Internal helper to make HTTP requests to Caddy server.
-
-        :param url: Full Caddy URL to request
-        :param operation: Description of operation (for error messages)
-        :param timeout: Request timeout in seconds
-        :param headers: Optional HTTP headers to include in the request
-        :return: Tuple of (status_code, content as bytes)
-        :raises FileNotFoundError: If resource returns 404
-        :raises Exception: For other HTTP or network errors
-        """
-        try:
-            async with (
-                ClientSession() as session,
-                session.get(url, timeout=ClientTimeout(total=timeout), headers=headers) as response,
-            ):
-                if response.status == 404:
-                    raise FileNotFoundError(f"{operation} not found at {url}")
-                elif response.status != 200:
-                    error_text = await response.text()
-                    raise Exception(f"{operation} failed: HTTP {response.status} - {error_text}")
-
-                # Return content as bytes
-                content = await response.read()
-                return response.status, content
-
-        except ClientError as e:
-            raise Exception(f"Network error during {operation}: {e}") from e
+    @property
+    def caddy(self) -> caddy.Caddy:
+        """Gets the Caddy file server running alongside this Sync Gateway"""
+        return self._caddy
 
     async def fetch_log_file(
         self,
@@ -1784,110 +1701,10 @@ class _SyncGatewayBase:
         :param log_type: Type of log file to fetch (e.g., 'debug', 'info', 'warn', 'error')
         :return: Content of the log file as a string
         :raises FileNotFoundError: If the log file doesn't exist
-        :raises Exception: For other HTTP errors
+        :raises CblTimeoutError: If the transfer stops making progress
+        :raises CblTestError: For other HTTP or network errors
         """
-        log_filename = f"sg_{log_type}.log"
-        caddy_url = f"http://{self.hostname}:20000/{log_filename}"
-
-        with self._tracer.start_as_current_span(
-            "fetch_log_file",
-            attributes={
-                "cbl.log.type": log_type,
-                "cbl.log.filename": log_filename,
-                "cbl.caddy.url": caddy_url,
-            },
-        ):
-            _, content = await self._caddy_http_request(caddy_url, f"Fetch {log_filename}", timeout=30)
-            log_content = content.decode("utf-8")
-            cbl_info(f"Successfully fetched {log_filename} ({len(log_content)} bytes)")
-            return log_content
-
-    async def download_file_via_caddy(
-        self,
-        remote_filename: str,
-        local_path: str,
-    ) -> None:
-        """
-        Downloads a file from the remote server via Caddy HTTP server
-
-        :param remote_filename: Name of the file on the remote server (e.g., 'sgcollectinfo-xxx-redacted.zip')
-        :param local_path: Local path where the file should be saved
-        :raises FileNotFoundError: If the file doesn't exist
-        :raises Exception: For other HTTP errors
-        """
-        caddy_url = f"http://{self.hostname}:20000/{remote_filename}"
-
-        with self._tracer.start_as_current_span(
-            "download_file_via_caddy",
-            attributes={
-                "cbl.remote.filename": remote_filename,
-                "cbl.local.path": local_path,
-                "cbl.caddy.url": caddy_url,
-            },
-        ):
-            _, content = await self._caddy_http_request(caddy_url, f"Download {remote_filename}", timeout=600)
-
-            # Ensure local directory exists and write file
-            local_file_path = Path(local_path)
-            local_file_path.parent.mkdir(parents=True, exist_ok=True)
-            local_file_path.write_bytes(content)
-
-            cbl_info(f"Successfully downloaded {remote_filename} to {local_path} ({len(content)} bytes)")
-
-    async def list_files_via_caddy(
-        self,
-        pattern: str | None = None,
-    ) -> list[str]:
-        """
-        Lists files available in the Caddy-served directory (requires 'browse' enabled in Caddyfile)
-
-        :param pattern: Optional regex pattern to filter filenames (e.g., 'sgcollect_info.*redacted.zip')
-        :return: List of filenames available in the directory
-        :raises Exception: If directory browsing is not enabled or request fails
-        """
-        caddy_url = f"http://{self.hostname}:20000/"
-
-        with self._tracer.start_as_current_span(
-            "list_files_via_caddy",
-            attributes={
-                "cbl.caddy.url": caddy_url,
-                "cbl.pattern": pattern or "all",
-            },
-        ):
-            try:
-                _, content = await self._caddy_http_request(
-                    caddy_url,
-                    "List directory",
-                    timeout=30,
-                    headers={"Accept": "application/json"},
-                )
-            except FileNotFoundError:
-                raise Exception(
-                    "Directory browsing endpoint not found. Ensure Caddy is configured with 'file_server browse'"
-                )
-
-            # Parse JSON response from Caddy
-            try:
-                dir_listing = loads(content.decode("utf-8"))
-            except ValueError as e:
-                raise Exception(f"Failed to parse Caddy JSON response: {e}")
-
-            # Extract filenames from the JSON array
-            files = [
-                entry["name"]
-                for entry in dir_listing
-                if isinstance(entry, dict) and "name" in entry and not entry.get("is_dir", False)
-            ]
-
-            # Filter by pattern if provided
-            if pattern:
-                regex = re.compile(pattern)
-                files = [f for f in files if regex.search(f)]
-
-            cbl_info(
-                f"Found {len(files)} files via Caddy browse (JSON)" + (f" (filtered by '{pattern}')" if pattern else "")
-            )
-            return files
+        return await self._caddy.fetch(f"sg_{log_type}.log")
 
     async def start_sgcollect(
         self,
@@ -1973,12 +1790,12 @@ class _SyncGatewayBase:
         """
         with self._tracer.start_as_current_span("run_sgcollect", attributes={"cbl.sgw.hostname": self.hostname}):
             pattern = r"sgcollectinfo-.*\.zip"
-            before = set(await self.list_files_via_caddy(pattern=pattern))
+            before = set(await self.caddy.list(pattern))
 
             await self.start_sgcollect(redact_level=redact_level)
             await self.wait_for_sgcollect_to_complete()
 
-            after = set(await self.list_files_via_caddy(pattern=pattern))
+            after = set(await self.caddy.list(pattern))
             new_files = after - before
             if not new_files:
                 raise CblTestError(
@@ -1993,7 +1810,7 @@ class _SyncGatewayBase:
             (zip_name,) = new_files
             safe_host = self.hostname.replace(".", "_")
             local_path = local_output_dir / f"{safe_host}-{zip_name}"
-            await self.download_file_via_caddy(zip_name, str(local_path))
+            await self.caddy.download(zip_name, local_path)
             return local_path
 
 
@@ -2027,7 +1844,6 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure, public_port)
-        self.__public_port = public_port
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2046,8 +1862,8 @@ class SyncGateway(_SyncGatewayBase):
 
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
-        self.has_caddy_sidecar: bool = _is_sidecar_reachable(url, CADDY_PORT)
-        self.has_shell2http_sidecar: bool = _is_sidecar_reachable(url, SHELL2HTTP_PORT)
+        self.has_caddy_sidecar: bool = self.caddy.is_reachable()
+        self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """
@@ -2348,7 +2164,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             # Use a short timeout to distinguish "not running" from "slow"
             async with (
-                self._create_session(self.secure, self.scheme, self.hostname, self.__public_port, None) as session,
+                self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
                 session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 if resp.status == 200:
@@ -2452,6 +2268,33 @@ class SyncGateway(_SyncGatewayBase):
         )
 
     @asynccontextmanager
+    async def get_user_client(
+        self,
+        username: str,
+        password: str,
+    ) -> AsyncIterator["SyncGatewayUserClient"]:
+        """
+        Yields a public-API client authenticated as an already existing user (e.g. one the
+        dataset created), closing its session on exit.  Use :func:`create_user_client` when
+        the user has to be created first.
+
+        :param username: The username to authenticate as
+        :param password: The password for the user
+        :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
+        """
+        client = SyncGatewayUserClient(
+            self.hostname,
+            username,
+            password,
+            port=self.public_port,
+            secure=self.secure,
+        )
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @asynccontextmanager
     async def create_user_client(
         self,
         db_name: str,
@@ -2474,17 +2317,8 @@ class SyncGateway(_SyncGatewayBase):
         """
         await self.reset_user(db_name, username, password, channels)
 
-        client = SyncGatewayUserClient(
-            self.hostname,
-            username,
-            password,
-            port=self.__public_port,
-            secure=self.secure,
-        )
-        try:
+        async with self.get_user_client(username, password) as client:
             yield client
-        finally:
-            await client.close()
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
         """
