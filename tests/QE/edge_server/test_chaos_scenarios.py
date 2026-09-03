@@ -20,7 +20,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(3)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_kill_sgw_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_kill_sgw_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("test_edge_to_sgw_replication")
         cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
@@ -31,6 +31,7 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
 
@@ -136,7 +137,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
     @pytest.mark.min_edge_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_3_edge_with_sync(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_3_edge_with_sync(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("test_3_edge_with_sync")
         self.mark_test_step("Configure Edge Server1 with travel dataset")
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(
@@ -148,18 +149,21 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
+        config_path = str(tmp_path / "es2_config.json")
         await write_json_file(config_path, config)
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Configure Edge Server3 with ES2 replication URL")
         source_db = edge_server2.replication_url("travel")
         config["replications"][0]["source"] = source_db
+        config_path = str(tmp_path / "es3_config.json")
         await write_json_file(config_path, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Configure Edge Server1 with ES3 replication URL")
         source_db = edge_server3.replication_url("travel")
         config["replications"][0]["source"] = source_db
+        config_path = str(tmp_path / "es1_config.json")
         await write_json_file(config_path, config)
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
         self.mark_test_step("Empty the travel.hotels collection")
@@ -215,7 +219,9 @@ class TestEdgeServerChaos(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_server_offline_sync_and_recovery(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_edge_server_offline_sync_and_recovery(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         self.mark_test_step("Edge Server Offline Sync and Recovery")
         cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
@@ -226,6 +232,7 @@ class TestEdgeServerChaos(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
+        config_path = str(tmp_path / "es1_config.json")
         await write_json_file(config_path, config)
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
         self.mark_test_step("Configure Edge Server 2 to replicate from Edge Server 1")
@@ -233,11 +240,13 @@ class TestEdgeServerChaos(CBLTestClass):
         source_db = edge_server1.replication_url("travel")
         config = await read_json_file(config_path2)
         config["replications"][0]["source"] = source_db
+        config_path2 = str(tmp_path / "es2_config.json")
         await write_json_file(config_path2, config)
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path2)
         self.mark_test_step("Configure Edge Server 3 to replicate from Edge Server 2")
         source_db = edge_server2.replication_url("travel")
         config["replications"][0]["source"] = source_db
+        config_path2 = str(tmp_path / "es3_config.json")
         await write_json_file(config_path2, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path2)
 
@@ -305,82 +314,84 @@ class TestEdgeServerChaos(CBLTestClass):
         scope: str,
         collection: str,
         revmap: dict[str, str],
-    ) -> bool | None:
-        """Perform async CRUD operation based on random optype"""
+    ) -> bool:
+        """
+        Perform one CRUD operation of the given type, returning whether Edge Server
+        reported it as applied. Errors propagate to the caller.
+        """
         doc_id = None
 
         # Nothing to operate on (except create)
         if optype != "create" and not docs_dict:
             return True
 
-        try:
-            if optype == "create":
-                doc_id = str(uuid.uuid4())
-                new_doc = docgen.generate_document(doc_id)
+        if optype == "create":
+            doc_id = str(uuid.uuid4())
+            # generate_document returns {doc_id: body}. docs_dict holds bodies, as
+            # generate_all_documents leaves them.
+            new_doc = docgen.generate_document(doc_id)[doc_id]
 
-                response = await client.put_document_with_id(
-                    document=new_doc,
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                    id=doc_id,
-                )
+            response = await client.put_document_with_id(
+                document=new_doc,
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+                id=doc_id,
+            )
 
-                if response.get("ok"):
-                    docs_dict[doc_id] = new_doc
-                    revmap[doc_id] = response["rev"]
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict[doc_id] = new_doc
+                revmap[doc_id] = response["rev"]
+            return response.get("ok", False)
 
-            # Pick existing doc
-            doc_id = random.choice(list(docs_dict.keys()))
+        # Pick existing doc
+        doc_id = random.choice(list(docs_dict.keys()))
 
-            if optype == "update" and doc_id in revmap:
-                updated_doc = docgen.update_document(docs_dict[doc_id], doc_id)
+        if optype == "update" and doc_id in revmap:
+            updated_doc = docgen.update_document(docs_dict[doc_id], doc_id)[doc_id]
 
-                response = await client.put_document_with_id(
-                    id=doc_id,
-                    document=updated_doc,
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                    rev=revmap[doc_id],
-                )
+            response = await client.put_document_with_id(
+                id=doc_id,
+                document=updated_doc,
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+                rev=revmap[doc_id],
+            )
 
-                if response.get("ok"):
-                    docs_dict[doc_id] = updated_doc
-                    revmap[doc_id] = response["rev"]
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict[doc_id] = updated_doc
+                revmap[doc_id] = response["rev"]
+            return response.get("ok", False)
 
-            if optype == "delete" and doc_id in revmap:
-                response = await client.delete_document(
-                    doc_id,
-                    revid=revmap[doc_id],
-                    db_name=db_name,
-                    scope=scope,
-                    collection=collection,
-                )
+        if optype == "delete" and doc_id in revmap:
+            response = await client.delete_document(
+                doc_id,
+                revid=revmap[doc_id],
+                db_name=db_name,
+                scope=scope,
+                collection=collection,
+            )
 
-                if response.get("ok"):
-                    docs_dict.pop(doc_id, None)
-                    revmap.pop(doc_id, None)
-                return response.get("ok", False)
+            if response.get("ok"):
+                docs_dict.pop(doc_id, None)
+                revmap.pop(doc_id, None)
+            return response.get("ok", False)
 
-            if optype == "read":
-                remote_doc = await client.get_document(
-                    db_name=db_name, scope=scope, collection=collection, doc_id=doc_id
-                )
-                local_doc = docs_dict.get(doc_id)
-                if not local_doc:
-                    return True  # deleted concurrently
+        if optype == "read":
+            remote_doc = await client.get_document(db_name=db_name, scope=scope, collection=collection, doc_id=doc_id)
+            local_doc = docs_dict.get(doc_id)
+            if not local_doc:
+                return True  # deleted concurrently
 
-                assert remote_doc is not None, f"Document {doc_id} not found"
+            assert remote_doc is not None, f"Document {doc_id} not found"
 
-                for key, value in remote_doc.body.items():
-                    assert local_doc.get(key) == value
-                return True
+            for key, value in remote_doc.body.items():
+                assert local_doc.get(key) == value
+            return True
 
-        except Exception:
-            return False
+        # An update or delete for a document with no known revision: nothing to do.
+        return True
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_with_concurrent_rest_requests(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

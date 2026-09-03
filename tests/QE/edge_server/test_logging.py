@@ -82,6 +82,7 @@ class TestLogging(CBLTestClass):
         cblpytest: CBLPyTest,
         dataset_path: Path,
         audit_mode: str,
+        tmp_path: Path,
     ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -128,6 +129,7 @@ class TestLogging(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
