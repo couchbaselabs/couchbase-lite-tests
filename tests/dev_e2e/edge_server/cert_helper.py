@@ -11,8 +11,8 @@ Key points for the mTLS scenario:
   * The client cert carries a clientAuth EKU; the server cert a serverAuth EKU.
 """
 
-import datetime
 import ipaddress
+from datetime import UTC, datetime, timedelta
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -38,15 +38,15 @@ def generate_ca(
     """Generate a self-signed CA. Returns (cert, private_key)."""
     key = _rsa_key()
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(UTC)
     cert = (
         x509.CertificateBuilder()
         .subject_name(name)
         .issuer_name(name)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(minutes=5))
-        .not_valid_after(now + datetime.timedelta(days=1))
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=1))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
         .sign(key, hashes.SHA256())
     )
@@ -69,7 +69,7 @@ def generate_signed_cert(
                 False → serverAuth EKU (for the target).
     """
     key = _rsa_key()
-    now = datetime.datetime.now(datetime.timezone.utc)
+    now = datetime.now(UTC)
     eku = x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH] if client else [ExtendedKeyUsageOID.SERVER_AUTH])
     builder = (
         x509.CertificateBuilder()
@@ -77,8 +77,8 @@ def generate_signed_cert(
         .issuer_name(ca_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now - datetime.timedelta(minutes=5))
-        .not_valid_after(now + datetime.timedelta(days=1))
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=1))
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
         .add_extension(eku, critical=False)
     )
