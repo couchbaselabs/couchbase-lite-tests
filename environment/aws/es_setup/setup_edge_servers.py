@@ -36,6 +36,7 @@ from tqdm import tqdm
 
 from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 from environment.aws.common.x509_certificate import CertKeyPair, create_cert
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -224,9 +225,7 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     else:
         click.echo(f"Setting up server {hostname} with ES {es_info.version}-{es_info.build_no}")
 
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username="ec2-user", pkey=pkey)
+    ssh = connect_ssh(hostname, pkey)
 
     global current_ssh
     current_ssh = hostname

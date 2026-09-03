@@ -3,6 +3,7 @@ import paramiko
 
 from environment.aws.common.io import realtime_output
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 
 
 def remote_exec(
@@ -35,9 +36,7 @@ def start_container(
     container_args: list[str] | None = None,
     replace_existing: bool = False,
 ) -> None:
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(host, username="ec2-user", pkey=pkey)
+    ssh = connect_ssh(host, pkey)
 
     header(f"Starting {name} on {host}")
     container_check = remote_exec(

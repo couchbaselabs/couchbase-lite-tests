@@ -20,7 +20,6 @@ import subprocess
 import sys
 from enum import Flag, auto
 from pathlib import Path
-from time import sleep
 from typing import IO, Any, cast
 
 import click
@@ -121,10 +120,7 @@ def terraform_apply(topology: TopologyConfig) -> None:
 
     topology.read_from_terraform(str(SCRIPT_DIR))
 
-    header("Done, sleeping for 5s")
-    # The machines won't be ready immediately, so we need to wait a bit
-    # before SSH access succeeds
-    sleep(5)
+    header("Done")
 
 
 def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str]) -> None:

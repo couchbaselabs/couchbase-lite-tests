@@ -22,6 +22,7 @@ from environment.aws.common.docker import (
 )
 from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -113,9 +114,7 @@ def main(topology: TopologyConfig) -> None:
     for lb in topology.load_balancers:
         create_traefik_config(lb.upstreams)
         ec2_hostname = get_ec2_hostname(lb.hostname)
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(ec2_hostname, username="ec2-user", pkey=topology.ssh_key)
+        ssh = connect_ssh(ec2_hostname, topology.ssh_key)
 
         global current_ssh
         current_ssh = lb.hostname
