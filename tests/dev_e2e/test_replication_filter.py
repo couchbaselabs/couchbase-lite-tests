@@ -15,7 +15,6 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
-from cbltest.utils import assert_not_null
 from test_replication_filter_data import uk_and_france_doc_ids
 
 
@@ -175,14 +174,13 @@ class TestReplicationFilter(CBLTestClass):
         remote_airport_10 = await sync_gateway.get_document("travel", "airport_10", "travel", "airports")
 
         remote_landmark_10 = await sync_gateway.get_document("travel", "landmark_10", "travel", "landmarks")
-        landmark_10_revid = assert_not_null(remote_landmark_10.revid, "Missing landmark_10 revid")
 
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42}),
             DocumentUpdateEntry("airport_10", remote_airport_10.revid, {"answer": 42}),
         ]
         await sync_gateway.update_documents("travel", updates, "travel", "airports")
-        await sync_gateway.delete_document("landmark_10", landmark_10_revid, "travel", "travel", "landmarks")
+        await sync_gateway.delete_document("landmark_10", remote_landmark_10.revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -264,10 +262,8 @@ class TestReplicationFilter(CBLTestClass):
         remote_airport_17 = await sync_gateway.get_document("travel", "airport_17", "travel", "airports")
 
         remote_landmark_1 = await sync_gateway.get_document("travel", "landmark_1", "travel", "landmarks")
-        landmark_1_revid = assert_not_null(remote_landmark_1.revid, "Missing landmark_1 revid")
 
         remote_landmark_601 = await sync_gateway.get_document("travel", "landmark_601", "travel", "landmarks")
-        landmark_601_revid = assert_not_null(remote_landmark_601.revid, "Missing landmark_601 revid")
 
         updates = [
             DocumentUpdateEntry("airport_1000", None, {"answer": 42, "channels": ["United Kingdom"]}),
@@ -291,8 +287,8 @@ class TestReplicationFilter(CBLTestClass):
         ]
 
         await sync_gateway.update_documents("travel", updates, "travel", "airports")
-        await sync_gateway.delete_document("landmark_1", landmark_1_revid, "travel", "travel", "landmarks")
-        await sync_gateway.delete_document("landmark_601", landmark_601_revid, "travel", "travel", "landmarks")
+        await sync_gateway.delete_document("landmark_1", remote_landmark_1.revid, "travel", "travel", "landmarks")
+        await sync_gateway.delete_document("landmark_601", remote_landmark_601.revid, "travel", "travel", "landmarks")
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
@@ -561,14 +557,12 @@ class TestReplicationFilter(CBLTestClass):
         updates = [DocumentUpdateEntry("name_1000", None, {"answer": 42})]
 
         remote_name_10 = await sync_gateway.get_document("names", "name_105")
-        name_10_revid = assert_not_null(remote_name_10.revid, "Missing name_105 revid")
 
         remote_name_20 = await sync_gateway.get_document("names", "name_193")
-        name_20_revid = assert_not_null(remote_name_20.revid, "Missing name_193 revid")
 
         await sync_gateway.update_documents("names", updates)
-        await sync_gateway.delete_document("name_105", name_10_revid, "names")
-        await sync_gateway.delete_document("name_193", name_20_revid, "names")
+        await sync_gateway.delete_document("name_105", remote_name_10.revid, "names")
+        await sync_gateway.delete_document("name_193", remote_name_20.revid, "names")
 
         self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()

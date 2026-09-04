@@ -95,7 +95,6 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
-        assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
         deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
         await sg.update_documents(
             "upgrade",
@@ -112,7 +111,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Pre local expected revtree-only: revid={pre.local.revid}, hlv={pre.local.cv}"
             )
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
+            assert pre.remote.cv is not None, (
                 f"Pre remote expected revtree+HLV: revid={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert not pre.remote.cv.endswith("@Revision+Tree+Encoding"), (
@@ -151,7 +150,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
             assert pre.local.revid is not None and pre.local.cv is None, (
                 f"Pre local expected revtree-only: revid={pre.local.revid}, hlv={pre.local.cv}"
             )
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
+            assert pre.remote.cv is None, (
                 f"Pre remote expected revtree-only (no HLV): revid={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert pre.local.revid < pre.remote.revid, (

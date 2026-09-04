@@ -342,7 +342,12 @@ class EdgeServer:
                     body=dumps(cast_resp),
                 )
 
-            return RemoteDocument(cast_resp)
+            return RemoteDocument(
+                doc_id=cast(str, cast_resp.pop("_id")),
+                rev=cast(str, cast_resp.pop("_rev")),
+                cv=cast(str | None, cast_resp.pop("_cv", None)),
+                body=cast_resp,
+            )
 
     async def get_all_dbs(self) -> list:
         with self.__tracer.start_as_current_span("get all database"):

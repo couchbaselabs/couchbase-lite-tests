@@ -44,7 +44,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
+            assert pre.remote.cv is None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
@@ -97,7 +97,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
+            assert pre.remote.cv is None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
@@ -149,7 +149,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
+            assert pre.remote.cv is None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
@@ -202,7 +202,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
+            assert pre.remote.cv is not None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
@@ -212,8 +212,6 @@ class TestReplicationUpgrade(CBLTestClass):
 
             # Validate post-condition:
             assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
-
-            assert post.remote.revid, "Expected remote doc to have revid, but got none"
 
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
@@ -254,7 +252,7 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
+            assert pre.remote.cv is not None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
@@ -264,8 +262,6 @@ class TestReplicationUpgrade(CBLTestClass):
 
             # Validate post-condition:
             assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
-
-            assert post.remote.revid, "Expected remote doc to have revid, but got none"
 
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
@@ -307,14 +303,12 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
+            assert pre.remote.cv is None, (
                 f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             # Validate post-condition:
             assert post.local.revid is None, f"Expected local doc to have no revid, but got: {post.local.revid}"
-
-            assert post.remote.revid is not None, "Expected remote doc to have revid, but got none"
 
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"HLV mismatch: Local:  {post.local.cv}, Remote: {post.remote.cv}"
@@ -365,8 +359,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             assert pre.local.revid < pre.remote.revid, (
@@ -418,8 +412,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             assert pre.local.revid < pre.remote.revid, (
@@ -496,8 +490,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is not None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             assert pre.local.revid < pre.remote.revid, (
@@ -572,8 +566,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             assert pre.local.revid > pre.remote.revid, (
@@ -647,8 +641,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is not None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             assert pre.local.revid > pre.remote.revid, (
@@ -678,7 +672,7 @@ class TestReplicationUpgrade(CBLTestClass):
             pre: DocSnapshot,
             post: DocSnapshot,
         ) -> None:
-            assert post.remote.revid and pre.remote.revid != post.remote.revid, (
+            assert pre.remote.revid != post.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
@@ -731,8 +725,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             # Validate post-condition:
@@ -759,7 +753,7 @@ class TestReplicationUpgrade(CBLTestClass):
             pre: DocSnapshot,
             post: DocSnapshot,
         ) -> None:
-            assert post.remote.revid and post.remote.revid != pre.remote.revid, (
+            assert post.remote.revid != pre.remote.revid, (
                 f"Expected remote doc revID to be updated after resolved doc was pushed. "
                 f"Before: {pre.remote.revid}, After: {post.remote.revid}"
             )
@@ -808,8 +802,8 @@ class TestReplicationUpgrade(CBLTestClass):
                 f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
             )
 
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Remote precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}"
+            assert pre.remote.cv is None, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
             )
 
             # Validate post-condition:

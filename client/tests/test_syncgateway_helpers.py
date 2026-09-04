@@ -460,3 +460,127 @@ class TestDeleteDatabase:
             await sg._delete_database("db2")
 
         assert len(received) == 4  # Initial attempt plus three retries.
+
+
+# Every response below was captured verbatim from Sync Gateway 4.2.
+_CREATE_RESPONSE = {
+    "id": "resp_doc",
+    "ok": True,
+    "rev": "1-bf281fce690d54e63a86f73a21b97b2d",
+    "cv": "18d23f837b030000@kfdCQ8+0sFPUI57mf2/www",
+}
+_UPDATE_RESPONSE = {
+    "id": "resp_doc",
+    "ok": True,
+    "rev": "2-2a3be1ee7b065c7b04d71c77a804096f",
+    "cv": "18d23f837d640000@kfdCQ8+0sFPUI57mf2/www",
+}
+_GET_RESPONSE = {
+    "_cv": "18d23f837d640000@kfdCQ8+0sFPUI57mf2/www",
+    "_id": "resp_doc",
+    "_rev": "2-2a3be1ee7b065c7b04d71c77a804096f",
+    "channels": ["x"],
+    "greeting": "hi again",
+}
+_CHANGES_RESPONSE = {
+    "results": [
+        {
+            "seq": 34,
+            "id": "resp_doc",
+            "changes": [{"rev": "2-2a3be1ee7b065c7b04d71c77a804096f"}],
+        }
+    ],
+    "last_seq": "34",
+}
+_ALL_DOCS_RESPONSE = {
+    "rows": [
+        {
+            "key": "resp_doc",
+            "id": "resp_doc",
+            "value": {"rev": "2-2a3be1ee7b065c7b04d71c77a804096f"},
+        }
+    ],
+    "total_rows": 1,
+    "update_seq": 34,
+}
+
+
+class TestDocumentResponseShapes:
+    """Sync Gateway answers a write and a read with different key styles: a PUT reports
+    `id`/`rev`/`cv`, while a GET body carries `_id`/`_rev`/`_cv`.  Every response below was
+    captured verbatim from Sync Gateway 4.2, so these pin the shapes RemoteDocument has to
+    read rather than the ones we assume it gets."""
+
+    @pytest.mark.asyncio
+    async def test_create_document_reads_a_put_response(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": _CREATE_RESPONSE}]
+
+        doc = await sg.create_document("db1", "resp_doc", {"greeting": "hello"})
+
+        assert doc.id == "resp_doc"
+        assert doc.revid == str(_CREATE_RESPONSE["rev"])
+        assert doc.cv == _CREATE_RESPONSE["cv"]
+
+    @pytest.mark.asyncio
+    async def test_update_document_reads_a_put_response(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": _UPDATE_RESPONSE}]
+
+        doc = await sg.update_document("db1", "resp_doc", {"greeting": "hi again"}, str(_CREATE_RESPONSE["rev"]))
+
+        assert doc.id == "resp_doc"
+        assert doc.revid == _UPDATE_RESPONSE["rev"]
+        assert doc.cv == _UPDATE_RESPONSE["cv"]
+
+    @pytest.mark.asyncio
+    async def test_update_document_reads_its_sequence_off_the_changes_feed(
+        self, sync_gateway: SyncGatewayFixture
+    ) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [
+            {"status": 201, "json": _UPDATE_RESPONSE},
+            {"status": 200, "json": _CHANGES_RESPONSE},
+        ]
+
+        doc = await sg.update_document(
+            "db1", "resp_doc", {"greeting": "hi again"}, str(_CREATE_RESPONSE["rev"]), wait_for_caching_feed=True
+        )
+
+        assert doc.seq == 34
+        # The feed has to be a request_plus one, or the sequence may not be cached yet.
+        assert "request_plus=true" in received[-1][_URL_KEY]
+
+    @pytest.mark.asyncio
+    async def test_get_document_reads_an_underscore_prefixed_body(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": _GET_RESPONSE}]
+
+        doc = await sg.get_document("db1", "resp_doc")
+
+        assert doc.id == "resp_doc"
+        assert doc.revid == _GET_RESPONSE["_rev"]
+        assert doc.cv == _GET_RESPONSE["_cv"]
+        # The metadata keys are stripped, leaving the document the caller stored.
+        assert doc.body == {"channels": ["x"], "greeting": "hi again"}
+
+    @pytest.mark.asyncio
+    async def test_changes_entry_reads_the_rev_out_of_its_changes_list(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": _CHANGES_RESPONSE}]
+
+        changes = await sg.get_changes("db1")
+
+        assert [(e.id, e.seq, e.changes, e.deleted) for e in changes.results] == [
+            ("resp_doc", 34, [_UPDATE_RESPONSE["rev"]], False)
+        ]
+        assert changes.last_seq == "34"
+
+    @pytest.mark.asyncio
+    async def test_all_documents_row_reads_the_rev_out_of_its_value(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": _ALL_DOCS_RESPONSE}]
+
+        all_docs = await sg.get_all_documents("db1")
+
+        assert [(row.id, row.revid) for row in all_docs.rows] == [("resp_doc", _UPDATE_RESPONSE["rev"])]

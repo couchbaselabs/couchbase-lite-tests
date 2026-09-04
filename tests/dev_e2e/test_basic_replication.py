@@ -19,7 +19,6 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
-from cbltest.utils import assert_not_null
 
 
 @pytest.mark.min_test_servers(1)
@@ -471,8 +470,7 @@ class TestBasicReplication(CBLTestClass):
         hotels_all_docs = await sync_gateway.get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_400" or doc.id == "hotel_500":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
-                await sync_gateway.delete_document(doc.id, revid, "travel", "travel", "hotels")
+                await sync_gateway.delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events(
@@ -744,8 +742,7 @@ class TestBasicReplication(CBLTestClass):
         hotels_all_docs = await sync_gateway.get_all_documents("travel", "travel", "hotels")
         for doc in hotels_all_docs.rows:
             if doc.id == "hotel_61" or doc.id == "hotel_62" or doc.id == "hotel_400" or doc.id == "hotel_500":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
-                await sync_gateway.delete_document(doc.id, revid, "travel", "travel", "hotels")
+                await sync_gateway.delete_document(doc.id, doc.revid, "travel", "travel", "hotels")
 
         self.mark_test_step("Wait until receiving all document replication events")
         await replicator.wait_for_all_doc_events(

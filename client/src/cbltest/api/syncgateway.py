@@ -275,7 +275,7 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the row"""
         return self.__revid
 
@@ -286,8 +286,8 @@ class AllDocumentsResponseRow:
 
     @property
     def revision(self) -> str:
-        """Gets the either revid or cv, whichever is populated (at least one must be)"""
-        return cast(str, self.__revid if self.__revid is not None else self.__cv)
+        """Gets the revision ID of the row"""
+        return self.__revid
 
     @property
     def doc(self) -> dict | None:
@@ -298,7 +298,7 @@ class AllDocumentsResponseRow:
         self,
         key: str,
         id: str,
-        revid: str | None,
+        revid: str,
         cv: str | None,
         doc: dict | None = None,
     ) -> None:
@@ -337,12 +337,12 @@ class AllDocumentsResponse:
                 AllDocumentsResponseRow(
                     row["key"],
                     row["id"],
-                    cast(str, rev["rev"]) if "rev" in rev else None,
+                    rev["rev"],
                     cast(str, rev["cv"]) if "cv" in rev else None,
                     doc,
                 )
             )
-            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
+            self.__revmap[row["id"]] = cast(str, rev["rev"])
 
 
 class ChangesResponseEntry:
@@ -381,7 +381,15 @@ class ChangesResponseEntry:
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
         changes_list = cast(list[dict], entry.get("changes", []))
-        self.__changes = [cast(str, c.get("rev") or c.get("cv")) for c in changes_list]
+        self.__changes: list[str] = []
+        for change in changes_list:
+            # The feed's version_type decides which of the two a change carries, so unlike a
+            # document body (which always has a rev) either one can be the missing one here.
+            version = change.get("rev", change.get("cv"))
+            assert isinstance(version, str), (
+                f"Changes feed entry for {self.__id} has neither a rev nor a cv: {change!r}"
+            )
+            self.__changes.append(version)
 
 
 class ChangesResponse:
@@ -462,7 +470,7 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the document"""
         return self.__rev
 
@@ -473,7 +481,18 @@ class RemoteDocument(JSONSerializable):
 
     @property
     def body(self) -> dict:
-        """Gets the body of the document"""
+        """
+        Gets the body of the document.
+
+        :raises CblTestError: if this document came from a write, whose response reports the
+                              revision it assigned rather than the document itself.
+        """
+        if self.__body is None:
+            raise CblTestError(
+                f"No body recorded for document {self.__id}; it came from a write response, which carries "
+                "only the id and the revision it assigned."
+            )
+
         return self.__body
 
     @property
@@ -482,7 +501,6 @@ class RemoteDocument(JSONSerializable):
         if self.__cv is not None:
             return self.__cv
 
-        assert self.__rev is not None
         return self.__rev
 
     @property
@@ -503,27 +521,48 @@ class RemoteDocument(JSONSerializable):
 
         return self.__seq
 
-    def __init__(self, body: dict, seq: int | None = None) -> None:
-        if "error" in body:
-            raise ValueError("Trying to create remote document from error response")
-
+    def __init__(
+        self,
+        *,
+        doc_id: str,
+        rev: str,
+        cv: str | None = None,
+        seq: int | None = None,
+        body: dict | None = None,
+    ) -> None:
+        """
+        :param doc_id: The document's ID.
+        :param rev: The revision ID Sync Gateway reported for this revision.
+        :param cv: The CV, on a gateway that reports one.
+        :param seq: The sequence, when it was read back from the changes feed.
+        :param body: The document itself, when the response carried one.  A write reports
+                     the revision it assigned and nothing else, so it has no body.
+        """
+        self.__id = doc_id
+        self.__rev = rev
+        self.__cv = cv
         self.__seq = seq
-        self.__body = body.copy()
-        self.__id = cast(str, body["_id"])
-        self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
-        self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
-        del self.__body["_id"]
-        if self.__rev is not None:
-            del self.__body["_rev"]
-        if self.__cv is not None:
-            del self.__body["_cv"]
+        self.__body = body
 
     def to_json(self) -> Any:
-        ret_val = self.__body.copy()
+        ret_val = {} if self.__body is None else self.__body.copy()
         ret_val["_id"] = self.__id
         ret_val["_rev"] = self.__rev
         ret_val["_cv"] = self.__cv
         return ret_val
+
+
+def _remote_document_from_write(response: dict, seq: int | None = None) -> RemoteDocument:
+    """
+    Builds a document out of a write response, which reports the revision it assigned under
+    bare keys and carries no document body.
+    """
+    return RemoteDocument(
+        doc_id=cast(str, response["id"]),
+        rev=cast(str, response["rev"]),
+        cv=cast(str | None, response.get("cv")),
+        seq=seq,
+    )
 
 
 class CouchbaseVersion(ABC):
@@ -1477,7 +1516,14 @@ class _SyncGatewayBase:
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
-            return RemoteDocument(cast(dict, response))
+            # A read reports the metadata under underscore-prefixed keys, alongside the document.
+            body = cast(dict, response)
+            return RemoteDocument(
+                doc_id=cast(str, body.pop("_id")),
+                rev=cast(str, body.pop("_rev")),
+                cv=cast(str | None, body.pop("_cv", None)),
+                body=body,
+            )
 
     async def create_document(
         self,
@@ -1521,21 +1567,8 @@ class _SyncGatewayBase:
                     f"Failed to create document {doc_id}: unexpected response type",
                     body=str(response),
                 )
-            if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}", body=dumps(response))
 
-            # Convert response to match expected format
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
-            return RemoteDocument(cast_resp)
+            return _remote_document_from_write(cast(dict, response))
 
     async def update_document(
         self,
@@ -1597,34 +1630,21 @@ class _SyncGatewayBase:
                     500, f"Failed to update document {doc_id} with rev {rev}", body=dumps(response)
                 )
 
-            # Convert response to match expected format
             cast_resp = cast(dict, response)
 
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp)
+                return _remote_document_from_write(cast_resp)
 
-            assert "_rev" in cast_resp or "_cv" in cast_resp, (
-                f"Update of document {doc_id} returned neither a revision ID nor a CV, so its sequence "
-                "cannot be read back from the changes feed"
-            )
-            version_type = "rev" if "_rev" in cast_resp else "cv"
-            expected_revision = cast(str, cast_resp[f"_{version_type}"])
+            expected_revision = cast(str, cast_resp["rev"])
 
             # request_plus waits for the cache to catch up to every sequence allocated before this request,
-            # which includes the one the PUT above was given.
+            # which includes the one the PUT above was given.  The feed has to report revs for
+            # expected_revision to match below.
             changes = await self.get_changes(
                 db_name,
                 scope,
                 collection,
-                version_type=version_type,
+                version_type="rev",
                 doc_ids=[doc_id],
                 request_plus=True,
             )
@@ -1644,7 +1664,7 @@ class _SyncGatewayBase:
                 f"{expected_revision} could be read back"
             )
 
-            return RemoteDocument(cast_resp, parse_sequence_id(matching[0].seq))
+            return _remote_document_from_write(cast_resp, parse_sequence_id(matching[0].seq))
 
     async def close(self) -> None:
         """
