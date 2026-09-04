@@ -11,7 +11,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import aiofiles
-from aiohttp import ClientSession
+import tenacity
+from aiohttp import ClientConnectorError, ClientSession
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.edgeserver import EdgeServer
@@ -79,11 +80,35 @@ class EdgeServerManager:
             await self._call_sidecar("post", "/kill-edgeserver")
 
     async def __start_process(self, config_file: str | None) -> None:
-        """Start the Edge Server on `config_file`, or on whatever the host already holds."""
+        """
+        Start the Edge Server on `config_file`, or on whatever the host already holds, and
+        wait for it to answer.
+        """
         config = await _read_config(config_file) if config_file else {}
         await self._call_sidecar("post", "/start-edgeserver", JSONDictionary(config))
         if config_file is not None:
             self.__config_file = config_file
+
+        async with self.get_anonymous_client() as probe:
+            await self.__wait_until_serving(probe)
+
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(1),
+        stop=tenacity.stop_after_delay(60),
+        reraise=True,
+        retry=tenacity.retry_if_exception_type(ClientConnectorError),
+    )
+    async def __wait_until_serving(self, client: EdgeServer) -> None:
+        """
+        Poll ``GET /`` until the Edge Server answers.  /start-edgeserver returns once the
+        process exists, which is before it is listening.
+        """
+        try:
+            await client.get_version()
+        except CblEdgeServerBadResponseError:
+            # A rejection is still an answer, so the Edge Server is serving.  A config
+            # that declares users answers 401 here.
+            pass
 
     async def start_server(self, config_file: str | None = None) -> EdgeServer:
         """
