@@ -7,6 +7,10 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
     stages {
         stage('Init') {
             steps {

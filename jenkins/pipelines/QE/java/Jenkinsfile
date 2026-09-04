@@ -11,6 +11,8 @@ pipeline {
         booleanParam(name: 'RUN_LINUX',   defaultValue: true, description: 'Run Linux Desktop tests')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 150, unit: 'MINUTES')
     }
     stages {
