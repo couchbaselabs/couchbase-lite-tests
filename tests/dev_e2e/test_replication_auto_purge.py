@@ -814,6 +814,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 )
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
 
         self.mark_test_step(f"""

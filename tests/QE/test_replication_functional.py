@@ -89,6 +89,7 @@ class TestReplicationFunctional(CBLTestClass):
                 ),
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
         # Documents in group2 channel (should NOT be accessible initially)
         await sync_gateway.update_documents(
@@ -116,6 +117,7 @@ class TestReplicationFunctional(CBLTestClass):
                 ),
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
 
         self.mark_test_step("""
