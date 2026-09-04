@@ -9,11 +9,14 @@ closes every client it hands out.
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+from pathlib import Path
 
 import aiofiles
 from aiohttp import ClientSession
 from opentelemetry.trace import get_tracer
 
+from cbltest.api import caddy
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
@@ -37,11 +40,22 @@ class EdgeServerManager:
         self.__info = info
         self.__tracer = get_tracer(__name__, VERSION)
         self.__shell2http_session = ClientSession(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
+        self.__caddy = caddy.Caddy(info.hostname)
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
 
     def __str__(self) -> str:
         return self.__info.hostname
+
+    @property
+    def hostname(self) -> str:
+        """Gets the host this Edge Server runs on"""
+        return self.__info.hostname
+
+    @property
+    def caddy(self) -> caddy.Caddy:
+        """Gets the Caddy file server running alongside this Edge Server"""
+        return self.__caddy
 
     def get_admin_client(self) -> EdgeServer:
         """A client that authenticates as the admin user, closed when the manager is."""
@@ -52,8 +66,9 @@ class EdgeServerManager:
         return client
 
     async def close(self) -> None:
-        """Close the sidecar session and every client handed out."""
+        """Close the sidecar session, this host's Caddy, and every client handed out."""
         await self.__shell2http_session.close()
+        await self.__caddy.close()
         for client in self.__clients:
             await client.close()
         self.__clients.clear()
@@ -179,6 +194,24 @@ class EdgeServerManager:
         """
         with self.__tracer.start_as_current_span("write file on edge server host"):
             await self._call_sidecar("post", "/write-file", JSONDictionary({"path": path, "content": content}))
+
+    async def collect_logs(self, output_dir: Path) -> Path:
+        """
+        Bundle the host's logs, audit logs, live config and system info into an archive,
+        then download it.
+
+        :param output_dir: Local directory to download the archive into
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span("collect edge server logs"):
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.hostname.replace(".", "-").replace(":", "-")
+            filename = f"es-collect-{safe_host}-{timestamp}.tar.gz"
+            await self._call_sidecar("post", "/collect-logs", JSONDictionary({"filename": filename}))
+
+            local_path = output_dir / filename
+            await self.__caddy.download(f"collect/{filename}", local_path)
+            return local_path
 
     async def set_firewall_rules(self, allow: list[str] | None = None, deny: list[str] | None = None) -> None:
         """
