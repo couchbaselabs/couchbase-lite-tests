@@ -7,6 +7,8 @@ pipeline {
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force Triggering Test Job(s)') 
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 30, unit: 'MINUTES')
     }
     triggers {

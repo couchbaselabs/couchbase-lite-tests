@@ -44,6 +44,8 @@ pipeline {
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the SGW test job even if this SGW version+build already ran')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 15, unit: 'MINUTES')
         disableConcurrentBuilds()
     }
