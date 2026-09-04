@@ -2053,7 +2053,9 @@ class SyncGateway(_SyncGatewayBase):
         async def _wait_for_rest_api_poll() -> None:
             try:
                 await self._send_request("get", "/_ping")
-            except (CblSyncGatewayBadResponseError, ClientConnectorError) as exc:
+            except (CblSyncGatewayBadResponseError, ClientError, OSError) as exc:
+                # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
+                # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
                 raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
 
         await async_retry_assert(

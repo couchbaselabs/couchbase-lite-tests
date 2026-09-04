@@ -126,6 +126,16 @@ class ExeBridge(PlatformBridge):
         for proc in psutil.process_iter():
             if proc.name() == self.__exe_name:
                 proc.terminate()
+                # Wait for it to actually go, so an immediate run() does not race a process that is
+                # still holding its listening port and its log file.
+                try:
+                    proc.wait(timeout=30)
+                except psutil.TimeoutExpired:
+                    click.secho(f"PID {proc.pid} ignored SIGTERM, killing it", fg="yellow")
+                    proc.kill()
+                    proc.wait(timeout=10)
+                except psutil.NoSuchProcess:
+                    pass
                 click.secho(f"Stopped PID {proc.pid}", fg="green")
                 return
 
