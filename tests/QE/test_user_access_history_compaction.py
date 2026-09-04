@@ -20,10 +20,7 @@ from cbltest.api.syncgateway import (
     IndexConfig,
     ScopeConfig,
     SyncGateway,
-    SyncGatewayUserClient,
 )
-
-PUBLIC_PORT = 4984
 
 
 async def _one_shot_pull(
@@ -60,11 +57,6 @@ _ACCESS_TRACKING_CONFIG = DatabaseConfig(
     index=IndexConfig(num_replicas=0),
     scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
 )
-
-
-def _user_client(sg: SyncGateway, username: str, password: str) -> SyncGatewayUserClient:
-    """Builds a public-API client for an already-existing user, without resetting their state."""
-    return SyncGatewayUserClient(sg.hostname, username, password, port=PUBLIC_PORT, secure=sg.secure)
 
 
 def _channels(response: dict, scope: str = "_default", collection: str = "_default") -> list[str]:
@@ -182,12 +174,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         self.mark_test_step(
             "As user 'bob', fetch all documents and check that the channel-'B' document is still visible"
         )
-        user_client = _user_client(sg, "bob", password)
-        try:
+        async with sg.get_user_client("bob", password) as user_client:
             docs = await user_client.get_all_documents(db_name)
             assert any(row.id == "doc_b" for row in docs.rows)
-        finally:
-            await user_client.close()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_channel_not_in_history_is_idempotent_noop(self, cblpytest: CBLPyTest) -> None:
