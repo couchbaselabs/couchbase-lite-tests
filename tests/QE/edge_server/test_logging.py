@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,6 +10,10 @@ from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
+
+# An unflushed event reads the same as one never written, so absence is only worth
+# asserting once the asynchronous flush has had this long to land.
+AUDIT_FLUSH_SETTLE_SECS = 5.0
 
 AUDIT_ASSERTIONS: dict[str, list[tuple[str, bool, str]]] = {
     "default": [
@@ -142,13 +147,14 @@ class TestLogging(CBLTestClass):
         self.mark_test_step("Checking that Edge Server has 5 documents.")
         assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
 
+        await asyncio.sleep(AUDIT_FLUSH_SETTLE_SECS)
+        audit_log = await edge_server.get_audit_log_content()
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
-            log = await edge_server.check_log(event_id)
             if expected_non_empty:
-                assert len(log) > 0, f"Audit log for {step_name} event not found"
+                assert event_id in audit_log, f"Audit log for {step_name} event not found"
             else:
-                assert log == [], f"Audit log for {step_name} event found"
+                assert event_id not in audit_log, f"Audit log for {step_name} event found"
 
         if audit_mode == "enabled":
             self.mark_test_step("Making CRUD requests to verify audit logs are generated for CRUD operations.")
@@ -178,7 +184,8 @@ class TestLogging(CBLTestClass):
             )
 
             self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
-            for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
+            await asyncio.sleep(AUDIT_FLUSH_SETTLE_SECS)
+            audit_log = await edge_server.get_audit_log_content()
+            for event_id, _, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
-                log = await edge_server.check_log(event_id)
-                assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"
+                assert event_id in audit_log, f"Audit log for {step_name} event not found"
