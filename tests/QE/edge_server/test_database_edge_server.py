@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.error import CblEdgeServerBadResponseError
+from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
@@ -18,9 +18,9 @@ class TestDatabase(CBLTestClass):
         self.mark_test_step("test_edge_server_incorrect_db_config")
         config_path = f"{SCRIPT_DIR}/config/test_edge_server_incorrect_db_config.json"
         self.mark_test_step("Edge server should fail to serve a database it is not allowed to create.")
-        with pytest.raises(CblEdgeServerBadResponseError):
-            edge_server = await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
-            await edge_server.get_version()
+        # No db.cblite2 is provisioned, so with create=false the process dies and the sidecar 500s.
+        with pytest.raises(CblTestError, match="failed to start"):
+            await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
         config = await read_json_file(config_path)
         config["databases"]["db"]["create"] = True
         config["databases"]["db"]["collections"] = ["test"]

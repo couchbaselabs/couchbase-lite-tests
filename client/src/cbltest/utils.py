@@ -77,10 +77,6 @@ def retry_assert[T](
     return retrying(checked_function)
 
 
-# Port the shell2http sidecar listens on, on every Sync Gateway and Edge Server host.
-SHELL2HTTP_PORT = 20001
-
-
 def is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
     """
     Whether anything responds on ``hostname:port``.  Any status counts -- this asks whether

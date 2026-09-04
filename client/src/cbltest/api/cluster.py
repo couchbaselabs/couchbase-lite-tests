@@ -58,6 +58,8 @@ class CouchbaseCluster:
         """Closes all the resources in the cluster"""
         for sgw in self.sync_gateways:
             await sgw.close()
+        for server in self.couchbase_servers:
+            await server.close()
 
     def create_collections(self, db_payload: DatabaseConfig) -> None:
         """

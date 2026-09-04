@@ -23,11 +23,12 @@ from pydantic import BaseModel, Field, TypeAdapter
 from cbltest.api import caddy
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.shell2http import Shell2Http
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
+from cbltest.utils import assert_not_null, async_retry_assert
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -1842,6 +1843,7 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure, public_port)
+        self.__shell2http = Shell2Http(url)
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -1861,7 +1863,12 @@ class SyncGateway(_SyncGatewayBase):
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
-        self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
+        self.has_shell2http_sidecar: bool = self.__shell2http.is_reachable()
+
+    async def close(self) -> None:
+        """Closes what the base class owns, and this client's shell2http session"""
+        await super().close()
+        await self.__shell2http.close()
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """

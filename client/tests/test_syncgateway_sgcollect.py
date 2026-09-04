@@ -43,6 +43,7 @@ class FakeSyncGateway(SyncGateway):
         with (
             patch("cbltest.api.syncgateway.ClientSession", autospec=True),
             patch("cbltest.api.caddy.ClientSession", autospec=True),
+            patch("cbltest.api.shell2http.ClientSession", autospec=True),
             patch("cbltest.api.syncgateway.requests.get", autospec=True),
         ):
             super().__init__(url=hostname, username="user", password="pass")

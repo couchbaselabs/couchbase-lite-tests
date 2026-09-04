@@ -12,6 +12,7 @@ from aiohttp import encode_basic_auth
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.shell2http import Shell2Http
 from cbltest.configparser import EdgeServerInfo
 from cbltest.plugins.cluster_cleanup import reset_all_edge_servers
 
@@ -26,7 +27,7 @@ def no_network() -> Iterator[None]:
     with (
         patch("cbltest.api.edgeserver.ClientSession", autospec=True),
         patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.api.shell2http.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
@@ -70,14 +71,22 @@ async def managers_for(config_files: list[str]) -> AsyncIterator[list[EdgeServer
                 await manager.close()
 
 
+def sidecar_of(manager: EdgeServerManager) -> Shell2Http:
+    """The sidecar a manager holds, which is private because only the manager may call it."""
+    return manager._EdgeServerManager__shell2http  # ty: ignore[unresolved-attribute]
+
+
 def stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: EdgeServerManager) -> list[SidecarCall]:
     """Record what a manager sends to its sidecar, so nothing reaches the network."""
     calls: list[SidecarCall] = []
 
-    async def _call_sidecar(method: str, path: str, payload: JSONSerializable | None = None) -> None:
+    async def _send_request(
+        method: str, path: str, payload: JSONSerializable | None = None, timeout: float | None = None
+    ) -> str:
         calls.append((method, path, None if payload is None else payload.to_json()))
+        return ""
 
-    monkeypatch.setattr(manager, "_call_sidecar", _call_sidecar)
+    monkeypatch.setattr(sidecar_of(manager), "_send_request", _send_request)
     return calls
 
 
@@ -204,7 +213,7 @@ def fake_sessions() -> Iterator[None]:
     with (
         patch("cbltest.api.edgeserver.ClientSession", FakeSession),
         patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.api.shell2http.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
