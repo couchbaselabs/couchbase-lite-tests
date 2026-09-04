@@ -58,8 +58,10 @@ class CouchbaseCluster:
         """Closes all the resources in the cluster"""
         for sgw in self.sync_gateways:
             await sgw.close()
+        for cbs in self.couchbase_servers:
+            await cbs.close()
 
-    def create_collections(self, db_payload: DatabaseConfig) -> None:
+    async def create_collections(self, db_payload: DatabaseConfig) -> None:
         """
         Create every scope and collection that the given database config refers to.
 
@@ -78,7 +80,7 @@ class CouchbaseCluster:
                         collections = list(scope_config.collections.keys())
                     elif isinstance(scope_config.collections, list):
                         collections = scope_config.collections
-                self.couchbase_servers[0].create_collections(db_payload.bucket, scope, collections)
+                await self.couchbase_servers[0].create_collections(db_payload.bucket, scope, collections)
 
     async def configure_dataset(
         self,
@@ -163,10 +165,10 @@ class CouchbaseCluster:
         # buckets and collections are implicitly created when using Rosmar
         if not self.sync_gateways[0].using_rosmar:
             assert config.bucket, "bucket needs to be specified in a database config"
-            bucket_created = self.couchbase_servers[0].create_bucket(config.bucket, num_replicas=bucket_replicas)
-            self.create_collections(config)
+            bucket_created = await self.couchbase_servers[0].create_bucket(config.bucket, num_replicas=bucket_replicas)
+            await self.create_collections(config)
             # Stale indexes only linger from a previous incarnation of the bucket, so
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
-                self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
+                await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
         await self.sync_gateway_cluster.create_database(db_name, config)

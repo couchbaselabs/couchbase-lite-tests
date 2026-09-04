@@ -196,7 +196,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"Rotation Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # --- Step 3: Write Token-A to file and start ES ---
         self.mark_test_step("Write Token-A to file and start ES")
@@ -240,7 +240,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"Rotation Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # --- Step 8: Verify ES has the new docs (replication works with Token-B) ---
         self.mark_test_step("Verify replication continues with Token-B")
@@ -323,7 +323,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"Disconnect Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT token")
@@ -449,7 +449,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"FileDel Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # --- Step 2: Start ES with valid token ---
         self.mark_test_step("Start ES with valid JWT file")
@@ -586,7 +586,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"Cycle Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # --- Step 3: Start with valid Token-A ---
         self.mark_test_step("Phase 1: Start ES with valid Token-A")
@@ -657,7 +657,7 @@ class TestJWTReplication(CBLTestClass):
                 "type": "airline",
                 "name": f"Cycle Airline {i}",
             }
-            cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
+            await cbs.upsert_document("travel", doc_id, doc, scope="travel", collection="airlines")
 
         # Verify ES does NOT have the new docs (replication is dead)
         response = await edge_server.get_all_documents("travel", collection="travel.airlines")

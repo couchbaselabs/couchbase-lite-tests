@@ -129,7 +129,7 @@ async def delete_all_buckets(cluster: CouchbaseCluster) -> None:
 
     cbl_trace(f"🧹 {cbs}: found buckets {bucket_names}, deleting...")
     for bucket_name in bucket_names:
-        cbs.drop_bucket(bucket_name)
+        await cbs.drop_bucket(bucket_name)
 
     cbl_trace(f"🧹 {cbs}: waiting for all buckets to be deleted...")
     await cbs.wait_for_no_buckets()
