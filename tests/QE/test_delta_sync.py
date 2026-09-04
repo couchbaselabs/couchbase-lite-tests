@@ -6,6 +6,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -77,7 +78,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -185,7 +185,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -297,7 +296,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -406,7 +404,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
         self.mark_test_step("""
@@ -498,7 +495,6 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
-        assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -624,51 +620,38 @@ class TestDeltaSync(CBLTestClass):
 
         self.mark_test_step("Get the current document state and revision before update.")
         sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
-        assert sgw_doc_before_update is not None, "Document should exist in SGW"
         assert sgw_doc_before_update.body.get("type") == "test", "Expected doc to have `type` as `test`"
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
 
-        self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
-        old_rev_doc = await sync_gateway.get_document_revision_public(
-            "short_expiry", "doc1", old_revision, username="user1", password="pass"
-        )
+        async with sync_gateway.get_user_client("user1", "pass") as sg_user:
+            self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
+            old_rev_doc = await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
+            assert old_rev_doc.body.get("type") == "test", "Old revision should have correct content"
 
-        assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
-        assert old_rev_doc.get("type") == "test", "Old revision should have correct content"
-
-        self.mark_test_step("""
-            Update docs in SGW:
-                * Modify content in document "doc1": `"name": "SGW"` (small change)
-        """)
-        await sync_gateway.upsert_documents(
-            "short_expiry",
-            [
-                DocumentUpdateEntry(
-                    "doc1",
-                    old_revision,
-                    {"name": "SGW"},
-                )
-            ],
-        )
-
-        self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
-        await asyncio.sleep(12)
-
-        self.mark_test_step("Verify old revision is not accessible through public API.")
-        try:
-            expired_rev_doc = await sync_gateway.get_document_revision_public(
+            self.mark_test_step("""
+                Update docs in SGW:
+                    * Modify content in document "doc1": `"name": "SGW"` (small change)
+            """)
+            await sync_gateway.upsert_documents(
                 "short_expiry",
-                "doc1",
-                old_revision,
-                username="user1",
-                password="pass",
+                [
+                    DocumentUpdateEntry(
+                        "doc1",
+                        old_revision,
+                        {"name": "SGW"},
+                    )
+                ],
             )
-            assert "stub" in expired_rev_doc or "_attachments" in expired_rev_doc, (
-                f"Expected old revision to be a stub, but got full document: {expired_rev_doc}"
-            )
-        except Exception as e:
-            assert "404" in str(e) or "not found" in str(e).lower(), f"Expected 404 error, got: {e}"
+
+            self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
+            await asyncio.sleep(12)
+
+            self.mark_test_step("Verify old revision is not accessible through public API.")
+            with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
+                await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert exc_info.value.code == 404, f"Expected 404 for the expired revision, got {exc_info.value.code}"
 
         self.mark_test_step("Start the same replicator again.")
         await replicator.start()
@@ -747,7 +730,6 @@ class TestDeltaSync(CBLTestClass):
                 * Update the same hotel document with identical content (no real change)
         """)
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
         await sync_gateway.update_documents(
             "travel",
             [DocumentUpdateEntry("hotel_400", original_doc.revid, {})],
@@ -820,7 +802,6 @@ class TestDeltaSync(CBLTestClass):
             f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
         )
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document should exist in SGW"
 
         self.mark_test_step("Get delta stats.")
         bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")

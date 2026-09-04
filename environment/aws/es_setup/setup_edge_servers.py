@@ -36,7 +36,7 @@ from tqdm import tqdm
 
 from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
-from environment.aws.common.x509_certificate import create_cert
+from environment.aws.common.x509_certificate import CertKeyPair, create_cert
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -208,7 +208,7 @@ def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
     click.echo()
 
 
-def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo) -> None:
+def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo, ca: CertKeyPair) -> None:
     """
     Set up an Edge Server on an EC2 instance.
 
@@ -216,6 +216,8 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
         hostname (str): The hostname or IP address of the EC2 instance.
         pkey (paramiko.Ed25519Key): The private key for SSH access.
         es_info (EsDownloadInfo): The download information for Edge Server.
+        ca (CertKeyPair): The CA every Edge Server's certificate is signed by, shared
+            across the whole topology so one client trust store works for all of them.
     """
     if es_info.is_release:
         click.echo(f"Setting up server {hostname} with ES {es_info.version}")
@@ -250,14 +252,10 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
         )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    ca = create_cert("EdgeTestCA", is_ca=True)
     cert = create_cert(hostname, ca, usages=[ExtendedKeyUsageOID.SERVER_AUTH])
-    client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
     ca_cert = ca.pem_bytes()
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
-    client_cert = client.pem_bytes()
-    client_key = client.private_pem_bytes()
 
     with open("/tmp/es_key.pem", "wb") as f:
         f.write(key_pem)
@@ -266,22 +264,6 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
         f.write(cert_pem)
 
     with open("/tmp/ca_cert.pem", "wb") as f:
-        f.write(ca_cert)
-
-    CERT_DIR = Path.home() / ".cbl_certs"
-    CERT_DIR.mkdir(exist_ok=True)
-
-    client_cert_path = CERT_DIR / "client_cert.pem"
-    client_key_path = CERT_DIR / "client_key.pem"
-    ca_cert_path = CERT_DIR / "ca_cert.pem"
-
-    with open(client_cert_path, "wb") as f:
-        f.write(client_cert)
-
-    with open(client_key_path, "wb") as f:
-        f.write(client_key)
-
-    with open(ca_cert_path, "wb") as f:
         f.write(ca_cert)
 
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
@@ -346,6 +328,34 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     ssh.close()
 
 
+def write_client_certs() -> CertKeyPair:
+    """
+    Create the one CA used by every Edge Server in the topology, plus the client
+    identity the test framework authenticates with, and write both into
+    ~/.cbl_certs where EdgeServer._create_session() looks for them.
+
+    A CA per host would leave the trust store holding only whichever host was
+    provisioned last, so TLS against any earlier host could never verify.
+
+    :return: The CA, for signing each host's server certificate.
+    """
+    ca = create_cert("EdgeTestCA", is_ca=True)
+    client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
+
+    cert_dir = Path.home() / ".cbl_certs"
+    cert_dir.mkdir(mode=0o700, exist_ok=True)
+    ca_cert_path = cert_dir / "ca_cert.pem"
+    client_cert_path = cert_dir / "client_cert.pem"
+    client_key_path = cert_dir / "client_key.pem"
+    ca_cert_path.write_bytes(ca.pem_bytes())
+    client_cert_path.write_bytes(client.pem_bytes())
+    client_key_path.write_bytes(client.private_pem_bytes())
+    client_key_path.chmod(0o600)
+    click.echo(f"Wrote CA and client identity to {cert_dir}")
+
+    return ca
+
+
 def main(topology: TopologyConfig) -> None:
     """
     Set up the Sync Gateway topology on EC2 instances.
@@ -356,7 +366,9 @@ def main(topology: TopologyConfig) -> None:
     if len(topology.edge_servers) == 0:
         return
 
+    ca = write_client_certs()
+
     for es in topology.edge_servers:
         es_info = EsDownloadInfo(es.version)
         download_es_package(es_info)
-        setup_server(es.hostname, topology.ssh_key, es_info)
+        setup_server(es.hostname, topology.ssh_key, es_info, ca)

@@ -152,7 +152,6 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 * Validate nested structure is preserved.
         """)
         doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
-        assert doc is not None, "Document should exist in SGW"
         nest1 = doc.body.get("nest_1")
         assert nest1 is not None, "Parent field should be present"
         nest2 = nest1.get("nest_2")
@@ -247,7 +246,6 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
         self.mark_test_step("Get existing document for encryption test")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert original_doc is not None, "Document hotel_400 should exist"
 
         self.mark_test_step("Update existing document in SGW with encryption")
         await sync_gateway.upsert_documents(
@@ -278,7 +276,6 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
         self.mark_test_step("Verify delta sync worked with encryption.")
         sgw_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
-        assert sgw_doc is not None, "Document should exist in SGW"
         assert sgw_doc.body.get("encrypted_field") is not None, "Encrypted value should be present"
 
         original_doc_size = len(json.dumps(sgw_doc.body).encode("utf-8"))

@@ -17,14 +17,14 @@ fail() {
 
 # --- Python ---
 if ! command -v python3 &>/dev/null; then
-  fail "python3 not found. Install Python 3.10+ first."
+  fail "python3 not found. Install Python 3.13+ first."
 fi
 
 py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 py_major=$(echo "$py_version" | cut -d. -f1)
 py_minor=$(echo "$py_version" | cut -d. -f2)
-if [ "$py_major" -lt 3 ] || { [ "$py_major" -eq 3 ] && [ "$py_minor" -lt 10 ]; }; then
-  fail "Python 3.10+ required (found $py_version)."
+if [ "$py_major" -lt 3 ] || { [ "$py_major" -eq 3 ] && [ "$py_minor" -lt 13 ]; }; then
+  fail "Python 3.13+ required (found $py_version)."
 fi
 info "Python $py_version"
 

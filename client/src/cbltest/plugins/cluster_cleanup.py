@@ -1,58 +1,28 @@
+"""
+Return the backend to a clean slate between tests: every Edge Server reset to its
+provisioned state, and every Couchbase Server bucket and Sync Gateway database removed.
+
+Failures are never swallowed: running against a half-cleaned environment fails later in a
+much harder way to diagnose.
+"""
+
 import asyncio
-from collections.abc import Awaitable, Iterable, Sequence
+from collections.abc import Sequence
 
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
-from cbltest.api.error import CblTestError
+from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info, cbl_trace
 
 
-def _raise_if_failed(what: str, errors: Sequence[BaseException]) -> None:
-    """
-    Raise a single error describing every failure in errors, or return if there were
-    none.
-
-    Cleanup failures are never swallowed: a test that runs against a half-cleaned
-    environment fails later in a way that is much harder to diagnose than failing here.
-
-    .. note:: Once the Python floor is 3.11 this can become
-        ``raise BaseExceptionGroup(what, errors)``, which keeps every sub-exception's
-        traceback instead of flattening them into one message.
-    """
-    if not errors:
-        return
-
-    details = "; ".join(f"{type(e).__name__}: {e}" for e in errors)
-    raise CblTestError(f"{what} failed ({len(errors)} error(s)): {details}") from errors[0]
-
-
-async def _gather_all(what: str, coros: Iterable[Awaitable[None]]) -> None:
-    """
-    Await every coroutine to completion, then raise if any of them failed.
-
-    `asyncio.gather` on its own propagates the first exception while leaving its
-    siblings running detached.  The test event loop is session scoped, so those
-    orphans keep running into the next test, racing its setup with a half-finished
-    delete.  Collect the results instead, so that every deletion is attempted before
-    this returns and every failure is reported.
-    """
-    results = await asyncio.gather(*coros, return_exceptions=True)
-    errors = [r for r in results if isinstance(r, BaseException)]
-    for error in errors:
-        # Cancellation is control flow, not a cleanup failure, so let it through as-is
-        if isinstance(error, asyncio.CancelledError):
-            raise error
-
-    _raise_if_failed(what, errors)
-
-
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Remove all Couchbase Server buckets and Sync Gateway databases.
+    Reset every Edge Server, then remove all Couchbase Server buckets and Sync Gateway
+    databases.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -61,9 +31,23 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     Tests that reuse a shared database/bucket across multiple test functions
     (e.g. `TestQueryConsistency`) can shadow this fixture with a class-scoped
     override that calls `perform_cleanup` once for the whole class instead of
-    once per test.
+    once per test. Such a class keeps its Edge Servers between tests too.
     """
+    # Edge Servers first: their provisioned config declares no replications, so nothing
+    # pulls from the Sync Gateway databases the next phase deletes.
+    await reset_all_edge_servers(cblpytest.edge_servers)
     await perform_cleanup(cblpytest)
+
+
+async def reset_all_edge_servers(managers: Sequence[EdgeServerManager]) -> None:
+    """Reset every Edge Server to its provisioned state, in parallel."""
+    if not managers:
+        return
+
+    cbl_trace(f"🧹 resetting {len(managers)} edge server(s)...")
+    async with asyncio.TaskGroup() as group:
+        for manager in managers:
+            group.create_task(manager.reset_to_initial_state())
 
 
 async def perform_cleanup(cblpytest: CBLPyTest) -> None:
@@ -82,15 +66,13 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
     # Databases are deleted before their backing buckets are dropped, so a failure in
     # the first phase stops the second rather than pulling a bucket out from under a
     # Sync Gateway database that is still configured to use it.
-    await _gather_all(
-        "Sync Gateway database cleanup",
-        [delete_all_databases(cluster.sync_gateway_cluster) for cluster in cblpytest.clusters],
-    )
+    async with asyncio.TaskGroup() as group:
+        for cluster in cblpytest.clusters:
+            group.create_task(delete_all_databases(cluster.sync_gateway_cluster))
 
-    await _gather_all(
-        "Couchbase Server bucket cleanup",
-        [delete_all_buckets(cluster) for cluster in cblpytest.clusters],
-    )
+    async with asyncio.TaskGroup() as group:
+        for cluster in cblpytest.clusters:
+            group.create_task(delete_all_buckets(cluster))
 
     cbl_info("🧹 Couchbase Server and Sync Gateway cleanup finished")
 
@@ -99,14 +81,13 @@ async def delete_all_databases(cluster: SyncGatewayCluster) -> None:
     """
     Delete every database on every node of the given Sync Gateway cluster, in parallel.
 
-    A node that never learned about a database is not covered by deleting it elsewhere,
-    so each node is asked for its own database list.  DELETE is synchronous, so once
-    these return there is nothing left to wait for.
+    Each node is asked for its own list, since a node that never learned about a database
+    is not covered by deleting it elsewhere.  Once this returns no node serves any
+    database, so the backing buckets are safe to drop.
     """
-    await _gather_all(
-        "Deleting Sync Gateway databases",
-        [delete_all_databases_on_node(sg) for sg in cluster.sync_gateways],
-    )
+    async with asyncio.TaskGroup() as group:
+        for sg in cluster.sync_gateways:
+            group.create_task(delete_all_databases_on_node(sg))
 
 
 async def delete_all_databases_on_node(sg: SyncGateway) -> None:
@@ -116,20 +97,18 @@ async def delete_all_databases_on_node(sg: SyncGateway) -> None:
     the database that uses it).
     """
     dbs = await sg.get_all_databases_verbose()
-    cbl_trace(f"🧹 SGW {sg}: found databases {list(dbs)}, deleting...")
+    cbl_trace(f"🧹 {sg}: found databases {list(dbs)}, deleting...")
 
-    await _gather_all(
-        f"Deleting databases on SGW {sg}",
-        [sg.delete_database(db_name) for db_name in dbs],
-    )
+    async with asyncio.TaskGroup() as group:
+        for db_name in dbs:
+            group.create_task(sg._delete_database(db_name))
 
     if sg.using_rosmar:
         bucket_names = {entry.bucket for entry in dbs.values()}
-        cbl_trace(f"🧹 SGW {sg}: dropping Rosmar buckets {bucket_names}...")
-        await _gather_all(
-            f"Dropping Rosmar buckets on SGW {sg}",
-            [sg.drop_rosmar_bucket(bucket_name) for bucket_name in bucket_names],
-        )
+        cbl_trace(f"🧹 {sg}: dropping Rosmar buckets {bucket_names}...")
+        async with asyncio.TaskGroup() as group:
+            for bucket_name in bucket_names:
+                group.create_task(sg.drop_rosmar_bucket(bucket_name))
 
 
 async def delete_all_buckets(cluster: CouchbaseCluster) -> None:
@@ -145,20 +124,12 @@ async def delete_all_buckets(cluster: CouchbaseCluster) -> None:
     cbs = cluster.couchbase_servers[0]
     bucket_names = cbs.get_bucket_names()
     if not bucket_names:
-        cbl_trace(f"🧹 CBS {cbs}: no buckets to delete")
+        cbl_trace(f"🧹 {cbs}: no buckets to delete")
         return
 
-    cbl_trace(f"🧹 CBS {cbs}: found buckets {bucket_names}, deleting...")
-    errors: list[BaseException] = []
+    cbl_trace(f"🧹 {cbs}: found buckets {bucket_names}, deleting...")
     for bucket_name in bucket_names:
-        try:
-            cbs.drop_bucket(bucket_name)
-        except Exception as e:
-            errors.append(e)
+        cbs.drop_bucket(bucket_name)
 
-    # Raise before waiting: a bucket whose drop failed is still there, so waiting on it
-    # can only burn the full timeout before failing anyway.
-    _raise_if_failed(f"Dropping buckets on CBS {cbs}", errors)
-
-    cbl_trace(f"🧹 CBS {cbs}: waiting for all buckets to be deleted...")
+    cbl_trace(f"🧹 {cbs}: waiting for all buckets to be deleted...")
     await cbs.wait_for_no_buckets()

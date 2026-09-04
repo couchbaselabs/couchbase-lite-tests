@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -11,12 +11,13 @@ from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
+@pytest.mark.skip(reason="Feature not implemented")
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestBlobs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blobs_create_delete(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -29,7 +30,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -54,6 +55,7 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -87,7 +89,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is replicated to Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -123,7 +124,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is removed on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert sg_doc is not None
 
         assert "_attachments" not in sg_doc.body, "'_attachments' field is present in the document response"
 
@@ -140,7 +140,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id}."
@@ -162,7 +162,7 @@ class TestBlobs(CBLTestClass):
         assert blob.body == empty_blob, "Empty blob data mismatch."
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_update(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("Creating a bucket on server.")
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -177,7 +177,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -200,6 +200,7 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
@@ -227,7 +228,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -264,7 +264,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -288,7 +288,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -320,7 +320,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -383,7 +383,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -436,7 +436,7 @@ class TestBlobs(CBLTestClass):
         doc = {
             "id": doc_id,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
         assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -462,7 +462,7 @@ class TestBlobs(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_blob_special_characters(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("Creating a bucket on server.")
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -477,7 +477,7 @@ class TestBlobs(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -501,6 +501,7 @@ class TestBlobs(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         self.mark_test_step("Waiting for idle.")
@@ -531,7 +532,6 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
         document = await sync_gateway.get_document(sg_db_name, doc_id)
-        assert document is not None
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"

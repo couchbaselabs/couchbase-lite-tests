@@ -1,6 +1,6 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -22,7 +22,7 @@ def _doc_body(doc_id: str) -> dict[str, Any]:
     return {
         "id": doc_id,
         "channels": ["public"],
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -37,7 +37,9 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestSystem(CBLTestClass):
-    async def _setup_system_test(self, cblpytest: CBLPyTest) -> tuple[SyncGateway, EdgeServer, str, str]:
+    async def _setup_system_test(
+        self, cblpytest: CBLPyTest, tmp_path: Path
+    ) -> tuple[SyncGateway, EdgeServer, str, str]:
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.
         Returns (sync_gateway, edge_server, sg_db_name, es_db_name).
         """
@@ -74,6 +76,7 @@ class TestSystem(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -88,17 +91,17 @@ class TestSystem(CBLTestClass):
         return sync_gateway, edge_server, sg_db_name, es_db_name
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+    async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
+        while datetime.now(UTC) < end_time:
             doc_id = f"doc_{doc_counter}"
 
             # Randomize whether the operation happens in the Sync Gateway cycle or Edge Server cycle
@@ -164,7 +167,6 @@ class TestSystem(CBLTestClass):
                 await asyncio.sleep(5)
                 self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                 sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                assert sg_doc is not None, f"Document {doc_id} does not exist on the sync gateway"
                 assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
                 assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
@@ -180,7 +182,6 @@ class TestSystem(CBLTestClass):
                     # Validate Update on Sync Gateway
                     self.mark_test_step(f"Verifying {doc_id} update on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc is not None
                     assert rev_id != sg_doc.revid, f"Document {doc_id} update not reflected on Sync Gateway"
                     # Storing the revision ID
                     rev_id = sg_doc.revid
@@ -198,22 +199,22 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+    async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
         edge_server_down = False
-        end = datetime.now(timezone.utc) + timedelta(minutes=2400)
+        end = datetime.now(UTC) + timedelta(minutes=2400)
         doc_counter = 11
 
-        while datetime.now(timezone.utc) < end_time:
-            if datetime.now(timezone.utc) > end:
+        while datetime.now(UTC) < end_time:
+            if datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 edge_server_down = False
@@ -235,8 +236,8 @@ class TestSystem(CBLTestClass):
 
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
-                end = datetime.now(timezone.utc) + timedelta(minutes=1)
+                await cblpytest.edge_servers[0].kill_server()
+                end = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
                 edge_server_down = True
@@ -300,7 +301,6 @@ class TestSystem(CBLTestClass):
                     assert created_doc is not None, f"Failed to create document {doc_id} via Edge Server"
                     self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc is not None, f"Document {doc_id} does not exist on the sync gateway"
                     assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
                     assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
@@ -316,7 +316,6 @@ class TestSystem(CBLTestClass):
                         # Validate Update on Sync Gateway
                         self.mark_test_step(f"Verifying {doc_id} update on Sync Gateway.")
                         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert sg_doc is not None
                         assert rev_id != sg_doc.revid, f"Document {doc_id} update not reflected on Sync Gateway"
 
                         # Storing the revision ID
@@ -335,20 +334,22 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_multi_client_concurrent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_multi_client_concurrent(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
 
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"c{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])
@@ -410,7 +411,6 @@ class TestSystem(CBLTestClass):
 
                     self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc is not None, f"[Client {client_id}] {doc_id} missing on Sync Gateway"
                     assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
                     assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                     rev_id = sg_doc.revid
@@ -425,7 +425,6 @@ class TestSystem(CBLTestClass):
                         )
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Sync Gateway.")
                         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert sg_doc is not None
                         assert rev_id != sg_doc.revid, (
                             f"[Client {client_id}] {doc_id} update not reflected on Sync Gateway"
                         )
@@ -452,28 +451,28 @@ class TestSystem(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(timezone.utc) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
 
         shared = {"edge_server_down": False}
         recent_docs: list[str] = []
 
         async def chaos_controller() -> None:
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 # Random quiet period of 5–20 minutes between chaos events.
                 await asyncio.sleep(random.uniform(300, 1200))
-                if datetime.now(timezone.utc) >= end_time:
+                if datetime.now(UTC) >= end_time:
                     break
 
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
+                await cblpytest.edge_servers[0].kill_server()
                 shared["edge_server_down"] = True
                 # Allow time for clients to observe the outage before next operations.
                 await asyncio.sleep(10)
@@ -482,7 +481,7 @@ class TestSystem(CBLTestClass):
                 await asyncio.sleep(60)
 
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 shared["edge_server_down"] = False
@@ -507,7 +506,7 @@ class TestSystem(CBLTestClass):
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
 
-            while datetime.now(timezone.utc) < end_time:
+            while datetime.now(UTC) < end_time:
                 doc_id = f"cc{client_id}_doc_{doc_counter}"
                 cycle = random.choice(["sync_gateway", "edge_server"])
                 operations = random.choice(["create", "create_update_delete", "create_delete"])
@@ -582,7 +581,6 @@ class TestSystem(CBLTestClass):
 
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert sg_doc is not None, f"[Client {client_id}] {doc_id} missing on Sync Gateway"
                         assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
                         assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                         rev_id = sg_doc.revid
@@ -604,7 +602,6 @@ class TestSystem(CBLTestClass):
                             )
                             self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Sync Gateway.")
                             sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                            assert sg_doc is not None
                             assert rev_id != sg_doc.revid, (
                                 f"[Client {client_id}] {doc_id} update not reflected on Sync Gateway"
                             )

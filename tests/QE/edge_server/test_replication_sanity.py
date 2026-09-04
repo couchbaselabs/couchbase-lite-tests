@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -20,7 +20,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(1)
 class TestReplicationSanity(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -33,7 +33,7 @@ class TestReplicationSanity(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             server.upsert_document(bucket_name, doc_id, doc)
 
@@ -59,6 +59,7 @@ class TestReplicationSanity(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -83,7 +84,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
         assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
@@ -102,7 +103,7 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc_body = {
             "id": doc_id_sg,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "changed": "yes",
         }
 
@@ -114,7 +115,6 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_sg)
-        assert sg_doc is not None
         assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
         rev_id = sg_doc.revid
 
@@ -134,7 +134,7 @@ class TestReplicationSanity(CBLTestClass):
         doc = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
@@ -144,7 +144,6 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id_es)
-        assert sg_doc is not None, f"Document {doc_id_es} does not exist on the sync gateway."
         assert sg_doc.id == doc_id_es, f"Document ID mismatch: {sg_doc.id}"
 
         rev_id = sg_doc.revid
@@ -154,7 +153,7 @@ class TestReplicationSanity(CBLTestClass):
         updated_doc_body = {
             "id": doc_id_es,
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "changed": "yes",
         }
         updated_doc = await sync_gateway.update_document(sg_db_name, doc_id_es, updated_doc_body, rev_id)

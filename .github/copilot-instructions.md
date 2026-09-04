@@ -25,8 +25,8 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 
 ### Python (client/, tests/, environment/, jenkins/)
 
-- **Python 3.10+ required** — use `X | Y` syntax, not `Union[X, Y]` or `Optional[X]`
-- `ruff` for linting + formatting; `ty` for type checking; `pyupgrade --py310-plus`
+- **Python 3.13+ required** — modern syntax is auto-enforced by ruff `UP` rules and pyupgrade
+- `ruff` for linting + formatting; `ty` for type checking; `pyupgrade --py313-plus`
 - All test code is **async** (`pytest-asyncio`, `aiohttp`)
 - Package manager: `uv` (workspace: root `pyproject.toml` + `client/pyproject.toml`)
 
@@ -73,7 +73,6 @@ For domain-specific AI agent guidance, check the `AGENTS.md` files in each subdi
 
 ## What NOT To Do
 
-- Don't use `Union[X, Y]` or `Optional[X]` — use `X | Y` and `X | None`
 - Don't hardcode server URLs in tests — use config fixtures
 - Don't hand-edit `config.json` or `topology.json` in test dirs — they are generated
 - Don't commit `terraform.tfstate`, `testserver.log`, `session.log`, `http_log/`, `.venv/`

@@ -1007,7 +1007,6 @@ class TestReplicationAutoPurge(CBLTestClass):
                 * Update `post_1` with channels = ["group1"]
         """)
         remote_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
-        assert remote_doc is not None, "post_1 vanished from SGW"
         await sync_gateway.update_documents(
             "posts",
             [DocumentUpdateEntry("post_1", remote_doc.revision, {"channels": ["group1"]})],
@@ -1131,7 +1130,6 @@ class TestReplicationAutoPurge(CBLTestClass):
         self.mark_test_step("Check that `post_1` on Sync Gateway has channels = ['fake']")
         remote_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
 
-        assert remote_doc is not None, "post_1 not found on Sync Gateway"
         assert remote_doc.body["channels"] == ["fake"], (
             f"Unexpected channels value found on remote document -> '{remote_doc.body['channels']}'"
         )

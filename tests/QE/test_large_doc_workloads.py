@@ -119,18 +119,15 @@ class TestLargeDocWorkloads(CBLTestClass):
         assert len(sgw_all_docs.rows) >= 1, "SGW _all_docs should have at least the control document"
 
         self.mark_test_step("Verify the oversized doc is not retrievable from SGW.")
-        try:
-            sgw_rejected = await sg.get_document(sg_db, "oversized_blob_doc", "_default", "_default")
-            assert sgw_rejected is None, "Oversized blob doc must NOT exist on SGW"
-        except CblSyncGatewayBadResponseError as e:
-            assert e.code == 404, f"Expected 404 for rejected blob doc on SGW, got HTTP {e.code}"
+        with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
+            await sg.get_document(sg_db, "oversized_blob_doc", "_default", "_default")
+        assert excinfo.value.code == 404, f"Expected 404 for rejected blob doc on SGW, got HTTP {excinfo.value.code}"
 
         self.mark_test_step("Verify the small control document WAS successfully replicated.")
         assert "small_control_doc" in sgw_doc_ids, (
             "Small control doc should be replicated successfully even when another doc was rejected"
         )
         sgw_control = await sg.get_document(sg_db, "small_control_doc", "_default", "_default")
-        assert sgw_control is not None, "Control doc must be retrievable from SGW"
         assert sgw_control.body.get("type") == "control", "Control doc body content mismatch on SGW"
 
         self.mark_test_step("Verify local CBL database integrity — blob doc still intact.")

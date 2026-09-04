@@ -81,6 +81,10 @@ else
   couchbase_cli_check cluster-init -c localhost --cluster-name couchbase-lite-test --cluster-username Administrator \
     --cluster-password password --services data,index,query --cluster-ramsize 8192 --cluster-index-ramsize 2048 --index-storage-setting default
   echo
+
+  echo "Naming the node $my_ip"
+  couchbase_cli_check node-init -c localhost -u Administrator -p password --node-init-hostname $my_ip
+  echo
 fi
 
 # Set alternate address for external access (after cluster init/join)

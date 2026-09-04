@@ -10,7 +10,7 @@ from cbltest.api.syncgateway import (
     ScopeConfig,
     SyncGatewayUserClient,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
+from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
 
 @pytest.mark.sgw
@@ -19,9 +19,14 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 @pytest.mark.min_load_balancers(1)
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_high_availability_with_load_balancer(self, cblpytest: CBLPyTest) -> None:
-        sgs = cblpytest.sync_gateways
-        sg_cluster = SyncGatewayCluster(sgs)
+    async def test_sgw_high_availability_with_load_balancer(
+        self, cblpytest: CBLPyTest, sg_cluster_manager: SyncGatewayClusterManager
+    ) -> None:
+        sg_cluster = cblpytest.sync_gateway_cluster
+        self.skip_if_not(
+            sg_cluster_manager.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on every Sync Gateway host",
+        )
         cbs = cblpytest.couchbase_servers[0]
         lb_url = cblpytest.load_balancers[0]
         sg_db = "db_ha"
@@ -30,8 +35,7 @@ class TestHighAvailability(CBLTestClass):
         channels = ["*"]
         username = "vipul"
         password = "pass"
-        sg2 = sgs[1]
-        await sg2.start()
+        sg2 = sg_cluster_manager.nodes[1]
 
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
@@ -42,8 +46,9 @@ class TestHighAvailability(CBLTestClass):
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
-        await sgs[0].reset_user(sg_db, username, password, channels)
+        await cblpytest.sync_gateways[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
+        # Hardcoded because `load_balancers` config carries no port of its own.
         lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")
@@ -82,7 +87,7 @@ class TestHighAvailability(CBLTestClass):
         await sg2.stop()
 
         self.mark_test_step("Verify load balancer still works with SG2 offline")
-        lb_docs_after = await lb_user.wait_for_all_documents(sg_db, len(all_doc_ids))
+        lb_docs_after = await lb_user.wait_for_document_count(sg_db, len(all_doc_ids))
         lb_doc_ids_after = {row.id for row in lb_docs_after.rows}
 
         assert len(lb_doc_ids_after) >= len(all_doc_ids), (
@@ -92,12 +97,12 @@ class TestHighAvailability(CBLTestClass):
         self.mark_test_step("Wait for SDK writes to complete and verify via load balancer")
         await write_task
 
-        lb_docs_final = await lb_user.wait_for_all_documents(sg_db, num_docs + 50)
+        lb_docs_final = await lb_user.wait_for_document_count(sg_db, num_docs + 50)
         final_doc_count = len(lb_docs_final.rows)
         assert final_doc_count >= num_docs + 50, f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
 
         self.mark_test_step("Bring SG2 back online")
-        await sg2.start(config_name="bootstrap")
+        await sg2.start()
         await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Verify load balancer now routes to all 3 nodes")
@@ -112,7 +117,7 @@ class TestHighAvailability(CBLTestClass):
         ]
         await lb_user.update_documents(sg_db, final_docs)
         final_doc_ids = [d.id for d in final_docs]
-        lb_final_check = await lb_user.wait_for_all_documents(sg_db, num_docs + 50 + len(final_docs))
+        lb_final_check = await lb_user.wait_for_document_count(sg_db, num_docs + 50 + len(final_docs))
         lb_final_ids = {row.id for row in lb_final_check.rows}
         for doc_id in final_doc_ids:
             assert doc_id in lb_final_ids, f"Final doc {doc_id} not accessible via LB"

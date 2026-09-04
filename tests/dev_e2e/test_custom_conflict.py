@@ -82,7 +82,6 @@ class TestCustomConflict(CBLTestClass):
 
         self.mark_test_step("Modify the remote name_101 document `name.last` = 'Jones'")
         existing = await sync_gateway.get_document("names", "name_101")
-        assert existing is not None, "Missing name_101 on remote"
         newBody = existing.body
         newBody["name"]["last"] = "Jones"
         await sync_gateway.update_documents("names", [DocumentUpdateEntry("name_101", existing.revid, newBody)])
@@ -185,7 +184,6 @@ class TestCustomConflict(CBLTestClass):
         for suffix in range(101, 104):
             existing_id = f"name_{suffix}"
             existing = await sync_gateway.get_document("names", existing_id)
-            assert existing is not None, f"Missing {existing_id} on remote"
             newBody = existing.body
             newBody["name"]["last"] = "Jones"
             sgw_updates.append(DocumentUpdateEntry(existing_id, existing.revid, newBody))
@@ -267,7 +265,6 @@ class TestCustomConflict(CBLTestClass):
 
         self.mark_test_step("Update name_101 document with `name.last` = 'Jackson' in SG")
         name_101_sg = await sync_gateway.get_document("names", "name_101")
-        assert name_101_sg is not None, "Missing name_101 on remote"
         newBody = name_101_sg.body
         newBody["name"]["last"] = "Jackson"
         await sync_gateway.update_documents("names", [DocumentUpdateEntry("name_101", name_101_sg.revid, newBody)])

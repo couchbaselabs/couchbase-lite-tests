@@ -92,7 +92,7 @@ class TestUsersChannels(CBLTestClass):
             assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
 
             self.mark_test_step("Verify user can retrieve all documents via _all_docs from one SGW node")
-            all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
+            all_docs = await sg_user.wait_for_document_count(sg_db, total_docs)
             all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
             assert len(all_docs_ids) == total_docs, f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
 
@@ -113,7 +113,7 @@ class TestUsersChannels(CBLTestClass):
             self.mark_test_step("Verify all documents are accessible from each SGW node independently")
             for i, sg in enumerate(sgs):
                 async with sg.create_user_client(sg_db, username, password, channels) as test_user:
-                    node_all_docs = await test_user.wait_for_all_documents(sg_db, total_docs)
+                    node_all_docs = await test_user.wait_for_document_count(sg_db, total_docs)
                     node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
                     assert len(node_doc_ids) == total_docs, (
                         f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"

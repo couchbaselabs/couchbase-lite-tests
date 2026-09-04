@@ -1,6 +1,13 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-lite/testserver.schema.json",
-    "sync-gateways": [{"hostname": "10.100.150.142" , "tls": true}],
-    "couchbase-servers": [{"hostname": "10.100.150.142"}],
+    "test-servers": ["http://{{test-server-ip}}:8080"],
+    "sync-gateways": [{"hostname": "{{test-client-ip}}", "tls": true}],
+    "couchbase-servers": [{"hostname": "{{test-client-ip}}"}],
+    "logslurp": "{{test-client-ip}}:8180",
+    "greenboard": {
+		"hostname": "10.100.150.106",
+		"username": "writer",
+		"password": "couchbase2"
+	},
     "api-version": 1
 }

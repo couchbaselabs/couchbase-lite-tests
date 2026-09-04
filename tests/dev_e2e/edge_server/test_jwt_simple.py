@@ -30,7 +30,9 @@ JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 @pytest.mark.min_edge_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_jwt_replication_reconnect_false(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_jwt_replication_reconnect_false(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """ES replicates with SGW using a static JWT token (reconnect_on_token_change=false)."""
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -112,25 +114,15 @@ class TestJWTSimple(CBLTestClass):
 
         # =====================================================================
         # STEP 6: Wait for SGW to import docs from CBS.
-        # CBS→SGW import is async. We poll SGW's _all_docs endpoint until our
-        # documents appear (max 30s). This prevents the race condition where
-        # ES starts replicating before SGW has the docs in its feed.
+        # CBS→SGW import is async; ES must not start replicating before the docs
+        # are in SGW's feed.
         # =====================================================================
         self.mark_test_step("Waiting for SGW to import documents from CBS.")
-        max_wait = 30
-        poll_interval = 2
-        elapsed = 0
-        docs_ready = False
-        while elapsed < max_wait:
-            sgw_docs = await sync_gateway.get_all_documents(sg_db_name, scope="travel", collection="airlines")
-            sgw_doc_ids = [row.id for row in sgw_docs.rows]
-            if all(f"jwt_test_airline_{i}" in sgw_doc_ids for i in range(1, 6)):
-                docs_ready = True
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-        assert docs_ready, (
-            f"SGW did not import all 5 docs within {max_wait}s. Found: {[d for d in sgw_doc_ids if 'jwt_test' in d]}"
+        await sync_gateway.wait_for_documents(
+            sg_db_name,
+            [f"jwt_test_airline_{i}" for i in range(1, 6)],
+            scope="travel",
+            collection="airlines",
         )
 
         # =====================================================================
@@ -139,11 +131,10 @@ class TestJWTSimple(CBLTestClass):
         # If this fails, the JWT/key configuration is wrong.
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
-        sgw_public_url = f"https://{sync_gateway.hostname}:4984/{sg_db_name}/"
         async with (
             aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
             session.get(
-                sgw_public_url,
+                f"{sync_gateway.public_url}/{sg_db_name}/",
                 headers={"Authorization": f"Bearer {jwt_token}"},
             ) as resp,
         ):
@@ -173,7 +164,7 @@ class TestJWTSimple(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
         config = await read_json_file(config_path)
 
-        # Set the real SGW replication URL (wss://hostname:4984/travel)
+        # Set the real SGW replication URL (e.g. wss://hostname:<public_port>/travel)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
 
         # Set auth to inline JWT token string (oneOf: string form).
@@ -183,6 +174,7 @@ class TestJWTSimple(CBLTestClass):
             "reconnect_on_token_change": False,
         }
 
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         es_manager = cblpytest.edge_servers[0]

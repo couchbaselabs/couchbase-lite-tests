@@ -1,6 +1,7 @@
 [project]
 name = "couchbase-lite-tests"
-requires-python = ">=3.10"
+# couchbase SDK only has wheels for < 3.14
+requires-python = ">=3.13,<3.14"
 version = "0.1.0"
 dependencies = [
   "cbltest",
@@ -13,10 +14,12 @@ dependencies = [
 ]
 
 [tool.ruff]
-lint.extend-select = ["ANN", "I"]
+lint.extend-select = ["ANN", "I", "UP"]
 lint.ignore = [
   "E402",
   "ANN401",  # `Any` is legitimate for JSON (de)serialization boundaries
+  "UP015",   # off: only fires on existing `open(..., "r")` calls, not worth churning
+  "UP042",   # off: `(str, Enum)` -> `StrEnum` changes `str()` output on existing enums
   "BLE001",  # TODO: BLE001 (blind-except) - will fix later
   "S110",    # TODO: S110 (try-except-pass) - will fix later
   "PLW1510", # TODO: PLW1510 (subprocess-run-without-check) - will fix later
@@ -28,7 +31,7 @@ lint.ignore = [
   "LOG015",  # TODO: LOG015 (root-logger-calls) - will fix later
 ]
 line-length = 120
-target-version = "py310"
+target-version = "py313"
 exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 
 

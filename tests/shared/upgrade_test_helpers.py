@@ -1,7 +1,6 @@
 import os
 from collections.abc import Callable
 from pathlib import Path
-from typing import TypeAlias
 
 from cbltest import CBLPyTest, CouchbaseServer
 from cbltest.api.cbltestclass import CBLTestClass
@@ -29,7 +28,7 @@ class DocSnapshot:
         self.remote = remote
 
 
-DocValidator: TypeAlias = Callable[[DocSnapshot, DocSnapshot], None]
+type DocValidator = Callable[[DocSnapshot, DocSnapshot], None]
 
 
 def tools_path() -> Path:
@@ -109,7 +108,6 @@ async def do_upgrade_replication_test(
     pre_remote_doc = await sg.get_document("upgrade", doc_id)
 
     assert pre_local_doc is not None
-    assert pre_remote_doc is not None
     cbl_info(f"Revision Info before Replication ({replicator_type}):")
     cbl_info(f"Local : RevID = {pre_local_doc.revid}, HLV = {pre_local_doc.cv}")
     cbl_info(f"Remote : RevID = {pre_remote_doc.revid}, HLV = {pre_remote_doc.cv}")
@@ -167,7 +165,6 @@ async def do_upgrade_replication_test(
     remote_doc = await sg.get_document("upgrade", doc_id)
 
     assert local_doc is not None
-    assert remote_doc is not None
     cbl_info(f"Revision Info after Replication ({replicator_type}):")
     cbl_info(f"Local : RevID = {local_doc.revid}, HLV = {local_doc.cv}")
     cbl_info(f"Remote : RevID = {remote_doc.revid}, HLV = {remote_doc.cv}")

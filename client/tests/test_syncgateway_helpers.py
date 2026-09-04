@@ -26,12 +26,16 @@ from cbltest.api.syncgateway import (
     DatabaseState,
     ScopeConfig,
     SyncGateway,
+    SyncGatewayUserClient,
 )
 from cbltest.httplog import _HttpLogWriter
 from pydantic import ValidationError
 
 # (SyncGateway, response specs the test server serves, headers the server saw)
 SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
+
+# Key under which each `received` entry carries the request target (path plus query string).
+_URL_KEY = "__url__"
 
 
 class _FakeConfigResponse:
@@ -53,7 +57,8 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online). `received` accumulates the headers of
-    every request the server saw, so tests can assert on what went out on the wire."""
+    every request the server saw (plus its target under `_URL_KEY`), so tests can assert on
+    what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
@@ -64,7 +69,7 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     received: list[dict[str, str]] = []
 
     async def handle(request: web.Request) -> web.Response:
-        received.append(dict(request.headers))
+        received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url)})
         spec = specs.pop(0) if len(specs) > 1 else specs[0]
         if "text" in spec:
             return web.Response(
@@ -103,35 +108,46 @@ class TestSessionAuth:
         assert received[0].get("Content-Type") == "application/json"
 
     @pytest.mark.asyncio
-    async def test_anonymous_session_sends_no_auth_header(self, sync_gateway: SyncGatewayFixture) -> None:
-        sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"ok": True}}]
+    async def test_create_session_sets_the_auth_header_only_when_given_credentials(
+        self, sync_gateway: SyncGatewayFixture
+    ) -> None:
+        """The public-port reachability probe in start_sgw builds an anonymous session, so
+        _create_session has to leave the Authorization header off when handed no credentials."""
+        sg, _, _ = sync_gateway
 
-        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, None) as session:
-            await sg._send_request("get", "/_status", session=session)
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None) as session:
+            assert "Authorization" not in session.headers
 
-        assert "Authorization" not in received[0]
+        auth_header = encode_basic_auth("alice", "s3cret", "ascii")
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, auth_header) as session:
+            assert session.headers["Authorization"] == auth_header
 
     @pytest.mark.asyncio
-    async def test_get_document_revision_public_authenticates_as_given_user(
+    async def test_user_client_get_document_revision_authenticates_as_given_user(
         self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}}]
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc", "type": "test"}}]
 
-        # get_document_revision_public hardcodes the public port, so redirect its
-        # session to the test server while leaving the credentials it builds alone.
+        # A user client talks to the public port, so redirect its session to the test
+        # server while leaving the credentials it builds alone.
         create_session = sg._create_session
         monkeypatch.setattr(
-            sg,
+            SyncGatewayUserClient,
             "_create_session",
-            lambda secure, scheme, url, port, auth_header: create_session(secure, scheme, url, sg.port, auth_header),
+            lambda self, secure, scheme, url, port, auth_header: create_session(
+                secure, scheme, url, sg.port, auth_header
+            ),
         )
 
-        doc = await sg.get_document_revision_public("db1", "doc1", "1-abc", username="alice", password="s3cret")
+        async with sg.get_user_client("alice", "s3cret") as user_client:
+            doc = await user_client.get_document("db1", "doc1", revision="1-abc")
 
-        assert doc == {"_id": "doc1", "_rev": "1-abc"}
-        # Authenticated as the passed-in user, not as the admin the session was built with.
+        assert doc is not None
+        assert doc.revid == "1-abc"
+        assert doc.body == {"type": "test"}
+        assert received[0][_URL_KEY] == "/db1._default._default/doc1?rev=1-abc"
+        # Authenticated as the passed-in user, not as the admin the sg session was built with.
         assert received[0].get("Authorization") == encode_basic_auth("alice", "s3cret", "ascii")
 
 
@@ -330,6 +346,17 @@ class TestWaitForDbUp:
 
         assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
+    @pytest.mark.asyncio
+    async def test_get_user_client_makes_no_admin_calls(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, _, received = sync_gateway
+
+        async with sg.get_user_client("test_user", "test_pass") as client:
+            assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+
+        assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+        # Unlike create_user_client, this does not create the user.
+        assert received == []
+
 
 class TestDatabaseConfig:
     def test_init_with_nested_config(self) -> None:
@@ -370,20 +397,54 @@ class TestDatabaseConfig:
             DatabaseConfig(scopes="not_a_dict")  # ty: ignore[invalid-argument-type]
 
 
+MISSING_BUCKET_ENTRY_REASON = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
+
+
+def _missing_bucket_entry_500() -> dict:
+    """The 500 SGW returns when a database's registry entry is already gone (CBG-5731)."""
+    return {"status": 500, "json": {"error": "Internal Server Error", "reason": MISSING_BUCKET_ENTRY_REASON}}
+
+
+def _all_dbs(*db_names: str) -> dict:
+    return {"status": 200, "json": [{"db_name": name, "bucket": "b", "state": "Online"} for name in db_names]}
+
+
 class TestDeleteDatabase:
-    """delete_database swallows the CBG-5731 500 SGW returns once the database's bucket
-    entry is gone, without swallowing 500s that a retry could still clear."""
+    """The delete waits for the node to stop serving the database, and still reports 500s
+    that mean anything else."""
 
     @pytest.mark.asyncio
-    async def test_ignores_known_missing_bucket_failure(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_waits_out_the_node_on_missing_bucket_entry(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The CBG-5731 500 means the node is still serving it, so the delete must wait."""
         sg, specs, received = sync_gateway
-        reason = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
-        specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": reason}}]
+        wait_for_database_gone = sg._wait_for_database_gone
+        monkeypatch.setattr(
+            sg,
+            "_wait_for_database_gone",
+            lambda db_name: wait_for_database_gone(db_name, retry_delay=0),
+        )
+        specs[:] = [
+            _missing_bucket_entry_500(),
+            _all_dbs("db2"),  # still serving it
+            _all_dbs("db2"),
+            _all_dbs(),  # config poll caught up
+        ]
 
-        await sg.delete_database("db2")
+        await sg._delete_database("db2")
 
-        # No retries: this response never changes.
-        assert len(received) == 1
+        assert len(received) == 4  # The DELETE plus the polls it took.
+
+    @pytest.mark.asyncio
+    async def test_raises_if_the_node_never_stops_serving_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A node that never catches up is a failure. Exercised on the wait, which owns the
+        budget and which the delete awaits."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [_all_dbs("db2")]
+
+        with pytest.raises(TimeoutError, match="still serving database db2"):
+            await sg._wait_for_database_gone("db2", timeout=0.2, retry_delay=0)
 
     @pytest.mark.asyncio
     async def test_retries_then_raises_on_other_500(
@@ -398,7 +459,7 @@ class TestDeleteDatabase:
         monkeypatch.setattr(asyncio, "sleep", no_sleep)
 
         with pytest.raises(CblSyncGatewayBadResponseError):
-            await sg.delete_database("db2")
+            await sg._delete_database("db2")
 
         assert len(received) == 4  # Initial attempt plus three retries.
 
