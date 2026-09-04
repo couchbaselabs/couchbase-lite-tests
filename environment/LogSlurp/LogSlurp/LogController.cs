@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text.Json.Serialization;
 
@@ -13,7 +14,7 @@ namespace LogSlurp
         private const string LogTagHeader = "CBL-Log-Tag";
         private const string LogTagParam = "cbl_log_tag";
 
-        private static readonly Dictionary<string, SerializedStreamWriter> FileLoggers = new();
+        private static readonly ConcurrentDictionary<string, SerializedStreamWriter> FileLoggers = new();
 
         [Route("/openLogStream")]
         [HttpGet]
@@ -62,12 +63,27 @@ namespace LogSlurp
             }
 
             Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "logslurp"));
-            var stream = System.IO.File.Open(Path.Combine(Path.GetTempPath(), "logslurp", $"{body.log_id}.txt"),
-                FileMode.CreateNew, 
-                FileAccess.Write,
-                FileShare.Read);
 
-            FileLoggers[body.log_id] = new SerializedStreamWriter(stream);
+            FileStream stream;
+            try {
+                stream = new FileStream(Path.Combine(Path.GetTempPath(), "logslurp", $"{body.log_id}.txt"),
+                    FileMode.CreateNew,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    bufferSize: 4096,
+                    FileOptions.Asynchronous);
+            } catch (IOException) {
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await HttpContext.Response.WriteAsync($"Log with id '{body.log_id}' already started!");
+                return;
+            }
+
+            var writer = new SerializedStreamWriter(stream);
+            if (!FileLoggers.TryAdd(body.log_id, writer)) {
+                await writer.DisposeAsync();
+                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await HttpContext.Response.WriteAsync($"Log with id '{body.log_id}' already started!");
+            }
         }
 
         [Route("/finishLog")]
@@ -79,7 +95,7 @@ namespace LogSlurp
                 return;
             }
 
-            if(!FileLoggers.Remove(id, out var writer)) {
+            if(!FileLoggers.TryRemove(id, out var writer)) {
                 HttpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 await HttpContext.Response.WriteAsync("Log removal failed");
                 return;
@@ -104,10 +120,12 @@ namespace LogSlurp
                 await writer.FlushAsync();
             }
 
-            var stream = System.IO.File.Open(Path.Combine(Path.GetTempPath(), "logslurp", $"{id}.txt"),
+            var stream = new FileStream(Path.Combine(Path.GetTempPath(), "logslurp", $"{id}.txt"),
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.ReadWrite);
+                FileShare.ReadWrite,
+                bufferSize: 4096,
+                FileOptions.Asynchronous);
 
             return File(stream, "text/plain");
         }
@@ -131,14 +149,30 @@ namespace LogSlurp
             return null;
         }
 
+        private const int MaxMessageBytes = 64 * 1024;
+
         private static async Task ReadLogs(WebSocket ws, string id, string prologueFormat)
         {
-            var writer = FileLoggers[id];
             var buffer = new byte[1024 * 4];
+            using var message = new MemoryStream();
+
             var receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             while(!receiveResult.CloseStatus.HasValue) {
-                var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss,fff");
-                await writer.WriteAsync(String.Format(prologueFormat, now), buffer.Take(receiveResult.Count).Select(x => (char)x).ToArray());
+                message.Write(buffer, 0, receiveResult.Count);
+                if (message.Length > MaxMessageBytes) {
+                    await ws.CloseAsync(WebSocketCloseStatus.MessageTooBig, "Message too large", CancellationToken.None);
+                    return;
+                }
+
+                if (receiveResult.EndOfMessage) {
+                    if (FileLoggers.TryGetValue(id, out var writer)) {
+                        var now = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss,fff");
+                        var chars = message.ToArray().Select(x => (char)x).ToArray();
+                        await writer.WriteAsync(String.Format(prologueFormat, now), chars);
+                    }
+                    message.SetLength(0);
+                }
+
                 receiveResult = await ws.ReceiveAsync(buffer, CancellationToken.None);
             }
 
