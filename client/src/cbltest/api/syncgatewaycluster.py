@@ -60,6 +60,31 @@ class SyncGatewayCluster:
             )
         )
 
+    async def wait_for_sequence(
+        self,
+        db_name: str,
+        sequence: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Wait until every node in the cluster serves `sequence` from its channel cache, checking
+        all nodes concurrently.
+
+        A write returns as soon as the node that took it has committed, and each node's cache
+        catches up on its own afterwards, so a replicator that connects to a different node can
+        otherwise miss it.  Waiting on the newest sequence a batch of writes was given covers
+        every write in the batch.
+
+        :param db_name: The name of the DB endpoint the sequence was assigned in.
+        :param sequence: The sequence to wait for, as read back from the changes feed.
+        :param scope: The scope the sequence was assigned in.
+        :param collection: The collection the sequence was assigned in.
+        """
+        await asyncio.gather(
+            *(sg._wait_for_sequence(db_name, sequence, scope, collection) for sg in self.__sync_gateways)
+        )
+
     async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
         """
         Create a database on one node of the cluster, and wait until every node

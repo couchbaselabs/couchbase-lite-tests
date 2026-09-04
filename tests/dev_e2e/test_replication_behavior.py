@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import SnapshotUpdater
@@ -13,7 +12,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.utils import assert_not_null, async_retry_assert
+from cbltest.utils import assert_not_null
 
 
 @pytest.mark.min_test_servers(1)
@@ -26,13 +25,27 @@ class TestReplicationBehavior(CBLTestClass):
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("Delete name_101 through name_150 on sync gateway")
+        self.mark_test_step("Delete name_001 through name_150 on sync gateway")
         all_docs = await sync_gateway.get_all_documents("names")
-        for row in all_docs.rows:
-            name_number = int(row.id[-3:])
-            if name_number <= 150:
-                revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
-                await sync_gateway.delete_document(row.id, revid, "names")
+        to_delete = [row for row in all_docs.rows if int(row.id[-3:]) <= 150]
+        assert to_delete, "The names dataset carries no documents to delete"
+        for row in to_delete[:-1]:
+            revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
+            await sync_gateway.delete_document(row.id, revid, "names")
+
+        # Only the last tombstone is read back from the changes feed: a `request_plus` feed waits
+        # for the cache to catch up to every sequence allocated before the request, so the sequence
+        # of the newest delete covers the ones before it.
+        last = to_delete[-1]
+        tombstone = await sync_gateway.delete_document(
+            last.id,
+            assert_not_null(last.revid, f"Missing revid on {last.id}"),
+            "names",
+            wait_for_caching_feed=True,
+        )
+
+        self.mark_test_step("Wait until every Sync Gateway node serves the deletes")
+        await cloud.sync_gateway_cluster.wait_for_sequence("names", tombstone.seq)
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
@@ -150,15 +163,17 @@ class TestReplicationBehavior(CBLTestClass):
         }
         cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
 
-        self.mark_test_step(f"Wait until Sync Gateway has imported the resurrected `{loc_deleted}`")
+        self.mark_test_step(
+            f"Read `{loc_deleted}` on Sync Gateway, which imports the resurrected document on demand, "
+            "and wait for that import to reach the changes feed"
+        )
 
-        async def _confirm_resurrected_on_sg() -> None:
-            remote_doc = await sync_gateway.get_document("names", loc_deleted)
-            assert remote_doc.body.get("name") == resurrected_body["name"], (
-                f"{loc_deleted} on Sync Gateway does not reflect the resurrected content yet"
-            )
-
-        await async_retry_assert(_confirm_resurrected_on_sg, tenacity.wait_fixed(1), tenacity.stop_after_attempt(15))
+        # The admin read performs the on-demand import itself, so the resurrected body comes back
+        # from this call; wait_for_caching_feed then holds until a replicator would see it too.
+        remote_doc = await sync_gateway.get_document("names", loc_deleted, wait_for_caching_feed=True)
+        assert remote_doc.body.get("name") == resurrected_body["name"], (
+            f"{loc_deleted} on Sync Gateway does not reflect the resurrected content: {remote_doc.body}"
+        )
 
         self.mark_test_step("""
             Start a replicator:
