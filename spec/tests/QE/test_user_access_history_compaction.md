@@ -279,8 +279,8 @@ user's access history but gets 403 attempting to compact it.
 ## test_compact_while_client_offline_leaves_stale_access_undetected
 
 This is the flagship scenario for this endpoint pair (mirrors the "Bob" offline-revoke
-case from a user-history angle). Uses the shared `backfill_after_offline` helper
-(`tests/shared/backfill_after_offline.py`) to simulate the offline window for both the
+case from a user-history angle). Uses `_one_shot_pull` helper to
+simulate the offline window -- the gap between the two one-shot pulls -- for both the
 initial sync and the reconnect.
 
 **Status: confirmed as expected/documented behavior, not a product bug.** A live run
