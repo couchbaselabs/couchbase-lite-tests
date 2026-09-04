@@ -5,7 +5,7 @@ from cbltest.api.error import CblTestError
 
 from .api.cluster import CouchbaseCluster
 from .api.couchbaseserver import CouchbaseServer
-from .api.edgeserver import EdgeServer
+from .api.edgeservermanager import EdgeServerManager
 from .api.syncgateway import SyncGateway
 from .api.syncgatewaycluster import SyncGatewayCluster
 from .api.testserver import TestServer
@@ -114,8 +114,8 @@ class CBLPyTest:
         return self.clusters[0].couchbase_servers if self.clusters else []
 
     @property
-    def edge_servers(self) -> Sequence[EdgeServer]:
-        """Gets the list of Edge Servers available"""
+    def edge_servers(self) -> Sequence[EdgeServerManager]:
+        """Gets the list of Edge Servers available, each with the client that talks to it"""
         return self.__edge_servers
 
     @property
@@ -196,18 +196,9 @@ class CBLPyTest:
 
         self.__clusters = cluster_builder.build()
 
-        self.__edge_servers: list[EdgeServer] = []
+        self.__edge_servers: list[EdgeServerManager] = []
         if not test_server_only:
-            for es in self.__config.edge_servers:
-                es_info = EdgeServerInfo(es)
-                self.__edge_servers.append(
-                    EdgeServer(
-                        es_info.hostname,
-                        es_info.admin_user,
-                        es_info.admin_password,
-                        es_info.config_path,
-                    )
-                )
+            self.__edge_servers = [EdgeServerManager(EdgeServerInfo(es)) for es in self.__config.edge_servers]
 
     async def resolve_api_version(self) -> None:
         apiVersion = 0

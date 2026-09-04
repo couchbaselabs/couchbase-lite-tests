@@ -1,15 +1,18 @@
 """
-Removal of every Couchbase Server bucket and Sync Gateway database between tests.
+Return the backend to a clean slate between tests: every Edge Server reset to its
+provisioned state, and every Couchbase Server bucket and Sync Gateway database removed.
 
 Failures are never swallowed: running against a half-cleaned environment fails later in a
 much harder way to diagnose.
 """
 
 import asyncio
+from collections.abc import Sequence
 
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
+from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info, cbl_trace
@@ -18,7 +21,8 @@ from cbltest.logging import cbl_info, cbl_trace
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Remove all Couchbase Server buckets and Sync Gateway databases.
+    Reset every Edge Server, then remove all Couchbase Server buckets and Sync Gateway
+    databases.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -27,9 +31,23 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     Tests that reuse a shared database/bucket across multiple test functions
     (e.g. `TestQueryConsistency`) can shadow this fixture with a class-scoped
     override that calls `perform_cleanup` once for the whole class instead of
-    once per test.
+    once per test. Such a class keeps its Edge Servers between tests too.
     """
+    # Edge Servers first: their provisioned config declares no replications, so nothing
+    # pulls from the Sync Gateway databases the next phase deletes.
+    await reset_all_edge_servers(cblpytest.edge_servers)
     await perform_cleanup(cblpytest)
+
+
+async def reset_all_edge_servers(managers: Sequence[EdgeServerManager]) -> None:
+    """Reset every Edge Server to its provisioned state, in parallel."""
+    if not managers:
+        return
+
+    cbl_trace(f"🧹 resetting {len(managers)} edge server(s)...")
+    async with asyncio.TaskGroup() as group:
+        for manager in managers:
+            group.create_task(manager.reset_to_initial_state())
 
 
 async def perform_cleanup(cblpytest: CBLPyTest) -> None:

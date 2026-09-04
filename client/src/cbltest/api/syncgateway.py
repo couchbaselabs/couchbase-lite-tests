@@ -27,7 +27,7 @@ from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import assert_not_null, async_retry_assert, is_sidecar_reachable
+from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -64,8 +64,6 @@ h7vaHwdE3b6S8WxeGR5HPOZeUVwrRHmTh8lkJPUQlfKDu+z/WP+Q4+engTSpRdRn
 fvJMZ8kpMTvrHDXO1G4EHiI48bzvQIJCKD6e2ZElimn25ZUJXSKL5ICsRij4
 -----END CERTIFICATE-----
 """
-
-SHELL2HTTP_PORT = 20001
 
 
 class ScopeConfig(BaseModel):

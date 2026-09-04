@@ -5,7 +5,7 @@ from collections.abc import AsyncGenerator, Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Literal, cast
+from typing import Any, Literal, cast
 from unittest.mock import MagicMock, patch
 
 import pluggy._result
@@ -131,6 +131,16 @@ class FakeEdgeServer:
         return EdgeServerVersion(self._version_str)
 
 
+class FakeEdgeServerManager:
+    """``CBLPyTest.edge_servers`` holds managers, and greenboard takes a client from one."""
+
+    def __init__(self, edge_server: Any) -> None:
+        self._edge_server = edge_server
+
+    def get_admin_client(self) -> Any:
+        return self._edge_server
+
+
 class FakeTestServer(testserver.TestServer):
     """Test-only TestServer that returns a fixed GetRootResponse from get_info."""
 
@@ -240,7 +250,7 @@ class TestCblpytestHelperFidelity:
     @pytest.mark.asyncio
     async def test_test_servers_and_edge_servers_surface(self) -> None:
         server = _make_server()
-        es = FakeEdgeServer("1.1.0(45;abc)")
+        es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])
         assert list(cblpytest.test_servers) == [server]
         assert list(cblpytest.edge_servers) == [es]
@@ -720,7 +730,7 @@ class TestGreenboardFixture:
     async def test_es_marker_sets_edge_server_platform(self) -> None:
         """@pytest.mark.min_edge_servers plus a live Edge Server switches the platform
         to edge-server and keys the doc on the ES build."""
-        es = FakeEdgeServer("1.1.0(45;abc)")
+        es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
@@ -749,7 +759,7 @@ class TestGreenboardFixture:
         """An Edge Server in the config is not on its own enough to retarget the
         doc: without @pytest.mark.min_edge_servers the run stays a CBL run."""
         server = _make_server()
-        es = FakeEdgeServer("1.1.0(45;abc)")
+        es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
@@ -772,7 +782,7 @@ class TestGreenboardFixture:
         @pytest.mark.min_edge_servers has no version to key a doc on: there is
         no CBL library version and no SGW version. Skip rather than file the
         run under the default sync-gateway platform."""
-        es = FakeEdgeServer("1.1.0(45;abc)")
+        es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
@@ -793,7 +803,7 @@ class TestGreenboardFixture:
         happens to have an Edge Server in the topology: the SGW version is a
         valid key, so the doc is uploaded under sync-gateway."""
         sgw = FakeSyncGateway("4.0.0(350;def)")
-        es = FakeEdgeServer("1.1.0(45;abc)")
+        es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
@@ -820,7 +830,9 @@ class TestGreenboardFixture:
             async def get_version(self) -> EdgeServerVersion:
                 raise RuntimeError("connection refused")
 
-        cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[UnreachableEdgeServer()])
+        cblpytest = _make_cblpytest(
+            test_servers=[], sync_gateways=[], edge_servers=[FakeEdgeServerManager(UnreachableEdgeServer())]
+        )
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
             gen = _raw_greenboard(cblpytest, config)

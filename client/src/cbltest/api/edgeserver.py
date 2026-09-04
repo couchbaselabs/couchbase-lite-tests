@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
-import aiofiles
 import pyjson5 as json5
 from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
@@ -102,43 +101,44 @@ class EdgeServer:
     def __init__(
         self,
         url: str,
-        admin_user: str = "admin_user",
-        admin_password: str = "password",
+        user: str | None = None,
+        password: str | None = None,
         config_file: str | None = None,
     ) -> None:
+        """
+        :param url: Hostname of the Edge Server
+        :param user: User to authenticate as, or None for a client that sends no credentials
+        :param password: That user's password
+        :param config_file: Config the Edge Server is running on, which decides the port,
+            the scheme, and whether it asks for credentials at all
+        """
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
-        port, secure, mtls, is_auth, is_anonymous_auth = self._decode_config_file(config_file)
+        port, secure, mtls, needs_auth = self._decode_config_file(config_file)
         self._caddy = caddy.Caddy(url)
         self.__secure: bool = secure
         self.__mtls: bool = mtls
         self.__hostname: str = url
         self.__port: int = port
-        self.__anonymous_auth: bool = is_anonymous_auth
         self.__config_file: str = config_file
-        self.__auth_name = admin_user
-        self.__auth_password = admin_password
-        self.__auth = is_auth
         ws_scheme = "wss://" if secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{port}"
         self.scheme = "https://" if secure else "http://"
-        self.__anonymous_session = self._create_session(self.scheme, url, port, None)
-        self.__admin_session = self._create_session(
-            self.scheme,
-            url,
-            port,
-            encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
-        )
-        self.__shell_session: ClientSession = self._create_session("http://", url, 20001, None)
+        # A config that declares no users turns credentials away, so send none against one.
+        self.__needs_auth = needs_auth
+        credentials = encode_basic_auth(user, password or "", "ascii") if needs_auth and user else None
+        self.__session = self._create_session(credentials)
+
+    @property
+    def needs_auth(self) -> bool:
+        """Whether the running config declares users, so a client can authenticate as one."""
+        return self.__needs_auth
 
     async def close(self) -> None:
-        """
-        Closes every aiohttp session this Edge Server holds, including its Caddy's
-        """
-        for session in (self.__anonymous_session, self.__admin_session, self.__shell_session):
-            if not session.closed:
-                await session.close()
+        """Close the session this client requests on, and its Caddy's."""
+        if not self.__session.closed:
+            await self.__session.close()
         await self._caddy.close()
 
     @property
@@ -150,14 +150,14 @@ class EdgeServer:
         """Gets the Caddy file server running alongside this Edge Server"""
         return self._caddy
 
-    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool, bool]:
+    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool]:
+        """Read the port, whether it is TLS, whether it is mTLS, and whether it wants users."""
         with open(config_file, encoding="utf-8") as file:
             config_content = file.read()
         config = json5.loads(config_content)
         https = config.get("https", False)
         interface = config.get("interface", "0.0.0.0:59840")
         port = int(interface.split(":")[1])
-        enable_anonymous_users = config.get("enable_anonymous_users", False)
         mtls = False
         if https:
             client_cert_path = https.get("client_cert_path", False)
@@ -170,10 +170,9 @@ class EdgeServer:
             https,
             mtls,
             users,
-            enable_anonymous_users,
         )
 
-    def _create_session(self, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
+    def _create_session(self, auth_header: str | None) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
         from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
         headers = {"Authorization": auth_header} if auth_header is not None else None
@@ -188,32 +187,24 @@ class EdgeServer:
                 )
 
             return ClientSession(
-                f"{scheme}{url}:{port}",
+                f"{self.scheme}{self.__hostname}:{self.__port}",
                 headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
-        return ClientSession(f"{scheme}{url}:{port}", headers=headers)
+        return ClientSession(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
 
     async def _send_request(
         self,
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
-        params: dict[str, str] | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
-        if session is None:
-            if self.__auth:
-                session = self.__admin_session
-            else:
-                session = self.__anonymous_session
-
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await session.request(method, path, data=data, headers=headers, params=params)
+            resp = await self.__session.request(method, path, data=data, headers=headers)
 
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -244,14 +235,12 @@ class EdgeServer:
         return keyspace
 
     async def get_version(self) -> CouchbaseVersion:
-        scheme = "https://" if self.__secure else "http://"
-        async with self._create_session(scheme, self.__hostname, self.__port, None) as s:
-            resp = await self._send_request("get", "/", session=s)
-            assert isinstance(resp, dict)
-            resp_dict = cast(dict, resp)
-            vendor = _get_typed_required(resp_dict, "vendor", dict)
-            raw_version = _get_typed_required(vendor, "version", str)
-            return EdgeServerVersion(raw_version)
+        resp = await self._send_request("get", "/")
+        assert isinstance(resp, dict)
+        resp_dict = cast(dict, resp)
+        vendor = _get_typed_required(resp_dict, "vendor", dict)
+        raw_version = _get_typed_required(vendor, "version", str)
+        return EdgeServerVersion(raw_version)
 
     async def get_all_documents(
         self,
@@ -872,23 +861,6 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def set_auth(self, auth: bool = True, name: str = "admin_user", password: str = "password") -> None:
-        if not auth:
-            self.__auth = False
-        else:
-            self.__auth_name = name
-            self.__auth_password = password
-            self.__admin_session = self._create_session(
-                self.scheme,
-                self.__hostname,
-                self.__port,
-                encode_basic_auth(self.__auth_name, self.__auth_password, "ascii"),
-            )
-
-    async def kill_server(self) -> None:
-        with self.__tracer.start_as_current_span("kill edge server"):
-            await self._send_request("post", "/kill-edgeserver", session=self.__shell_session)
-
     async def get_log_content(
         self,
         log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
@@ -935,77 +907,6 @@ class EdgeServer:
         ):
             content = await self.get_log_content(log_file)
             return [line for line in content.splitlines() if search_string in line]
-
-    async def start_server(self, config: dict | None = None) -> None:
-        if config is None:
-            config = {}
-        with self.__tracer.start_as_current_span("start edge server"):
-            await self._send_request(
-                "post",
-                "/start-edgeserver",
-                JSONDictionary(config),
-                session=self.__shell_session,
-            )
-
-    async def configure_dataset(self, db_name: str = "db", config_file: str | None = None) -> "EdgeServer":
-        if not config_file:
-            repo_root = next(
-                p
-                for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-                if p.name == "couchbase-lite-tests"
-            )
-            config_file = f"{repo_root}/environment/aws/es_setup/config/config.json"
-        await self.kill_server()
-        await self._send_request(
-            "post",
-            "/reset-db",
-            JSONDictionary({"filename": f"{db_name}.cblite2"}),
-            session=self.__shell_session,
-        )
-        async with aiofiles.open(config_file) as f:
-            cfg = json.loads(await f.read())
-        await self.start_server(config=cfg)
-        return EdgeServer(self.__hostname, config_file=config_file)
-
-    async def set_firewall_rules(
-        self,
-        allow: list[Any] | None = None,
-        deny: list[Any] | None = None,
-    ) -> None:
-        """
-        Add firewall rules to the edge server host. Can be used to block SGW connection to ES.
-
-        :param allow: The IPs allowed to access edge-server. Used to accept incoming SGW connection.
-        :param deny: The IPs denied from accessing edge-server. Used to deny incoming SGW connection.
-        """
-        with self.__tracer.start_as_current_span("go online offline"):
-            payload: dict[str, Any] = {}
-            if allow:
-                payload["allow"] = allow
-            if deny:
-                payload["deny"] = deny
-            await self._send_request(
-                "post",
-                "firewall",
-                JSONDictionary(payload),
-                session=self.__shell_session,
-            )
-
-    async def reset_firewall(self) -> None:
-        with self.__tracer.start_as_current_span("reset firewall"):
-            await self._send_request("post", "firewall", session=self.__shell_session)
-
-    async def add_user(self, name: str, password: str, role: str = "admin") -> None:
-        with self.__tracer.start_as_current_span("Add user"):
-            await self.kill_server()
-            payload = {"name": name, "password": password, "role": role}
-            await self._send_request(
-                "post",
-                "add-user",
-                JSONDictionary(payload),
-                session=self.__shell_session,
-            )
-            await self.start_server()
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
