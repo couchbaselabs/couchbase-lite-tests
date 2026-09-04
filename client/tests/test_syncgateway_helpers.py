@@ -257,7 +257,7 @@ class TestGetAllDatabasesVerbose:
 class TestWaitForDbUp:
     @pytest.mark.asyncio
     async def test_succeeds_when_database_is_online(self, sync_gateway: SyncGatewayFixture) -> None:
-        sg, specs, _ = sync_gateway
+        sg, specs, received = sync_gateway
         specs[:] = [
             {
                 "status": 200,
@@ -266,6 +266,29 @@ class TestWaitForDbUp:
         ]
 
         await sg._wait_for_db_online("db1", max_retries=1, retry_delay=0)
+
+        # Wait for the node to serve the database at all, reload its config, then wait
+        # for the database to come online under that config.
+        assert [entry[_URL_KEY] for entry in received] == [
+            "/_all_dbs?verbose=true",
+            "/db1/_config?refresh_config=true",
+            "/_all_dbs?verbose=true",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_raises_when_refresh_fails(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": [{"bucket": "b1", "db_name": "db1", "state": "Online"}]},
+            {"status": 403, "json": {"error": "Forbidden", "reason": ""}},
+        ]
+
+        # The node answers a reload in every state it serves the database in, so a failure
+        # here means the database is gone.  That surfaces rather than retrying to a timeout.
+        with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
+            await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
+
+        assert exc_info.value.code == 403
 
     @pytest.mark.asyncio
     async def test_timeout_reports_last_seen_state(self, sync_gateway: SyncGatewayFixture) -> None:
@@ -317,7 +340,7 @@ class TestWaitForDbUp:
         with pytest.raises(TimeoutError) as exc_info:
             await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 
-        assert "database not present in /_all_dbs?verbose=true" in str(exc_info.value)
+        assert "does not serve database db1 (not present in /_all_dbs?verbose=true)" in str(exc_info.value)
 
     @pytest.mark.asyncio
     async def test_reset_user(self, sync_gateway: SyncGatewayFixture) -> None:

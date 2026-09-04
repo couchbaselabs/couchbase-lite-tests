@@ -149,7 +149,6 @@ class CouchbaseCluster:
                 )
 
             await sg.load_dataset(dataset_name, data_filepath)
-        await self.sync_gateway_cluster.wait_for_db_online(dataset_name)
 
     async def create_database(self, db_name: str, config: DatabaseConfig, *, bucket_replicas: int = 0) -> None:
         """
