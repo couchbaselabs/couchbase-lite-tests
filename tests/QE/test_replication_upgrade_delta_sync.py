@@ -106,6 +106,7 @@ class TestUpgradeDeltaSync(CBLTestClass):
                     body={**current.body, "updated_by": "delta_sync_history_test"},
                 )
             ],
+            wait_for_caching_feed=True,
         )
 
         def validator(pre: DocSnapshot, post: DocSnapshot) -> None:
