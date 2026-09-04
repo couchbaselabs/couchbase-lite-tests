@@ -74,7 +74,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record baseline bytes before update")
-        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
@@ -114,7 +114,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Record bytes transferred after delta sync")
-        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
@@ -181,7 +181,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
@@ -232,7 +232,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_pull_bytes_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify delta sync bytes transferred is less than doc size.")
         delta_bytes = read_pull_bytes_after - read_pull_bytes_before
@@ -292,7 +292,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get baseline bytes before update")
-        bytes_pull_before, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_pull_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
@@ -340,7 +340,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred again this time.")
-        bytes_pull_after, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_pull_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify only delta is updated while replicating UTF-8 content.")
         delta_bytes_transferred = bytes_pull_after - bytes_pull_before
@@ -400,7 +400,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
@@ -441,7 +441,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify delta transferred is less than doc size.")
         delta_bytes_transferred = bytes_read_after - bytes_read_before
@@ -491,7 +491,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("posts")
+        bytes_read_before = (await sync_gateway.get_database_stats("posts")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
@@ -540,7 +540,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("posts")
+        bytes_read_after = (await sync_gateway.get_database_stats("posts")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify delta transferred equivalent to doc size (full doc transfer).")
         updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
@@ -616,7 +616,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("short_expiry")
+        read_pull_bytes_before = (await sync_gateway.get_database_stats("short_expiry")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get the current document state and revision before update.")
         sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
@@ -663,7 +663,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("short_expiry")
+        read_pull_bytes_after = (await sync_gateway.get_database_stats("short_expiry")).database.doc_reads_bytes_blip
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
 
         self.mark_test_step("""
@@ -717,7 +717,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify docs are replicated correctly.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
@@ -747,7 +747,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get the original document size.")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
@@ -804,7 +804,7 @@ class TestDeltaSync(CBLTestClass):
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_before = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -839,7 +839,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Get delta stats.")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("travel")
+        bytes_read_after = (await sync_gateway.get_database_stats("travel")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify document is replicated correctly.")
         cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))

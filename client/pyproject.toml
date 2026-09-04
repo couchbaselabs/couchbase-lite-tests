@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
   "aiofiles==25.1.0",
   "aiohttp==3.14.3",
+  "asyncstdlib==3.13.1",
   "couchbase==4.3.4",
   "cryptography==44.0.0",
   "deepdiff==8.6.1",

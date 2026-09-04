@@ -25,6 +25,7 @@ from cbltest.greenboarduploader import (
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
+from conftest import patch_bootstrap
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
 
@@ -105,9 +106,7 @@ class FakeSyncGateway(SyncGateway):
     """Test-only SyncGateway that returns a fixed version without network calls."""
 
     def __init__(self, version_str: str) -> None:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"bootstrap": {"server": "couchbase://localhost"}}
-        with patch("cbltest.api.syncgateway.requests.get", return_value=mock_response):
+        with patch_bootstrap(server="couchbase://localhost"):
             super().__init__("localhost", "admin", "password")
         self._version_str = version_str
 

@@ -242,7 +242,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
 
         self.mark_test_step("Record baseline bytes before update")
-        _, bytes_written_before = await sync_gateway.bytes_transferred("travel")
+        bytes_written_before = (await sync_gateway.get_database_stats("travel")).database.doc_writes_bytes_blip
 
         self.mark_test_step("Get existing document for encryption test")
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
@@ -272,7 +272,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred after delta sync.")
-        _, bytes_written_after = await sync_gateway.bytes_transferred("travel")
+        bytes_written_after = (await sync_gateway.get_database_stats("travel")).database.doc_writes_bytes_blip
 
         self.mark_test_step("Verify delta sync worked with encryption.")
         sgw_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")

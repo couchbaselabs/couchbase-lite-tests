@@ -3,7 +3,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from aiohttp import ClientSession, TCPConnector, web
@@ -13,6 +12,7 @@ from cbltest.api.x509_certificate import (
     create_ca_certificate,
     create_leaf_certificate,
 )
+from conftest import patch_bootstrap
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
@@ -104,7 +104,7 @@ class TestSyncGatewayCaCertificate:
 
         async with _tls_server(_SG_CERT_FILE, _SG_KEY_FILE) as port:
             # SyncGateway's constructor pings the host over plain HTTP; not what this tests.
-            with patch("cbltest.api.syncgateway.requests.get", autospec=True):
+            with patch_bootstrap():
                 sync_gateway = SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True)
 
             session = sync_gateway._create_session(True, "https://", "127.0.0.1", port, None)
