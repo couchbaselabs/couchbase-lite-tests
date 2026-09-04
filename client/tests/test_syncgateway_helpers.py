@@ -24,6 +24,7 @@ from cbltest.api.syncgateway import (
     ChangesResponse,
     DatabaseConfig,
     DatabaseState,
+    DocumentUpdateEntry,
     ScopeConfig,
     SyncGateway,
     SyncGatewayUserClient,
@@ -611,3 +612,59 @@ class TestWaitForCachingFeed:
         await sg.update_document("db", "doc1", {"foo": "bar"}, "1-abc")
 
         assert calls == [], "the default must not pay for a changes feed read"
+
+    @pytest.mark.asyncio
+    async def test_read_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A read imports a document Couchbase Server wrote, so it has a cache to wait for too."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "2-abc", "foo": "bar"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.get_document("db", "doc1", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert doc.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_waits_on_the_last_revision(self, sync_gateway: SyncGatewayFixture) -> None:
+        """The last write's sequence covers the earlier ones, so only it is read back."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            # update_documents rewrites revision IDs off _all_docs before it writes
+            {"status": 200, "json": {"rows": []}},
+            {"status": 201, "json": [{"id": "doc0", "rev": "2-aaa"}, {"id": "doc1", "rev": "2-abc"}]},
+        ]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_documents(
+            "db",
+            [
+                DocumentUpdateEntry("doc0", None, {"foo": "bar"}),
+                DocumentUpdateEntry("doc1", None, {"foo": "bar"}),
+            ],
+            wait_for_caching_feed=True,
+        )
+
+        assert len(calls) == 1, "one wait on the newest revision covers the whole batch"
+        assert calls[0].get("request_plus") is True
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_fails_on_a_rejected_write(self, sync_gateway: SyncGatewayFixture) -> None:
+        """_bulk_docs answers 201 even for writes it rejected, so the entries have to be checked."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"rows": []}},
+            {"status": 201, "json": [{"id": "doc0", "error": "conflict", "status": 409}]},
+        ]
+        self._record_get_changes(sg, [])
+
+        with pytest.raises(AssertionError, match="rejected"):
+            await sg.update_documents(
+                "db",
+                [DocumentUpdateEntry("doc0", None, {"foo": "bar"})],
+                wait_for_caching_feed=True,
+            )

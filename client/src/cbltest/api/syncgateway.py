@@ -1322,6 +1322,7 @@ class _SyncGatewayBase:
         updates: list[DocumentUpdateEntry],
         scope: str = "_default",
         collection: str = "_default",
+        wait_for_caching_feed: bool = False,
     ) -> None:
         """
         Sends a list of documents to be updated on Sync Gateway
@@ -1330,6 +1331,13 @@ class _SyncGatewayBase:
         :param updates: A list of updates to perform
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
+        :param wait_for_caching_feed: If True, wait for a `request_plus` changes feed to report the last
+                                      revision this wrote, which covers the earlier ones too, and fail on
+                                      any update Sync Gateway rejected.  A replication started straight
+                                      after would otherwise read a feed that still has the documents at
+                                      their previous revisions (default False)
+        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway rejected an update,
+            answered with no usable entries, or the feed never reported the last revision written
         """
         with self._tracer.start_as_current_span(
             "update_documents",
@@ -1343,10 +1351,34 @@ class _SyncGatewayBase:
 
             body = {"docs": [u.to_json() for u in updates]}
 
-            await self._send_request(
+            response = await self._send_request(
                 "post",
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
                 JSONDictionary(body),
+            )
+
+            if not wait_for_caching_feed:
+                return
+
+            assert isinstance(response, list), f"Bulk update returned {response!r}, not a JSON array"
+            entries = cast(list[dict], response)
+            assert entries, f"Bulk update of {len(updates)} documents returned no entries"
+            for entry in entries:
+                # _bulk_docs answers 201 even for writes it rejected
+                assert "error" not in entry, f"Bulk update was rejected: {dumps(entry)}"
+
+            # The last revision's wait covers the earlier ones
+            last = entries[-1]
+            doc_id = last.get("id")
+            assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
+            written = {"_id": doc_id}
+            if "rev" in last:
+                written["_rev"] = last["rev"]
+            if "cv" in last:
+                written["_cv"] = last["cv"]
+
+            await self._document_with_sequence(
+                written, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
             )
 
     async def upsert_documents(
@@ -1474,8 +1506,7 @@ class _SyncGatewayBase:
             if "cv" in cast_resp:
                 cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
 
-            # RemoteDocument requires an ID, and every caller of this method already ignores the
-            # return value, so do not make them depend on the delete ack carrying one.
+            # RemoteDocument requires an ID, and the delete ack does not always carry one.
             cast_resp.setdefault("_id", doc_id)
 
             if not wait_for_caching_feed:
@@ -1526,6 +1557,7 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         revision: str | None = None,
+        wait_for_caching_feed: bool = False,
     ) -> RemoteDocument:
         """
         Gets a document from Sync Gateway
@@ -1535,6 +1567,10 @@ class _SyncGatewayBase:
         :param scope: The scope that the document exists in (default '_default')
         :param collection: The collection that the document exists in (default '_default')
         :param revision: A specific revision to get, instead of the current one (default None)
+        :param wait_for_caching_feed: If True, wait for a `request_plus` changes feed to report the revision
+                                      that was read.  Reading a document Couchbase Server wrote behind
+                                      Sync Gateway's back imports it on demand, so without this it reads
+                                      back while a replicator still cannot see it (default False)
         :raises CblSyncGatewayBadResponseError: If Sync Gateway does not return the document. Returns a 404 for a non existent or tombstoned document.
         """
         with self._tracer.start_as_current_span(
@@ -1551,7 +1587,12 @@ class _SyncGatewayBase:
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 
-            return RemoteDocument(cast(dict, response))
+            if not wait_for_caching_feed:
+                return RemoteDocument(cast(dict, response))
+
+            return await self._document_with_sequence(
+                cast(dict, response), db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
+            )
 
     async def _document_with_sequence(
         self,
@@ -1709,6 +1750,8 @@ class _SyncGatewayBase:
                       after this sequence; pass the `seq` of the previous write when writing in a
                       loop, so each wait does not re-read the whole feed
         :return: The updated document as a RemoteDocument object
+        :raises AssertionError: if `wait_for_caching_feed` is set and the response carries no revision,
+            or the feed never reported the revision written
         """
         with self._tracer.start_as_current_span(
             "update_document",
