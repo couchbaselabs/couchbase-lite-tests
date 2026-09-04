@@ -392,7 +392,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             "Create a document assigned to channel 'ABC' directly through Couchbase Server, bypassing "
             "Sync Gateway, so it has no channel-history metadata when Sync Gateway later imports it"
         )
-        cbs.upsert_document(bucket_name, doc_id, {"channels": ["ABC"]})
+        await cbs.upsert_document(bucket_name, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Perform on demand import")
         await sg.get_document(sg_db, doc_id)
@@ -687,7 +687,7 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             "Write a document directly into the Couchbase Server bucket, bypassing Sync Gateway entirely, "
             "so it has no Sync Gateway metadata yet"
         )
-        cbs.upsert_document(bucket_name, doc_id, {"channels": ["ABC"]})
+        await cbs.upsert_document(bucket_name, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Compact the document's channel history without first waiting for it to be imported")
         compacted = await sg.compact_document_channel_history(sg_db, doc_id, 1_000_000)

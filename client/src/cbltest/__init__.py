@@ -132,6 +132,12 @@ class CBLPyTest:
         dataset_version: str = "4.0",
     ) -> "CBLPyTest":
         ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version)
+
+        # The Couchbase Server SDK is async, so the constructor cannot connect its nodes.
+        for cluster in ret_val.clusters:
+            for cbs in cluster.couchbase_servers:
+                await cbs.connect()
+
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 

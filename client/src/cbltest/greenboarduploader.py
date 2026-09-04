@@ -8,8 +8,8 @@ from uuid import uuid4
 
 import pytest
 from _pytest.reports import TestReport
+from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
-from couchbase.cluster import Cluster
 from couchbase.options import ClusterOptions
 from junitparser import JUnitXml
 from pydantic import BaseModel, ConfigDict, Field
@@ -204,7 +204,7 @@ class GreenboardUploader:
         """
         return self.__has_es_marker
 
-    def upload(
+    async def upload(
         self,
         platform: str,
         os_name: str,
@@ -283,7 +283,7 @@ class GreenboardUploader:
                     # If the part after '-' is not a number, build remains 0
                     cbl_warning(f"Could not parse build number from '{version}'")
 
-        self._upload_document(
+        await self._upload_document(
             RunResult(
                 build=parsed_build,
                 version=parsed_version,
@@ -297,7 +297,7 @@ class GreenboardUploader:
             )
         )
 
-    def upload_from_junit_file(
+    async def upload_from_junit_file(
         self,
         junit_output: Path,
         platform: str,
@@ -337,7 +337,7 @@ class GreenboardUploader:
         if not junit_output.is_file():
             # Pytest didn't write an XML for this session; use the in-process
             # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version, es_version)
+            await self.upload(platform, os_name, version, sgw_version, es_version)
             return
 
         junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
@@ -348,7 +348,7 @@ class GreenboardUploader:
             cbl_info(f"Greenboard: all {junit_error} tests errored before running (harness failure); skipping upload")
             return
 
-        self.upload(
+        await self.upload(
             platform,
             os_name,
             version,
@@ -451,7 +451,7 @@ class GreenboardUploader:
             f"(pass={self.__pass_count}, fail={self.__fail_count})"
         )
 
-    def upload_upgrade_batch(self, results_file: str) -> None:
+    async def upload_upgrade_batch(self, results_file: str) -> None:
         """Upload one aggregate document for the whole upgrade run.
 
         Reads the iterations recorded by ``record_upgrade_step`` and emits
@@ -504,7 +504,7 @@ class GreenboardUploader:
             # `build` fields preserve what was actually running at each step.
             target_build = 0
 
-        self._upsert(
+        await self._upsert(
             {
                 "build": target_build,
                 "version": target_version,
@@ -523,10 +523,10 @@ class GreenboardUploader:
             f"failedAt={failed_at}"
         )
 
-    def _upload_document(self, test_run: RunResult) -> None:
-        self._upsert(test_run.model_dump(by_alias=True))
+    async def _upload_document(self, test_run: RunResult) -> None:
+        await self._upsert(test_run.model_dump(by_alias=True))
 
-    def _upsert(self, doc: dict) -> None:
+    async def _upsert(self, doc: dict) -> None:
         """Add timestamp fields and write one document to the greenboard bucket."""
         now = datetime.now(UTC)
         unix_timestamp = (now - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
@@ -537,7 +537,12 @@ class GreenboardUploader:
 
         auth = PasswordAuthenticator(self.__username, self.__password)
         opts = ClusterOptions(auth)
-        cluster = Cluster(self.__url, opts)
-        cluster.wait_until_ready(timedelta(seconds=10))
+        cluster = await Cluster.connect(self.__url, opts)
+        try:
+            await cluster.wait_until_ready(timedelta(seconds=10))
 
-        cluster.bucket("greenboard").default_collection().upsert(str(uuid4()), doc)
+            bucket = cluster.bucket("greenboard")
+            await bucket.on_connect()
+            await bucket.default_collection().upsert(str(uuid4()), doc)
+        finally:
+            await cluster.close()

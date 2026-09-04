@@ -148,7 +148,7 @@ class TestReplicationBehavior(CBLTestClass):
             "collection": "_default",
             "scope": "_default",
         }
-        cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
+        await cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
 
         self.mark_test_step(f"Wait until Sync Gateway has imported the resurrected `{loc_deleted}`")
 

@@ -186,7 +186,7 @@ class TestSgwUpgrade(CBLTestClass):
 
         self.mark_test_step("Verify data persistence on CBS and CBL for all docs")
         for row in docs_before.rows:
-            cbs_doc = cbs.get_document(bucket, row.id)
+            cbs_doc = await cbs.get_document(bucket, row.id)
             assert cbs_doc is not None, f"Doc {row.id} not found on CBS"
             assert "version" in cbs_doc, f"Doc {row.id} missing 'version' field!"
             assert cbs_doc["type"] == "upgrade_test_doc", (
