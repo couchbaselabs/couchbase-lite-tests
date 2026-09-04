@@ -202,8 +202,8 @@ class EdgeServerManager:
 
     async def reset_to_initial_state(self) -> None:
         """
-        Restore the config, admin credentials and databases the host was provisioned with.
-        Files written through :func:`write_file`, and users added, remain.
+        Restore the config, admin credentials, databases and audit log the host was
+        provisioned with.  Files written through :func:`write_file`, and users added, remain.
         """
         with self.__tracer.start_as_current_span("reset edge server"):
             # First: a leftover DROP rule hides the host from everything below.

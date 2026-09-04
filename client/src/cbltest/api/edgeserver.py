@@ -863,7 +863,7 @@ class EdgeServer:
 
     async def get_log_content(
         self,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
+        log_file: str,
     ) -> str:
         """
         Fetch raw log file content from the Edge Server host via Caddy (port :data:`~cbltest.api.caddy.DEFAULT_PORT`).
@@ -885,28 +885,9 @@ class EdgeServer:
                 cbl_warning(f"Failed to fetch {log_file} via Caddy, treating as empty: {e}")
                 return ""
 
-    async def check_log(
-        self,
-        search_string: str,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-    ) -> list[str]:
-        """
-        Fetch log content from the server and return lines matching search_string.
-        Filtering is done in Python on the client.
-
-        :param search_string: String to search for (e.g. audit event id).
-        :param log_file: Path to the log file on the Edge Server host.
-        :return: List of matching lines, or empty list if none or on error.
-        """
-        with self.__tracer.start_as_current_span(
-            "check_log",
-            attributes={
-                "cbl.search_string": search_string,
-                "cbl.log_file": log_file,
-            },
-        ):
-            content = await self.get_log_content(log_file)
-            return [line for line in content.splitlines() if search_string in line]
+    async def get_audit_log_content(self) -> str:
+        """Fetch the audit log the Edge Server writes when its config asks for one."""
+        return await self.get_log_content("/home/ec2-user/audit/EdgeServerAuditLog.txt")
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
