@@ -15,15 +15,18 @@ import concurrent.futures
 import json
 import os
 import pathlib
+import re
 import shlex
+import socket
 import subprocess
 import sys
 import tempfile
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NamedTuple
 from urllib.parse import urlsplit
 
 import click
+import psutil
 import requests
 from cbltest.configparser import CouchbaseServerInfo
 from click.core import ParameterSource
@@ -33,6 +36,7 @@ if __name__ == "__main__":
     sys.path.append(str(SCRIPT_DIR.parent.parent))
 
 from environment.aws import download_tool
+from environment.aws.common.output import header
 from environment.aws.topology_setup import setup_topology
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
 
@@ -48,6 +52,122 @@ TEST_CONFIG = {
     "rosmar": TOPOLOGY_CONFIG_DIR / "rosmar_config.json",
     "cbs": TOPOLOGY_CONFIG_DIR / "cbs_config.json",
 }
+SYNC_GATEWAY_EXE_NAME = SYNC_GATEWAY_BIN.name
+# Stem shared by every per-instance file, so a whole run's worth can be swept as a set.
+SG_INSTANCE_STEM = "sync_gateway_instance"
+# Matches the per-instance logs of any run, plus the single sync_gateway.log written before instances
+# were numbered -- that name is never written now, so left behind it would only ever mislead.
+SG_LOG_GLOB = "sync_gateway*.log"
+# Sync Gateway's own default ports, which the first instance takes whenever they are free.
+SG_BASE_PUBLIC_PORT = 4984
+SG_BASE_ADMIN_PORT = 4985
+SG_BASE_METRICS_PORT = 4986
+# A port block is the default ports plus block * stride, leaving room between instances.
+SG_PORT_STRIDE = 10
+# How long a terminated Sync Gateway gets to release its ports before it is killed outright.
+SG_STOP_TIMEOUT_SECONDS = 10
+# How many port blocks are scanned for free ones before giving up.
+SG_MAX_PORT_BLOCKS = 20
+# Recovers the instance number from a generated instance config's filename.
+SG_INSTANCE_CONFIG_RE = re.compile(rf"^{SG_INSTANCE_STEM}(\d+)_")
+
+
+class SyncGatewayPorts(NamedTuple):
+    """The three ports a single Sync Gateway instance listens on."""
+
+    public: int
+    admin: int
+    metrics: int
+
+
+def port_block(block: int) -> SyncGatewayPorts:
+    """Return the ports of the given 0-based block: Sync Gateway's defaults plus block * stride."""
+    offset = block * SG_PORT_STRIDE
+    return SyncGatewayPorts(SG_BASE_PUBLIC_PORT + offset, SG_BASE_ADMIN_PORT + offset, SG_BASE_METRICS_PORT + offset)
+
+
+def _port_free(port: int) -> bool:
+    """Whether port can be bound right now. The wildcard address is used so that a listener on any
+    single interface, loopback included, counts as taken."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind(("0.0.0.0", port))
+        except OSError:
+            return False
+    return True
+
+
+def allocate_sync_gateway_ports(count: int) -> list[SyncGatewayPorts]:
+    """
+    Choose a port block per instance, stepping over any block something else already holds.
+
+    The first instance keeps Sync Gateway's default ports whenever they are free, so the ordinary
+    single-instance run still lands where everything expects it. When they are not free -- a Sync
+    Gateway from a second checkout, or anything else on 4984 -- binding them anyway only fails at
+    startup, and it fails inside that instance's log while this script goes on to report success.
+    Moving to the next free block costs nothing instead: every generated config and the topology
+    config handed to pytest carry whatever ports were chosen.
+
+    Blocks are taken whole. Filling in around a partly-used block would split one instance's three
+    ports across two of them, and the numbering that names logs and configs assumes it can talk
+    about a block as one thing.
+
+    Call this only once the instances from a previous run have been stopped, or they will be found
+    holding their own ports and every run will walk further up the range than the last.
+    """
+    allocated: list[SyncGatewayPorts] = []
+    for block in range(SG_MAX_PORT_BLOCKS):
+        if len(allocated) == count:
+            break
+
+        ports = port_block(block)
+        taken = [str(port) for port in ports if not _port_free(port)]
+        if taken:
+            click.secho(
+                f"Skipping ports {ports.public}-{ports.metrics}: {', '.join(taken)} already in use",
+                fg="yellow",
+            )
+            continue
+
+        allocated.append(ports)
+
+    if len(allocated) < count:
+        raise click.ClickException(
+            f"Found only {len(allocated)} free port block(s) for {count} Sync Gateway instance(s) "
+            f"within {SG_MAX_PORT_BLOCKS} blocks of {SG_BASE_PUBLIC_PORT}. Stop whatever is holding "
+            "them and try again."
+        )
+
+    return allocated
+
+
+# Instances are numbered from 1 everywhere -- filenames and console output alike -- so the number
+# printed at startup is the number naming that instance's files. Every name below is derived from
+# sync_gateway_instance_name() rather than spelled out, which is what keeps them in step.
+
+
+def sync_gateway_instance_name(number: int) -> str:
+    """Stem naming every file of the given 1-based instance, e.g. `sync_gateway_instance2`."""
+    return f"{SG_INSTANCE_STEM}{number}"
+
+
+def sync_gateway_config_prefix(number: int) -> str:
+    """Generated-config filename prefix for the given 1-based instance."""
+    return f"{sync_gateway_instance_name(number)}_"
+
+
+def sync_gateway_log_name(number: int) -> str:
+    """Filename the given 1-based instance's console output is captured to."""
+    return f"{sync_gateway_instance_name(number)}.log"
+
+
+def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
+    """The Sync Gateway `api` config block pinning an instance to the given ports."""
+    return {
+        "public_interface": f":{ports.public}",
+        "admin_interface": f"127.0.0.1:{ports.admin}",
+        "metrics_interface": f"127.0.0.1:{ports.metrics}",
+    }
 
 
 @click.command()
@@ -96,6 +216,17 @@ TEST_CONFIG = {
     "which always uses the default Administrator/password.",
 )
 @click.option(
+    "--sync-gateways",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of Sync Gateway instances to start against the same backing store. Instances are "
+    f"numbered from 1; instance N binds to Sync Gateway's default ports shifted by (N-1)*{SG_PORT_STRIDE} "
+    "(so instance 2 uses 4994/4995/4996) and writes sync_gateway_instanceN.log, and the topology "
+    "config lists them all. Values above 1 require --server cbs, since rosmar's in-memory bucket is "
+    "per-process and instances would not share data.",
+)
+@click.option(
     "--skip-testserver",
     is_flag=True,
     help="Skip downloading/building and installing/running the test server.",
@@ -124,21 +255,27 @@ def main(
     git_tag: str | None,
     admin_user: str,
     admin_password: str,
+    sync_gateways: int,
     skip_testserver: bool,
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
     stop_sync_gateway: bool,
 ) -> None:
     if stop_sync_gateway:
-        ExeBridge(
-            exe_path=str(SYNC_GATEWAY_BIN),
-            extra_args=[],
-            log_filename="sync_gateway.log",
-        ).stop("localhost")
+        stop_all_sync_gateways()
         return
 
     if not server:
         raise click.UsageError("--server is required unless --stop-sync-gateway is set.")
+
+    if sync_gateways < 1:
+        raise click.UsageError(f"--sync-gateways must be at least 1; got {sync_gateways}.")
+
+    if sync_gateways > 1 and server != "cbs":
+        raise click.UsageError(
+            "--sync-gateways > 1 requires --server cbs. Each rosmar instance keeps its bucket in its "
+            "own process memory, so the instances would not share any data."
+        )
 
     if connstr and server != "cbs":
         # --connstr defaults from $SG_TEST_COUCHBASE_SERVER_URL, so it may be set in the
@@ -191,9 +328,11 @@ def main(
         connstr = cbs_future.result()
 
     if not skip_sync_gateway_start:
-        start_sync_gateway(server, connstr, admin_user, admin_password)
+        instance_ports = start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
+    else:
+        instance_ports = resolve_skipped_sync_gateway_ports(sync_gateways)
 
-    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password)
+    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password, instance_ports)
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
 
@@ -345,17 +484,32 @@ def get_cbs_version(hostname: str, admin_user: str, admin_password: str) -> str:
     return r.json()["implementationVersion"].split("-")[0]
 
 
+def _remove_generated(dir: pathlib.Path, pattern: str) -> None:
+    """Delete previously generated files in dir matching pattern, ignoring any that are already gone."""
+    for stale in dir.glob(pattern):
+        stale.unlink(missing_ok=True)
+
+
 def _write_patched_json(
     template_path: pathlib.Path,
     dir: pathlib.Path,
     prefix: str,
     patch_fn: Callable[[dict[str, Any]], None],
+    *,
+    clean_stale: bool = True,
 ) -> str:
-    """Read a JSON template, apply patch_fn(config) in place, and write the result to a new temp file in dir."""
+    """
+    Read a JSON template, apply patch_fn(config) in place, and write the result to a new temp file in dir.
+
+    Earlier files under the same prefix are removed first so the random temp names cannot pile up
+    across runs. A caller writing a *set* of files whose prefixes differ per member passes
+    clean_stale=False and sweeps the whole set itself -- a per-write sweep only ever matches that
+    member's own prefix, which would leave the surplus members of a larger previous run behind.
+    """
     config = json.loads(template_path.read_text())
     patch_fn(config)
-    for stale in dir.glob(f"{prefix}*.json"):
-        stale.unlink()
+    if clean_stale:
+        _remove_generated(dir, f"{prefix}*.json")
     with tempfile.NamedTemporaryFile(mode="w", dir=dir, suffix=".json", delete=False, prefix=prefix) as f:
         json.dump(config, f)
         return f.name
@@ -394,31 +548,275 @@ def resolve_sync_gateway_config(server: str, connstr: str | None, admin_user: st
     return config_path
 
 
-def start_sync_gateway(server: str, connstr: str | None, admin_user: str, admin_password: str) -> None:
-    """Stop any running sync_gateway process and start a new one for the given server type."""
-    config_path = resolve_sync_gateway_config(server, connstr, admin_user, admin_password)
-    bridge = ExeBridge(
-        exe_path=str(SYNC_GATEWAY_BIN),
-        extra_args=[config_path],
-        log_filename="sync_gateway.log",
-    )
-    bridge.stop("localhost")
-    bridge.run("localhost")
+def _is_our_sync_gateway(proc: psutil.Process) -> bool:
+    """
+    Whether proc is the sync_gateway binary this script builds, rather than some other copy of it.
+
+    A process whose executable cannot be read is treated as ours: it is more likely an instance
+    running under another user than an unrelated Sync Gateway, and terminating it will fail loudly
+    below rather than silently, which is the better outcome when it is holding our ports.
+    """
+    try:
+        return pathlib.Path(proc.exe()) == SYNC_GATEWAY_BIN
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return True
 
 
-def resolve_topology_config(server: str, connstr: str | None, admin_user: str, admin_password: str) -> pathlib.Path:
-    """Resolve the cbltest topology config to use, patching in a CBS connstr override if given."""
+def _wait_for_exit(procs: list[psutil.Process]) -> None:
+    """
+    Wait for terminated processes to actually exit, killing any that overstay.
+
+    Sync Gateway holds its listening ports until it has finished shutting down, and the next instance
+    binds those same ports within milliseconds -- without this wait it loses the race and dies with
+    "address already in use", while the script reports a successful start.
+    """
+    if not procs:
+        return
+
+    _, alive = psutil.wait_procs(procs, timeout=SG_STOP_TIMEOUT_SECONDS)
+    for proc in alive:
+        click.secho(f"PID {proc.pid} did not exit within {SG_STOP_TIMEOUT_SECONDS}s; killing it", fg="yellow")
+        try:
+            proc.kill()
+        except psutil.NoSuchProcess:
+            continue
+
+    if alive:
+        psutil.wait_procs(alive, timeout=SG_STOP_TIMEOUT_SECONDS)
+
+
+def stop_all_sync_gateways() -> None:
+    """
+    Terminate every sync_gateway process started from this checkout, and wait for its ports to free.
+
+    ExeBridge.stop() stops only the first process matching the executable name, which is not enough
+    once more than one instance is running. Processes are matched on their executable path rather
+    than that name alone: a name match would also kill a system-installed Sync Gateway, or one run
+    from a second checkout of this repo, neither of which is ours to stop.
+    """
+    header(f"Stopping all '{SYNC_GATEWAY_EXE_NAME}' processes from {SYNC_GATEWAY_BIN}")
+    terminated: list[psutil.Process] = []
+    refused: list[psutil.Process] = []
+    for proc in psutil.process_iter():
+        try:
+            if proc.name() != SYNC_GATEWAY_EXE_NAME:
+                continue
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            # The process list is a snapshot; anything that exits from under us is not our concern.
+            continue
+
+        if not _is_our_sync_gateway(proc):
+            continue
+
+        try:
+            proc.terminate()
+        except psutil.NoSuchProcess:
+            continue
+        except psutil.AccessDenied:
+            refused.append(proc)
+            continue
+
+        click.secho(f"Stopped PID {proc.pid}", fg="green")
+        terminated.append(proc)
+
+    for proc in refused:
+        click.secho(
+            f"Not allowed to stop PID {proc.pid} -- it may still be holding Sync Gateway's ports",
+            fg="red",
+        )
+
+    if not terminated and not refused:
+        click.secho(f"Unable to find process to stop ({SYNC_GATEWAY_EXE_NAME})", fg="yellow")
+
+    _wait_for_exit(terminated)
+
+
+def _generated_instance_configs() -> list[tuple[int, pathlib.Path]]:
+    """The generated instance configs on disk, each paired with its instance number, in that order."""
+    numbered = []
+    for path in SYNC_GATEWAY_CONFIG_DIR.glob(f"{SG_INSTANCE_STEM}*.json"):
+        match = SG_INSTANCE_CONFIG_RE.match(path.name)
+        if match:
+            numbered.append((int(match.group(1)), path))
+
+    return sorted(numbered)
+
+
+def _ports_from_instance_config(config_path: pathlib.Path) -> SyncGatewayPorts | None:
+    """Read back the ports pinned in a generated instance config, or None if it cannot be read."""
+    keys = ("public_interface", "admin_interface", "metrics_interface")
+    try:
+        api = json.loads(config_path.read_text())["api"]
+        return SyncGatewayPorts(*(int(str(api[key]).rsplit(":", 1)[-1]) for key in keys))
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def discover_running_sync_gateways() -> list[SyncGatewayPorts]:
+    """
+    Find the Sync Gateway instances an earlier run left running, and the ports they are on.
+
+    The ports are read back from that run's own generated configs rather than recomputed from the
+    block arithmetic: a run that stepped over a busy block did not put its instances where
+    recomputing would go looking. An instance whose admin port answers nothing is dropped -- it has
+    exited, or never started -- and any response at all counts as an answer.
+    """
+    running: list[SyncGatewayPorts] = []
+    for _, config_path in _generated_instance_configs():
+        ports = _ports_from_instance_config(config_path)
+        if ports is None:
+            continue
+
+        try:
+            requests.get(f"http://localhost:{ports.admin}/", timeout=2)
+        except requests.RequestException:
+            continue
+
+        running.append(ports)
+
+    return running
+
+
+def resolve_skipped_sync_gateway_ports(requested: int) -> list[SyncGatewayPorts]:
+    """
+    Decide which instances to describe when --skip-sync-gateway-start started none of them.
+
+    These drive the topology, so taking --sync-gateways at face value here would advertise nodes
+    that may not exist -- or, at its default of 1, quietly drop the extra nodes an earlier run left
+    running. Probe for the truth instead, and only accept an explicit --sync-gateways that agrees.
+    """
+    instance_ports = discover_running_sync_gateways()
+    running = len(instance_ports)
+    explicit = click.get_current_context().get_parameter_source("sync_gateways") == ParameterSource.COMMANDLINE
+    if explicit and running != requested:
+        raise click.UsageError(
+            f"--sync-gateways {requested} does not match the {running} Sync Gateway instance(s) currently "
+            "listening, and --skip-sync-gateway-start means this run will not change that. Drop "
+            f"--sync-gateways to describe what is running, or drop --skip-sync-gateway-start to start {requested}."
+        )
+
+    if running == 0:
+        click.secho(
+            "No Sync Gateway instances are listening, so the topology config will describe none. "
+            "Drop --skip-sync-gateway-start to start some.",
+            fg="yellow",
+        )
+    else:
+        click.echo(f"Describing the {running} already-running Sync Gateway instance(s) in the topology config")
+
+    return instance_ports
+
+
+def _pin_api_ports(ports: SyncGatewayPorts) -> Callable[[dict[str, Any]], None]:
+    """Return a patch pinning a config's `api` block to the given ports, keeping any other api keys."""
+
+    def patch(config: dict[str, Any]) -> None:
+        config["api"] = {**config.get("api", {}), **sync_gateway_api_config(ports)}
+
+    return patch
+
+
+def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[SyncGatewayPorts]) -> list[str]:
+    """
+    Write one copy of base_config_path per instance, each pinned to that instance's ports.
+
+    Every previously generated instance config is swept first: the filenames carry the instance
+    number, so a run asking for fewer instances than the last would otherwise leave the surplus
+    ones on disk. The ones written here are also what a later --skip-sync-gateway-start run reads
+    the running instances' ports back out of, so they must describe this run and only this run.
+    """
+    _remove_generated(SYNC_GATEWAY_CONFIG_DIR, f"{SG_INSTANCE_STEM}*.json")
+
+    return [
+        _write_patched_json(
+            pathlib.Path(base_config_path),
+            SYNC_GATEWAY_CONFIG_DIR,
+            sync_gateway_config_prefix(number),
+            _pin_api_ports(ports),
+            clean_stale=False,
+        )
+        for number, ports in enumerate(instance_ports, start=1)
+    ]
+
+
+def start_sync_gateways(
+    server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1
+) -> list[SyncGatewayPorts]:
+    """
+    Stop any running sync_gateway processes, start `count` new ones for the given server type, and
+    return the ports each was given.
+
+    Ports are allocated after the stop, not before: the instances being replaced hold the ports this
+    run wants back, and allocating first would see them taken and walk up the range every time.
+    """
+    base_config_path = resolve_sync_gateway_config(server, connstr, admin_user, admin_password)
+
+    stop_all_sync_gateways()
+
+    instance_ports = allocate_sync_gateway_ports(count)
+    config_paths = sync_gateway_instance_configs(base_config_path, instance_ports)
+
+    # Wipe every Sync Gateway log before launching. ExeBridge truncates the log of each instance it
+    # starts anyway, so this only really matters for the logs this run has no instance for -- left
+    # alone, they sit there looking current and send you reading a stale instance.
+    header("Removing previous Sync Gateway logs")
+    _remove_generated(SCRIPT_DIR, SG_LOG_GLOB)
+
+    for number, (config_path, ports) in enumerate(zip(config_paths, instance_ports, strict=True), start=1):
+        click.echo(
+            f"Sync Gateway instance {number}/{count}: public {ports.public}, admin {ports.admin}, "
+            f"log {sync_gateway_log_name(number)}"
+        )
+        ExeBridge(
+            exe_path=str(SYNC_GATEWAY_BIN),
+            extra_args=[config_path],
+            log_filename=sync_gateway_log_name(number),
+        ).run("localhost")
+
+    return instance_ports
+
+
+def resolve_topology_config(
+    server: str,
+    connstr: str | None,
+    admin_user: str,
+    admin_password: str,
+    instance_ports: list[SyncGatewayPorts],
+) -> pathlib.Path:
+    """
+    Resolve the cbltest topology config to use.
+
+    Patches in a CBS connstr override if given, and expands `sync-gateways` to one entry per running
+    instance so tests marked `min_sync_gateways(N)` can see them all.
+
+    Any topology config generated by an earlier run is swept first, for every server rather than just
+    this one: the filename carries the server name, so switching servers -- or dropping back to the
+    unpatched checked-in template below -- would otherwise leave the previous run's config sitting in
+    the directory looking current.
+    """
+    for name in TEST_CONFIG:
+        _remove_generated(TOPOLOGY_CONFIG_DIR, f"{name}_config_*.json")
+
     config_path = TEST_CONFIG[server]
-    if server != "cbs" or not connstr:
+    override_cbs = server == "cbs" and bool(connstr)
+    # The checked-in template already describes a single instance on the default ports, so it only
+    # stands in for one that actually landed there.
+    if not override_cbs and instance_ports == [port_block(0)]:
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
-        cbs = c["couchbase-servers"][0]
-        cbs["hostname"] = connstr
-        cbs["admin_user"] = admin_user
-        cbs["admin_password"] = admin_password
+        if override_cbs:
+            cbs = c["couchbase-servers"][0]
+            cbs["hostname"] = connstr
+            cbs["admin_user"] = admin_user
+            cbs["admin_password"] = admin_password
 
-    return pathlib.Path(_write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, "cbs_config_", patch))
+        template = c["sync-gateways"][0]
+        c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]
+
+    return pathlib.Path(
+        _write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, f"{server}_config_", patch, clean_stale=False)
+    )
 
 
 def get_cbl_platform() -> str:

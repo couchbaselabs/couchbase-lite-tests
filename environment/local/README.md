@@ -67,6 +67,59 @@ manage it directly, use `cbdinocluster`
 (`go run github.com/couchbaselabs/cbdinocluster@latest rm <cluster-id>`) — `start_local.py` has
 no `--stop-cbs` equivalent to `--stop-sync-gateway`.
 
+## Multiple Sync Gateway instances
+
+`--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests
+marked `min_sync_gateways(N)`:
+
+```bash
+uv run environment/local/start_local.py --server cbs --connstr couchbase://127.0.0.1 --sync-gateways 2
+```
+
+Instances are numbered from 1 and take a *port block* each — Sync Gateway's default ports shifted
+by a multiple of 10 — so the usual run puts instance 1 on 4984/4985/4986, instance 2 on
+4994/4995/4996 and instance 3 on 5004/5005/5006. Every file belonging to an instance is named
+`sync_gateway_instanceN` — its generated config (gitignored) and its log:
+
+| Instance | Public / admin / metrics | Config | Log |
+|----------|--------------------------|--------|-----|
+| 1 | 4984 / 4985 / 4986 | `sync_gateway_config/sync_gateway_instance1_*.json` | `sync_gateway_instance1.log` |
+| 2 | 4994 / 4995 / 4996 | `sync_gateway_config/sync_gateway_instance2_*.json` | `sync_gateway_instance2.log` |
+| 3 | 5004 / 5005 / 5006 | `sync_gateway_config/sync_gateway_instance3_*.json` | `sync_gateway_instance3.log` |
+
+A block already in use is skipped and the instance takes the next free one, which it reports as it
+starts:
+
+```
+Skipping ports 4984-4986: 4984, 4985 already in use
+Sync Gateway instance 1/3: public 4994, admin 4995, log sync_gateway_instance1.log
+```
+
+Something else on 4984 is usually a Sync Gateway from a second checkout of this repo, which
+`--stop-sync-gateway` deliberately leaves alone. Binding the port regardless would fail inside that
+instance's log while the script reported success, so it steps aside instead. The instances started
+by the *previous* run of this script are stopped before ports are picked, so a plain re-run
+reclaims the same ports rather than climbing the range.
+
+The generated topology config lists every instance with the ports it actually got, so the test
+framework follows the instances wherever they landed.
+
+Starting Sync Gateway wipes the previous run's logs and generated configs first, so nothing is
+left over from a run that used more instances than the current one — a stale
+`sync_gateway_instance3.log` next to a two-instance run would just be something to misread.
+
+`N > 1` requires `--server cbs`: rosmar keeps its bucket in the process's own memory, so
+separate instances would share no data.
+
+`--stop-sync-gateway` stops every instance started from this checkout — matched on the executable
+path, so a system-installed Sync Gateway or one run from another checkout is left alone — and waits
+for each to release its ports before returning.
+
+`--skip-sync-gateway-start` describes whatever is already listening rather than whatever
+`--sync-gateways` says, since a run that starts nothing cannot know how many are up. It reads the
+ports back out of the previous run's generated instance configs and keeps the instances whose admin
+port answers. Passing `--sync-gateways` alongside it is an error unless the two agree.
+
 ## Running the individual steps
 
 `build_sync_gateway.py` and `run_sync_gateway.py` have been folded into `start_local.py`.
@@ -83,7 +136,8 @@ To stop the background Sync Gateway process independently:
 uv run environment/local/start_local.py --stop-sync-gateway
 ```
 
-- **Logs:** Written to `environment/local/sync_gateway.log`.
+- **Logs:** Written to `environment/local/sync_gateway_instanceN.log`, one per instance
+  (`sync_gateway_instance1.log` for a single-instance run). Wiped at the start of each run.
 - **Configuration:**
   - `--server rosmar`: uses `environment/local/sync_gateway_config/basic_sync_gateway_rosmar.json`
   - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json` (with `bootstrap.server` overridden by `--connstr`/`--start-cbs`, if given)
