@@ -3,7 +3,7 @@ import re
 import ssl
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Collection, Mapping
+from collections.abc import AsyncIterator, Collection
 from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
@@ -678,18 +678,6 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
-def _config_version(headers: Mapping[str, str]) -> str | None:
-    """
-    Read a database config version out of a response's ``Etag`` header.
-
-    Sync Gateway quotes the value per RFC 7232, so the quotes are stripped to give the
-    bare version.  Returns None when the header is absent (older Sync Gateway builds do
-    not set it on every config endpoint).
-    """
-    etag = headers.get("Etag")
-    return etag.strip('"') if etag is not None else None
-
-
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -790,20 +778,6 @@ class _SyncGatewayBase:
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
     ) -> Any:
-        body, _ = await self._send_request_with_headers(method, path, payload, params)
-        return body
-
-    async def _send_request_with_headers(
-        self,
-        method: str,
-        path: str,
-        payload: JSONSerializable | DatabaseConfig | None = None,
-        params: dict[str, str] | None = None,
-    ) -> tuple[Any, Mapping[str, str]]:
-        """
-        As :func:`_send_request`, but also returns the response headers for the callers
-        that need them (e.g. to read the ``Etag`` of a database config).
-        """
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
@@ -830,7 +804,7 @@ class _SyncGatewayBase:
                     body=data,
                 )
 
-            return ret_val, resp.headers
+            return ret_val
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -925,7 +899,7 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str | None:
+    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> None:
         """
         Upsert a database configuration on the Sync Gateway instance
 
@@ -935,14 +909,11 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
-        :return: The version of the resulting config, or None if this Sync Gateway
-                 does not report one
         """
         with self._tracer.start_as_current_span("update_database_config", attributes={"sg.database.name": db_name}):
-            _, headers = await self._send_request_with_headers("post", f"/{db_name}/_config", payload)
-            return _config_version(headers)
+            await self._send_request("post", f"/{db_name}/_config", payload)
 
-    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> str | None:
+    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> None:
         """
         Attempts to create a database on the Sync Gateway instance
 
@@ -951,12 +922,9 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
-        :return: The version of the resulting config, or None if this Sync Gateway
-                 does not report one
         """
         with self._tracer.start_as_current_span("put_database", attributes={"sg.database.name": db_name}):
-            _, headers = await self._send_request_with_headers("put", f"/{db_name}/", payload)
-            return _config_version(headers)
+            await self._send_request("put", f"/{db_name}/", payload)
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -1658,31 +1626,28 @@ class _SyncGatewayBase:
         """
         Gets the configuration for a specific database from the admin API.
 
-        Args:
-            db_name: The name of the database to get configuration for
-
-        Returns:
-            DatabaseConfig containing the database configuration
+        :param db_name: The name of the database to get configuration for
+        :return: The configuration this node is serving for the database
         """
         _assert_not_null(db_name, "db_name")
         with self._tracer.start_as_current_span("get_database_config", attributes={"cbl.database.name": db_name}):
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
 
-    async def get_database_config_version(self, db_name: str) -> str | None:
+    async def _refresh_database_config(self, db_name: str) -> None:
         """
-        Gets the version of the config that this node is currently serving for a
-        database, from the ``Etag`` of ``GET /{db}/_config``.
+        Make this node apply the database config from the bucket now, rather than at its
+        next config poll, so that a config written on another node takes effect here
+        straight away.  A node that has not loaded the database at all loads it here.
 
-        :param db_name: The name of the database to get the config version for
-        :return: The config version, or None if this Sync Gateway does not report one
+        :param db_name: The name of the database to reload the config for
+        :raises CblSyncGatewayBadResponseError: if the node cannot re-read the config: 404
+            when it serves the database but the config is gone from the bucket, 403 when it
+            does not serve the database at all
         """
         _assert_not_null(db_name, "db_name")
-        with self._tracer.start_as_current_span(
-            "get_database_config_version", attributes={"cbl.database.name": db_name}
-        ):
-            _, headers = await self._send_request_with_headers("GET", f"/{db_name}/_config")
-            return _config_version(headers)
+        with self._tracer.start_as_current_span("refresh_database_config", attributes={"cbl.database.name": db_name}):
+            await self._send_request("GET", f"/{db_name}/_config", params={"refresh_config": "true"})
 
     @property
     def caddy(self) -> caddy.Caddy:
@@ -2077,37 +2042,40 @@ class SyncGateway(_SyncGatewayBase):
         self,
         db_name: str,
         *,
-        version: str | None = None,
         max_retries: int = 70,
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until the SGW node reports the database as Online.
+        Wait until the SGW node serves the database, force one config re-read so that
+        the caller does not go on to use a config version the node cached earlier, then
+        wait until the node reports the database as Online again, because the re-read
+        re-opens the database on the node.
 
         :param db_name: Database name to poll.
-        :param version: If given, also wait until the node serves this config version,
-                        since writing a config brings the database online asynchronously
-                        and the node may still be serving the previous one.
-        :param max_retries: Number of polls before timing out.
+        :param max_retries: Number of polls before timing out, for each of the two waits.
         :param retry_delay: Seconds between polls.
+        :raises CblSyncGatewayBadResponseError: if the config is gone by the time the node
+            is asked to re-read it.  A database it still serves re-reads in any state,
+            Offline and Resyncing included, so there is no transient failure to retry.
         """
+
+        wait = tenacity.wait_fixed(retry_delay)
+        stop = tenacity.stop_after_attempt(max_retries)
+
+        async def _wait_for_db_present_poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            assert db_name in dbs, f"{self} does not serve database {db_name} (not present in /_all_dbs?verbose=true)"
+
+        await async_retry_assert(_wait_for_db_present_poll, wait, stop)
+        await self._refresh_database_config(db_name)
 
         async def _wait_for_db_online_poll() -> None:
             dbs = await self.get_all_databases_verbose()
-            assert db_name in dbs, f"Database {db_name} is not online (database not present in /_all_dbs?verbose=true)"
-            entry = dbs[db_name]
+            entry = dbs.get(db_name)
+            assert entry is not None, f"{self} stopped serving database {db_name} while it was coming online"
             assert entry.state == DatabaseState.ONLINE, f"Database {db_name} is not online: {entry}"
-            if version is not None:
-                current = await self.get_database_config_version(db_name)
-                assert current == version, (
-                    f"Database {db_name} is serving config version {current}, waiting for {version}"
-                )
 
-        await async_retry_assert(
-            _wait_for_db_online_poll,
-            tenacity.wait_fixed(retry_delay),
-            tenacity.stop_after_attempt(max_retries),
-        )
+        await async_retry_assert(_wait_for_db_online_poll, wait, stop)
 
     async def get_import_count(self, db_name: str) -> int:
         """

@@ -62,25 +62,24 @@ and cluster cleanup is skipped so that documents from earlier phases survive.
 
 **Steps**:
 
-1. **Wait for the database online on the cluster**: Call `wait_for_db_online(sg_db)`
-2. **Cross-version read verification**:
+1. **Cross-version read verification**:
    - Get all documents from upgraded node N (new version) → verify count > 0
    - Get all documents from each old-version node → verify same count
    - Assert: doc counts match across all nodes
-3. **Cross-version write verification**:
+2. **Cross-version write verification**:
    - Write 5 new documents via upgraded node N
    - Verify all 5 are readable from old-version nodes (after ~1 sec sync)
    - Write 5 new documents via an old-version node
    - Verify all 5 are readable from upgraded node N (after ~1 sec sync)
-4. **Replicator connectivity**:
+3. **Replicator connectivity**:
    - Start individual continuous push-pull replicators from CBL to **each** node
    - All replicators must reach IDLE with no errors
    - **If load balancer in topology**: Start additional replicator through LB, verify IDLE with no errors
-5. **Revision consistency in mixed-version**: 
+4. **Revision consistency in mixed-version**:
    - Get all documents from all 3 nodes
    - For each document, assert revision ID is identical across all nodes
    - Mixed-version cluster must maintain revision synchronization
-6. **CBS spot-check**:
+5. **CBS spot-check**:
    - Pick first 5 documents from any node
    - For each, verify it exists on CBS
    - Verify `type`, `version`, and `content` fields are present and correct
