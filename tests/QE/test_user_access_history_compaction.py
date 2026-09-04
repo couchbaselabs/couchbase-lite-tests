@@ -3,7 +3,6 @@ import asyncio
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.database import Database
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.jsonserializable import JSONDictionary
@@ -23,7 +22,6 @@ from cbltest.api.syncgateway import (
     SyncGateway,
     SyncGatewayUserClient,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 PUBLIC_PORT = 4984
 
@@ -53,41 +51,15 @@ async def _one_shot_pull(
     return replicator
 
 
-async def _setup_db(
-    sg: SyncGateway,
-    sg_cluster: SyncGatewayCluster,
-    cbs: CouchbaseServer,
-    db_name: str,
-    bucket_name: str,
-    extra_collections: list[str] | None = None,
-) -> None:
-    """
-    Creates a bucket and configures an SGW database on it, optionally with extra named
-    collections alongside _default._default.
+_BUCKET = "data-bucket"
+_CHANNEL_SYNC_FUNCTION = "function(doc){channel(doc.channels);}"
 
-    Confirmed live: Sync Gateway allows only one scope per database ("only one named
-    scope is supported" 400) -- mixing `_default` with a separately-named scope in one
-    database config is not possible. Any extra collections therefore have to live in
-    the `_default` scope too, which is all this helper supports.
-    """
-    cbs.create_bucket(bucket_name)
-    default_collections: dict[str, dict] = {"_default": {}}
-    if extra_collections:
-        cbs.create_collections(bucket_name, "_default", extra_collections)
-        for c in extra_collections:
-            default_collections[c] = {}
-
-    db_payload = DatabaseConfig(
-        bucket=bucket_name,
-        index=IndexConfig(num_replicas=0),
-        scopes={
-            "_default": ScopeConfig(
-                collections={name: {"sync": "function(doc){channel(doc.channels);}"} for name in default_collections}
-            )
-        },
-    )
-    await sg_cluster.create_database(db_name, db_payload)
-    await SyncGatewayCluster([sg]).wait_for_db_online(db_name)
+# A database with only the _default._default collection.
+_ACCESS_TRACKING_CONFIG = DatabaseConfig(
+    bucket=_BUCKET,
+    index=IndexConfig(num_replicas=0),
+    scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
+)
 
 
 def _user_client(sg: SyncGateway, username: str, password: str) -> SyncGatewayUserClient:
@@ -113,11 +85,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_new_user_access_history_is_empty(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'newuser' with access to channel 'A' (never changed since)")
         await sg.add_user(
@@ -133,11 +104,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_history_for_nonexistent_user_returns_404(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Get the access history for a user that was never created")
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
@@ -149,11 +119,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_grant_then_revoke_channel_appears_in_history(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'alice' with access to channel 'A'")
         await sg.add_user(
@@ -174,11 +143,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_removes_channel_entry_without_touching_live_access(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'bob' with access to channels 'A' and 'B'")
         password = "pass"
@@ -224,11 +192,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_channel_not_in_history_is_idempotent_noop(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'carol' with no channel access")
         await sg.add_user(
@@ -250,15 +217,26 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_multiple_collections_independently(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step(
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(
-            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        await cblpytest.clusters[0].create_database(
+            db_name,
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={
+                    "_default": ScopeConfig(
+                        collections={
+                            "_default": {"sync": _CHANNEL_SYNC_FUNCTION},
+                            "other": {"sync": _CHANNEL_SYNC_FUNCTION},
+                        }
+                    )
+                },
+            ),
         )
 
         self.mark_test_step(
@@ -299,15 +277,26 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_default_and_named_collection_history_roundtrip(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step(
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(
-            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        await cblpytest.clusters[0].create_database(
+            db_name,
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={
+                    "_default": ScopeConfig(
+                        collections={
+                            "_default": {"sync": _CHANNEL_SYNC_FUNCTION},
+                            "other": {"sync": _CHANNEL_SYNC_FUNCTION},
+                        }
+                    )
+                },
+            ),
         )
 
         self.mark_test_step(
@@ -353,11 +342,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_role_inherited_channel_not_reachable_via_user_compact_endpoint(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create role 'myrole' with access to channel 'ROLE_CHAN'")
         await sg.add_role(db_name, "myrole", {"_default": {"_default": {"admin_channels": ["ROLE_CHAN"]}}})
@@ -403,15 +391,26 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_same_channel_name_two_collections_isolated(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step(
             "Create a bucket and configure a Sync Gateway database with an extra named collection "
             "(_default.other) in addition to _default._default"
         )
-        await _setup_db(
-            sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket", extra_collections=["other"]
+        await cblpytest.clusters[0].create_database(
+            db_name,
+            DatabaseConfig(
+                bucket=_BUCKET,
+                index=IndexConfig(num_replicas=0),
+                scopes={
+                    "_default": ScopeConfig(
+                        collections={
+                            "_default": {"sync": _CHANNEL_SYNC_FUNCTION},
+                            "other": {"sync": _CHANNEL_SYNC_FUNCTION},
+                        }
+                    )
+                },
+            ),
         )
 
         self.mark_test_step(
@@ -448,11 +447,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_concurrent_double_compact_clean_conflict(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'henry' with access to channel 'A'")
         await sg.add_user(
@@ -492,11 +490,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_during_live_replication_no_disconnect_no_recompute(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step(
             "Create user 'iris' with access to channel 'B', and revoke channel 'A' to give her some access history"
@@ -569,11 +566,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_partial_multi_channel_compact_only_found_removed(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'jack' with access to channel 'A'")
         await sg.add_user(
@@ -604,11 +600,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         self, cblpytest: CBLPyTest
     ) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step(
             "Create users 'mona' and 'nora', each with access to channels 'ch1' and 'ch2', then revoke both for each"
@@ -651,11 +646,14 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_same_username_different_databases_isolated(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
 
         self.mark_test_step("Create two buckets and configure two separate Sync Gateway databases, one on each")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, "db1", "data-bucket-1")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, "db2", "data-bucket-2")
+        await cblpytest.clusters[0].create_database(
+            "db1", _ACCESS_TRACKING_CONFIG.model_copy(update={"bucket": "data-bucket-1"})
+        )
+        await cblpytest.clusters[0].create_database(
+            "db2", _ACCESS_TRACKING_CONFIG.model_copy(update={"bucket": "data-bucket-2"})
+        )
 
         self.mark_test_step("Create a user with the same name on both databases, each with access to channel 'A'")
         access = {"_default": {"_default": {"admin_channels": ["A"]}}}
@@ -689,14 +687,13 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_while_client_offline_leaves_stale_access_undetected(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         db_name = "db"
         doc_id = "doc_a"
         username = "leo"
         password = "pass"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
-        await _setup_db(sg, cblpytest.clusters[0].sync_gateway_cluster, cbs, db_name, "data-bucket")
+        await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
 
         self.mark_test_step("Create user 'leo' with access to channel 'A'")
         await sg.reset_user(db_name, username, password, ["A"])
