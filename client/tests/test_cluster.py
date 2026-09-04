@@ -17,6 +17,16 @@ def fake_sync_gateway() -> Iterator[SyncGateway]:
         yield gateways[0]
 
 
+@contextmanager
+def fake_couchbase_server_deps() -> Iterator[None]:
+    """Keep a CouchbaseServer off the network, and off the event loop it has no need of here."""
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.shell2http.ClientSession", autospec=True),
+    ):
+        yield
+
+
 def test_cluster_without_couchbase_server() -> None:
     with fake_sync_gateway() as sync_gateway:
         sync_gateway.using_rosmar = False
@@ -33,7 +43,7 @@ def test_cluster_without_couchbase_server() -> None:
 
 
 def test_cluster_with_couchbase_server() -> None:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with fake_couchbase_server_deps():
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
             username="user",
@@ -45,7 +55,7 @@ def test_cluster_with_couchbase_server() -> None:
 
 
 def test_cluster_with_multiple_sync_gateways() -> None:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with fake_couchbase_server_deps():
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
             username="user",

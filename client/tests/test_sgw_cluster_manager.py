@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 from cbltest.api.error import CblTestError
+from cbltest.api.shell2http import Shell2Http
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.plugins.sgw_cluster_manager import (
@@ -53,6 +54,11 @@ async def _manager_for(sync_gateways: list[SyncGateway]) -> AsyncIterator[SyncGa
         await _close_fixture(generator)
 
 
+def _sidecar_of(node: SyncGatewayManager) -> Shell2Http:
+    """The sidecar a node manager holds, which is private because only it may call it."""
+    return node._SyncGatewayManager__shell2http  # ty: ignore[unresolved-attribute]
+
+
 def _stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: SyncGatewayClusterManager) -> list[SidecarCall]:
     """
     Record what each node manager sends to its sidecar, and treat the node's REST API as
@@ -62,12 +68,13 @@ def _stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: SyncGatewayClusterMa
 
     for index, node in enumerate(manager.nodes):
 
-        async def _call_sidecar(
-            method: str, path: str, data: str | None = None, timeout: int = 120, index: int = index
-        ) -> None:
+        async def _send_request(
+            method: str, path: str, data: str | None = None, timeout: float | None = None, index: int = index
+        ) -> str:
             calls.append((f"{index}:{method}", path, data))
+            return ""
 
-        monkeypatch.setattr(node, "_call_sidecar", _call_sidecar)
+        monkeypatch.setattr(_sidecar_of(node), "_send_request", _send_request)
 
     return calls
 
@@ -284,11 +291,11 @@ async def test_sessions_are_closed_even_if_the_restore_fails(monkeypatch: pytest
         generator, manager = await _open_fixture(_FakeCBLPyTest(SyncGatewayCluster(sync_gateways)))
         nodes = list(manager.nodes)
 
-        async def _call_sidecar(*args: Any, **kwargs: Any) -> None:
+        async def _send_request(*args: Any, **kwargs: Any) -> str:
             raise CblTestError("sidecar is gone")
 
         for node in manager.nodes:
-            monkeypatch.setattr(node, "_call_sidecar", _call_sidecar)
+            monkeypatch.setattr(_sidecar_of(node), "_send_request", _send_request)
 
         with pytest.raises(ExceptionGroup):
             await anext(generator)

@@ -7,14 +7,10 @@ import zipfile
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import TypeVar, cast
-
-import aiohttp
-
-T = TypeVar("T")
-import json
+from typing import cast
 from urllib.parse import quote_plus, urlparse
 
+import aiohttp
 import requests
 import tenacity
 from couchbase.auth import PasswordAuthenticator
@@ -36,6 +32,8 @@ from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
+from cbltest.api.jsonserializable import JSONDictionary
+from cbltest.api.shell2http import Shell2Http
 from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
@@ -130,6 +128,13 @@ class CouchbaseServer:
             # Create a reusable HTTP session for REST API calls
             self.__http_session = requests.Session()
             self.__http_session.auth = (username, password)
+            self.__shell2http = Shell2Http(self.__hostname)
+
+    async def close(self) -> None:
+        """Closes the sidecar session, the REST connection pool and the SDK cluster."""
+        await self.__shell2http.close()
+        self.__http_session.close()
+        self.__cluster.close()
 
     def _parse_connection_url(self, url: str) -> None:
         """
@@ -1006,7 +1011,7 @@ class CouchbaseServer:
             # Wait for rebalance to complete
             self._wait_for_rebalance_completion()
 
-    def _retry(
+    def _retry[T](
         self,
         func: Callable[[], T],
         max_attempts: int = 3,
@@ -1194,13 +1199,7 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        async with (
-            aiohttp.ClientSession() as session,
-            session.get(f"http://{self.hostname}:20001/stop-cbs") as resp,
-        ):
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+        await self.__shell2http.get("/stop-cbs")
 
     async def start_server(self, port: int = 8091) -> None:
         """
@@ -1208,17 +1207,7 @@ class CouchbaseServer:
 
         :param port: REST API port to wait for readiness (default 8091)
         """
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                f"http://{self.hostname}:20001/start-cbs",
-                data=json.dumps({"port": port}),
-                headers={"Content-Type": "application/json"},
-            ) as resp,
-        ):
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+        await self.__shell2http.post("/start-cbs", JSONDictionary({"port": port}))
 
     async def get_root_ca_certificate(self) -> bytes:
         """
