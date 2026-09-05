@@ -152,13 +152,13 @@ class ConfigDefaults:
             if self.CouchbaseServer.version.is_set:
                 raise Exception("Both main and included file are setting default CBS version")
 
-            self.CouchbaseServer.version.set_value(other.CouchbaseServer.version.value)
+            self.CouchbaseServer.version.set_value(cast(str, other.CouchbaseServer.version.value))
 
         if other.SyncGateway.version.is_set:
             if self.SyncGateway.version.is_set:
                 raise Exception("Both main and included file are setting default SGW version")
 
-            self.SyncGateway.version.set_value(other.SyncGateway.version.value)
+            self.SyncGateway.version.set_value(cast(str, other.SyncGateway.version.value))
 
         if other.EdgeServer.version.is_set and self.EdgeServer.version.is_set:
             raise Exception("Both main and included file are setting default ES version")
