@@ -30,6 +30,7 @@ from paramiko import Ed25519Key
 from environment.aws.common.io import get_ec2_hostname
 from environment.aws.common.output import header
 from environment.aws.common.terraform import get_terraform_json
+from environment.aws.common.versions import resolve_latest_version
 from environment.aws.topology_setup.test_server import TestServer
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -41,14 +42,14 @@ class DefaultProperty:
     """
 
     @property
-    def value(self) -> str:
+    def value(self) -> str | None:
         return self.__value if self.__value is not None else self.__default_value
 
     @property
     def is_set(self) -> bool:
         return self.__value is not None
 
-    def __init__(self, default_value: str) -> None:
+    def __init__(self, default_value: str | None) -> None:
         self.__default_value = default_value
         self.__value: str | None = None
 
@@ -56,13 +57,13 @@ class DefaultProperty:
         self.__value = value
 
     def __str__(self) -> str:
-        return self.value
+        return str(self.value)
 
 
 class CouchbaseServerDefaults:
     __cbs_key: Final[str] = "cbs"
     __version_key: Final[str] = "version"
-    __default_version: Final[str] = "7.6.7"
+    __default_version: Final[str | None] = None
 
     @property
     def version(self) -> DefaultProperty:
@@ -83,7 +84,7 @@ class CouchbaseServerDefaults:
 class SyncGatewayDefaults:
     __sgw_key: Final[str] = "sgw"
     __version_key: Final[str] = "version"
-    __default_version: Final[str] = "4.0.0"
+    __default_version: Final[str | None] = None
 
     @property
     def version(self) -> DefaultProperty:
@@ -104,7 +105,7 @@ class SyncGatewayDefaults:
 class EdgeServerDefaults:
     __es_key: Final[str] = "es"
     __version_key: Final[str] = "version"
-    __default_version: Final[str] = "1.0.0"
+    __default_version: Final[str | None] = None
 
     @property
     def version(self) -> DefaultProperty:
@@ -151,13 +152,13 @@ class ConfigDefaults:
             if self.CouchbaseServer.version.is_set:
                 raise Exception("Both main and included file are setting default CBS version")
 
-            self.CouchbaseServer.version.set_value(other.CouchbaseServer.version.value)
+            self.CouchbaseServer.version.set_value(cast(str, other.CouchbaseServer.version.value))
 
         if other.SyncGateway.version.is_set:
             if self.SyncGateway.version.is_set:
                 raise Exception("Both main and included file are setting default SGW version")
 
-            self.SyncGateway.version.set_value(other.SyncGateway.version.value)
+            self.SyncGateway.version.set_value(cast(str, other.SyncGateway.version.value))
 
         if other.EdgeServer.version.is_set and self.EdgeServer.version.is_set:
             raise Exception("Both main and included file are setting default ES version")
@@ -537,7 +538,7 @@ class TopologyConfig:
                 version = (
                     cast(str, raw_cluster[self.__version_key])
                     if self.__version_key in raw_cluster
-                    else str(self.__defaults.CouchbaseServer.version)
+                    else self.__defaults.CouchbaseServer.version.value or resolve_latest_version("couchbase-server")
                 )
                 self.__cluster_inputs.append(ClusterInput(version, raw_cluster))
 
@@ -551,7 +552,7 @@ class TopologyConfig:
                 version = (
                     cast(str, raw_server[self.__version_key])
                     if self.__version_key in raw_server
-                    else str(self.__defaults.SyncGateway.version)
+                    else self.__defaults.SyncGateway.version.value or resolve_latest_version("sync-gateway")
                 )
                 self.__sync_gateway_inputs.append(SyncGatewayInput(cluster_index, version))
 
@@ -561,7 +562,7 @@ class TopologyConfig:
                 version = (
                     cast(str, raw_server[self.__version_key])
                     if self.__version_key in raw_server
-                    else str(self.__defaults.EdgeServer.version)
+                    else self.__defaults.EdgeServer.version.value or resolve_latest_version("couchbase-edge-server")
                 )
                 self.__edge_server_inputs.append(EdgeServerInput(version))
 

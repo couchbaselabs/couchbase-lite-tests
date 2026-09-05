@@ -23,7 +23,7 @@ from jenkins.pipelines.shared.setup_test import resolved_version
 def setup_multiplatform_test(
     platform_versions: dict,
     sgw_version: str,
-    couchbase_version: str = "7.6",
+    couchbase_version: str | None = None,
     setup_dir: str = "QE",
 ) -> None:
     """
