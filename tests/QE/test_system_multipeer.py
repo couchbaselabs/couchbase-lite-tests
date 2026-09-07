@@ -401,7 +401,7 @@ class TestSystemMultipeer(CBLTestClass):
             docgen = JSONGenerator(random.randint(1, 10), size=DOC_COUNT)
             server_docs = docgen.generate_all_documents()
             for key, value in server_docs.items():
-                server.upsert_document(bucket, key, value)
+                await server.upsert_document(bucket, key, value)
 
         async def insert_sgw(sgw: SyncGateway, db_name: str = "names") -> None:
             docgen = JSONGenerator(random.randint(11, 20), size=DOC_COUNT)

@@ -149,9 +149,9 @@ class TestLargeDocWorkloads(CBLTestClass):
         assert len(local_doc_ids) == 2, f"Expected exactly 2 local docs, found {len(local_doc_ids)}: {local_doc_ids}"
 
         self.mark_test_step("Verify CBS bucket — control doc present, blob doc NOT present.")
-        cbs_control = cbs.get_document(bucket_name, "small_control_doc")
+        cbs_control = await cbs.get_document(bucket_name, "small_control_doc")
         assert cbs_control is not None, "Control doc must exist in CBS bucket after successful replication"
-        cbs_blob = cbs.get_document(bucket_name, "oversized_blob_doc")
+        cbs_blob = await cbs.get_document(bucket_name, "oversized_blob_doc")
         assert cbs_blob is None, "Oversized blob doc must NOT exist in CBS bucket"
 
         await ts.cleanup()
