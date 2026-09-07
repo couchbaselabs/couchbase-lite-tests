@@ -1,11 +1,10 @@
 """Tests for GreenboardUploader and the greenboard fixture."""
 
 import inspect
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Literal, cast
+from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
 import pluggy._result
@@ -13,7 +12,8 @@ import pytest
 from _pytest.reports import TestReport
 from cbltest import CBLPyTest
 from cbltest.api import testserver
-from cbltest.api.edgeserver import EdgeServerVersion
+from cbltest.api.edgeserver import EdgeServer, EdgeServerVersion
+from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.syncgateway import CouchbaseVersion, SyncGateway, SyncGatewayVersion
 from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
@@ -115,29 +115,27 @@ class FakeSyncGateway(SyncGateway):
         return SyncGatewayVersion(self._version_str)
 
 
-class FakeEdgeServer:
-    """Test-only stand-in for EdgeServer that returns a fixed version.
+class FakeEdgeServer(EdgeServer):
+    """Test-only EdgeServer that returns a fixed version.
 
-    Unlike :class:`FakeSyncGateway` this does not subclass the real
-    ``EdgeServer``: that constructor reads and decodes a config file off disk.
-    The greenboard fixture only ever calls ``get_version()``, so a duck type
-    is enough.
+    The real constructor reads and decodes a config file off disk, so it is
+    skipped; the greenboard fixture only ever calls ``get_version()``.
     """
 
     def __init__(self, version_str: str) -> None:
         self._version_str = version_str
 
-    async def get_version(self) -> EdgeServerVersion:
+    async def get_version(self) -> CouchbaseVersion:
         return EdgeServerVersion(self._version_str)
 
 
-class FakeEdgeServerManager:
+class FakeEdgeServerManager(EdgeServerManager):
     """``CBLPyTest.edge_servers`` holds managers, and greenboard takes a client from one."""
 
-    def __init__(self, edge_server: Any) -> None:
+    def __init__(self, edge_server: EdgeServer) -> None:
         self._edge_server = edge_server
 
-    def get_admin_client(self) -> Any:
+    def get_admin_client(self) -> EdgeServer:
         return self._edge_server
 
 
@@ -152,14 +150,52 @@ class FakeTestServer(testserver.TestServer):
         return self._get_info_fn()
 
 
+class FakeCBLPyTest(CBLPyTest):
+    """Test-only CBLPyTest that supplies fakes directly.
+
+    The real constructor builds TestServer/SyncGateway/CouchbaseServer objects
+    from the config, and SyncGateway.__init__ makes a network call, so it cannot
+    be used here. Only the three properties greenboard actually reads are
+    overridden; the rest of CBLPyTest is deliberately left unwired.
+    """
+
+    def __init__(
+        self,
+        config: ParsedConfig,
+        test_servers: Sequence[testserver.TestServer],
+        sync_gateways: Sequence[SyncGateway],
+        edge_servers: Sequence[EdgeServerManager],
+    ) -> None:
+        self._config = config
+        self._test_servers = test_servers
+        self._sync_gateways = sync_gateways
+        self._edge_servers = edge_servers
+
+    @property
+    def config(self) -> ParsedConfig:
+        return self._config
+
+    @property
+    def test_servers(self) -> Sequence[testserver.TestServer]:
+        return self._test_servers
+
+    @property
+    def sync_gateways(self) -> Sequence[SyncGateway]:
+        return self._sync_gateways
+
+    @property
+    def edge_servers(self) -> Sequence[EdgeServerManager]:
+        return self._edge_servers
+
+
 def _make_cblpytest(
     *,
     url: str | None = "couchbase://greenboard.example.com",
     username: str | None = "fakeuser",
     password: str | None = "fakepass",
-    test_servers: list | None = None,
-    sync_gateways: list | None = None,
-    edge_servers: list | None = None,
+    test_servers: Sequence[testserver.TestServer] | None = None,
+    sync_gateways: Sequence[SyncGateway] | None = None,
+    edge_servers: Sequence[EdgeServerManager] | None = None,
 ) -> CBLPyTest:
     if url is not None and username is not None and password is not None:
         config = ParsedConfig(
@@ -173,16 +209,7 @@ def _make_cblpytest(
         )
     else:
         config = ParsedConfig({})
-    cblpytest = CBLPyTest.__new__(CBLPyTest)
-    cblpytest._CBLPyTest__config = config
-    cblpytest._CBLPyTest__test_servers = test_servers if test_servers is not None else []
-    cblpytest._CBLPyTest__edge_servers = edge_servers if edge_servers is not None else []
-    cluster = SimpleNamespace(
-        sync_gateways=sync_gateways if sync_gateways is not None else [],
-        couchbase_servers=[],
-    )
-    cblpytest._CBLPyTest__clusters = [cluster]
-    return cblpytest
+    return FakeCBLPyTest(config, test_servers or [], sync_gateways or [], edge_servers or [])
 
 
 def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") -> pytest.Config:
@@ -826,12 +853,12 @@ class TestGreenboardFixture:
         the platform is still edge-server, and upload() skips instead of
         publishing a 0.0.0 doc."""
 
-        class UnreachableEdgeServer:
-            async def get_version(self) -> EdgeServerVersion:
+        class UnreachableEdgeServer(FakeEdgeServer):
+            async def get_version(self) -> CouchbaseVersion:
                 raise RuntimeError("connection refused")
 
         cblpytest = _make_cblpytest(
-            test_servers=[], sync_gateways=[], edge_servers=[FakeEdgeServerManager(UnreachableEdgeServer())]
+            test_servers=[], sync_gateways=[], edge_servers=[FakeEdgeServerManager(UnreachableEdgeServer("n/a"))]
         )
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
