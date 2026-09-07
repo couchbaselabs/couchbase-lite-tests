@@ -64,16 +64,12 @@ Compacting a specific channel out of a user's history removes it from subsequent
 while the user's actual current (live) channel access is provably unaffected.
 
 ### Steps
-1. Create a bucket and configure a Sync Gateway database on it.
-2. Create user 'bob' with access to channels 'A' and 'B'.
-3. Update user 'bob' to remove access to channel 'A' only (revoke 'A', keep 'B').
-4. Get the user's access history and check that channel 'A' is present.
-5. Create a document in channel 'B'.
-6. Compact channel 'A' out of the user's access history.
-7. Check that the compact response reports channel 'A' as compacted.
-8. Get the user's access history again and check that channel 'A' is gone.
-9. As user 'bob', fetch all documents and check that the channel-'B' document is still
-   visible (current access to 'B' was never touched by the compaction).
+1. Create doc1 (Channel A) and doc2 (Channel B)
+2. Get changes for user bob after user creation, bob should have access to both doc1 and doc2, store the checkpoint (last_seq value)
+3. Remove access to Channel A for bob 
+4. Get changes for user from previous checkpoint and bob should receive a revocation 
+5. Compact access history 
+6. Get changes again from the old checkpoint, no revocation should be sent
 
 ## test_compact_channel_not_in_history_is_idempotent_noop
 
@@ -139,11 +135,6 @@ reach it. There is also no equivalent `/_role/{name}/_access_history/compact` en
 4. Update role 'myrole' to remove access to channel 'ROLE_CHAN'.
 5. Get user 'frank's access history and check that channel 'ROLE_CHAN' is absent (the
    history lives on the role's own principal record, not the user's).
-6. Compact channel 'ROLE_CHAN' via the user endpoint for 'frank' and check that nothing is
-   reported as compacted.
-7. Attempt to call a role-scoped access-history-compact endpoint directly and check that it
-   does not exist (404) — confirming there is no way to compact a role's own history via
-   this feature.
 
 ## test_same_channel_name_two_collections_isolated
 
