@@ -38,7 +38,8 @@ def connect_ssh(
     :param username: User to connect as
     :param password: Password to authenticate with, for hosts that take one
     :param timeout: How long to keep trying, in seconds
-    :return: A connected SSHClient, which the caller closes
+    :return: A connected SSHClient.  Prefer `with connect_ssh(...) as ssh:`, which closes it
+        on the way out, or close it yourself if the connection has to outlive the block.
     """
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -57,17 +58,19 @@ def connect_ssh(
             if waiting:
                 click.echo(f"{hostname} is accepting SSH")
             return ssh
-        # An authentication failure is not a boot in progress: the credentials are wrong,
-        # and waiting does not make them right.  It subclasses SSHException, so it has to
-        # be turned away before the retry below sees it.
-        except paramiko.AuthenticationException:
+        # A credential failure is not a boot in progress: the key or the password is wrong,
+        # and waiting does not make it right.  Both subclass SSHException, so they have to
+        # be turned away before the retry below sees them.
+        except (paramiko.AuthenticationException, paramiko.PasswordRequiredException):
             ssh.close()
             raise
         # No listener yet, a listener that hangs up, or sshd accepting the socket before it
         # can speak SSH -- all of them are what a booting instance looks like.
         except (paramiko.SSHException, OSError) as e:
+            # A failed connect can still leave a socket or a half-built transport behind, so
+            # every attempt starts from a closed client.
+            ssh.close()
             if time.monotonic() >= deadline:
-                ssh.close()
                 raise TimeoutError(f"{hostname} did not accept SSH within {timeout}s: {e}") from e
 
             if not waiting:
