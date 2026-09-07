@@ -1242,17 +1242,52 @@ class _SyncGatewayBase:
         Use this rather than wait_for_document_count when the collection also holds
         unrelated documents.
         """
-        wanted = set(doc_ids)
+        return await self._wait_for_changed_documents(db_name, doc_ids, scope, collection, deleted=False)
 
-        async def _wait_for_documents_poll() -> ChangesResponse:
+    async def wait_for_deleted_documents(
+        self,
+        db_name: str,
+        doc_ids: Collection[str],
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> ChangesResponse:
+        """
+        Retry the _doc_ids filtered changes feed until every doc in doc_ids is
+        present as a tombstone, then return the response.  Raises TimeoutError
+        if they have not all arrived within 60s.
+
+        Use this rather than wait_for_documents when the documents are expected to
+        be gone: a delete reaches the feed on the same asynchronous paths a write does.
+        """
+        return await self._wait_for_changed_documents(db_name, doc_ids, scope, collection, deleted=True)
+
+    async def _wait_for_changed_documents(
+        self,
+        db_name: str,
+        doc_ids: Collection[str],
+        scope: str,
+        collection: str,
+        *,
+        deleted: bool,
+    ) -> ChangesResponse:
+        """
+        Poll the _doc_ids filtered changes feed until every doc in doc_ids is there in the
+        state the caller wants, a tombstone or not, and return the response.
+
+        :param deleted: The tombstone state every document must reach.
+        """
+        wanted = set(doc_ids)
+        wanted_state = "deleted" if deleted else "present"
+
+        async def _wait_for_changed_documents_poll() -> ChangesResponse:
             changes = await self.get_changes(db_name, scope, collection, doc_ids=sorted(wanted))
-            missing = wanted - {entry.id for entry in changes.results if not entry.deleted}
-            assert not missing, f"Documents missing from {db_name}.{scope}.{collection}: {sorted(missing)}"
+            unmet = wanted - {entry.id for entry in changes.results if entry.deleted == deleted}
+            assert not unmet, f"Documents not {wanted_state} in {db_name}.{scope}.{collection}: {sorted(unmet)}"
             return changes
 
         # Import lands on SGW's polling cadence, not sub-second.
         return await async_retry_assert(
-            _wait_for_documents_poll,
+            _wait_for_changed_documents_poll,
             tenacity.wait_fixed(2),
             tenacity.stop_after_delay(60),
         )

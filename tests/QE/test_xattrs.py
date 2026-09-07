@@ -3,6 +3,7 @@ import random
 from typing import Any
 
 import pytest
+import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -12,6 +13,9 @@ from cbltest.api.syncgateway import (
     IndexConfig,
     ScopeConfig,
 )
+from cbltest.utils import async_retry_assert
+from couchbase.exceptions import CasMismatchException
+from couchbase.options import ReplaceOptions
 
 
 @pytest.mark.sgw
@@ -112,9 +116,7 @@ class TestXattrs(CBLTestClass):
             content_errors = []
             for doc_id in sg_doc_ids + sdk_doc_ids:
                 doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if doc is None:
-                    content_errors.append(f"SG doc {doc_id} not found")
-                elif doc.id.startswith("sg_"):
+                if doc.id.startswith("sg_"):
                     sgw_docs_now += 1
                     if doc.body.get("updated_by_sdk") is not True:
                         content_errors.append(f"SG doc {doc_id} missing 'updated_by_sdk' flag")
@@ -196,9 +198,6 @@ class TestXattrs(CBLTestClass):
 
             self.mark_test_step("Get all docs via Sync Gateway and save revisions")
             sg_all_docs = await sg_user.wait_for_document_count(sg_db, num_docs * 2)
-            assert len(sg_all_docs.rows) == num_docs * 2, (
-                f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
-            )
             all_doc_revisions: dict[str, str] = {row.id: row.revision for row in sg_all_docs.rows}
 
             supports_version_vectors = await sg.supports_version_vectors()
@@ -222,11 +221,10 @@ class TestXattrs(CBLTestClass):
 
             for doc_id in docs_to_delete:
                 sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if sg_doc is not None and sg_doc.revid is not None:
-                    await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
+                await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
             self.mark_test_step("Verify deleted docs visible in changes feed with new revision")
-            rev_changes = await sg.get_changes(sg_db, "_default", "_default", version_type="rev")
+            rev_changes = await sg.get_changes(sg_db, "_default", "_default", version_type="rev", request_plus=True)
             deleted_revisions, remaining_revisions = 0, 0
             for entry in rev_changes.results:
                 if entry.id in docs_to_delete and entry.deleted:
@@ -348,11 +346,7 @@ class TestXattrs(CBLTestClass):
             assert sdk_visible_count == num_docs * 2, f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
 
             self.mark_test_step(f"Verify user '{username}' sees all docs via _changes (public API)")
-            user_changes = await sg_user.get_changes(sg_db)
-            unique_docs = {e.id for e in user_changes.results if e.id in all_doc_ids}
-            assert len(unique_docs) == num_docs * 2, (
-                f"User should see {num_docs * 2} docs via public API, got {len(unique_docs)}"
-            )
+            await sg_user.wait_for_documents(sg_db, all_doc_ids)
 
             self.mark_test_step(f"Bulk update sdk docs {num_updates} times via SDK")
             for _ in range(num_updates):
@@ -373,10 +367,9 @@ class TestXattrs(CBLTestClass):
                 sg_docs_to_update: list[DocumentUpdateEntry] = []
                 for doc_id in sg_doc_ids:
                     sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                    if sg_doc is not None:
-                        updated_body = sg_doc.body.copy()
-                        updated_body["content"]["updates"] += 1
-                        sg_docs_to_update.append(DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body))
+                    updated_body = sg_doc.body.copy()
+                    updated_body["content"]["updates"] += 1
+                    sg_docs_to_update.append(DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body))
                 await sg.update_documents(sg_db, sg_docs_to_update, "_default", "_default")
 
             self.mark_test_step("Verify SDK sees all doc updates")
@@ -388,13 +381,12 @@ class TestXattrs(CBLTestClass):
                     )
 
             self.mark_test_step(f"Verify '{username}' sees all doc updates via _all_docs (public API)")
-            all_docs_updated = await sg_user.get_all_documents(sg_db)
+            all_docs_updated = await sg_user.wait_for_document_count(sg_db, num_docs * 2)
             for row in all_docs_updated.rows:
                 sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
-                if sg_doc is not None:
-                    assert sg_doc.body["content"]["updates"] == num_updates + 1, (
-                        f"SG doc {sg_doc.id} should have {num_updates + 1} updates, got {sg_doc.body['content']['updates']}"
-                    )
+                assert sg_doc.body["content"]["updates"] == num_updates + 1, (
+                    f"SG doc {sg_doc.id} should have {num_updates + 1} updates, got {sg_doc.body['content']['updates']}"
+                )
 
             self.mark_test_step("Verify SDK docs still don't contain _sync after updates")
             for doc_id in sdk_doc_ids:
@@ -409,8 +401,7 @@ class TestXattrs(CBLTestClass):
             self.mark_test_step("Bulk delete sg docs via Sync Gateway")
             for doc_id in sg_doc_ids:
                 sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if sg_doc is not None and sg_doc.revid is not None:
-                    await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
+                await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
             self.mark_test_step("Verify SDK sees all docs as deleted")
             sdk_deleted_count = 0
@@ -423,11 +414,8 @@ class TestXattrs(CBLTestClass):
             )
 
             self.mark_test_step(f"Verify '{username}' sees all docs as deleted via _changes (public API)")
-            changes_deleted = await sg_user.get_changes(sg_db)
-            sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
-            assert sg_deleted_count == num_docs * 2, (
-                f"Expected {num_docs * 2} docs to be deleted via SG, got {sg_deleted_count}"
-            )
+
+            await sg_user.wait_for_deleted_documents(sg_db, all_doc_ids)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_sdk_interop_shared_docs(self, cblpytest: CBLPyTest) -> None:
@@ -493,8 +481,7 @@ class TestXattrs(CBLTestClass):
             assert sdk_visible_count == num_docs * 2, f"Expected {num_docs * 2} docs via SDK, got {sdk_visible_count}"
 
             self.mark_test_step(f"Verify '{username}' sees all docs via _all_docs (public API)")
-            sg_all_docs = await sg_user.get_all_documents(sg_db)
-            assert len(sg_all_docs.rows) == num_docs * 2, f"Expected {num_docs * 2} docs, got {len(sg_all_docs.rows)}"
+            await sg_user.wait_for_document_count(sg_db, num_docs * 2)
 
             self.mark_test_step(f"Perform concurrent updates ({num_updates} per doc) from SDK and SG")
 
@@ -505,7 +492,7 @@ class TestXattrs(CBLTestClass):
                     doc_id = random.choice(docs_remaining)
                     try:
                         sg_doc = await sg.get_document(sg_db, doc_id)
-                        if sg_doc is None or sg_doc.body.get("sg_updates", 0) >= num_updates:
+                        if sg_doc.body.get("sg_updates", 0) >= num_updates:
                             docs_remaining.remove(doc_id)
                             continue
 
@@ -524,49 +511,57 @@ class TestXattrs(CBLTestClass):
 
             def update_from_sdk() -> None:
                 """Update documents from SDK side with CAS"""
+                # The wrapper's upsert overwrites whatever is there, so go to the collection
+                # directly for the CAS this update has to be guarded by.
+                collection = cbs.get_bucket(bucket_name).scope("_default").collection("_default")
                 docs_remaining = list(all_doc_ids)
                 while docs_remaining:
                     doc_id = random.choice(docs_remaining)
-                    sdk_doc = cbs.get_document(bucket_name, doc_id)
-                    if sdk_doc is None or sdk_doc.get("sdk_updates", 0) >= num_updates:
+                    result = collection.get(doc_id)
+                    sdk_doc = result.content_as[dict]
+                    if sdk_doc.get("sdk_updates", 0) >= num_updates:
                         docs_remaining.remove(doc_id)
                         continue
 
                     # Ensure no _sync metadata in SDK docs
                     assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
+                    sdk_doc["sdk_updates"] = sdk_doc.get("sdk_updates", 0) + 1
+                    sdk_doc["updates"] = sdk_doc.get("updates", 0) + 1
                     try:
-                        sdk_doc["sdk_updates"] = sdk_doc.get("sdk_updates", 0) + 1
-                        sdk_doc["updates"] = sdk_doc.get("updates", 0) + 1
-                        cbs.upsert_document(bucket_name, doc_id, sdk_doc)
-                    except Exception:
-                        # CAS mismatch or other error, retry
+                        collection.replace(doc_id, sdk_doc, ReplaceOptions(cas=result.cas))
+                    except CasMismatchException:
+                        # Sync Gateway wrote between the get and the replace; re-read next pass.
                         continue
 
             # Run concurrent updates
             await asyncio.gather(update_from_sg(), asyncio.to_thread(update_from_sdk))
 
-            self.mark_test_step("Verify all documents have correct update counts")
+            self.mark_test_step("Verify the update counts are consistent")
             for doc_id in all_doc_ids:
-                # Verify from SDK side
                 sdk_doc = cbs.get_document(bucket_name, doc_id)
                 assert sdk_doc is not None, f"Doc {doc_id} should exist in SDK"
-                assert (
-                    sdk_doc["updates"] == num_updates * 2
-                    and sdk_doc["sg_updates"] == num_updates
-                    and sdk_doc["sdk_updates"] == num_updates
-                ), (
-                    f"Doc {doc_id} should have {num_updates * 2} total updates via SDK, got {sdk_doc['updates']}, ie, SG: {sdk_doc['sg_updates']}, SDK: {sdk_doc['sdk_updates']}"
-                )
+                assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
 
-                # Verify from SG side
-                sg_doc = await sg.get_document(sg_db, doc_id)
-                assert (
-                    sg_doc.body["updates"] == num_updates * 2
-                    and sg_doc.body["sdk_updates"] == num_updates
-                    and sg_doc.body["sg_updates"] == num_updates
-                ), (
-                    f"Doc {doc_id} should have {num_updates * 2} total updates via SG, got {sg_doc.body['updates']}, ie, SDK: {sg_doc.body['sdk_updates']}, SG: {sg_doc.body['sg_updates']}"
+                # update_documents rewrites the rev to whatever is current, so a Sync Gateway
+                # write always lands and can put sdk_updates back to the value it read.  The
+                # SDK side is CAS guarded, so it can never do the same to sg_updates.
+                assert sdk_doc["updates"] == sdk_doc["sg_updates"] + sdk_doc["sdk_updates"], (
+                    f"Doc {doc_id} counts do not add up: {sdk_doc}"
                 )
+                assert 0 < sdk_doc["sg_updates"] <= num_updates, f"Doc {doc_id}: {sdk_doc}"
+                assert 0 <= sdk_doc["sdk_updates"] <= num_updates, f"Doc {doc_id}: {sdk_doc}"
+
+            self.mark_test_step("Verify Sync Gateway serves what the SDK stored")
+
+            async def _sg_agrees_with_the_sdk() -> None:
+                for doc_id in all_doc_ids:
+                    sg_doc = await sg.get_document(sg_db, doc_id)
+                    body = {k: v for k, v in sg_doc.body.items() if not k.startswith("_")}
+                    assert body == cbs.get_document(bucket_name, doc_id), (
+                        f"Doc {doc_id} differs between SG and the SDK: {body}"
+                    )
+
+            await async_retry_assert(_sg_agrees_with_the_sdk, tenacity.wait_fixed(2), tenacity.stop_after_delay(60))
 
             self.mark_test_step("Perform concurrent deletes from SDK and SG")
 
@@ -579,13 +574,8 @@ class TestXattrs(CBLTestClass):
                     doc_id = random.choice(docs_to_delete)
                     try:
                         sg_doc = await sg.get_document(sg_db, doc_id)
-                        if sg_doc is None:
-                            docs_to_delete.remove(doc_id)
-                            continue
-
-                        if sg_doc.revid is not None:
-                            await sg.delete_document(doc_id, sg_doc.revid, sg_db)
-                            deleted_count += 1
+                        await sg.delete_document(doc_id, sg_doc.revid, sg_db)
+                        deleted_count += 1
                         docs_to_delete.remove(doc_id)
                     except CblSyncGatewayBadResponseError as e:
                         if e.code in [
@@ -605,14 +595,9 @@ class TestXattrs(CBLTestClass):
                 docs_to_delete = list(all_doc_ids)
                 while docs_to_delete:
                     doc_id = random.choice(docs_to_delete)
-                    try:
-                        cbs.delete_document(bucket_name, doc_id)
-                        deleted_count += 1
-                        docs_to_delete.remove(doc_id)
-                    except Exception:
-                        # Document not found, must have been deleted by SG
-                        docs_to_delete.remove(doc_id)
-                        continue
+                    cbs.delete_document(bucket_name, doc_id)
+                    deleted_count += 1
+                    docs_to_delete.remove(doc_id)
                     await asyncio.sleep(0.01)
                 return deleted_count
 
@@ -632,11 +617,8 @@ class TestXattrs(CBLTestClass):
             )
 
             self.mark_test_step(f"Verify '{username}' sees all docs as deleted via _changes (public API)")
-            changes_deleted = await sg_user.get_changes(sg_db)
-            sg_deleted_count = sum(1 for entry in changes_deleted.results if entry.deleted)
-            assert sg_deleted_count == num_docs * 2, (
-                f"Expected {num_docs * 2} docs deleted via SG, got {sg_deleted_count}"
-            )
+
+            await sg_user.wait_for_deleted_documents(sg_db, all_doc_ids)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sync_xattrs_update_concurrently(self, cblpytest: CBLPyTest) -> None:
@@ -703,19 +685,10 @@ class TestXattrs(CBLTestClass):
                 )
 
             self.mark_test_step("Wait for SG to import all docs (as admin)")
-            sg_all_docs = await sg.wait_for_document_count(sg_db, num_docs)
-            assert len(sg_all_docs.rows) >= num_docs, (
-                f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
-            )
+            await sg.wait_for_document_count(sg_db, num_docs)
 
             self.mark_test_step(f"Verify user '{username1}' can see all docs in channel '{sg_channel1}'")
-            await asyncio.sleep(10)
-            user1_changes = await sg_user1.get_changes(sg_db)
-            unique_user1_docs = {e.id for e in user1_changes.results if e.id in sdk_doc_ids}
-            user1_doc_count = len(unique_user1_docs)
-            assert user1_doc_count == num_docs, (
-                f"User '{username1}' should see {num_docs} docs in channel '{sg_channel1}', got {user1_doc_count}"
-            )
+            await sg_user1.wait_for_documents(sg_db, sdk_doc_ids)
 
             self.mark_test_step(f"Concurrently update xattrs to '{sg_channel2}' while querying docs")
 
@@ -751,17 +724,18 @@ class TestXattrs(CBLTestClass):
             await sg.reset_user(sg_db, username2, password, [sg_channel2])
 
             self.mark_test_step(f"Verify user '{username2}' can now see all docs")
-            user2_changes = await sg_user2.get_changes(sg_db)
-            unique_user2_docs = {e.id for e in user2_changes.results if e.id in sdk_doc_ids}
-            user2_count = len(unique_user2_docs)
-            assert user2_count == num_docs, (
-                f"User '{username2}' should see {num_docs} docs after xattr change to channel '{sg_channel2}', got {user2_count}"
-            )
+            await sg_user2.wait_for_documents(sg_db, sdk_doc_ids)
 
             self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
-            user1_changes_after = await sg_user1.get_changes(sg_db)
-            unique_user1_after = {e.id for e in user1_changes_after.results if e.id in sdk_doc_ids}
-            user1_count_after = len(unique_user1_after)
-            assert user1_count_after == 0, (
-                f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', got {user1_count_after}"
-            )
+
+            # A document leaves user1's feed only once its own re-import lands, which the
+            # other documents reaching user2 does not imply.
+            async def _user1_sees_no_docs() -> None:
+                user1_changes_after = await sg_user1.get_changes(sg_db)
+                still_visible = {e.id for e in user1_changes_after.results if e.id in sdk_doc_ids}
+                assert not still_visible, (
+                    f"User '{username1}' should see 0 docs after xattr change to channel '{sg_channel2}', "
+                    f"got {sorted(still_visible)}"
+                )
+
+            await async_retry_assert(_user1_sees_no_docs, tenacity.wait_fixed(2), tenacity.stop_after_delay(60))

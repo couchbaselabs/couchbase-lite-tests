@@ -65,11 +65,15 @@ Test concurrent updates and deletes from both Sync Gateway and SDK on shared doc
 4. Bulk create 10 docs via SG with tracking properties
 5. Verify SDK sees all docs
 6. Verify 'vipul' sees all docs via _all_docs (public API)
-7. Perform concurrent updates (10 per doc) from SDK and SG
-8. Verify all documents have correct update counts
-9. Perform concurrent deletes from SDK and SG
-10. Verify all docs deleted from SDK side
-11. Verify 'vipul' sees all docs as deleted via _changes (public API)
+7. Perform concurrent updates (10 per doc) from SDK and SG, the SDK's guarded by CAS
+8. Verify the update counts are consistent: `updates` equals `sg_updates + sdk_updates`,
+   neither count exceeds 10, and `sg_updates` is at least 1.  Exact counts are not asserted:
+   a Sync Gateway write replaces the whole body with the one it read, so it can put
+   `sdk_updates` back to any earlier value.
+9. Verify Sync Gateway serves what the SDK stored, once the last SDK write has been imported
+10. Perform concurrent deletes from SDK and SG
+11. Verify all docs deleted from SDK side
+12. Verify 'vipul' sees all docs as deleted via _changes (public API)
 
 ## test_sync_xattrs_update_concurrently
 
