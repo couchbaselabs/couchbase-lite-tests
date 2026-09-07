@@ -653,6 +653,25 @@ class TestWaitForCachingFeed:
         assert calls[0].get("request_plus") is True
 
     @pytest.mark.asyncio
+    async def test_bulk_update_waits_for_a_tombstone(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A batch can end on a deletion, which the feed reports as deleted rather than live."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"rows": [{"id": "doc1", "value": {"rev": "1-abc"}}]}},
+            {"status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]},
+        ]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls, deleted=True)
+
+        await sg.update_documents(
+            "db",
+            [DocumentUpdateEntry("doc1", "1-abc", {"_deleted": True})],
+            wait_for_caching_feed=True,
+        )
+
+        assert len(calls) == 1
+
+    @pytest.mark.asyncio
     async def test_bulk_update_fails_on_a_rejected_write(self, sync_gateway: SyncGatewayFixture) -> None:
         """_bulk_docs answers 201 even for writes it rejected, so the entries have to be checked."""
         sg, specs, _ = sync_gateway

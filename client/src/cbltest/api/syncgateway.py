@@ -435,6 +435,11 @@ class DocumentUpdateEntry(JSONSerializable):
 
         return cast(str, self.__body["_rev"])
 
+    @property
+    def deleted(self) -> bool:
+        """Gets whether this entry deletes the document"""
+        return bool(self.__body.get("_deleted", False))
+
     def __init__(self, id: str, revid: str | None, body: dict) -> None:
         self.__body = body.copy()
         self.__body["_id"] = id
@@ -1377,8 +1382,19 @@ class _SyncGatewayBase:
             if "cv" in last:
                 written["_cv"] = last["cv"]
 
+            # A batch can end on a deletion, which the feed reports as deleted rather than live
+            last_update = assert_not_null(
+                next((u for u in updates if u.id == doc_id), None),
+                f"Bulk update response names {doc_id}, which was not in the batch",
+            )
+
             await self._document_with_sequence(
-                written, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
+                written,
+                db_name=db_name,
+                doc_id=doc_id,
+                scope=scope,
+                collection=collection,
+                tombstone=last_update.deleted,
             )
 
     async def upsert_documents(
