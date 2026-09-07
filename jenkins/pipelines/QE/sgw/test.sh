@@ -45,13 +45,13 @@ section_start "$COLOR_CYAN" "INFRA SETUP"
 pushd "$AWS_ENVIRONMENT_DIR" >/dev/null
 uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 popd >/dev/null
+section_end
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
   echo "Setup completed. Exiting due to --setup-only flag."
   exit 0
 fi
-section_end
 
 # test_replication_xdcr.py needs two separate Couchbase Server clusters, which
 # this single-cluster topology does not provide; it is deferred until the
