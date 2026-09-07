@@ -123,6 +123,6 @@ class TestChangesFeed(CBLTestClass):
             es_db_name,
             feed="longpoll",
             filter_type="doc_ids",
-            doc_ids=["doc_10", "doc_9"],
+            doc_ids=["doc_11", "doc_12"],
         )
         assert len(changes["results"]) == 2, f"Expected 2 changes, but got {len(changes['results'])} changes."

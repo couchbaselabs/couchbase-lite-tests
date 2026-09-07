@@ -31,6 +31,8 @@ def no_network() -> Iterator[None]:
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
         patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
+        # Starting an Edge Server polls it until it answers, which is a real request.
+        patch("cbltest.api.edgeserver.EdgeServer.get_version", autospec=True),
     ):
         yield
 
@@ -209,6 +211,8 @@ def fake_sessions() -> Iterator[None]:
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
         patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
+        # Starting an Edge Server polls it until it answers, which FakeSession cannot serve.
+        patch("cbltest.api.edgeserver.EdgeServer.get_version", autospec=True),
     ):
         yield
 

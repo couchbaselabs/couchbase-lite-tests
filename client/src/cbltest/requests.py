@@ -6,7 +6,7 @@ from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from shutil import rmtree
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 from uuid import UUID, uuid4
 
 from aiohttp import ClientSession
@@ -49,11 +49,12 @@ class TestServerRequestType(Enum):
 _request_registry: dict[tuple[TestServerRequestType, int], type] = {}
 _body_registry: dict[tuple[TestServerRequestType, int], type] = {}
 
+_RequestT = TypeVar("_RequestT", bound=type["TestServerRequest"])
+_BodyT = TypeVar("_BodyT", bound=type["JSONSerializable"])
 
-def register_request(
-    request_type: TestServerRequestType, version: int | list[int]
-) -> Callable[[type[TestServerRequest]], type]:
-    def deco(cls: type[TestServerRequest]) -> type:
+
+def register_request(request_type: TestServerRequestType, version: int | list[int]) -> Callable[[_RequestT], _RequestT]:
+    def deco(cls: _RequestT) -> _RequestT:
         if isinstance(version, list):
             for v in version:
                 _request_registry[(request_type, v)] = cls
@@ -64,10 +65,8 @@ def register_request(
     return deco
 
 
-def register_body(
-    request_type: TestServerRequestType, version: int | list[int]
-) -> Callable[[type[JSONSerializable]], type]:
-    def deco(cls: type[JSONSerializable]) -> type:
+def register_body(request_type: TestServerRequestType, version: int | list[int]) -> Callable[[_BodyT], _BodyT]:
+    def deco(cls: _BodyT) -> _BodyT:
         if isinstance(version, list):
             for v in version:
                 _body_registry[(request_type, v)] = cls
