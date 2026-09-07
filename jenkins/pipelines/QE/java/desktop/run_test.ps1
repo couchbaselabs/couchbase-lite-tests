@@ -1,7 +1,8 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
-    [Parameter()][string]$DatasetVersion = "4.0"
+    [Parameter()][string]$DatasetVersion = "4.0",
+    [Parameter()][string]$TestFilter = ""
 )
 $ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
@@ -11,9 +12,14 @@ if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }
 
+$pytestArgs = @('--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '--dataset-version', $DatasetVersion, '-m', 'cbl')
+if ($TestFilter) {
+    $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
+}
+
 Push-Location $QE_TESTS_DIR
 try {
-    uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion -m cbl
+    uv run pytest @pytestArgs
     $saved_exit = $LASTEXITCODE
 } finally {
     Pop-Location

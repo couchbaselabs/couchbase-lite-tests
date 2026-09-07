@@ -1,7 +1,8 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
-    [Parameter()][string]$DatasetVersion = "4.0"
+    [Parameter()][string]$DatasetVersion = "4.0",
+    [Parameter()][string]$TestFilter = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,9 +13,14 @@ if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }
 
+$pytestArgs = @('-v', '--no-header', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '--dataset-version', $DatasetVersion)
+if ($TestFilter) {
+    $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
+}
+
 Push-Location $DEV_E2E_TESTS_DIR
 try {
-    uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json --dataset-version $DatasetVersion
+    uv run pytest @pytestArgs
     $saved_exit = $LASTEXITCODE
 } finally {
     Pop-Location

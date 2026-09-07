@@ -2,10 +2,10 @@ import os
 from pathlib import Path
 
 import pytest
+import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -17,6 +17,7 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     ScopeConfig,
 )
+from shared.upgrade_test_helpers import cleanup_unless_mid_upgrade, is_initial_upgrade_phase
 
 
 @pytest.mark.upg_sgw
@@ -24,6 +25,11 @@ from cbltest.api.syncgateway import (
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestSgwUpgrade(CBLTestClass):
+    @pytest_asyncio.fixture(scope="function", autouse=True)
+    async def cluster_cleanup(self, cblpytest: CBLPyTest) -> None:
+        """Only the `initial` phase starts clean."""
+        await cleanup_unless_mid_upgrade(cblpytest)
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replication_and_persistence_after_upgrade(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
@@ -47,11 +53,6 @@ class TestSgwUpgrade(CBLTestClass):
             f"Running upgrade test version {current_upgrade_ver} for SGW DB '{sg_db}' -> CBS '{bucket}.{scope}.{collection}'"
         )
         doc_id_prefix = f"upg_test_{sg_db}_{current_upgrade_ver}"
-
-        self.mark_test_step("Add a bucket on CBS if not there already")
-        if bucket not in cbs.get_bucket_names():
-            print(f"Bucket '{bucket}' not found on CBS. Creating it for the test...")
-            cbs.create_bucket(bucket)
 
         self.mark_test_step("Load dataset on CBL")
         if not hasattr(self, "db"):
@@ -81,11 +82,12 @@ class TestSgwUpgrade(CBLTestClass):
             enable_shared_bucket_access=True,
             delta_sync=DeltaSyncConfig(enabled=True),
         )
-        try:
-            await sg.put_database(sg_db, db_payload)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 412:
-                raise e
+        if is_initial_upgrade_phase():
+            # Also creates the backing bucket and collections.
+            await cblpytest.clusters[0].create_database(sg_db, db_payload)
+        else:
+            # Later phases inherit the bucket and database, so just wait for the nodes.
+            await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Create user1 for replication")
         collection_access = sg.create_collection_access_dict({"_default._default": ["*"]})

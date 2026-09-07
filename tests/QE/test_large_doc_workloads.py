@@ -47,16 +47,13 @@ class TestLargeDocWorkloads(CBLTestClass):
         password = "pass"
         channels = ["test"]
 
-        self.mark_test_step("Create bucket on Couchbase Server.")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint.")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with channel access.")
         await sg.reset_user(sg_db, username, password, channels)
@@ -122,18 +119,15 @@ class TestLargeDocWorkloads(CBLTestClass):
         assert len(sgw_all_docs.rows) >= 1, "SGW _all_docs should have at least the control document"
 
         self.mark_test_step("Verify the oversized doc is not retrievable from SGW.")
-        try:
-            sgw_rejected = await sg.get_document(sg_db, "oversized_blob_doc", "_default", "_default")
-            assert sgw_rejected is None, "Oversized blob doc must NOT exist on SGW"
-        except CblSyncGatewayBadResponseError as e:
-            assert e.code == 404, f"Expected 404 for rejected blob doc on SGW, got HTTP {e.code}"
+        with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
+            await sg.get_document(sg_db, "oversized_blob_doc", "_default", "_default")
+        assert excinfo.value.code == 404, f"Expected 404 for rejected blob doc on SGW, got HTTP {excinfo.value.code}"
 
         self.mark_test_step("Verify the small control document WAS successfully replicated.")
         assert "small_control_doc" in sgw_doc_ids, (
             "Small control doc should be replicated successfully even when another doc was rejected"
         )
         sgw_control = await sg.get_document(sg_db, "small_control_doc", "_default", "_default")
-        assert sgw_control is not None, "Control doc must be retrievable from SGW"
         assert sgw_control.body.get("type") == "control", "Control doc body content mismatch on SGW"
 
         self.mark_test_step("Verify local CBL database integrity — blob doc still intact.")

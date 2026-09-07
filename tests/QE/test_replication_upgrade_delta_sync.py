@@ -3,7 +3,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import (
     DatabaseConfig,
@@ -71,18 +70,8 @@ class TestUpgradeDeltaSync(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         payload = _DELTA_SYNC_UPGRADE_CONFIG
 
-        self.mark_test_step("Create SG 'upgrade' database with delta_sync enabled and import from bucket")
-        try:
-            await sg.put_database("upgrade", payload)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 412:
-                raise
-            await sg.delete_database("upgrade")
-            try:
-                await sg.put_database("upgrade", payload)
-            except CblSyncGatewayBadResponseError as e2:
-                if e2.code != 412:
-                    raise
+        self.mark_test_step("Update the SG 'upgrade' database config to enable delta_sync")
+        await cblpytest.sync_gateway_cluster.update_database_config("upgrade", payload)
 
         self.mark_test_step("Verify delta_sync is actually enabled on SGW 'upgrade' database")
         config = await sg.get_database_config("upgrade")
@@ -106,7 +95,6 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
-        assert current is not None, f"Expected '{doc_id}' imported from bucket"
         assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
         deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
         await sg.update_documents(

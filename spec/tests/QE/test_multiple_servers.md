@@ -16,13 +16,12 @@ Test that Sync Gateway handles Couchbase Server cluster rebalancing correctly du
 10. Rebalance IN cbs_two to cluster
 11. Wait for all updates to complete
 12. Verify all docs are present and revisions/version vectors changed
-13. Cleanup: Delete database and bucket
 
 ## test_server_goes_down_sanity
 
 Test that Sync Gateway continues to function when a Couchbase Server node fails over.
 
-1. Clean up and setup test environment (bucket and database)
+1. Setup test environment (backing bucket and database)
 2. Create user with specific channels
 3. Add 50 docs to Sync Gateway before failover
 4. Verify all docs were created
@@ -35,13 +34,12 @@ Test that Sync Gateway continues to function when a Couchbase Server node fails 
 11. Recover CBS node 2 (or add back if needed)
 12. Wait for cluster to become healthy after recovery
 13. Verify all 100 docs are accessible after recovery
-14. Cleanup: Delete database and bucket
 
 ## test_isgr_explicit_collection_mapping
 
 Test Inter-Sync Gateway Replication (ISGR) with explicit collection mapping between different buckets.
 
-1. Clean up any leftover state from all Sync Gateways
+1. Set alternate addresses on all CBS nodes
 2. Create 3 buckets on single CBS cluster (isgr_bucket1, isgr_bucket2, isgr_bucket3)
 3. Create collections in _default scope for each bucket:
    - bucket1: collection1, collection2, collection3

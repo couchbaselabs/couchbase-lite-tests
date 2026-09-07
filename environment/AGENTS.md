@@ -219,7 +219,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - Terraform `>= 1.2.0`
 - SSH config: `Host *.amazonaws.com` with `StrictHostKeyChecking accept-new`
 - Git LFS (datasets)
-- Python 3.10+ with `uv`
+- Python 3.13+ with `uv`
 - iOS only: Xcode 16+, `libimobiledevice`, iPhone Private WiFi OFF
 
 ## Rules
@@ -228,7 +228,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - **Always tear down via `stop_backend.py`** — prevents orphaned EC2 instances ($$$)
 - **AWS SSO must be active** — `aws sso login` before any orchestrator op
 - **Topology files are generated** by `jenkins/` setup scripts — don't hand-edit for CI
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`
+- **Python 3.13+** — modern syntax enforced by ruff `UP` + pyupgrade (see root [AGENTS.md](../AGENTS.md))
 - **`uv run` is required** for AWS scripts (uses root workspace deps — there is no separate `orchestrator` dep group)
 - **Use `click`** for all CLI argument parsing
 - **Use `paramiko`** for all SSH operations

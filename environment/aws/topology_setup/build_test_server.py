@@ -49,7 +49,7 @@ def upload_exists(server: TestServer) -> bool:
     Raises:
         RuntimeError: If an unexpected status code is returned from the latestbuilds server.
     """
-    url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/{server.latestbuilds_path}"
+    url = f"https://latestbuilds.service.couchbase.com/builds/{server.artifact_root}/{server.latestbuilds_path}"
     response = requests.head(url)
     if response.status_code == 200:
         return True
@@ -119,7 +119,7 @@ def main() -> None:
     sftp_progress_bar(
         sftp,
         package_path,
-        f"/data/builds/latestbuilds/{server.latestbuilds_path}",
+        f"/data/builds/{server.artifact_root}/{server.latestbuilds_path}",
     )
     sftp.close()
 

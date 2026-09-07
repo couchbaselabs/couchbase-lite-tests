@@ -40,29 +40,27 @@ revtree leaf.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset, re-enabling expired
+1. Restore Couchbase Server Bucket using `upgrade` dataset, re-enabling expired
    old-revision backup bodies.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Create SG 'upgrade' database with delta_sync enabled and import from bucket.
-   On 412 (already exists), force-recreate by `delete_database` + `put_database`.
-6. Verify delta_sync is actually enabled on SGW 'upgrade' database.
-7. Create user `user1` with full access to `_default._default`.
-8. Mutate `nonconflict_3` on 4.x SGW to create a new revtree leaf + HLV.
-9. Start a replicator:
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Update the SG 'upgrade' database config to enable delta_sync.
+5. Verify delta_sync is actually enabled on SGW 'upgrade' database.
+6. Create user `user1` with full access to `_default._default`.
+7. Mutate `nonconflict_3` on 4.x SGW to create a new revtree leaf + HLV.
+8. Start a replicator:
    * endpoint: `/upgrade`
    * collections: `_default._default`
    * type: pull
    * document_ids: `['nonconflict_3']`
    * continuous: False
    * credentials: user1/pass
-10. Wait until the replicator is stopped.
-11. Check that the doc is replicated correctly.
-12. Validate revid and HLV of local and remote doc:
+9. Wait until the replicator is stopped.
+10. Check that the doc is replicated correctly.
+11. Validate revid and HLV of local and remote doc:
     * Pre: local has revid + no HLV; SGW has revid + canonical (non-RTE) HLV.
     * Post: local has no revid (4.x CBL is HLV-only); local HLV equals SGW HLV.
-13. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
+12. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
 
 ### Expected Outcome
 
@@ -97,29 +95,27 @@ rev with no HLV, not a 4.x HLV-bearing rev.
 
 ### Steps
 
-1. Delete Sync Gateway 'upgrade' database if exists.
-2. Restore Couchbase Server Bucket using `upgrade` dataset, re-enabling expired
+1. Restore Couchbase Server Bucket using `upgrade` dataset, re-enabling expired
    old-revision backup bodies.
-3. Wait 2s to ensure SG picks up the restored database.
-4. Reset local database, and load `upgrade` dataset.
-5. Create SG 'upgrade' database with delta_sync enabled and import from bucket.
-   On 412 (already exists), force-recreate by `delete_database` + `put_database`.
-6. Verify delta_sync is actually enabled on SGW 'upgrade' database.
-7. Create user `user1` with full access to `_default._default`.
-8. Start a replicator:
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Update the SG 'upgrade' database config to enable delta_sync.
+5. Verify delta_sync is actually enabled on SGW 'upgrade' database.
+6. Create user `user1` with full access to `_default._default`.
+7. Start a replicator:
    * endpoint: `/upgrade`
    * collections: `_default._default`
    * type: pull
    * document_ids: `['nonconflict_2']`
    * continuous: False
    * credentials: user1/pass
-9. Wait until the replicator is stopped.
-10. Check that the doc is replicated correctly.
-11. Validate revid and HLV of local and remote doc:
+8. Wait until the replicator is stopped.
+9. Check that the doc is replicated correctly.
+10. Validate revid and HLV of local and remote doc:
     * Pre: both sides have revid and no HLV; local revid < SGW revid.
     * Post: local and SGW share the same revid; neither has an HLV (the legacy
       rev carries no HLV and PULL doesn't touch SGW).
-12. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
+11. Confirm SGW sent the revision as a delta (`deltas_sent` incremented).
 
 ### Expected Outcome
 

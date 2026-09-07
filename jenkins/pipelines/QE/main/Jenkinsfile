@@ -20,6 +20,8 @@ pipeline {
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the QE test job(s) even if this version+build already ran')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 30, unit: 'MINUTES')
         disableConcurrentBuilds()
     }

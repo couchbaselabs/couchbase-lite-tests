@@ -40,7 +40,7 @@ The `es/` pipeline:
 
 The `multiplatform/` pipeline:
 - **Cross-platform replication tests** — C, .NET, iOS, Java all syncing together
-- Uses `setup_test_multi()` with per-platform version maps
+- Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version maps
 - Single topology, multiple test servers
 - Complex topology with multiple platforms and topologies
 

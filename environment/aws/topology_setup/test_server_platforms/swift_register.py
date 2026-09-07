@@ -121,8 +121,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return self.artifact_path("testserver_ios.zip")
 
     def build(self) -> None:
         self._download_cbl()

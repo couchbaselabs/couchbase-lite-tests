@@ -1,6 +1,6 @@
 import asyncio
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -26,7 +26,7 @@ class TestTTLExpires(CBLTestClass):
         doc = {
             "id": "ttl_doc",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, "ttl_doc", es_db_name, ttl=5)
         assert response is not None, "Failed to create document with TTL of 5 seconds"
@@ -53,10 +53,10 @@ class TestTTLExpires(CBLTestClass):
         doc = {
             "id": "ttl_doc",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-        expires = datetime.now(timezone.utc) + timedelta(seconds=5)
+        expires = datetime.now(UTC) + timedelta(seconds=5)
         response = await edge_server.put_document_with_id(doc, "ttl_doc", es_db_name, expires=int(expires.timestamp()))
         assert response is not None, "Failed to create document with Expires of 5 seconds"
 
@@ -83,7 +83,7 @@ class TestTTLExpires(CBLTestClass):
         doc = {
             "id": "ttl",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         response = await edge_server.put_document_with_id(doc, "ttl", es_db_name, ttl=30)
         assert response is not None, "Failed to create document with TTL of 30 seconds"
@@ -99,7 +99,7 @@ class TestTTLExpires(CBLTestClass):
         updated_doc = {
             "id": "ttl",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "updated": "yes",
         }
         response = await edge_server.put_document_with_id(updated_doc, "ttl", es_db_name, rev=rev_id, ttl=5)
@@ -125,7 +125,7 @@ class TestTTLExpires(CBLTestClass):
         doc = {
             "id": "ttl_expires_doc1",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Calculate expires as current timestamp + 30 seconds (Unix timestamp)
@@ -154,7 +154,7 @@ class TestTTLExpires(CBLTestClass):
         doc2 = {
             "id": "ttl_expires_doc2",
             "channels": ["public"],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Calculate expires as current timestamp + 10 seconds (Unix timestamp) - lower than TTL
@@ -218,7 +218,7 @@ class TestTTLExpires(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "ttl": 10,
                 "doc_num": doc_num,
             }
@@ -231,7 +231,7 @@ class TestTTLExpires(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "ttl": 30,
                 "doc_num": doc_num,
             }
@@ -244,7 +244,7 @@ class TestTTLExpires(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "ttl": 60,
                 "doc_num": doc_num,
             }

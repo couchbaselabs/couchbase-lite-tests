@@ -8,6 +8,10 @@ pipeline {
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
     }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
     stages {
         stage('Init') {
             steps {

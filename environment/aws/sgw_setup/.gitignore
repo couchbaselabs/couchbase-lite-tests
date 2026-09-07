@@ -4,3 +4,4 @@ bootstrap-alternate.json
 bootstrap-cbs-alternate.json
 bootstrap-x509-cacert-only.json
 *.rpm
+cert/*.srl

@@ -5,7 +5,7 @@ This file covers the per-pipeline structure and the **topology-test synchronizat
 ## Scope
 
 You own everything under `jenkins/pipelines/`:
-- `shared/` — `setup_test.py` (`setup_test` / `setup_test_multi`), `config.sh`, `config.psm1`
+- `shared/` — `setup_test.py` (`setup_test`), `config.sh`, `config.psm1`
 - `dev_e2e/` — developer E2E pipelines (one per platform + `multipeer_functional/`)
 - `QE/` — QA pipelines (one per platform + `sgw/`, `upg-sgw/`, `es/`, `multiplatform/`)
 - `prebuild/` — test server artifact prebuild pipeline
@@ -27,7 +27,7 @@ The matching topology file MUST provision **at least** those resources:
 {
   "clusters":      [{"server_count": 1}, {"server_count": 1}],
   "sync_gateways": [{"cluster": 0},      {"cluster": 1}],
-  "test_servers":  [{"platform": "swift_ios", "cbl_version": "{{version}}"}]
+  "test_servers":  [{"platform": "swift_ios", "cbl_versions": "{{version}}"}]
 }
 ```
 
@@ -42,7 +42,7 @@ Every `{platform}/` directory under `dev_e2e/` or `QE/` contains:
 ```
 {platform}/
 ├── Jenkinsfile                       # Groovy pipeline definition
-├── setup_test.py                     # Calls shared setup_test()/setup_test_multi()
+├── setup_test.py                     # Calls shared setup_test()
 ├── config*.json                      # TDK config template(s)
 ├── topology*.json                    # Topology template(s)
 ├── test.sh / run_test.sh / run_test.ps1
@@ -63,7 +63,7 @@ Every `{platform}/` directory under `dev_e2e/` or `QE/` contains:
 | **Multi-file topology** | `c/`, `dotnet/` use `topologies/topology_single_{platform}.json` per-target. |
 | **Programmatic topology** | `QE/es/` builds topology via `generate_topology()` instead of a JSON template. |
 
-Common placeholders: `{{version}}`, `{{cbl_version}}`, `{{cbs_version}}`, per-platform variants like `{{swift_ios}}`, `{{jak_android}}`, `{{jak_desktop}}`.
+Common placeholders: `{{version}}`, `{{cbl_versions}}`, `{{cbs_version}}`, per-platform variants like `{{swift_ios}}`, `{{jak_android}}`, `{{jak_desktop}}`.
 
 ## Special Pipelines
 
@@ -81,14 +81,18 @@ Iterates SGW versions. Requires **≥ 2 SGW nodes and ≥ 2 CBS clusters** for u
 
 Does NOT use shared `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly. CLI options: `--sgw-version`, `--cbs-version`.
 
-### `dev_e2e/multipeer_functional/` and `QE/multiplatform/`
+### `dev_e2e/multipeer_functional/`
 
-Use `setup_test_multi()` (not `setup_test()`) with per-platform version maps for cross-platform mesh tests.
+Builds a per-platform version map from CLI options, expands it into a positional `cbl_versions` list (via `ts_to_topology`/`get_platform_version`) matching its topology's `test_servers` order, then calls `setup_test()`.
+
+### `QE/multiplatform/`
+
+Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version parsing.
 
 ## `shared/setup_test.py` Recap
 
-- `setup_test(cbl_version, sgw_version, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="dev_e2e")` — wraps all platforms with the same `cbl_version` and delegates.
-- `setup_test_multi(cbl_version_map, sgw_version, …)` — reads the topology template, resolves versions via `proget`, sets defaults + tag + per-test-server CBL version, writes the final topology to `environment/aws/topology_setup/topology.json`, downloads `cbbackupmgr`, then calls `start_backend()`.
+- `setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="dev_e2e")` — reads the topology template, resolves versions via `proget`, assigns `cbl_versions` positionally to `test_servers` and `sgw_versions` positionally to `sync_gateways` (repeating the last entry once a list is exhausted — see `distribute_versions`; `sgw_versions` only applies per-instance when `sync_gateways` is defined directly in `topology_file_in` rather than via `include`), sets defaults + tag, writes the final topology to `environment/aws/topology_setup/topology.json`, downloads `cbbackupmgr`, then calls `start_backend()`.
+- `VersionType` is a `click.ParamType` that converts a comma-separated CLI argument (e.g. `"4.0.0,4.1.0"`) into a `list[str]` (via `parse_versions()`) — every `setup_test.py` CLI wrapper declares its version arguments with `type=VersionType()` so `cli_entry` receives lists directly.
 - `ts_to_topology()` maps platform tags: `swift_* → ios`, `jak_android → android`, `jak_* → java`, `dotnet_* → dotnet`, `c_* → c`.
 
 ## Rules
@@ -100,7 +104,7 @@ Use `setup_test_multi()` (not `setup_test()`) with per-platform version maps for
 - **Topology must match `@pytest.mark.min_*` decorators** before tests change.
 - **Always call `move_artifacts`** in `teardown.sh`.
 - **Teardown runs on failure** — Jenkinsfile uses `post { always { … } }`.
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]`.
+- **Python 3.13+** — `X | Y`, never `Union[X, Y]`.
 - **No markdown sidecars** for pipeline changes.
 
 ## Commands

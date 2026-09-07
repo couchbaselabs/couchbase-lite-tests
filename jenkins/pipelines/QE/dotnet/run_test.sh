@@ -11,11 +11,12 @@ XHARNESS_VERSION="10.0.0-prerelease*"
 XHARNESS_SOURCE="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json"
 
 function usage() {
-  echo "Usage: $0 <version> <platform> <sgw_version> [dataset-version] [--setup-only]"
+  echo "Usage: $0 <version> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
   echo "version: CBL version (e.g. 3.2.1-2)"
   echo "platform: The .NET platform to build (e.g. ios)"
   echo "sgw_version: Version of Sync Gateway to download and use"
-  echo "dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
 }
 
@@ -42,18 +43,31 @@ fi
 cbl_version=$1
 platform=$2
 sgw_version=$3
+shift 3
 
 SETUP_ONLY=false
 DATASET_VERSION="4.0"
+TEST_FILTER=""
 
 # Parse optional arguments
-for arg in "${@:4}"; do
-  case "$arg" in
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dataset-version)
+      DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
     --setup-only)
       SETUP_ONLY=true
+      shift
       ;;
     *)
-      DATASET_VERSION="$arg"
+      echo "Unknown argument: $1"
+      usage
+      exit 1
       ;;
   esac
 done
@@ -71,7 +85,16 @@ fi
 pushd "$QE_TESTS_DIR"
 
 export DEVELOPER_DIR="/Applications/Xcode-$DOTNET_XCODE_VERSION.app/"
-uv run pytest -v --no-header -W ignore::DeprecationWarning \
-  --config config.json \
-  --dataset-version "$DATASET_VERSION" \
-  -m cbl
+if [ -n "$TEST_FILTER" ]; then
+  uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl \
+    -k "$TEST_FILTER" \
+    --no-result-upload
+else
+  uv run pytest -v --no-header -W ignore::DeprecationWarning \
+    --config config.json \
+    --dataset-version "$DATASET_VERSION" \
+    -m cbl
+fi

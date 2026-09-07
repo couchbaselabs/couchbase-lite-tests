@@ -10,7 +10,6 @@ from cbltest.api.syncgateway import (
     IndexConfig,
     ScopeConfig,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 
 
 @pytest.mark.sgw
@@ -20,8 +19,6 @@ class TestUsersChannels(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_single_user_multiple_channels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sgs = cblpytest.sync_gateways
-        sg_cluster = SyncGatewayCluster(sgs)
-        cbs = cblpytest.couchbase_servers[0]
         sg_db = "db"
         bucket_name = "data-bucket"
         channels = ["ABC", "CBS", "NBC", "FOX"]
@@ -32,17 +29,13 @@ class TestUsersChannels(CBLTestClass):
         total_docs = num_batches * batch_size
         num_sgs = len(sgs)
 
-        self.mark_test_step("Create single shared bucket for all SGW nodes")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step(f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sgs[0].put_database(sg_db, db_payload)
-        await sg_cluster.wait_for_db_online(sg_db)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to {channels} (stored in shared bucket)")
         async with sgs[0].create_user_client(sg_db, username, password, channels) as sg_user:
@@ -99,7 +92,7 @@ class TestUsersChannels(CBLTestClass):
             assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
 
             self.mark_test_step("Verify user can retrieve all documents via _all_docs from one SGW node")
-            all_docs = await sg_user.wait_for_all_documents(sg_db, total_docs)
+            all_docs = await sg_user.wait_for_document_count(sg_db, total_docs)
             all_docs_ids = [row.id for row in all_docs.rows if row.id in doc_ids]
             assert len(all_docs_ids) == total_docs, f"Expected {total_docs} docs via _all_docs, got {len(all_docs_ids)}"
 
@@ -120,7 +113,7 @@ class TestUsersChannels(CBLTestClass):
             self.mark_test_step("Verify all documents are accessible from each SGW node independently")
             for i, sg in enumerate(sgs):
                 async with sg.create_user_client(sg_db, username, password, channels) as test_user:
-                    node_all_docs = await test_user.wait_for_all_documents(sg_db, total_docs)
+                    node_all_docs = await test_user.wait_for_document_count(sg_db, total_docs)
                     node_doc_ids = [row.id for row in node_all_docs.rows if row.id in doc_ids]
                     assert len(node_doc_ids) == total_docs, (
                         f"SGW node {i}: Expected {total_docs} docs, got {len(node_doc_ids)}"

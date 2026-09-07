@@ -21,18 +21,17 @@ Test SGW enforcement of the 20 MB document body size limit via SGW admin API. Do
 
 Test that SGW rejects a 50 MB blob attachment pushed via BLIP replication from CBL, while the local CBL database remains intact. Uses xl2.jpg (50 MB) from dataset/server/blobs/ — well beyond SGW's 20 MB attachment limit.
 
-1. Create bucket on Couchbase Server.
-2. Configure Sync Gateway database endpoint.
-3. Create user 'blobuser' with channel access.
-4. Reset local database with empty collection.
-5. Create a document with a 50 MB blob attachment (xl2.jpg) in CBL.
-6. Verify the document and blob exist locally in CBL.
-7. Also create a small control document to verify partial replication works.
-8. Push replicate to SGW — expect SGW to reject the 50 MB blob.
-9. Verify SGW did NOT receive the oversized-blob document.
-10. Verify the oversized doc is not retrievable from SGW.
-11. Verify the small control document WAS successfully replicated.
-12. Verify local CBL database integrity — blob doc still intact.
-13. Verify local control doc also still intact.
-14. Verify local database has exactly 2 documents.
-15. Verify CBS bucket — control doc present, blob doc NOT present.
+1. Configure Sync Gateway database endpoint.
+2. Create user 'blobuser' with channel access.
+3. Reset local database with empty collection.
+4. Create a document with a 50 MB blob attachment (xl2.jpg) in CBL.
+5. Verify the document and blob exist locally in CBL.
+6. Also create a small control document to verify partial replication works.
+7. Push replicate to SGW — expect SGW to reject the 50 MB blob.
+8. Verify SGW did NOT receive the oversized-blob document.
+9. Verify the oversized doc is not retrievable from SGW.
+10. Verify the small control document WAS successfully replicated.
+11. Verify local CBL database integrity — blob doc still intact.
+12. Verify local control doc also still intact.
+13. Verify local database has exactly 2 documents.
+14. Verify CBS bucket — control doc present, blob doc NOT present.

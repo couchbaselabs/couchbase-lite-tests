@@ -6,7 +6,7 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import GreenboardUploader, resolve_branch
+from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
 # This plugin provides an automatic (i.e. not used directly by tests)
@@ -19,7 +19,7 @@ from cbltest.logging import cbl_info, cbl_warning
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> AsyncGenerator[None, None]:
+async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> AsyncGenerator[None]:
     if (
         cblpytest.config.greenboard_username is None
         or cblpytest.config.greenboard_password is None
@@ -32,7 +32,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
         cbl_info("Greenboard uploading disabled by flag")
         yield
         return
-    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0:
+    if len(cblpytest.test_servers) == 0 and len(cblpytest.sync_gateways) == 0 and len(cblpytest.edge_servers) == 0:
         yield
         return
 
@@ -93,6 +93,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
             )
         else:
             sgw_version: CouchbaseVersion | None = None
+            es_version: CouchbaseVersion | None = None
             test_platform: str = "sync-gateway"
             os_name: str = "n/a"
             library_version: str = "n/a"
@@ -111,6 +112,30 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     sgw_version = await cblpytest.sync_gateways[0].get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
+            # A mixed run keeps the test server's platform, so its CBL results are not
+            # filed under edge-server.
+            if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
+                if len(cblpytest.test_servers) == 0:
+                    test_platform = EDGE_SERVER_PLATFORM
+                try:
+                    es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
+                except Exception as e:
+                    cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
+            # An Edge-Server-only run whose tests carry no min_edge_servers
+            # marker has nothing to key the doc on: no CBL version, no SGW
+            # version. Skip it instead of filing it under the default
+            # sync-gateway platform.
+            if (
+                test_platform == "sync-gateway"
+                and len(cblpytest.sync_gateways) == 0
+                and len(cblpytest.test_servers) == 0
+            ):
+                cbl_warning(
+                    "Greenboard upload skipped: only Edge Servers are configured but no test "
+                    "carried the min_edge_servers marker, so the run has no platform to file under"
+                )
+                return
+
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
                 uploader.upload_from_junit_file(
@@ -119,6 +144,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     os_name,
                     library_version,
                     sgw_version,
+                    es_version,
                 )
             else:
                 # No --junitxml configured. Normally our pytest_configure
@@ -127,7 +153,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 # pytest.Config.fromdictargs in unit tests). Fall back to
                 # the in-process counter — mirrors upload_from_junit_file's
                 # file-missing branch.
-                uploader.upload(test_platform, os_name, library_version, sgw_version)
+                uploader.upload(test_platform, os_name, library_version, sgw_version, es_version)
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 

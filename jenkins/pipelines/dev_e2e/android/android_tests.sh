@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <cbl_version> <sg version>"
+  echo "Usage: $0 <cbl_version> <sg_version> [--dataset-version VERSION] [--test-filter EXPR]"
   exit 1
 }
 
@@ -21,7 +21,26 @@ if [ -z "$CBL_VERSION" ]; then usage; fi
 
 SG_VERSION="$2"
 if [ -z "$SG_VERSION" ]; then usage; fi
-DATASET_VERSION=${3:-"4.0"}
+shift 2
+
+DATASET_VERSION="4.0"
+TEST_FILTER=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --dataset-version)
+      DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      usage
+      ;;
+  esac
+done
 
 STATUS=0
 
@@ -44,4 +63,8 @@ echo "Run the tests"
 # To re-enable this, this script needs to become aware of the
 # serial number of the device, which is not currently passed
 #adb shell input keyevent KEYCODE_WAKEUP
-uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version $DATASET_VERSION
+if [ -n "$TEST_FILTER" ]; then
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
+else
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json --dataset-version "$DATASET_VERSION"
+fi

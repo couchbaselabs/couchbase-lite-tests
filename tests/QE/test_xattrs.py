@@ -20,6 +20,7 @@ from cbltest.api.syncgateway import (
 class TestXattrs(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_offline_processing_of_external_updates(self, cblpytest: CBLPyTest) -> None:
+        cluster = cblpytest.clusters[0]
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         num_docs = 100
@@ -28,17 +29,13 @@ class TestXattrs(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.drop_bucket(bucket_name)
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cluster.create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user {username} with access to SG and SDK channels")
         async with sg.create_user_client(sg_db, username, password, ["SG", "SDK"]) as sg_user:
@@ -81,7 +78,7 @@ class TestXattrs(CBLTestClass):
                 original_vv = {row.id: row.cv for row in sg_all_docs.rows}
 
         self.mark_test_step("Stop Sync Gateway")
-        await sg.delete_database(sg_db)
+        await cluster.sync_gateway_cluster.delete_database(sg_db)
 
         self.mark_test_step("Update all SG docs via SDK")
         for doc_id in sg_doc_ids:
@@ -108,7 +105,7 @@ class TestXattrs(CBLTestClass):
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         self.mark_test_step("Restart Sync Gateway (recreate database endpoint)")
-        await sg.put_database(sg_db, db_payload)
+        await cluster.sync_gateway_cluster.create_database(sg_db, db_payload)
         async with sg.create_user_client(sg_db, username, password, ["SG", "SDK"]) as sg_user:
             self.mark_test_step("Verify revisions, versions and contents of all documents")
             sgw_docs_now, sdk_docs_now = 0, 0
@@ -146,16 +143,13 @@ class TestXattrs(CBLTestClass):
         bucket_name = "data-bucket"
         channels = ["NASA"]
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user {username} with access to channels")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:
@@ -201,7 +195,7 @@ class TestXattrs(CBLTestClass):
             all_doc_ids = sg_doc_ids + sdk_doc_ids
 
             self.mark_test_step("Get all docs via Sync Gateway and save revisions")
-            sg_all_docs = await sg_user.wait_for_all_documents(sg_db, num_docs * 2)
+            sg_all_docs = await sg_user.wait_for_document_count(sg_db, num_docs * 2)
             assert len(sg_all_docs.rows) == num_docs * 2, (
                 f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
             )
@@ -254,8 +248,7 @@ class TestXattrs(CBLTestClass):
 
             self.mark_test_step("Verify non-deleted docs still accessible")
             for doc_id in remaining_docs:
-                sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                assert sg_doc is not None, f"Non-deleted doc {doc_id} should still be accessible"
+                await sg.get_document(sg_db, doc_id, "_default", "_default")
 
             if supports_version_vectors:
                 self.mark_test_step("Verify new version vectors for deleted docs (optional)")
@@ -305,9 +298,6 @@ class TestXattrs(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway with default sync function")
         # Default sync function reads doc.channels from document body
         db_payload = DatabaseConfig(
@@ -315,7 +305,7 @@ class TestXattrs(CBLTestClass):
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to SDK and SG channels")
         async with sg.create_user_client(sg_db, username, password, ["sdk", "sg"]) as sg_user:
@@ -450,16 +440,13 @@ class TestXattrs(CBLTestClass):
         sg_db = "db"
         bucket_name = "data-bucket"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway with default sync function")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to shared channel")
         async with sg.create_user_client(sg_db, username, password, ["shared"]) as sg_user:
@@ -573,7 +560,6 @@ class TestXattrs(CBLTestClass):
 
                 # Verify from SG side
                 sg_doc = await sg.get_document(sg_db, doc_id)
-                assert sg_doc is not None, f"Doc {doc_id} should exist in SG"
                 assert (
                     sg_doc.body["updates"] == num_updates * 2
                     and sg_doc.body["sdk_updates"] == num_updates
@@ -666,9 +652,6 @@ class TestXattrs(CBLTestClass):
         username2 = "lupiv"
         password = "password"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway with custom sync function using xattrs")
         sync_function = f"""
         function(doc, oldDoc, meta) {{
@@ -689,7 +672,7 @@ class TestXattrs(CBLTestClass):
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {"sync": sync_function}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(
             f"Create users '{username1}', '{username2}' with access to '{sg_channel1}', '{sg_channel2}'"
@@ -720,7 +703,7 @@ class TestXattrs(CBLTestClass):
                 )
 
             self.mark_test_step("Wait for SG to import all docs (as admin)")
-            sg_all_docs = await sg.wait_for_all_documents(sg_db, num_docs)
+            sg_all_docs = await sg.wait_for_document_count(sg_db, num_docs)
             assert len(sg_all_docs.rows) >= num_docs, (
                 f"Expected at least {num_docs} docs to be imported, got {len(sg_all_docs.rows)}"
             )
@@ -761,8 +744,7 @@ class TestXattrs(CBLTestClass):
                 cbs.delete_document_xattr(bucket_name, doc_id, "_sync", "_default", "_default")
 
             self.mark_test_step("Restart Sync Gateway to force re-import with updated xattrs")
-            await sg.delete_database(sg_db)
-            await sg.put_database(sg_db, db_payload)
+            await cblpytest.sync_gateway_cluster.update_database_config(sg_db, db_payload)
 
             # Recreate users after database restart
             await sg.reset_user(sg_db, username1, password, [sg_channel1])

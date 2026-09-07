@@ -13,11 +13,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidBecomeActive(_ scene: UIScene) {
-        TSTestServer.shared().start()
+        
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
-        TSTestServer.shared().stop()
+        
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {

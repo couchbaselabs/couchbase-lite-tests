@@ -1,6 +1,6 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -94,13 +94,13 @@ class TestSystemMultipeer(CBLTestClass):
         ]
         await asyncio.gather(*[r.start() for r in multipeer_replicators])
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         end_time = start_time + TEST_DURATION
 
         await asyncio.sleep(CRUD_INTERVAL.total_seconds())
 
         self.mark_test_step(f"Starting the System test for {NUM_DEVICES} devices ")
-        while datetime.now(timezone.utc) < end_time:
+        while datetime.now(UTC) < end_time:
             insert_testserver = random.randint(0, NUM_DEVICES - 1)
             delete_testserver = random.randint(0, NUM_DEVICES - 1)
             update_testserver = random.randint(0, NUM_DEVICES - 1)

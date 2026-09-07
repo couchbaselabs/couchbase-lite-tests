@@ -22,7 +22,7 @@ import com.couchbase.lite.TLSIdentity;
 import com.couchbase.lite.internal.core.CBLVersion;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.KeyStoreService;
-import com.couchbase.lite.jvm.mobiletest.services.JavaDesktopKeyStoreService;
+import com.couchbase.lite.jvm.mobiletest.services.JavaKeyStoreService;
 
 
 /**
@@ -143,7 +143,7 @@ public abstract class BaseTestApp extends TestApp {
         return identity;
     }
 
-    private final KeyStoreService keyStoreService = new JavaDesktopKeyStoreService();
+    private final KeyStoreService keyStoreService = new JavaKeyStoreService();
 
     @NonNull
     @Override

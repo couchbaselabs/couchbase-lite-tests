@@ -231,7 +231,6 @@ class TestReplicationBlob(CBLTestClass):
 
         self.mark_test_step("Check that the document with the ID from step 3 contains a valid `watermelon` property")
         remote_doc = await sync_gateway.get_document("names", "fruits")
-        assert remote_doc is not None, "Document `fruits` not found in SGW"
 
         def check_blob_prop(d: dict, prop: str, expected_value: Any) -> None:
             assert prop in d, f"Property `{prop}` not found in the blob"

@@ -67,7 +67,6 @@ class TestEncryptedProperties(CBLTestClass):
 
         self.mark_test_step("Check that the document in SG is not in plaintext")
         pushed_doc = await sync_gateway.get_document("names", "secret")
-        assert pushed_doc is not None, "Document not found in SG"
         assert "password" not in pushed_doc.body, "The document was pushed without encryption"
         assert "encrypted$password" in pushed_doc.body, (
             "The document was pushed without encryption, but the encrypted field is not present"

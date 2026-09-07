@@ -88,7 +88,6 @@ class TestLogRedaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_log_redaction_partial(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         self.skip_if_not(
             sg.has_caddy_sidecar,
             "Caddy sidecar is not reachable on this Sync Gateway host",
@@ -100,16 +99,13 @@ class TestLogRedaction(CBLTestClass):
         username = "vipul"
         password = "pass"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:
@@ -154,7 +150,7 @@ class TestLogRedaction(CBLTestClass):
                 except FileNotFoundError:
                     continue
                 except Exception as e:
-                    raise Exception(f"Failed to fetch sg_{log_type}.log via Caddy: {e}") from e
+                    raise Exception(f"Failed to fetch sg_{log_type}.log via Caddy: {e!r}") from e
 
             assert len(all_violations) == 0, (
                 f"Found {len(all_violations)} log redaction violations across all logs: Showing first 10:\n"
@@ -166,7 +162,6 @@ class TestLogRedaction(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sgcollect_redacted_files_and_contents(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
-        cbs = cblpytest.couchbase_servers[0]
         self.skip_if_not(
             sg.has_caddy_sidecar,
             "Caddy sidecar is not reachable on this Sync Gateway host",
@@ -178,16 +173,13 @@ class TestLogRedaction(CBLTestClass):
         username = "vipul_sgcollect"
         password = "password"
 
-        self.mark_test_step("Create bucket and default collection")
-        cbs.create_bucket(bucket_name)
-
         self.mark_test_step("Configure Sync Gateway with log redaction enabled")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
             index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
-        await sg.put_database(sg_db, db_payload)
+        await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels")
         async with sg.create_user_client(sg_db, username, password, channels) as sg_user:
@@ -228,7 +220,7 @@ class TestLogRedaction(CBLTestClass):
 
             self.mark_test_step("Discover redacted SGCollect zip file via Caddy")
             try:
-                files = await sg.list_files_via_caddy(pattern=r"sgcollect.*redacted.*\.zip")
+                files = await sg.caddy.list(pattern=r"sgcollect.*redacted.*\.zip")
                 assert len(files) > 0, (
                     "No redacted SGCollect zip files found. "
                     "Make sure SGCollect was run with redaction enabled and Caddy has 'browse' enabled."
@@ -244,7 +236,7 @@ class TestLogRedaction(CBLTestClass):
             self.mark_test_step(f"Download redacted zip: {redacted_zip_filename}")
             with tempfile.TemporaryDirectory() as tmpdir:
                 local_zip_path = Path(tmpdir) / redacted_zip_filename
-                await sg.download_file_via_caddy(redacted_zip_filename, str(local_zip_path))
+                await sg.caddy.download(redacted_zip_filename, local_zip_path)
 
                 assert local_zip_path.exists(), f"Downloaded zip not found at {local_zip_path}"
 

@@ -1,26 +1,40 @@
+import inspect
 import json
 import os
 import subprocess
 import sys
-import time
 from collections.abc import Awaitable, Callable
-from typing import Any, NoReturn, TypeVar, cast
+from typing import Any, NoReturn, cast
 
+import requests
 import tenacity
 import tenacity._utils
 import tenacity.asyncio
 
-from .api.error import CblTimeoutError
-
-T = TypeVar("T")
-
 # Hide tenacity's retry-loop frames so failures show the actual assertion, not
-# AsyncRetrying plumbing.
+# Retrying/AsyncRetrying plumbing.
+tenacity.__dict__["__tracebackhide__"] = True
 tenacity.asyncio.__dict__["__tracebackhide__"] = True
 tenacity._utils.__dict__["__tracebackhide__"] = True
 
 
-async def retry_assert(
+def _on_retry_assert_exhausted(retry_state: tenacity.RetryCallState) -> NoReturn:
+    __tracebackhide__ = True
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    elapsed = retry_state.seconds_since_start
+    raise TimeoutError(f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)") from exc
+
+
+def _retry_assert_policy(wait: tenacity.wait.wait_base, stop: tenacity.stop.stop_base) -> dict[str, Any]:
+    return {
+        "wait": wait,
+        "stop": stop,
+        "retry": tenacity.retry_if_exception_type(AssertionError),
+        "retry_error_callback": _on_retry_assert_exhausted,
+    }
+
+
+async def async_retry_assert[T](
     function: Callable[[], Awaitable[T]],
     wait: tenacity.wait.wait_base,
     stop: tenacity.stop.stop_base,
@@ -29,47 +43,87 @@ async def retry_assert(
     as TimeoutError with elapsed time."""
     __tracebackhide__ = True
 
-    def _on_exhausted(retry_state: tenacity.RetryCallState) -> NoReturn:
-        __tracebackhide__ = True
-        exc = retry_state.outcome.exception() if retry_state.outcome else None
-        elapsed = retry_state.seconds_since_start
-        raise TimeoutError(f"{exc} (gave up after {retry_state.attempt_number} attempts, {elapsed:.1f}s)") from exc
-
-    retrying = tenacity.AsyncRetrying(
-        wait=wait,
-        stop=stop,
-        retry=tenacity.retry_if_exception_type(AssertionError),
-        retry_error_callback=_on_exhausted,
-    )
+    retrying = tenacity.AsyncRetrying(**_retry_assert_policy(wait, stop))
     return await retrying(function)
 
 
-def _try_n_times(
-    num_times: int,
-    seconds_between: float,
-    wait_before_first_try: bool,
-    func: Callable[..., T],
-    *args: Any,
-    **kwargs: dict[str, Any],
+def retry_assert[T](
+    function: Callable[[], T],
+    wait: tenacity.wait.wait_base,
+    stop: tenacity.stop.stop_base,
 ) -> T:
-    function_name = getattr(func, "__name__", "<unknown function>")
-    for i in range(num_times):
-        try:
-            if i == 0 and wait_before_first_try:
-                time.sleep(seconds_between)
-            ret = func(*args, **kwargs)
-            return ret
-        except Exception as e:
-            if i < num_times - 1:
-                print(f"Trying {function_name} failed (reason='{e}'), retry in {seconds_between} seconds ...")
-                time.sleep(seconds_between)
-            else:
-                print(f"Trying {function_name} failed (reason='{e}')")
+    """Retries function while it raises AssertionError; on exhaustion, re-raises
+    as TimeoutError with elapsed time.
 
-    raise CblTimeoutError(f"Failed to call {function_name} after {num_times} attempts!")
+    :raises TypeError: if function is async.  An async callable returns its
+        coroutine without running any assertions, which would look like success on
+        the first attempt and silently skip the retry loop.  Use
+        :func:`async_retry_assert` instead.
+    """
+    __tracebackhide__ = True
+
+    def checked_function() -> T:
+        __tracebackhide__ = True
+        result = function()
+        if inspect.isawaitable(result):
+            close = getattr(result, "close", None)
+            if close is not None:
+                close()
+            name = getattr(function, "__name__", repr(function))
+            raise TypeError(f"{name} is async, use async_retry_assert instead of retry_assert")
+        return result
+
+    retrying = tenacity.Retrying(**_retry_assert_policy(wait, stop))
+    return retrying(checked_function)
 
 
-def assert_not_null(input: T | None, msg: str) -> T:
+# Port the shell2http sidecar listens on, on every Sync Gateway and Edge Server host.
+SHELL2HTTP_PORT = 20001
+
+
+def is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:
+    """
+    Whether anything responds on ``hostname:port``.  Any status counts -- this asks whether
+    a sidecar is there at all, not whether a particular resource exists.
+
+    :param hostname: Host to probe
+    :param port: Port the sidecar is expected on
+    :param timeout: Seconds to wait before deciding nothing is listening
+    :return: True if the port answered
+    """
+    try:
+        requests.get(f"http://{hostname}:{port}/", timeout=timeout)
+        return True
+    except requests.RequestException:
+        return False
+
+
+def describe_transfer(received: int, expected: int | None) -> str:
+    """
+    Describes how much of a response body arrived, for error messages on a transfer that
+    did not finish.
+
+    :param received: Bytes actually read so far
+    :param expected: Bytes the response promised via Content-Length, or None if it did not say
+    :return: Something like "12.3 MiB of 40.0 MiB (31%)", or "12.3 MiB of unknown total"
+    """
+
+    def size(n: int) -> str:
+        value = float(n)
+        for unit in ("B", "KiB", "MiB", "GiB"):
+            if value < 1024 or unit == "GiB":
+                return f"{value:.1f} {unit}" if unit != "B" else f"{n} B"
+            value /= 1024
+        raise AssertionError("unreachable")
+
+    if expected is None:
+        return f"{size(received)} of unknown total"
+    if expected == 0:
+        return f"{size(received)} of 0 B"
+    return f"{size(received)} of {size(expected)} ({received * 100 // expected}%)"
+
+
+def assert_not_null[T](input: T | None, msg: str) -> T:
     assert input is not None, msg
     return cast(T, input)
 
