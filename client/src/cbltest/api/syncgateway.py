@@ -1689,20 +1689,19 @@ class _SyncGatewayBase:
         """Gets the Caddy file server running alongside this Sync Gateway"""
         return self._caddy
 
-    async def fetch_log_file(
-        self,
-        log_type: str,
-    ) -> str:
+    async def fetch_log_file(self, log_type: str, local_path: str | Path) -> Path:
         """
-        Fetches a log file from the remote Sync Gateway server via Caddy HTTP server
+        Downloads a log file from the remote Sync Gateway server via its Caddy HTTP server,
+        writing it straight to disk so a log of any size never has to fit in memory.
 
         :param log_type: Type of log file to fetch (e.g., 'debug', 'info', 'warn', 'error')
-        :return: Content of the log file as a string
+        :param local_path: Local path to write the log file to
+        :return: The local path the log file was written to
         :raises FileNotFoundError: If the log file doesn't exist
         :raises CblTimeoutError: If the transfer stops making progress
         :raises CblTestError: For other HTTP or network errors
         """
-        return await self._caddy.fetch(f"sg_{log_type}.log")
+        return await self._caddy.download(f"sg_{log_type}.log", local_path)
 
     async def start_sgcollect(
         self,

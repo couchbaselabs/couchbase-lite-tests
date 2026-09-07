@@ -28,8 +28,9 @@ class FakeCaddy(Caddy):
     async def list(self, pattern: str | None = None) -> list[str]:
         return self.__owner.caddy_snapshots.pop(0)
 
-    async def download(self, filename: str, local_path: str | Path) -> None:
+    async def download(self, filename: str, local_path: str | Path) -> Path:
         self.__owner.downloaded.append((filename, str(local_path)))
+        return Path(local_path)
 
 
 class FakeSyncGateway(SyncGateway):

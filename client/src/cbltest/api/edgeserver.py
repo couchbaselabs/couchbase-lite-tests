@@ -1,6 +1,7 @@
 import asyncio
 import json
 import ssl
+import tempfile
 import urllib.parse
 import uuid
 from json import dumps
@@ -29,6 +30,9 @@ from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
+
+AUDIT_LOG_PATH = "/home/ec2-user/audit/EdgeServerAuditLog.txt"
+"""Where an AWS-provisioned Edge Server host writes its audit log."""
 
 
 class EdgeServerVersion(CouchbaseVersion):
@@ -861,52 +865,61 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def get_log_content(
-        self,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-    ) -> str:
+    async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
-        Fetch raw log file content from the Edge Server host via Caddy (port :data:`~cbltest.api.caddy.DEFAULT_PORT`).
+        Downloads a log file from the Edge Server host via its Caddy HTTP server
+        (port :data:`~cbltest.api.caddy.DEFAULT_PORT`), writing it straight to disk so a log of
+        any size never has to fit in memory.
 
-        :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
-        :return: Full log file content as string, or empty string on error.
+        :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user)
+        :param local_path: Local path to write the log file to
+        :return: The local path the log file was written to
+        :raises FileNotFoundError: If the log file does not exist
+        :raises CblTimeoutError: If the transfer stops making progress
+        :raises CblTestError: For other HTTP or network errors
         """
-        with self.__tracer.start_as_current_span(
-            "get_log_content",
-            attributes={"cbl.log_file": log_file},
-        ):
-            try:
-                prefix = "/home/ec2-user/"
-                path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                return await self._caddy.fetch(path)
-            except Exception as e:
-                # Callers treat "" as "nothing in the log", which is indistinguishable from
-                # a fetch that failed -- so say which one this was.
-                cbl_warning(f"Failed to fetch {log_file} via Caddy, treating as empty: {e}")
-                return ""
+        with self.__tracer.start_as_current_span("download_log_file", attributes={"cbl.log_file": log_file}):
+            prefix = "/home/ec2-user/"
+            path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
+            return await self._caddy.download(path, local_path)
 
     async def check_log(
         self,
         search_string: str,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
+        log_file: str = AUDIT_LOG_PATH,
     ) -> list[str]:
         """
-        Fetch log content from the server and return lines matching search_string.
-        Filtering is done in Python on the client.
+        Downloads a log file from the Edge Server host and returns the lines that contain
+        search_string.  Matches on raw bytes, one line at a time, so a log of any size never
+        has to fit in memory and a record quoting bytes that are not valid UTF-8 still scans.
 
         :param search_string: String to search for (e.g. audit event id).
         :param log_file: Path to the log file on the Edge Server host.
-        :return: List of matching lines, or empty list if none or on error.
+        :return: The matching lines, or an empty list if the log file does not exist
+        :raises CblTimeoutError: If the transfer stops making progress
+        :raises CblTestError: For other HTTP or network errors
         """
-        with self.__tracer.start_as_current_span(
-            "check_log",
-            attributes={
-                "cbl.search_string": search_string,
-                "cbl.log_file": log_file,
-            },
+        with (
+            self.__tracer.start_as_current_span(
+                "check_log",
+                attributes={
+                    "cbl.search_string": search_string,
+                    "cbl.log_file": log_file,
+                },
+            ),
+            tempfile.TemporaryDirectory() as tmpdir,
         ):
-            content = await self.get_log_content(log_file)
-            return [line for line in content.splitlines() if search_string in line]
+            try:
+                local_path = await self.download_log_file(log_file, Path(tmpdir) / Path(log_file).name)
+            except FileNotFoundError:
+                # Nothing was ever logged, so there are no matching lines.  Every other
+                # failure raises, or an unreachable host would read as an empty log.
+                cbl_warning(f"{log_file} does not exist on {self.__hostname}, treating as empty")
+                return []
+
+            needle = search_string.encode()
+            with local_path.open("rb") as f:
+                return [line.decode(errors="replace").rstrip("\r\n") for line in f if needle in line]
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
