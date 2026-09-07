@@ -77,6 +77,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "=== Teardown Dotnet Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
@@ -105,6 +117,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "=== Teardown Dotnet macOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
@@ -137,6 +161,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "=== Teardown Dotnet iOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
@@ -168,6 +204,18 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish and archive pytest's JUnit XML so
+                            // per-test failures (messages and tracebacks) are
+                            // surfaced in Jenkins even if teardown fails.
+                            script {
+                                try {
+                                    junit testResults: 'tests/QE/junit_result.xml', allowEmptyResults: true
+                                    archiveArtifacts artifacts: 'tests/QE/junit_result.xml', fingerprint: true, allowEmptyArchive: true
+                                } catch (err) {
+                                    echo "WARNING: Failed to publish/archive JUnit XML: ${err}"
+                                }
+                            }
+
                             echo "=== Teardown Dotnet Android Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
