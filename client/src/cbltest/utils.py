@@ -49,7 +49,9 @@ async def async_retry_assert[T](
     """
     __tracebackhide__ = True
 
-    if not inspect.iscoroutinefunction(function) and not inspect.iscoroutinefunction(getattr(function, "__call__", None)):
+    if not inspect.iscoroutinefunction(function) and not (
+        callable(function) and inspect.iscoroutinefunction(type(function).__call__)
+    ):
         name = getattr(function, "__name__", repr(function))
         raise TypeError(f"{name} is not async, use retry_assert instead of async_retry_assert")
 
