@@ -116,16 +116,13 @@ path, so a system-installed Sync Gateway or one run from another checkout is lef
 for each to release its ports before returning.
 
 `--skip-sync-gateway-start` carries forward the instances named in the topology config the last run
-wrote, rather than whatever `--sync-gateways` says, since a run that starts nothing cannot know how
-many are up. That file is this checkout's own record of its own instances, so several checkouts each
-running instances do not read each other's, and no port is probed — an answer on a port says nothing
-about whose instance answered. Passing `--sync-gateways`, or a `--server`, that disagrees with the
-record is an error, and so is having no record at all: a topology describing no Sync Gateway would
-skip every test that needs one, which reads as a pass.
+wrote, rather than whatever `--sync-gateways` says. That file is this checkout's own record, so
+several checkouts each running instances do not read each other's, and no port is probed. Passing a
+`--sync-gateways` or `--server` that disagrees with the record is an error, and so is having no
+record at all — a topology naming no Sync Gateway silently skips every test that needs one.
 
-The record is only as current as the last run left it. `--stop-sync-gateway` clears it, but an
-instance that dies on its own stays on it, and the tests then fail on connection rather than
-skipping.
+The record is only as current as the last run left it: `--stop-sync-gateway` clears it, but an
+instance that dies on its own stays on it, and the tests then fail on connection rather than skip.
 
 ## Running the individual steps
 
