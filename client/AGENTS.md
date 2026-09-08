@@ -51,7 +51,8 @@ client/
     │   ├── multipeer_replicator_types.py
     │   ├── syncgateway.py        # SyncGateway admin API
     │   ├── couchbaseserver.py    # CBS bucket/scope/collection mgmt (via SDK)
-    │   ├── edgeserver.py
+    │   ├── edgeserver.py         # EdgeServer REST client + EdgeServerConfig, its parsed config file
+    │   ├── edgeservermanager.py  # EdgeServerManager — Edge Server state, via the shell2http sidecar
     │   ├── cluster.py            # CouchbaseCluster — SGW+CBS cluster grouping
     │   ├── error.py              # CblTestServerBadResponseError etc.
     │   ├── error_types.py

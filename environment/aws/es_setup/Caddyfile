@@ -1,4 +1,6 @@
 :20000
 bind 0.0.0.0
 root * /home/ec2-user
+# Serve a path the Edge Server config names verbatim, as well as one relative to the root.
+uri strip_prefix /home/ec2-user
 file_server
