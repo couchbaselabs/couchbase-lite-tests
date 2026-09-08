@@ -2,7 +2,7 @@ import asyncio
 import random
 from collections.abc import Sequence
 
-from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, ResyncState, SyncGateway
 
 
 class SyncGatewayCluster:
@@ -105,3 +105,82 @@ class SyncGatewayCluster:
         """
         version = await self.random_node._update_database_config(db_name, config)
         await self.wait_for_db_online(db_name, version)
+
+    async def take_database_offline(
+        self,
+        db_name: str,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Take a database offline on one node of the cluster, and wait until every node
+        reports the database as Offline.
+
+        :param db_name: Database name to take offline.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        await self.random_node._set_database_offline(db_name)
+        await asyncio.gather(
+            *(
+                sg._wait_for_db_offline(db_name, max_retries=max_retries, retry_delay=retry_delay)
+                for sg in self.__sync_gateways
+            )
+        )
+
+    async def update_sync_function(
+        self,
+        db_name: str,
+        sync_function: str,
+        *,
+        scope: str = "_default",
+        collection: str = "_default",
+        max_retries: int = 30,
+        retry_delay: int = 2,
+    ) -> None:
+        """
+        Update the sync function for a collection on one node of the cluster, and wait
+        until every node serves the resulting config version.  Unlike
+        `update_database_config`, this does not require the database to be online, so it
+        can be used to set up a resync.
+
+        :param db_name: The name of the database to update.
+        :param sync_function: The new sync function body.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection to update the sync function for (default '_default').
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        version = await self.random_node._update_sync_function(
+            db_name, sync_function, scope=scope, collection=collection
+        )
+        assert version is not None, f"Sync Gateway did not report a config version when updating {db_name}"
+        await asyncio.gather(
+            *(
+                sg._wait_for_config_version(db_name, version, max_retries=max_retries, retry_delay=retry_delay)
+                for sg in self.__sync_gateways
+            )
+        )
+
+    async def wait_for_resync_state(
+        self,
+        db_name: str,
+        state: ResyncState,
+        max_retries: int = 30,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until every node in the cluster's resync status converges on the given
+        state, polling all nodes concurrently.
+
+        :param db_name: Database name to poll.
+        :param state: The resync state to wait for.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        await asyncio.gather(
+            *(
+                sg._wait_for_resync_state(db_name, state, max_retries=max_retries, retry_delay=retry_delay)
+                for sg in self.__sync_gateways
+            )
+        )
