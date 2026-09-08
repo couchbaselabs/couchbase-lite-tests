@@ -86,7 +86,7 @@ class TestTTL(CBLTestClass):
             with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
                 await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
             assert excinfo.value.code in [403, 404], f"Expected 403/404 for expired doc, got {excinfo.value.code}"
-            sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
+            sdk_doc = await cbs.get_document(bucket_name, "exp_5", "_default", "_default")
             assert sdk_doc is None, "exp_5 should be purged"
 
             self.mark_test_step("Verify exp_years document is still accessible")
@@ -162,7 +162,7 @@ class TestTTL(CBLTestClass):
             with pytest.raises(CblSyncGatewayBadResponseError) as excinfo:
                 await sg_user.get_document(sg_db, "exp_5", "_default", "_default")
             assert excinfo.value.code in [403, 404], f"Expected 403/404 for expired doc, got {excinfo.value.code}"
-            sdk_doc = cbs.get_document(bucket_name, "exp_5", "_default", "_default")
+            sdk_doc = await cbs.get_document(bucket_name, "exp_5", "_default", "_default")
             assert sdk_doc is None, "exp_5 should be purged from bucket"
 
             self.mark_test_step("Verify exp_years document is still accessible")

@@ -118,7 +118,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 if len(cblpytest.test_servers) == 0:
                     test_platform = EDGE_SERVER_PLATFORM
                 try:
-                    es_version = await cblpytest.edge_servers[0].get_version()
+                    es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
                 except Exception as e:
                     cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
             # An Edge-Server-only run whose tests carry no min_edge_servers
@@ -138,7 +138,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
 
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
-                uploader.upload_from_junit_file(
+                await uploader.upload_from_junit_file(
                     Path(xmlpath),
                     test_platform,
                     os_name,
@@ -153,7 +153,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 # pytest.Config.fromdictargs in unit tests). Fall back to
                 # the in-process counter — mirrors upload_from_junit_file's
                 # file-missing branch.
-                uploader.upload(test_platform, os_name, library_version, sgw_version, es_version)
+                await uploader.upload(test_platform, os_name, library_version, sgw_version, es_version)
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 

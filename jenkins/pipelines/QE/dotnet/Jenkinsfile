@@ -12,6 +12,8 @@ pipeline {
         booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Run Android tests')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 150, unit: 'MINUTES')
     }
     stages {

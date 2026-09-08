@@ -48,11 +48,11 @@ class TestSystem(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 10 documents to bucket.")
         for i in range(1, 11):
             doc_id = f"doc_{i}"
-            server.upsert_document(bucket_name, doc_id, _doc_body(doc_id))
+            await server.upsert_document(bucket_name, doc_id, _doc_body(doc_id))
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
@@ -214,7 +214,7 @@ class TestSystem(CBLTestClass):
         while datetime.now(UTC) < end_time:
             if datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 edge_server_down = False
@@ -236,7 +236,7 @@ class TestSystem(CBLTestClass):
 
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
+                await cblpytest.edge_servers[0].kill_server()
                 end = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
@@ -472,7 +472,7 @@ class TestSystem(CBLTestClass):
                     break
 
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
+                await cblpytest.edge_servers[0].kill_server()
                 shared["edge_server_down"] = True
                 # Allow time for clients to observe the outage before next operations.
                 await asyncio.sleep(10)
@@ -481,7 +481,7 @@ class TestSystem(CBLTestClass):
                 await asyncio.sleep(60)
 
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 shared["edge_server_down"] = False

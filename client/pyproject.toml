@@ -58,6 +58,7 @@ sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
 timeout_fixture = "cbltest.plugins.timeout_fixture"
 cluster_cleanup = "cbltest.plugins.cluster_cleanup"
+sgw_cluster_manager = "cbltest.plugins.sgw_cluster_manager"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"

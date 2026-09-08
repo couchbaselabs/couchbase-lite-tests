@@ -75,7 +75,7 @@ client/
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
-        └── cluster_cleanup.py          # cluster_cleanup (autouse) — wipes SGW DBs + CBS/Rosmar buckets
+        └── cluster_cleanup.py          # cluster_cleanup (autouse) — resets Edge Servers, wipes SGW DBs + CBS/Rosmar buckets
 ```
 
 ## Core Concepts

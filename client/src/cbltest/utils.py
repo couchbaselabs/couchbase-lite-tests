@@ -40,8 +40,20 @@ async def async_retry_assert[T](
     stop: tenacity.stop.stop_base,
 ) -> T:
     """Retries function while it raises AssertionError; on exhaustion, re-raises
-    as TimeoutError with elapsed time."""
+    as TimeoutError with elapsed time.
+
+    :raises TypeError: if function is not async.  tenacity calls a plain callable
+        without awaiting it, so a lambda returning a coroutine never runs any of its
+        assertions, which would look like success on the first attempt.  Use
+        :func:`retry_assert` instead.
+    """
     __tracebackhide__ = True
+
+    if not inspect.iscoroutinefunction(function) and not (
+        callable(function) and inspect.iscoroutinefunction(type(function).__call__)
+    ):
+        name = getattr(function, "__name__", repr(function))
+        raise TypeError(f"{name} is not async, use retry_assert instead of async_retry_assert")
 
     retrying = tenacity.AsyncRetrying(**_retry_assert_policy(wait, stop))
     return await retrying(function)
@@ -75,6 +87,10 @@ def retry_assert[T](
 
     retrying = tenacity.Retrying(**_retry_assert_policy(wait, stop))
     return retrying(checked_function)
+
+
+# Port the shell2http sidecar listens on, on every Sync Gateway and Edge Server host.
+SHELL2HTTP_PORT = 20001
 
 
 def is_sidecar_reachable(hostname: str, port: int, timeout: float = 1.0) -> bool:

@@ -108,7 +108,7 @@ class TestDbGone(CBLTestClass):
         assert errors_403 == 0, f"DB is available but {errors_403}/{endpoints_tested} endpoints returned 403"
 
         self.mark_test_step("Delete bucket to sever connection")
-        cbs.drop_bucket(bucket_name)
+        await cbs.drop_bucket(bucket_name)
         db_status = await sg.get_database_status(sg_db)
         while db_status is not None and db_status.state == "Online":
             db_status = await sg.get_database_status(sg_db)
@@ -165,8 +165,8 @@ class TestDbGone(CBLTestClass):
             assert status.state == "Online", f"{db_name} should be online, but state is: {status.state}"
 
         self.mark_test_step("Delete buckets for db1 and db3 and wait for those databases to be gone")
-        cbs.drop_bucket("data-bucket-1")
-        cbs.drop_bucket("data-bucket-3")
+        await cbs.drop_bucket("data-bucket-1")
+        await cbs.drop_bucket("data-bucket-3")
         await cbs.wait_for_bucket_deleted("data-bucket-1")
         await cbs.wait_for_bucket_deleted("data-bucket-3")
         for db_name in ["db1", "db3"]:

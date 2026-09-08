@@ -21,7 +21,7 @@ class TestChangesFeed(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
             doc_id = f"doc_{i}"
@@ -30,7 +30,7 @@ class TestChangesFeed(CBLTestClass):
                 "channels": ["public"],
                 "timestamp": datetime.now(UTC).isoformat(),
             }
-            server.upsert_document(bucket_name, doc_id, doc)
+            await server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
@@ -123,6 +123,6 @@ class TestChangesFeed(CBLTestClass):
             es_db_name,
             feed="longpoll",
             filter_type="doc_ids",
-            doc_ids=["doc_10", "doc_9"],
+            doc_ids=["doc_11", "doc_12"],
         )
         assert len(changes["results"]) == 2, f"Expected 2 changes, but got {len(changes['results'])} changes."

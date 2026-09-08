@@ -7,6 +7,10 @@ pipeline {
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
     stages {
         stage('Init') {
             steps {

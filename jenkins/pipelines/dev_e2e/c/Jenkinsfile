@@ -9,6 +9,8 @@ pipeline {
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 90, unit: 'MINUTES')
     }
     stages {
