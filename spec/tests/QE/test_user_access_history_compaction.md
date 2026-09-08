@@ -140,13 +140,7 @@ reach it. There is also no equivalent `/_role/{name}/_access_history/compact` en
 
 ### Description
 The same channel name revoked in two different collections for the same user is tracked
-and compacted independently; compacting one must not affect the other. Also serves as
-regression coverage for a `_setup_db` helper bug: an extra collection named under the
-`_default` scope was being added to the Sync Gateway database config without first being
-physically created in the Couchbase Server bucket, and separately, the collection's
-`ScopeConfig` was being constructed before that extra collection was merged into it — a
-real class of failure seen in a live run (a named collection referenced by Sync Gateway
-before it actually exists on the Sync Gateway side).
+and compacted independently; compacting one must not affect the other.
 
 ### Steps
 1. Create a bucket and configure a Sync Gateway database with an extra named collection
