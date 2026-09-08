@@ -12,6 +12,8 @@ Functions:
 
 import json
 import subprocess
+from collections.abc import Iterator
+from contextlib import suppress
 from pathlib import Path
 
 import click
@@ -123,23 +125,40 @@ class ExeBridge(PlatformBridge):
             location (str): The location of the executable (e.g., "localhost").
         """
         header(f"Stopping test server '{self.__exe_name}'")
-        for proc in psutil.process_iter():
-            if proc.name() == self.__exe_name:
+        for proc in self.__find_processes():
+            pid = proc.pid
+            # Wait for it to actually go, so an immediate run() does not race a process that is
+            # still holding its listening port and its log file.
+            try:
                 proc.terminate()
-                # Wait for it to actually go, so an immediate run() does not race a process that is
-                # still holding its listening port and its log file.
+                proc.wait(timeout=30)
+            except psutil.TimeoutExpired:
+                click.secho(f"PID {pid} ignored SIGTERM, killing it", fg="yellow")
                 try:
-                    proc.wait(timeout=30)
-                except psutil.TimeoutExpired:
-                    click.secho(f"PID {proc.pid} ignored SIGTERM, killing it", fg="yellow")
                     proc.kill()
                     proc.wait(timeout=10)
+                except psutil.TimeoutExpired:
+                    click.secho(f"PID {pid} did not exit after SIGKILL", fg="red")
+                    return
                 except psutil.NoSuchProcess:
                     pass
-                click.secho(f"Stopped PID {proc.pid}", fg="green")
-                return
+            except psutil.NoSuchProcess:
+                pass
+
+            click.secho(f"Stopped PID {pid}", fg="green")
+            return
 
         click.secho(f"Unable to find process to stop ({self.__exe_name})", fg="yellow")
+
+    def __find_processes(self) -> Iterator[psutil.Process]:
+        """
+        Yield running processes matching the executable name, skipping any that exit or
+        become unreadable while the process table is being scanned.
+        """
+        for proc in psutil.process_iter(["name"]):
+            with suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+                if proc.info["name"] == self.__exe_name:
+                    yield proc
 
     def uninstall(self, location: str) -> None:
         """

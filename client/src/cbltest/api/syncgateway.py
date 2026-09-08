@@ -2267,26 +2267,21 @@ class SyncGateway(_SyncGatewayBase):
                 print(f"Certificate '{cert_name}' uploaded successfully to {cert_path}")
                 return cert_path
 
+    @tenacity.retry(
+        wait=tenacity.wait_fixed(0.1),
+        stop=tenacity.stop_after_delay(70),
+        reraise=True,
+        # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
+        # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
+        retry=tenacity.retry_if_exception_type((CblSyncGatewayBadResponseError, ClientError, OSError)),
+    )
     async def _wait_for_rest_api(self) -> None:
         """
         Wait until the SGW node's REST API is responding, polling /_ping until it
         returns 200. /_ping endpoint is not responsive on startup until the all
         databases are loaded and active.
         """
-
-        async def _wait_for_rest_api_poll() -> None:
-            try:
-                await self._send_request("get", "/_ping")
-            except (CblSyncGatewayBadResponseError, ClientError, OSError) as exc:
-                # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
-                # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
-                raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
-
-        await async_retry_assert(
-            _wait_for_rest_api_poll,
-            tenacity.wait_fixed(0.1),
-            tenacity.stop_after_delay(70),
-        )
+        await self._send_request("get", "/_ping")
 
     async def restart_with_config(self, config_name: str = "bootstrap") -> None:
         """
