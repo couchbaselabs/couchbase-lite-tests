@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import click
-import requests
 
+from environment.aws.common.versions import resolve_latest_version
 from environment.aws.download_tool import ToolName, download_tool
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -47,15 +47,17 @@ def ts_to_topology(ts_platform: str) -> str:
     raise ValueError(f"Unknown test server platform: {ts_platform}")
 
 
-def resolved_version(product: str, version: str) -> str:
-    if len(version.split(".")) >= 3:
+def resolved_version(product: str, version: str | None) -> str:
+    """
+    Resolves `version` to a concrete released version of `product`. A full
+    x.y.z version is returned as-is; a partial version (e.g. "7.6") resolves
+    to the latest release matching that prefix; `None` resolves to the true
+    latest release.
+    """
+    if version and len(version.split(".")) >= 3:
         return version
 
-    r = requests.get(f"http://proget.build.couchbase.com:8080/api/latest_release?product={product}&version={version}")
-    if r.status_code != 200:
-        raise RuntimeError(f"Failed to get latest version for {product} {version}: {r.text}")
-
-    return cast(str, r.json()["version"])
+    return resolve_latest_version(product, version)
 
 
 def get_platform_version(version_map: dict[str, str], platform: str) -> str:
@@ -108,11 +110,15 @@ def setup_test(
     topology_file_in: Path,
     config_file_in: Path,
     topology_tag: str,
-    couchbase_version: str = "7.6",
+    couchbase_version: str | None = None,
     setup_dir: str = "dev_e2e",
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version(s) and Sync Gateway version(s).
+
+    `couchbase_version` is resolved via `resolved_version()`: a full x.y.z version is used
+    as-is, a partial version (e.g. "7.6") resolves to the latest release matching that
+    prefix, and `None` (the default) resolves to the true latest Couchbase Server release.
 
     `cbl_versions` is assigned positionally to `topology_file_in`'s test_servers, and
     `sgw_versions` positionally to its sync_gateways (only meaningful when sync_gateways
