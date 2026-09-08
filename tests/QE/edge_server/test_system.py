@@ -36,6 +36,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
+@pytest.mark.skip("These tests are marked for 6 hours each and flake as is - see CBL-8867")
 class TestSystem(CBLTestClass):
     async def _setup_system_test(
         self, cblpytest: CBLPyTest, tmp_path: Path
