@@ -116,23 +116,28 @@ class Caddy:
         """
         destination = Path(local_path)
         written = 0
-        async with aclosing(self._stream(self.url(filename), f"Download {filename}")) as stream:
-            # The first chunk comes before the file is opened, so a request that fails outright
-            # never creates the file at all.
-            first = await anext(stream, b"")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            try:
-                async with aiofiles.open(destination, "wb") as f:
-                    await f.write(first)
-                    written += len(first)
-                    async for chunk in stream:
-                        await f.write(chunk)
-                        written += len(chunk)
-            except BaseException:
-                # A file left half written is worse than none, since a caller cannot tell that
-                # it is incomplete.
-                destination.unlink(missing_ok=True)
-                raise
+        url = self.url(filename)
+        operation = f"Download {filename}"
+        with _tracer.start_as_current_span(
+            "caddy_request", attributes={"cbl.caddy.url": url, "cbl.caddy.operation": operation}
+        ):
+            async with aclosing(self._stream(url, operation)) as stream:
+                # The first chunk comes before the file is opened, so a request that fails
+                # outright never creates the file at all.
+                first = await anext(stream, b"")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    async with aiofiles.open(destination, "wb") as f:
+                        await f.write(first)
+                        written += len(first)
+                        async for chunk in stream:
+                            await f.write(chunk)
+                            written += len(chunk)
+                except BaseException:
+                    # A file left half written is worse than none, since a caller cannot tell
+                    # that it is incomplete.
+                    destination.unlink(missing_ok=True)
+                    raise
 
         cbl_info(f"Successfully downloaded {filename} to {destination} ({written} bytes)")
         return destination
@@ -183,13 +188,18 @@ class Caddy:
         :raises CblTimeoutError: If the transfer stalls, or exceeds the total budget
         :raises CblTestError: For other HTTP or network errors
         """
-        chunks = [chunk async for chunk in self._stream(url, operation, headers)]
+        with _tracer.start_as_current_span(
+            "caddy_request", attributes={"cbl.caddy.url": url, "cbl.caddy.operation": operation}
+        ):
+            chunks = [chunk async for chunk in self._stream(url, operation, headers)]
+
         return b"".join(chunks)
 
     async def _stream(self, url: str, operation: str, headers: dict[str, str] | None = None) -> AsyncGenerator[bytes]:
         """
         Yields the response body in chunks, so a caller never needs the whole file at once.
-        Yields nothing but a 200's body, since any other status raises.
+        Yields nothing but a 200's body, since any other status raises.  The caller owns the
+        span, since a generator suspends between chunks.
 
         :param url: Full Caddy URL to request
         :param operation: Description of the operation, used in error messages
@@ -202,43 +212,40 @@ class Caddy:
         # Tracked across the whole transfer so a failure can report how far it got.
         received = 0
         expected: int | None = None
-        with _tracer.start_as_current_span(
-            "caddy_request", attributes={"cbl.caddy.url": url, "cbl.caddy.operation": operation}
-        ):
-            try:
-                async with self.__session.get(url, headers=headers) as response:
-                    if response.status == 404:
-                        raise FileNotFoundError(f"{operation} not found at {url}")
-                    if response.status != 200:
-                        # An error page can be arbitrarily large, and its body goes in the
-                        # message, so keep only the head of it, as bytes if it is not text.
-                        body = await response.content.read(4 * 1024)
-                        received += len(body)
-                        try:
-                            detail = body.decode("utf-8")
-                        except UnicodeDecodeError:
-                            detail = f"binary body of {len(body)} bytes, starting {body[:200]!r}"
+        try:
+            async with self.__session.get(url, headers=headers) as response:
+                if response.status == 404:
+                    raise FileNotFoundError(f"{operation} not found at {url}")
+                if response.status != 200:
+                    # An error page can be arbitrarily large, and its body goes in the
+                    # message, so keep only the head of it, as bytes if it is not text.
+                    body = await response.content.read(4 * 1024)
+                    received += len(body)
+                    try:
+                        detail = body.decode("utf-8")
+                    except UnicodeDecodeError:
+                        detail = f"binary body of {len(body)} bytes, starting {body[:200]!r}"
 
-                        raise CblTestError(f"{operation} failed: HTTP {response.status} - {detail}")
+                    raise CblTestError(f"{operation} failed: HTTP {response.status} - {detail}")
 
-                    expected = response.content_length
-                    async for chunk in response.content.iter_chunked(_CHUNK_SIZE):
-                        received += len(chunk)
-                        yield chunk
+                expected = response.content_length
+                async for chunk in response.content.iter_chunked(_CHUNK_SIZE):
+                    received += len(chunk)
+                    yield chunk
 
-            # Must precede ClientError, which aiohttp's timeouts subclass, or it never runs.  A
-            # total timeout raises a bare TimeoutError that stringifies to "", so lead with the
-            # URL, the progress and the budgets, and append its own text only if it has any.
-            except TimeoutError as e:
-                detail = f": {e}" if str(e) else ""
-                # The aiohttp session's own budgets, so the message stays true to what expired.
-                budgets = self.__session.timeout
-                raise CblTimeoutError(
-                    f"{operation} timed out at {url} after receiving {describe_transfer(received, expected)} "
-                    f"(connect {budgets.connect}s, read-chunk {budgets.sock_read}s, total {budgets.total}s){detail}"
-                ) from e
-            except ClientError as e:
-                raise CblTestError(
-                    f"Network error during {operation} at {url} after receiving "
-                    f"{describe_transfer(received, expected)}: {e}"
-                ) from e
+        # Must precede ClientError, which aiohttp's timeouts subclass, or it never runs.  A
+        # total timeout raises a bare TimeoutError that stringifies to "", so lead with the
+        # URL, the progress and the budgets, and append its own text only if it has any.
+        except TimeoutError as e:
+            detail = f": {e}" if str(e) else ""
+            # The aiohttp session's own budgets, so the message stays true to what expired.
+            budgets = self.__session.timeout
+            raise CblTimeoutError(
+                f"{operation} timed out at {url} after receiving {describe_transfer(received, expected)} "
+                f"(connect {budgets.connect}s, read-chunk {budgets.sock_read}s, total {budgets.total}s){detail}"
+            ) from e
+        except ClientError as e:
+            raise CblTestError(
+                f"Network error during {operation} at {url} after receiving "
+                f"{describe_transfer(received, expected)}: {e}"
+            ) from e
