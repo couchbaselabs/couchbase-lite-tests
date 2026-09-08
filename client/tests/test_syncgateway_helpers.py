@@ -492,7 +492,7 @@ class TestWaitForCachingFeed:
             return ChangesResponse({"results": [entry], "last_seq": "5"})
 
         # An instance attribute, so only this SyncGateway is affected.
-        sg.get_changes = fake_get_changes  # type: ignore[method-assign]
+        sg.get_changes = fake_get_changes  # ty: ignore[invalid-assignment]
 
     @pytest.mark.asyncio
     async def test_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
