@@ -61,6 +61,7 @@ class FakeSyncGateway(SyncGateway):
         path: str,
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
+        log_response: bool = True,
     ) -> Any:
         self.sent_requests.append((method, path, payload))
         return self.send_request_result

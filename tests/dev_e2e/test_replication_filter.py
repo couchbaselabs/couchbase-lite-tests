@@ -338,6 +338,7 @@ class TestReplicationFilter(CBLTestClass):
         await sync_gateway.update_documents(
             "names",
             [DocumentUpdateEntry("test_public", None, {"hello": "world", "channels": ["!"]})],
+            wait_for_caching_feed=True,
         )
         snapshot_updater.upsert_document(
             "_default._default",
