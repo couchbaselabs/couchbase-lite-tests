@@ -34,6 +34,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
 - Python 3.13+
 - `uv` ([docs](https://docs.astral.sh/uv/))
 - Git LFS (install **before** cloning — the repo carries binary datasets via LFS)
+- .NET SDK matching `servers/dotnet/global.json` (only needed for `servers/dotnet/` work). If `dotnet` on `PATH` doesn't satisfy the pinned version, also check `$HOME/.dotnetX/dotnet` (or platform equivalent), where `X` is the major version from `global.json`'s `sdk.version` (e.g. `.dotnet10` for `10.0.200`) — a common location for a dotnet-install.sh/.ps1-managed side-by-side SDK install.
 
 ## Setup
 

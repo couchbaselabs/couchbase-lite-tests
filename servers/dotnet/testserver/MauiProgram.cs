@@ -11,7 +11,7 @@ namespace TestServer;
 
 public static class MauiProgram
 {
-	public static string LogFilePath { get; private set; } = default!;
+    private static string LogFilePath { get; set; } = null!;
 
 	public static MauiApp CreateMauiApp()
 	{
@@ -37,8 +37,8 @@ public static class MauiProgram
 		logConfig.WriteTo.Debug(restrictedToMinimumLevel: LogEventLevel.Warning);
 #endif
 
-		Serilog.Log.Logger = logConfig.CreateLogger();
-        Serilog.Log.Logger.Write(LogEventLevel.Information, "Test server started at {time}", DateTimeOffset.UtcNow);
+		Log.Logger = logConfig.CreateLogger();
+        Log.Logger.Write(LogEventLevel.Information, "Test server started at {time}", DateTimeOffset.UtcNow);
 
 		LogSinks.Custom = new SerilogLogger(LogLevel.Debug);
 		LogSinks.Console = null;

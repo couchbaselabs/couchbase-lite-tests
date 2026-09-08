@@ -1,18 +1,17 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using System.Collections.Specialized;
 using System.Net;
 using System.Reflection;
 using System.Text.Json;
+using JetBrains.Annotations;
 using TestServer.Services;
-using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
     [HttpHandler("", noSession: true)]
-    public static Task GetRootHandler(JsonDocument body, HttpListenerResponse response)
+    [UsedImplicitly]
+    public static async Task GetRootHandler(JsonDocument body, HttpListenerResponse response)
     {
         var responseBody = new
         {
@@ -22,7 +21,6 @@ internal static partial class HandlerList
             device = CBLTestServer.ServiceProvider.GetRequiredService<IDeviceInformation>()
         };
 
-        response.WriteBody(responseBody);
-        return Task.CompletedTask;
+        await response.WriteBody(responseBody).ConfigureAwait(false);
     }
 }

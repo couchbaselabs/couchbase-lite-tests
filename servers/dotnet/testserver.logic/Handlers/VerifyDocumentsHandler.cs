@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using System.Dynamic;
 using System.Net;
 using System.Text.Json;
@@ -9,28 +10,25 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
-    internal readonly record struct VerifyDocumentsBody
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct VerifyDocumentsBody(
+        string database,
+        string snapshot,
+        IReadOnlyList<UpdateDatabaseEntry> changes)
     {
-        public required string database { get; init; }
+        public required string database { get; init; } = database;
 
-        public required string snapshot { get; init; }
+        public required string snapshot { get; init; } = snapshot;
 
-        public required IReadOnlyList<UpdateDatabaseEntry> changes { get; init; }
-
-        [JsonConstructor]
-        public VerifyDocumentsBody(string database, string snapshot, IReadOnlyList<UpdateDatabaseEntry> changes)
-        {
-            this.database = database;
-            this.snapshot = snapshot;
-            this.changes = changes;
-        }
+        public required IReadOnlyList<UpdateDatabaseEntry> changes { get; init; } = changes;
     }
 
     internal sealed class KeyPathValue
     {
         public bool Exists { get; }
 
-        public object? Value { get; } = null;
+        public object? Value { get; }
 
         public KeyPathValue()
         {
@@ -80,7 +78,7 @@ internal static partial class HandlerList
                 Success = false,
                 KeyPath = keyPath,
                 Expected = new KeyPathValue(expected.ToDocumentObject()),
-                Actual = new KeyPathValue(actual?.ToDocumentObject())
+                Actual = new KeyPathValue(actual.ToDocumentObject())
             };
         }
 
@@ -89,30 +87,26 @@ internal static partial class HandlerList
 
     internal static CompareResult IsEqual(Database db, string keyPath, object? expected, object? actual)
     {
-        switch(expected) {
-            case null:
-                return new CompareResult
-                {
-                    Success = actual == null,
-                    KeyPath = keyPath,
-                    Expected = new KeyPathValue(expected.ToDocumentObject()),
-                    Actual = new KeyPathValue(actual?.ToDocumentObject())
-                };
-            case Blob blob:
-                return IsEqual(db, keyPath, blob, actual);
-            case IMutableArray arr:
-                return IsEqual(db, keyPath, arr, actual as IArray);
-            case IMutableDictionary dict:
-                return IsEqual(db, keyPath, dict, actual as IDictionaryObject);
-            default:
-                return new CompareResult
-                {
-                    Success = expected.Equals(actual),
-                    KeyPath = keyPath,
-                    Expected = new KeyPathValue(expected.ToDocumentObject()),
-                    Actual = new KeyPathValue(actual?.ToDocumentObject())
-                };
-        }
+        return expected switch
+        {
+            null => new CompareResult
+            {
+                Success = actual == null,
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToDocumentObject()),
+                Actual = new KeyPathValue(actual?.ToDocumentObject())
+            },
+            Blob blob => IsEqual(db, keyPath, blob, actual),
+            IMutableArray arr => IsEqual(db, keyPath, arr, actual as IArray),
+            IMutableDictionary dict => IsEqual(db, keyPath, dict, actual as IDictionaryObject),
+            _ => new CompareResult
+            {
+                Success = expected.Equals(actual),
+                KeyPath = keyPath,
+                Expected = new KeyPathValue(expected.ToDocumentObject()),
+                Actual = new KeyPathValue(actual?.ToDocumentObject())
+            }
+        };
     }
 
     internal static CompareResult IsEqual(Database db, string keyPath, IMutableArray expected, IArray? actual)
@@ -185,15 +179,15 @@ internal static partial class HandlerList
         return new CompareResult();
     }
 
-    public static void HandleCompareFailure(Document existing, CompareResult compareResult, HttpListenerResponse response)
+    public static async Task HandleCompareFailure(Document existing, CompareResult compareResult, HttpListenerResponse response)
     {
         dynamic responseBody = new ExpandoObject();
         responseBody.result = false;
-        responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had unexpected properties at key '{compareResult.KeyPath.Substring(2)}'";
+        responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had unexpected properties at key '{compareResult.KeyPath[2..]}'";
         if (compareResult.Actual.Exists) {
             responseBody.actual = compareResult.Actual.Value;
-            if(compareResult.Actual.Value is Blob b && b.Content == null) {
-                responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had non-existent blob at key '{compareResult.KeyPath.Substring(2)}'"; ;
+            if(compareResult.Actual.Value is Blob { Content: null }) {
+                responseBody.description = $"Document '{existing.Id}' in '{existing.Collection!.Scope.Name}.{existing.Collection!.Name}' had non-existent blob at key '{compareResult.KeyPath[2..]}'";
             }
         }
 
@@ -204,7 +198,7 @@ internal static partial class HandlerList
         responseBody.document = existing.ToDictionary();
 
         try {
-            response.WriteBody((object)responseBody);
+            await response.WriteBody((object)responseBody).ConfigureAwait(false);
         } catch(Exception ex) {
             Serilog.Log.Logger.Error(ex, "Error writing VerifyDocuments body to response");
         }
@@ -213,21 +207,22 @@ internal static partial class HandlerList
     [HttpHandler("verifyDocuments")]
     public static async Task VerifyDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(response, out var verifyBody)) {
+        if (!body.RootElement.TryDeserialize<VerifyDocumentsBody>(out var verifyBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
             return;
         }
 
         var db = session.ObjectManager.GetDatabase(verifyBody.database);
         if (db == null) {
             // Error 1 : The specified database was not found.
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), HttpStatusCode.BadRequest);
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{verifyBody.database}'!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
             return;
         }
 
         var snapshot = session.ObjectManager.GetObject<Snapshot>(verifyBody.snapshot);
         if(snapshot == null) {
             // Error 2 : The specified snapshot was not found.
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), HttpStatusCode.BadRequest);
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find snapshot named '{verifyBody.snapshot}'!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
             return;
         }
 
@@ -238,20 +233,20 @@ internal static partial class HandlerList
             seenKeys.Add(key);
             if(!snapshot.ContainsKey(key)) {
                 // Error 3 : The document in the collection didn't exist in the snapshot.
-                response.WriteBody(Router.CreateErrorResponse($"Document '{change.documentID}' in '{change.collection}' does not exist in the snapshot"), HttpStatusCode.BadRequest);
+                await response.WriteBody(Router.CreateErrorResponse($"Document '{change.documentID}' in '{change.collection}' does not exist in the snapshot"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                 return;
             }
 
             using var existing = db.GetCollection(collSpec.name, collSpec.scope)?.GetDocument(change.documentID);
-            if (change.Type == UpdateDatabaseType.Purge || change.Type == UpdateDatabaseType.Delete) {
+            if (change.Type is UpdateDatabaseType.Purge or UpdateDatabaseType.Delete) {
                 if(existing != null) {
-                    // Case 2 : Document should be deleted but it wasn't.
-                    // Case 3 : Document should be purged but it wasn't.
+                    // Case 2 : Document should be deleted, but it wasn't.
+                    // Case 3 : Document should be purged, but it wasn't.
                     var verb = change.Type == UpdateDatabaseType.Purge ? "purged" : "deleted";
-                    response.WriteBody(new {
+                    await response.WriteBody(new {
                         result = false,
                         description = $"Document '{change.documentID}' in '{change.collection}' was not {verb}"
-                    });
+                    }).ConfigureAwait(false);
                     return;
                 }
 
@@ -259,11 +254,11 @@ internal static partial class HandlerList
             }
 
             if (existing == null) {
-                // Case 1: Document should exist in the collection but it doesn't exist to verify.
-                response.WriteBody(new {
+                // Case 1: Document should exist in the collection, but it doesn't exist to verify.
+                await response.WriteBody(new {
                     result = false,
                     description = $"Document '{change.documentID}' in '{change.collection}' was not found"
-                });
+                }).ConfigureAwait(false);
                 return;
             }
 
@@ -293,7 +288,7 @@ internal static partial class HandlerList
             var compareResult = IsEqual(db, "$", mutableCopy, existing);
             if(!compareResult.Success) {
                 // Case 4 : Document has unexpected properties.
-                HandleCompareFailure(existing, compareResult, response);
+                await HandleCompareFailure(existing, compareResult, response).ConfigureAwait(false);
                 return;
             }
         }
@@ -315,30 +310,30 @@ internal static partial class HandlerList
             using var existing = db.GetCollection(components[1], components[0])?.GetDocument(components[2]);
             if (entry.Value == null && existing != null) {
                 // Case 5 : Document shouldn't exist (null value in the snapshot), but the document does exist.
-                response.WriteBody(new
+                await response.WriteBody(new
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' should not exist"
-                });
+                }).ConfigureAwait(false);
             } else if (entry.Value != null && existing == null) {
-                // Case 1: Document should exist in the collection but it doesn't exist to verify.
-                response.WriteBody(new
+                // Case 1: Document should exist in the collection, but it doesn't exist to verify.
+                await response.WriteBody(new
                 {
                     result = false,
                     description = $"Document '{components[2]}' in '{collection}' was not found"
-                });
+                }).ConfigureAwait(false);
 
                 return;
             } else if (existing != null) {
                 var compareResult = IsEqual(db, "$", entry.Value, existing);
                 if (!compareResult.Success) {
                     // Case 4 : Document has unexpected properties.
-                    HandleCompareFailure(existing, compareResult, response);
+                    await HandleCompareFailure(existing, compareResult, response).ConfigureAwait(false);
                     return;
                 }
             }
         }
 
-        response.WriteBody(new { result = true });
+        await response.WriteBody(new { result = true }).ConfigureAwait(false);
     }
 }

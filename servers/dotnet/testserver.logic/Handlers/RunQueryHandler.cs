@@ -1,29 +1,27 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
 using System.Net;
-using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct RunQueryBody(string database, string query);
 
     [HttpHandler("runQuery")]
-    public static Task RunQueryHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task RunQueryHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<RunQueryBody>(response, out var runQueryBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<RunQueryBody>(out var runQueryBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var db = session.ObjectManager.GetDatabase(runQueryBody.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{runQueryBody.database}'"), HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{runQueryBody.database}'"), HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         using var query = db.CreateQuery(runQueryBody.query);
@@ -33,8 +31,7 @@ internal static partial class HandlerList
             results = results.Select(x => x.ToDictionary())
         };
 
-        response.WriteBody(retVal);
-        return Task.CompletedTask;
+        await response.WriteBody(retVal).ConfigureAwait(false);
     }
 }
 
