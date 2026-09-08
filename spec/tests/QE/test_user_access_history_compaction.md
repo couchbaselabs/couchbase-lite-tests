@@ -64,12 +64,13 @@ Compacting a specific channel out of a user's history removes it from subsequent
 while the user's actual current (live) channel access is provably unaffected.
 
 ### Steps
-1. Create doc1 (Channel A) and doc2 (Channel B)
-2. Get changes for user bob after user creation, bob should have access to both doc1 and doc2, store the checkpoint (last_seq value)
-3. Remove access to Channel A for bob 
-4. Get changes for user from previous checkpoint and bob should receive a revocation 
-5. Compact access history 
-6. Get changes again from the old checkpoint, no revocation should be sent
+1. Create a bucket and configure a Sync Gateway database on it
+2. Create doc1 (Channel A) and doc2 (Channel B)
+3. Get changes for user bob after user creation, bob should have access to both doc1 and doc2, store the checkpoint (last_seq value)
+4. Remove access to Channel A for bob 
+5. Get changes for user from previous checkpoint and bob should receive a revocation 
+6. Compact access history 
+7. Get changes again from the old checkpoint, no revocation should be sent
 
 ## test_compact_channel_not_in_history_is_idempotent_noop
 

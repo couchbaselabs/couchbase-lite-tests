@@ -136,12 +136,10 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
     async def test_compact_removes_channel_entry_without_touching_live_access(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
         db_name = "db"
+        password = "pass"
 
         self.mark_test_step("Create a bucket and configure a Sync Gateway database on it")
         await cblpytest.clusters[0].create_database(db_name, _ACCESS_TRACKING_CONFIG)
-
-        self.mark_test_step("Create user 'bob' with access to channels 'A' and 'B'")
-        password = "pass"
         await sg.add_user(
             db_name,
             "bob",
@@ -149,34 +147,46 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             collection_access={"_default": {"_default": {"admin_channels": ["A", "B"]}}},
         )
 
-        self.mark_test_step("Update user 'bob' to remove access to channel 'A' only (revoke 'A', keep 'B')")
-        await sg.add_user(
-            db_name, "bob", password=password, collection_access={"_default": {"_default": {"admin_channels": ["B"]}}}
-        )
+        self.mark_test_step("Create doc1 (Channel A) and doc2 (Channel B)")
+        await sg.create_document(db_name, "doc1", {"channels": ["A"]})
+        await sg.create_document(db_name, "doc2", {"channels": ["B"]})
 
-        self.mark_test_step("Get the user's access history and check that channel 'A' is present")
-        history = await sg.get_user_access_history(db_name, "bob")
-        assert "A" in _channels(history)
+        async with sg.get_user_client("bob", password) as bob:
+            self.mark_test_step(
+                "Get changes for user bob after user creation, bob should have access to both doc1 and doc2, "
+                "store the checkpoint (last_seq value)"
+            )
+            changes = await bob._send_request("get", f"/{db_name}._default._default/_changes")
+            doc_ids = {entry["id"] for entry in changes["results"]}
+            assert {"doc1", "doc2"} <= doc_ids
+            checkpoint = changes["last_seq"]
 
-        self.mark_test_step("Create a document in channel 'B'")
-        await sg.update_documents(db_name, [DocumentUpdateEntry("doc_b", None, {"channels": ["B"]})])
+            self.mark_test_step("Remove access to Channel A for bob")
+            await sg.add_user(
+                db_name,
+                "bob",
+                password=password,
+                collection_access={"_default": {"_default": {"admin_channels": ["B"]}}},
+            )
 
-        self.mark_test_step("Compact channel 'A' out of the user's access history")
-        compacted = await sg.compact_user_access_history(db_name, "bob", {"_default": {"_default": ["A"]}})
+            self.mark_test_step("Get changes for user from previous checkpoint and bob should receive a revocation")
+            changes_after_revoke = await bob._send_request(
+                "get", f"/{db_name}._default._default/_changes", params={"since": checkpoint}
+            )
+            revoked_ids = {entry["id"] for entry in changes_after_revoke["results"] if entry.get("removed")}
+            assert "doc1" in revoked_ids
 
-        self.mark_test_step("Check that the compact response reports channel 'A' as compacted")
-        assert "A" in _channels(compacted)
+            self.mark_test_step("Compact access history")
+            await sg.compact_user_access_history(db_name, "bob", {"_default": {"_default": ["A"]}})
 
-        self.mark_test_step("Get the user's access history again and check that channel 'A' is gone")
-        history_after = await sg.get_user_access_history(db_name, "bob")
-        assert "A" not in _channels(history_after)
-
-        self.mark_test_step(
-            "As user 'bob', fetch all documents and check that the channel-'B' document is still visible"
-        )
-        async with sg.get_user_client("bob", password) as user_client:
-            docs = await user_client.get_all_documents(db_name)
-            assert any(row.id == "doc_b" for row in docs.rows)
+            self.mark_test_step("Get changes again from the old checkpoint, no revocation should be sent")
+            changes_after_compact = await bob._send_request(
+                "get", f"/{db_name}._default._default/_changes", params={"since": checkpoint}
+            )
+            revoked_ids_after_compact = {
+                entry["id"] for entry in changes_after_compact["results"] if entry.get("removed")
+            }
+            assert not revoked_ids_after_compact
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_channel_not_in_history_is_idempotent_noop(self, cblpytest: CBLPyTest) -> None:
