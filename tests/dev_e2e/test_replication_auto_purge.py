@@ -1198,7 +1198,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             [
                 DocumentUpdateEntry(
                     "post_1",
-                    revid=None,
+                    revision=None,
                     body={"title": "Post 1", "channels": ["group1"]},
                 )
             ],

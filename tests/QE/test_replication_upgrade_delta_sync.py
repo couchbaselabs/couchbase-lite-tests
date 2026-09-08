@@ -95,7 +95,6 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         self.mark_test_step(f"Mutate '{doc_id}' on 4.x SGW to create a new revtree leaf + HLV.")
         current = await sg.get_document("upgrade", doc_id)
-        assert current.revid is not None, f"Expected '{doc_id}' to have a revid"
         deltas_sent_before = _deltas_sent(await sg.get_delta_sync_stats("upgrade"))
         await sg.update_documents(
             "upgrade",
@@ -110,15 +109,15 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         def validator(pre: DocSnapshot, post: DocSnapshot) -> None:
             assert pre.local.revid is not None and pre.local.cv is None, (
-                f"Pre local expected revtree-only: revid={pre.local.revid}, hlv={pre.local.cv}"
+                f"Pre local expected revtree-only: revision={pre.local.revid}, hlv={pre.local.cv}"
             )
-            assert pre.remote.revid is not None and pre.remote.cv is not None, (
-                f"Pre remote expected revtree+HLV: revid={pre.remote.revid}, hlv={pre.remote.cv}"
+            assert pre.remote.cv is not None, (
+                f"Pre remote expected revtree+HLV: revision={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert not pre.remote.cv.endswith("@Revision+Tree+Encoding"), (
                 f"Pre remote expected canonical HLV, got RTE-encoded: {pre.remote.cv}"
             )
-            assert post.local.revid is None, f"Post local expected HLV-only, got revid={post.local.revid}"
+            assert post.local.revid is None, f"Post local expected HLV-only, got revision={post.local.revid}"
             assert post.local.cv and post.local.cv == post.remote.cv, (
                 f"Post HLV mismatch: local={post.local.cv}, remote={post.remote.cv}"
             )
@@ -149,10 +148,10 @@ class TestUpgradeDeltaSync(CBLTestClass):
 
         def validator(pre: DocSnapshot, post: DocSnapshot) -> None:
             assert pre.local.revid is not None and pre.local.cv is None, (
-                f"Pre local expected revtree-only: revid={pre.local.revid}, hlv={pre.local.cv}"
+                f"Pre local expected revtree-only: revision={pre.local.revid}, hlv={pre.local.cv}"
             )
-            assert pre.remote.revid is not None and pre.remote.cv is None, (
-                f"Pre remote expected revtree-only (no HLV): revid={pre.remote.revid}, hlv={pre.remote.cv}"
+            assert pre.remote.cv is None, (
+                f"Pre remote expected revtree-only (no HLV): revision={pre.remote.revid}, hlv={pre.remote.cv}"
             )
             assert pre.local.revid < pre.remote.revid, (
                 f"Pre expected local revid < remote revid: local={pre.local.revid}, remote={pre.remote.revid}"

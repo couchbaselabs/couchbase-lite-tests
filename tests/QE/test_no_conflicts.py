@@ -79,13 +79,14 @@ class TestNoConflicts(CBLTestClass):
                 * In SGW: `"title"`: `"SGW Update"`
                 * In CBL: `"title"`: `"CBL Update"`
         """)
+        sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
         await asyncio.gather(
             sync_gateway.update_documents(
                 "posts",
                 [
                     DocumentUpdateEntry(
                         "post_1000",
-                        None,
+                        sg_doc.revid,
                         {"channels": ["group1"], "title": "SGW Update"},
                     )
                 ],
@@ -389,13 +390,14 @@ class TestNoConflicts(CBLTestClass):
                 * In DB2: `"title": "CBL2 Update 1"`
                 * In DB3: `"title": "CBL3 Update 1"`
         """)
+        sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
         await asyncio.gather(
             sync_gateway.update_documents(
                 "posts",
                 [
                     DocumentUpdateEntry(
                         "post_1000",
-                        None,
+                        sg_doc.revid,
                         {"channels": ["group1"], "title": "SGW Update 1"},
                     )
                 ],

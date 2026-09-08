@@ -103,7 +103,7 @@ class TestMultipleServers(CBLTestClass):
             docs_to_add = [
                 DocumentUpdateEntry(
                     id=f"test_doc_{i}",
-                    revid=None,
+                    revision=None,
                     body={
                         "type": "test_doc",
                         "index": i,
@@ -144,7 +144,7 @@ class TestMultipleServers(CBLTestClass):
                             updates = [
                                 DocumentUpdateEntry(
                                     id=f"test_doc_{i}",
-                                    revid=rev_map.get(f"test_doc_{i}"),  # Use current revision
+                                    revision=rev_map.get(f"test_doc_{i}"),  # Use current revision
                                     body={
                                         "type": "test_doc",
                                         "index": i,
@@ -225,7 +225,7 @@ class TestMultipleServers(CBLTestClass):
             docs_to_add = [
                 DocumentUpdateEntry(
                     id=f"test_doc_{i}",
-                    revid=None,
+                    revision=None,
                     body={
                         "type": "test_doc",
                         "index": i,
@@ -253,7 +253,7 @@ class TestMultipleServers(CBLTestClass):
             new_docs_during_failover = [
                 DocumentUpdateEntry(
                     id=f"test_doc_during_failover_{i}",
-                    revid=None,
+                    revision=None,
                     body={
                         "type": "test_doc_failover",
                         "index": i,
@@ -313,7 +313,7 @@ class TestISGRCollectionMapping(CBLTestClass):
             docs = [
                 DocumentUpdateEntry(
                     id=f"{collection}_doc_{i}",
-                    revid=None,
+                    revision=None,
                     body={"type": "test", "collection": collection, "index": i},
                 )
                 for i in range(num_docs)

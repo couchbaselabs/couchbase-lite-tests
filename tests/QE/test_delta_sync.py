@@ -500,7 +500,7 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify the `name` field of the doc (small change).
         """)
-        await sync_gateway.upsert_documents(
+        await sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
@@ -634,7 +634,7 @@ class TestDeltaSync(CBLTestClass):
                 Update docs in SGW:
                     * Modify content in document "doc1": `"name": "SGW"` (small change)
             """)
-            await sync_gateway.upsert_documents(
+            await sync_gateway.update_documents(
                 "short_expiry",
                 [
                     DocumentUpdateEntry(

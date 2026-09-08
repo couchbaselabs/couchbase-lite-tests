@@ -408,8 +408,8 @@ class TestSystemMultipeer(CBLTestClass):
             sgw_docs = docgen.generate_all_documents()
             docs_list = []
             for key, value in sgw_docs.items():
-                docs_list.append(DocumentUpdateEntry(key, revid=None, body=value))
-            await sgw.upsert_documents(db_name, docs_list)
+                docs_list.append(DocumentUpdateEntry(key, revision=None, body=value))
+            await sgw.update_documents(db_name, docs_list)
 
         async def insert_testserver(testserver_db: Database) -> None:
             docgen = JSONGenerator(random.randint(21, 50), size=DOC_COUNT, format="key-value")

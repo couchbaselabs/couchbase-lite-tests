@@ -257,6 +257,47 @@ class TestGetAllDatabasesVerbose:
         assert "2.state" in message
 
 
+class TestGetAllDocuments:
+    @pytest.mark.asyncio
+    async def test_asks_for_and_reports_both_revisions(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Sync Gateway 4.0 and later report a CV alongside the revid, but only the revid is
+        guaranteed, so a row carries both and `revision` stays the revid."""
+        sg, specs, received = sync_gateway
+        specs[:] = [
+            {
+                "status": 200,
+                "json": {
+                    "total_rows": 1,
+                    "rows": [{"key": "doc1", "id": "doc1", "value": {"rev": "1-abc", "cv": "18d3@src"}}],
+                },
+            }
+        ]
+
+        response = await sg.get_all_documents("db")
+
+        assert "show_cv=true" in received[0][_URL_KEY]
+        row = response.rows[0]
+        assert row.revid == "1-abc"
+        assert row.cv == "18d3@src"
+        assert row.revision == "1-abc"
+
+    @pytest.mark.asyncio
+    async def test_reports_no_cv_when_the_server_sends_none(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Edge Server shares this response class, and it answers with revids alone."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {
+                "status": 200,
+                "json": {"total_rows": 1, "rows": [{"key": "doc1", "id": "doc1", "value": {"rev": "1-abc"}}]},
+            }
+        ]
+
+        response = await sg.get_all_documents("db")
+
+        assert response.rows[0].cv is None
+        assert response.revmap == {"doc1": "1-abc"}
+
+
 class TestWaitForDbUp:
     @pytest.mark.asyncio
     async def test_succeeds_when_database_is_online(self, sync_gateway: SyncGatewayFixture) -> None:
@@ -632,11 +673,7 @@ class TestWaitForCachingFeed:
     async def test_bulk_update_waits_on_the_last_revision(self, sync_gateway: SyncGatewayFixture) -> None:
         """The last write's sequence covers the earlier ones, so only it is read back."""
         sg, specs, _ = sync_gateway
-        specs[:] = [
-            # update_documents rewrites revision IDs off _all_docs before it writes
-            {"status": 200, "json": {"rows": []}},
-            {"status": 201, "json": [{"id": "doc0", "rev": "2-aaa"}, {"id": "doc1", "rev": "2-abc"}]},
-        ]
+        specs[:] = [{"status": 201, "json": [{"id": "doc0", "rev": "2-aaa"}, {"id": "doc1", "rev": "2-abc"}]}]
         calls: list[dict] = []
         self._record_get_changes(sg, calls)
 
@@ -656,10 +693,7 @@ class TestWaitForCachingFeed:
     async def test_bulk_update_waits_for_a_tombstone(self, sync_gateway: SyncGatewayFixture) -> None:
         """A batch can end on a deletion, which the feed reports as deleted rather than live."""
         sg, specs, _ = sync_gateway
-        specs[:] = [
-            {"status": 200, "json": {"rows": [{"id": "doc1", "value": {"rev": "1-abc"}}]}},
-            {"status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]},
-        ]
+        specs[:] = [{"status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]}]
         calls: list[dict] = []
         self._record_get_changes(sg, calls, deleted=True)
 
@@ -675,15 +709,8 @@ class TestWaitForCachingFeed:
     async def test_bulk_update_fails_on_a_rejected_write(self, sync_gateway: SyncGatewayFixture) -> None:
         """_bulk_docs answers 201 even for writes it rejected, so the entries have to be checked."""
         sg, specs, _ = sync_gateway
-        specs[:] = [
-            {"status": 200, "json": {"rows": []}},
-            {"status": 201, "json": [{"id": "doc0", "error": "conflict", "status": 409}]},
-        ]
+        specs[:] = [{"status": 201, "json": [{"id": "doc0", "error": "conflict", "status": 409}]}]
         self._record_get_changes(sg, [])
 
-        with pytest.raises(AssertionError, match="rejected"):
-            await sg.update_documents(
-                "db",
-                [DocumentUpdateEntry("doc0", None, {"foo": "bar"})],
-                wait_for_caching_feed=True,
-            )
+        with pytest.raises(CblSyncGatewayBadResponseError, match="conflict"):
+            await sg.update_documents("db", [DocumentUpdateEntry("doc0", None, {"foo": "bar"})])

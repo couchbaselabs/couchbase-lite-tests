@@ -21,12 +21,13 @@ from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api import caddy
+from cbltest.api.bulk_docs import analyze_bulk_docs_response
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
-from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
+from cbltest.logging import cbl_error, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
@@ -275,7 +276,7 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the row"""
         return self.__revid
 
@@ -286,8 +287,8 @@ class AllDocumentsResponseRow:
 
     @property
     def revision(self) -> str:
-        """Gets the either revid or cv, whichever is populated (at least one must be)"""
-        return cast(str, self.__revid if self.__revid is not None else self.__cv)
+        """Gets the revision ID of the row"""
+        return self.__revid
 
     @property
     def doc(self) -> dict | None:
@@ -298,7 +299,7 @@ class AllDocumentsResponseRow:
         self,
         key: str,
         id: str,
-        revid: str | None,
+        revid: str,
         cv: str | None,
         doc: dict | None = None,
     ) -> None:
@@ -337,12 +338,12 @@ class AllDocumentsResponse:
                 AllDocumentsResponseRow(
                     row["key"],
                     row["id"],
-                    cast(str, rev["rev"]) if "rev" in rev else None,
+                    rev["rev"],
                     cast(str, rev["cv"]) if "cv" in rev else None,
                     doc,
                 )
             )
-            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
+            self.__revmap[row["id"]] = cast(str, rev["rev"])
 
 
 class ChangesResponseEntry:
@@ -381,7 +382,15 @@ class ChangesResponseEntry:
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
         changes_list = cast(list[dict], entry.get("changes", []))
-        self.__changes = [cast(str, c.get("rev") or c.get("cv")) for c in changes_list]
+        self.__changes: list[str] = []
+        for change in changes_list:
+            # The feed's version_type decides which of the two a change carries, so unlike a
+            # document body (which always has a rev) either one can be the missing one here.
+            version = change.get("rev", change.get("cv"))
+            assert isinstance(version, str), (
+                f"Changes feed entry for {self.__id} has neither a rev nor a cv: {change!r}"
+            )
+            self.__changes.append(version)
 
 
 class ChangesResponse:
@@ -415,42 +424,32 @@ class ChangesResponse:
 class DocumentUpdateEntry(JSONSerializable):
     """
     A class that represents an update to a document.
-    For creating a new document, set revid to None.
+    For creating a new document, set revision to None.
     """
 
     @property
     def id(self) -> str:
         """
-        Gets the ID of the entry (NOTE: Will go away once SGW supports VV in REST)
+        Gets the ID of the entry
         """
         return cast(str, self.__body["_id"])
-
-    @property
-    def rev(self) -> str | None:
-        """
-        Gets the rev ID of the entry (NOTE: Will go away once SGW supports VV in REST)
-        """
-        if "_rev" not in self.__body:
-            return None
-
-        return cast(str, self.__body["_rev"])
 
     @property
     def deleted(self) -> bool:
         """Gets whether this entry deletes the document"""
         return bool(self.__body.get("_deleted", False))
 
-    def __init__(self, id: str, revid: str | None, body: dict) -> None:
+    def __init__(self, id: str, revision: str | None, body: dict) -> None:
+        assert "_id" not in body, "_id will be overwritten by DocumentUpdateEntry.id"
+        assert "_rev" not in body, "_rev will be overwritten by DocumentUpdateEntry.revision"
+        assert "_cv" not in body, "_cv will be overwritten by DocumentUpdateEntry.revision"
         self.__body = body.copy()
         self.__body["_id"] = id
-        if revid:
-            self.__body["_rev"] = revid
-
-    def swap_rev(self, revid: str) -> None:
-        """
-        Changes the revid to the provided one (NOTE: Will go away once SGW supports VV in REST)
-        """
-        self.__body["_rev"] = revid
+        if revision:
+            if "@" in revision:
+                self.__body["_cv"] = revision
+            else:
+                self.__body["_rev"] = revision
 
     def to_json(self) -> Any:
         return self.__body
@@ -467,7 +466,7 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the document"""
         return self.__rev
 
@@ -492,7 +491,6 @@ class RemoteDocument(JSONSerializable):
         if self.__cv is not None:
             return self.__cv
 
-        assert self.__rev is not None
         return self.__rev
 
     @property
@@ -515,18 +513,14 @@ class RemoteDocument(JSONSerializable):
         return self.__seq
 
     def __init__(self, body: dict, seq: int | None = None, tombstone: bool = False) -> None:
-        if "error" in body:
-            raise ValueError("Trying to create remote document from error response")
-
         self.__seq = seq
         self.__tombstone = tombstone
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
-        self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
+        self.__rev = cast(str, body["_rev"])
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
-        if self.__rev is not None:
-            del self.__body["_rev"]
+        del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
 
@@ -536,6 +530,18 @@ class RemoteDocument(JSONSerializable):
         ret_val["_rev"] = self.__rev
         ret_val["_cv"] = self.__cv
         return ret_val
+
+
+def _write_response_body(response: dict, doc_id: str) -> dict:
+    """
+    Builds a document body out of the response to a write, which reports the same values as a
+    document body but under `id`, `rev` and (Sync Gateway 4.0 and later) `cv`.  A delete
+    acknowledgement does not always name the document, so `doc_id` stands in for a missing `id`.
+    """
+    assert "rev" in response, f"Unexpected response to a document write: {dumps(response)}"
+    body = {f"_{key}": response[key] for key in ("rev", "cv") if key in response}
+    body["_id"] = response.get("id", doc_id)
+    return body
 
 
 class CouchbaseVersion(ABC):
@@ -1082,19 +1088,6 @@ class _SyncGatewayBase:
             entries = _all_databases_verbose_adapter.validate_python(resp)
             return {entry.db_name: entry for entry in entries}
 
-    def _analyze_dataset_response(self, response: list) -> None:
-        assert isinstance(response, list), "Invalid bulk docs response (not a list)"
-        typed_response = cast(list, response)
-        for r in typed_response:
-            info = cast(dict, r)
-            assert isinstance(info, dict), "Invalid item inside bulk docs response list (not an object)"
-            if "error" in info:
-                raise CblSyncGatewayBadResponseError(
-                    info["status"],
-                    f"At least one bulk docs insert failed ({info['error']})",
-                    body=dumps(info),
-                )
-
     async def load_dataset(self, db_name: str, path: Path) -> None:
         """
         Populates a given database name with the JSON contents at the specified path
@@ -1129,7 +1122,7 @@ class _SyncGatewayBase:
                             f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                             JSONDictionary({"docs": collected}),
                         )
-                        self._analyze_dataset_response(resp)
+                        analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
                         collected.clear()
 
                     last_scope = scope
@@ -1142,7 +1135,7 @@ class _SyncGatewayBase:
                     f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                     JSONDictionary({"docs": collected}),
                 )
-                self._analyze_dataset_response(cast(list, resp))
+                analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
 
     async def get_all_documents(
         self,
@@ -1152,7 +1145,7 @@ class _SyncGatewayBase:
         include_docs: bool = False,
     ) -> AllDocumentsResponse:
         """
-        Gets all the documents in the given collection from Sync Gateway (id and revid)
+        Gets all the documents in the given collection from Sync Gateway (id, revid and CV)
 
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
@@ -1168,7 +1161,7 @@ class _SyncGatewayBase:
                 "cbl.include_docs": include_docs,
             },
         ):
-            params = {}
+            params = {"show_cv": "true"}
             if include_docs:
                 params["include_docs"] = "true"
 
@@ -1290,37 +1283,6 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
 
-    async def _rewrite_rev_ids(
-        self,
-        db_name: str,
-        updates: list[DocumentUpdateEntry],
-        scope: str,
-        collection: str,
-    ) -> None:
-        all_docs_body = [u.id for u in updates if u.rev is not None]
-        all_docs_response = await self._send_request(
-            "post",
-            f"/{db_name}.{scope}.{collection}/_all_docs",
-            JSONDictionary({"keys": all_docs_body}),
-        )
-
-        if not isinstance(all_docs_response, dict):
-            raise ValueError("Inappropriate response from sync gateway _all_docs (not JSON dict)")
-
-        rows = cast(dict, all_docs_response)["rows"]
-        if not isinstance(rows, list):
-            raise ValueError("Inappropriate response from sync gateway _all_docs (rows not a list)")
-
-        for r in cast(list, rows):
-            next_id = r["id"]
-            found = assert_not_null(
-                next((u for u in updates if u.id == next_id), None),
-                f"Unable to find {next_id} in updates!",
-            )
-            new_rev_id = r["value"]["rev"]
-            cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
-            found.swap_rev(new_rev_id)
-
     async def update_documents(
         self,
         db_name: str,
@@ -1337,12 +1299,12 @@ class _SyncGatewayBase:
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
         :param wait_for_caching_feed: If True, wait for a `request_plus` changes feed to report the last
-                                      revision this wrote, which covers the earlier ones too, and fail on
-                                      any update Sync Gateway rejected.  A replication started straight
-                                      after would otherwise read a feed that still has the documents at
-                                      their previous revisions (default False)
-        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway rejected an update,
-            answered with no usable entries, or the feed never reported the last revision written
+                                      revision this wrote, which covers the earlier ones too.  A replication
+                                      started straight after would otherwise read a feed that still has the
+                                      documents at their previous revisions (default False)
+        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update
+        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway answered with no usable
+            entries, or the feed never reported the last revision written
         """
         with self._tracer.start_as_current_span(
             "update_documents",
@@ -1352,8 +1314,6 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            await self._rewrite_rev_ids(db_name, updates, scope, collection)
-
             body = {"docs": [u.to_json() for u in updates]}
 
             response = await self._send_request(
@@ -1361,26 +1321,17 @@ class _SyncGatewayBase:
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
                 JSONDictionary(body),
             )
+            entries = analyze_bulk_docs_response(response, CblSyncGatewayBadResponseError)
 
             if not wait_for_caching_feed:
                 return
 
-            assert isinstance(response, list), f"Bulk update returned {response!r}, not a JSON array"
-            entries = cast(list[dict], response)
             assert entries, f"Bulk update of {len(updates)} documents returned no entries"
-            for entry in entries:
-                # _bulk_docs answers 201 even for writes it rejected
-                assert "error" not in entry, f"Bulk update was rejected: {dumps(entry)}"
 
             # The last revision's wait covers the earlier ones
-            last = entries[-1]
+            last = cast(dict, entries[-1])
             doc_id = last.get("id")
             assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
-            written = {"_id": doc_id}
-            if "rev" in last:
-                written["_rev"] = last["rev"]
-            if "cv" in last:
-                written["_cv"] = last["cv"]
 
             # A batch can end on a deletion, which the feed reports as deleted rather than live
             last_update = assert_not_null(
@@ -1389,71 +1340,13 @@ class _SyncGatewayBase:
             )
 
             await self._document_with_sequence(
-                written,
+                _write_response_body(last, doc_id),
                 db_name=db_name,
                 doc_id=doc_id,
                 scope=scope,
                 collection=collection,
                 tombstone=last_update.deleted,
             )
-
-    async def upsert_documents(
-        self,
-        db_name: str,
-        updates: list[DocumentUpdateEntry],
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> None:
-        """
-        Upserts a list of documents on Sync Gateway.
-        Its different from update_documents in that it will not overwrite the doc body in case the
-            doc already exists.
-        It will preserve the existing body fields and only add / update whatever is being passed,
-            like the behaviour shown by the function batch_upsert used in CBL updates.
-
-        :param db_name: The name of the DB endpoint to upsert
-        :param updates: A list of upserts to perform
-        :param scope: The scope that the upserts will be applied to (default '_default')
-        :param collection: The collection that the upserts will be applied to (default '_default')
-        """
-        with self._tracer.start_as_current_span(
-            "update_documents",
-            attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-            },
-        ):
-            merged_updates = []
-            for update in updates:
-                try:
-                    current_doc = await self.get_document(db_name, update.id, scope, collection)
-                    if current_doc is not None:
-                        current_body = dict(current_doc.body)
-                        current_body.update(update.to_json())
-                        current_body["_id"] = update.id
-                        if update.rev:
-                            current_body["_rev"] = update.rev
-                    else:
-                        current_body = update.to_json()
-                except Exception:
-                    current_body = update.to_json()
-                merged_updates.append(DocumentUpdateEntry(update.id, update.rev, current_body))
-
-            await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
-            body = {"docs": [u.to_json() for u in merged_updates]}
-            await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary(body),
-            )
-
-    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> str:
-        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
-        assert isinstance(response, dict)
-        response_dict = cast(dict, response)
-        assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
-        return cast(dict, response)["_rev"]
 
     async def delete_document(
         self,
@@ -1492,15 +1385,10 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
-            if "@" in revid:
-                new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
-            else:
-                new_rev_id = revid
-
             response = await self._send_request(
                 "delete",
                 f"/{db_name}.{scope}.{collection}/{doc_id}",
-                params={"rev": new_rev_id},
+                params={"rev": revid},
             )
 
             if not isinstance(response, dict):
@@ -1512,24 +1400,12 @@ class _SyncGatewayBase:
             if "error" in response:
                 raise CblSyncGatewayBadResponseError(500, f"Failed to delete document {doc_id}", body=dumps(response))
 
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
-            # RemoteDocument requires an ID, and the delete ack does not always carry one.
-            cast_resp.setdefault("_id", doc_id)
-
+            deleted = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp, tombstone=True)
+                return RemoteDocument(deleted, tombstone=True)
 
             return await self._document_with_sequence(
-                cast_resp,
+                deleted,
                 db_name=db_name,
                 doc_id=doc_id,
                 scope=scope,
@@ -1622,12 +1498,11 @@ class _SyncGatewayBase:
         since: int | str | None = None,
     ) -> RemoteDocument:
         """Wait for the write `body` describes to reach the caching feed, and return it with its sequence."""
-        assert "_rev" in body or "_cv" in body, (
-            f"Write of document {doc_id} returned neither a revision ID nor a CV, "
-            "so its sequence cannot be read back from the changes feed"
+        assert "_rev" in body, (
+            f"Write of document {doc_id} returned no revision ID, so its sequence cannot be read "
+            "back from the changes feed"
         )
-        version_type = "rev" if "_rev" in body else "cv"
-        expected_revision = cast(str, body[f"_{version_type}"])
+        expected_revision = cast(str, body["_rev"])
 
         # No `doc_ids`: only the unfiltered feed honours `request_plus`.  `RequestPlusSeq` is read
         # by `SimpleMultiChangesFeed` alone, while a `_doc_ids` feed comes from `DocIDChangesFeed`,
@@ -1639,7 +1514,7 @@ class _SyncGatewayBase:
             db_name,
             scope,
             collection,
-            version_type=version_type,
+            version_type="rev",
             request_plus=True,
             since=since,
             log_response=False,
@@ -1688,7 +1563,7 @@ class _SyncGatewayBase:
         :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
                       after this sequence; pass the `seq` of the previous write when writing in a
                       loop, so each wait does not re-read the whole feed
-        :return: The created document.  Never None; every failure raises
+        :return: The written document's id and revision (a write reports no body)
         :raises CblSyncGatewayBadResponseError: if the write is rejected, or the response is not a
                                                 document
         """
@@ -1716,25 +1591,13 @@ class _SyncGatewayBase:
                     f"Failed to create document {doc_id}: unexpected response type",
                     body=str(response),
                 )
-            if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}", body=dumps(response))
 
-            # Convert response to match expected format
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
+            created = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp)
+                return RemoteDocument(created)
 
             return await self._document_with_sequence(
-                cast_resp, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
+                created, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
             )
 
     async def update_document(
@@ -1765,7 +1628,7 @@ class _SyncGatewayBase:
         :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
                       after this sequence; pass the `seq` of the previous write when writing in a
                       loop, so each wait does not re-read the whole feed
-        :return: The updated document as a RemoteDocument object
+        :return: The written document's id and revision (a write reports no body)
         :raises AssertionError: if `wait_for_caching_feed` is set and the response carries no revision,
             or the feed never reported the revision written
         """
@@ -1779,6 +1642,9 @@ class _SyncGatewayBase:
             },
         ):
             body = dict(document)
+            assert "_id" not in body, f"_id will be overwritten by {doc_id}"
+            assert "_rev" not in body, f"_rev will be overwritten by {rev}"
+            assert "_cv" not in body, "_cv would be ignored by _rev"
             body["_id"] = doc_id
             body["_rev"] = rev
 
@@ -1797,27 +1663,12 @@ class _SyncGatewayBase:
                     f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
                     body=str(response),
                 )
-            if "error" in response:
-                raise CblSyncGatewayBadResponseError(
-                    500, f"Failed to update document {doc_id} with rev {rev}", body=dumps(response)
-                )
-
-            # Convert response to match expected format
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
+            updated = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp)
+                return RemoteDocument(updated)
 
             return await self._document_with_sequence(
-                cast_resp, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
+                updated, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
             )
 
     async def close(self) -> None:
