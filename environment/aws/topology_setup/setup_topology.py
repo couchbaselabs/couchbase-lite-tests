@@ -160,8 +160,11 @@ class ConfigDefaults:
 
             self.SyncGateway.version.set_value(cast(str, other.SyncGateway.version.value))
 
-        if other.EdgeServer.version.is_set and self.EdgeServer.version.is_set:
-            raise Exception("Both main and included file are setting default ES version")
+        if other.EdgeServer.version.is_set:
+            if self.EdgeServer.version.is_set:
+                raise Exception("Both main and included file are setting default ES version")
+
+            self.EdgeServer.version.set_value(cast(str, other.EdgeServer.version.value))
 
 
 class ClusterConfig:
