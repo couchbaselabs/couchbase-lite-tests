@@ -127,7 +127,7 @@ if __name__ == "__main__":
 - **Never hand-edit generated topology** — it's written at runtime by setup_test.py
 - **Validate topology against schema** — `jsonschema` validates against `topology_schema.json`
 - **Template placeholders** are resolved at runtime: `{{version}}`, etc.
-- **Python 3.10+**: `X | Y`, never `Union[X, Y]`
+- **Python 3.13+**: `X | Y`, never `Union[X, Y]`
 - **⚠️ DO NOT create markdown documentation files** for changes. Markdown is for AI understanding only. The actual pipeline code is self-documenting via shared scripts and comments.
 
 ## Commands

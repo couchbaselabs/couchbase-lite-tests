@@ -255,7 +255,9 @@ class _FileScope(NamedTuple):
 
 
 def _build_scope(tree: ast.Module, path: Path) -> _FileScope:
-    module_funcs = {n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+    module_funcs: dict[str, ast.AST] = {
+        n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
     imports: dict[str, tuple[str, str]] = {}
     for node in tree.body:
         if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
@@ -458,7 +460,9 @@ class _Checker(ast.NodeVisitor):
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
         self._class_markers.append(_min_markers(node.decorator_list))
-        methods = {n.name: n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        methods: dict[str, ast.AST] = {
+            n.name: n for n in node.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+        }
         self._class_methods_stack.append(methods)
         self._class_autouse_stack.append(_class_autouse_usage(methods, self._scope))
 

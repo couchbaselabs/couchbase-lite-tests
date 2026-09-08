@@ -12,7 +12,7 @@ from opentelemetry.trace import Span
 
 
 @pytest.fixture(scope="function", autouse=True)
-def span_generation(request: pytest.FixtureRequest) -> Generator[Span | None, None, None]:
+def span_generation(request: pytest.FixtureRequest) -> Generator[Span | None]:
     otel_endpoint = request.config.getoption("--otel-endpoint")
     if otel_endpoint is not None:
         tracer = trace.get_tracer("cbltest", VERSION)

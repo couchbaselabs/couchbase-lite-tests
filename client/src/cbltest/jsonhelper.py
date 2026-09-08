@@ -1,9 +1,7 @@
 import json
-from typing import Any, TypeVar, cast, get_origin
+from typing import Any, cast, get_origin
 
 from .logging import cbl_info, cbl_warning
-
-T = TypeVar("T")
 
 
 def dumps_with_ellipsis(obj: Any, limit: int = 100) -> str:
@@ -96,7 +94,7 @@ def _get_bool_or_default(d: dict, key: str, default: bool) -> bool:
     return cast(bool, ret_val)
 
 
-def _get_typed(d: dict, key: str, expected_type: type[T]) -> T | None:
+def _get_typed[T](d: dict, key: str, expected_type: type[T]) -> T | None:
     if key not in d:
         return None
 
@@ -114,12 +112,12 @@ def _get_typed(d: dict, key: str, expected_type: type[T]) -> T | None:
     return cast(T, ret_val)
 
 
-def _get_typed_nonnull(d: dict, key: str, expected_type: type[T], default: T) -> T:
+def _get_typed_nonnull[T](d: dict, key: str, expected_type: type[T], default: T) -> T:
     found_val = _get_typed(d, key, expected_type)
     return found_val if found_val is not None else default
 
 
-def _get_typed_required(d: dict, key: str, expected_type: type[T]) -> T:
+def _get_typed_required[T](d: dict, key: str, expected_type: type[T]) -> T:
     if key not in d:
         raise ValueError(f"Missing required key {key} in dictionary!")
 

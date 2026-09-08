@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -15,22 +15,22 @@ SCRIPT_DIR = str(Path(__file__).parent)
 @pytest.mark.min_edge_servers(1)
 class TestChangesFeed(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_changes_feed_longpoll(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_changes_feed_longpoll(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
             doc_id = f"doc_{i}"
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
-            server.upsert_document(bucket_name, doc_id, doc)
+            await server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
@@ -54,6 +54,7 @@ class TestChangesFeed(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -106,7 +107,7 @@ class TestChangesFeed(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, f"Failed to create document {doc_id} via Edge Server"
@@ -122,6 +123,6 @@ class TestChangesFeed(CBLTestClass):
             es_db_name,
             feed="longpoll",
             filter_type="doc_ids",
-            doc_ids=["doc_10", "doc_9"],
+            doc_ids=["doc_11", "doc_12"],
         )
         assert len(changes["results"]) == 2, f"Expected 2 changes, but got {len(changes['results'])} changes."

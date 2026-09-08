@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using JetBrains.Annotations;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
@@ -40,21 +41,22 @@ internal static partial class HandlerList
 
     internal sealed class ReplicatorDocumentIDsFilter : IReplicatorFilter
     {
-        private const string DocumentIDsKey = "documentIDs";
+        private const string DOCUMENT_IDS_KEY = "documentIDs";
+        
         private readonly Dictionary<string, IReadOnlySet<string>> _allowedDocumentIDs;
 
         public ReplicatorDocumentIDsFilter(IReadOnlyDictionary<string, JsonElement>? args)
         {
-            if(args?.ContainsKey(DocumentIDsKey) == false) {
+            if(args?.ContainsKey(DOCUMENT_IDS_KEY) == false) {
                 throw new ApplicationStatusException("documentIDs filter is missing documentIDs argument", HttpStatusCode.BadRequest);
             }
 
-            if (args![DocumentIDsKey].ValueKind != JsonValueKind.Object) {
+            if (args![DOCUMENT_IDS_KEY].ValueKind != JsonValueKind.Object) {
                 throw new ApplicationStatusException("documentIDs filter documentIDs argument wrong type (expecting dictionary of arrays)",
                     HttpStatusCode.BadRequest);
             }
 
-            _allowedDocumentIDs = args[DocumentIDsKey].EnumerateObject().ToDictionary(x => x.Name, IReadOnlySet<string> (x) =>
+            _allowedDocumentIDs = args[DOCUMENT_IDS_KEY].EnumerateObject().ToDictionary(x => x.Name, IReadOnlySet<string> (x) =>
             {
                 if (x.Value.ValueKind != JsonValueKind.Array) {
                     throw new ApplicationStatusException($"documentIDs filter documentIDs argument contained invalid list for '{x.Name}'",
@@ -78,14 +80,19 @@ internal static partial class HandlerList
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct DocumentReplicationEvent
     {
+        [UsedImplicitly]
         public required bool isPush { get; init; }
 
+        [UsedImplicitly]
         public required string collection { get; init; }
 
+        [UsedImplicitly]
         public required string documentID { get; init; }
 
+        [UsedImplicitly]
         public required IReadOnlyList<string> flags { get; init; }
 
+        [UsedImplicitly]
         public ErrorReturnBody? error { get; init; }
     }
 
@@ -152,8 +159,10 @@ internal static partial class HandlerList
         private const string BasicType = "BASIC";
 
         // Note that System.Text.Json does not support private fields or properties
+        // ReSharper disable MemberCanBePrivate.Global
         public readonly string username = "";
         public readonly string password = "";
+        // ReSharper restore MemberCanBePrivate.Global
 
         public required string type { get; init; }
 
@@ -199,11 +208,22 @@ internal static partial class HandlerList
     internal readonly record struct StartReplicatorCollection
     {
         public required IReadOnlyList<string> names { get; init; }
+        
+        [UsedImplicitly]
         public IReadOnlyList<string> channels { get; init; }
+        
+        [UsedImplicitly]
         public IReadOnlyList<string> documentIDs { get; init; }
+        
+        [UsedImplicitly]
         public StartReplicatorFilter? pushFilter { get; init; }
+        
+        [UsedImplicitly]
         public StartReplicatorFilter? pullFilter { get; init; }
+        
+        [UsedImplicitly]
         public StartReplicatorConflictResolver? conflictResolver { get; init; }
+        
         public IConflictResolver? ConflictResolver { get; }
 
         [JsonConstructor]
@@ -247,21 +267,27 @@ internal static partial class HandlerList
         public required string endpoint { get; init; }
 
         public required bool continuous { get; init; }
-
+        
+        [UsedImplicitly]
         public required string replicatorType { get; init; }
 
         public required IReadOnlyList<StartReplicatorCollection> collections { get; init; }
 
+        [UsedImplicitly]
         public StartReplicatorAuthenticator? authenticator { get; init; }
 
         public ReplicatorType ReplicatorType { get; }
 
+        [UsedImplicitly]
         public bool enableDocumentListener { get; init; }
 
+        [UsedImplicitly]
         public bool enableAutoPurge { get; init; }
 
+        [UsedImplicitly]
         public string? pinnedServerCert { get; init; }
 
+        [UsedImplicitly]
         public IReadOnlyDictionary<string, string?>? headers { get; init; }
 
         [JsonConstructor]
@@ -281,11 +307,11 @@ internal static partial class HandlerList
             this.pinnedServerCert = pinnedServerCert;
             this.headers = headers;
 
-            if (replicatorType.ToLowerInvariant() == "pull") {
+            if (replicatorType.Equals("pull", StringComparison.InvariantCultureIgnoreCase)) {
                 ReplicatorType = ReplicatorType.Pull;
-            } else if (replicatorType.ToLowerInvariant() == "push") {
+            } else if (replicatorType.Equals("push", StringComparison.InvariantCultureIgnoreCase)) {
                 ReplicatorType = ReplicatorType.Push;
-            } else if (replicatorType.ToLowerInvariant() == "pushandpull") {
+            } else if (replicatorType.Equals("pushandpull", StringComparison.InvariantCultureIgnoreCase)) {
                 ReplicatorType = ReplicatorType.PushAndPull;
             } else {
                 throw new JsonException($"Invalid replicatorType '{replicatorType}' (expecting push, pull, or pushAndPull)");
@@ -316,16 +342,17 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startReplicator")]
-    public static Task StartReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task StartReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(response, out var deserializedBody)) {
-            return Task.CompletedTask;
+        if(!body.RootElement.TryDeserialize<StartReplicatorBody>(out var deserializedBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var db = session.ObjectManager.GetDatabase(deserializedBody.config.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{deserializedBody.config.database}'!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         var endpoint = new URLEndpoint(new Uri(deserializedBody.config.endpoint));
@@ -336,8 +363,8 @@ internal static partial class HandlerList
                     var spec = CollectionSpec(name);
                     var coll = db.GetCollection(spec.name, spec.scope);
                     if (coll == null) {
-                        response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), HttpStatusCode.BadRequest);
-                        return Task.CompletedTask;
+                        await response.WriteBody(Router.CreateErrorResponse($"Unable to find collection '{name}'"), HttpStatusCode.BadRequest).ConfigureAwait(false);
+                        return;
                     }
 
                     var collectionConfig = new CollectionConfiguration(coll)
@@ -374,7 +401,6 @@ internal static partial class HandlerList
 
         repl.Start(deserializedBody.reset);
 
-        response.WriteBody(new { id });
-        return Task.CompletedTask;
+        await response.WriteBody(new { id }).ConfigureAwait(false);
     }
 }

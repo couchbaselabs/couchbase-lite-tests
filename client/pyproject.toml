@@ -9,7 +9,7 @@ authors = [{ name = "Jim Borden", email = "jim.borden@couchbase.com" }]
 description = "A client for consuming the Couchbase Lite functional testing REST API"
 readme = "README.md"
 # couchbase SDK only has wheels for < 3.14
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.13,<3.14"
 license = { text = "Apache-2.0" }
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
@@ -58,6 +58,7 @@ sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
 timeout_fixture = "cbltest.plugins.timeout_fixture"
 cluster_cleanup = "cbltest.plugins.cluster_cleanup"
+sgw_cluster_manager = "cbltest.plugins.sgw_cluster_manager"
 
 [tool.hatch.version]
 path = "src/cbltest/version.py"

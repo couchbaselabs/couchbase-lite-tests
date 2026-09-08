@@ -5,7 +5,7 @@ from cbltest.api.error import CblTestError
 
 from .api.cluster import CouchbaseCluster
 from .api.couchbaseserver import CouchbaseServer
-from .api.edgeserver import EdgeServer
+from .api.edgeservermanager import EdgeServerManager
 from .api.syncgateway import SyncGateway
 from .api.syncgatewaycluster import SyncGatewayCluster
 from .api.testserver import TestServer
@@ -114,8 +114,8 @@ class CBLPyTest:
         return self.clusters[0].couchbase_servers if self.clusters else []
 
     @property
-    def edge_servers(self) -> Sequence[EdgeServer]:
-        """Gets the list of Edge Servers available"""
+    def edge_servers(self) -> Sequence[EdgeServerManager]:
+        """Gets the list of Edge Servers available, each with the client that talks to it"""
         return self.__edge_servers
 
     @property
@@ -132,6 +132,12 @@ class CBLPyTest:
         dataset_version: str = "4.0",
     ) -> "CBLPyTest":
         ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version)
+
+        # The Couchbase Server SDK is async, so the constructor cannot connect its nodes.
+        for cluster in ret_val.clusters:
+            for cbs in cluster.couchbase_servers:
+                await cbs.connect()
+
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
@@ -181,6 +187,7 @@ class CBLPyTest:
                         sgw_info.rbac_password,
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
+                        sgw_info.port,
                     ),
                     sgw_info.cluster_index,
                 )
@@ -195,18 +202,9 @@ class CBLPyTest:
 
         self.__clusters = cluster_builder.build()
 
-        self.__edge_servers: list[EdgeServer] = []
+        self.__edge_servers: list[EdgeServerManager] = []
         if not test_server_only:
-            for es in self.__config.edge_servers:
-                es_info = EdgeServerInfo(es)
-                self.__edge_servers.append(
-                    EdgeServer(
-                        es_info.hostname,
-                        es_info.admin_user,
-                        es_info.admin_password,
-                        es_info.config_path,
-                    )
-                )
+            self.__edge_servers = [EdgeServerManager(EdgeServerInfo(es)) for es in self.__config.edge_servers]
 
     async def resolve_api_version(self) -> None:
         apiVersion = 0
@@ -225,11 +223,13 @@ class CBLPyTest:
 
     async def close(self) -> None:
         """
-        Closes all the clusters
+        Closes all the clusters and edge servers
         """
         await self.request_factory.close()
         for cluster in self.__clusters:
             await cluster.close()
+        for edge_server in self.__edge_servers:
+            await edge_server.close()
 
     def __str__(self) -> str:
         ret_val = "Configuration:" + "\n" + str(self.__config) + "\n\n" + "Log Level: " + str(self.__log_level)

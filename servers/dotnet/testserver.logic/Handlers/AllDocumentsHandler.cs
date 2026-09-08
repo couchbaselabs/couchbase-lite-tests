@@ -1,27 +1,32 @@
-﻿using Couchbase.Lite;
-using System.Collections.Specialized;
-using System.Diagnostics;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using System.Net;
 using System.Text.Json;
+using JetBrains.Annotations;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
+[UsedImplicitly]
+[SuppressMessage("ReSharper", "InconsistentNaming")]
 internal readonly record struct AllDocumentsResponse(string id, string rev);
 
 internal static partial class HandlerList
 {
     [HttpHandler("getAllDocuments")]
-    public static Task AllDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    [UsedImplicitly]
+    public static async Task AllDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
         if(!body.RootElement.TryGetProperty("database", out var database) || database.ValueKind != JsonValueKind.String) {
-            response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(Router.CreateErrorResponse("'database' property not found or invalid"), 
+                HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         if(!body.RootElement.TryGetProperty("collections", out var collections) || collections.ValueKind != JsonValueKind.Array) {
-            response.WriteBody(Router.CreateErrorResponse("'collections' property not found or invalid"), HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(Router.CreateErrorResponse("'collections' property not found or invalid"), 
+                HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         var dbName = database.GetString()!;
@@ -34,11 +39,9 @@ internal static partial class HandlerList
                 message = $"database '{dbName}' not registered!"
             };
 
-            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
-
-
 
         var retVal = new Dictionary<string, List<AllDocumentsResponse>>();
         foreach(var collName in collections.EnumerateArray()
@@ -49,7 +52,6 @@ internal static partial class HandlerList
             retVal[collName] = results;
         }
 
-        response.WriteBody(retVal);
-        return Task.CompletedTask;
+        await response.WriteBody(retVal).ConfigureAwait(false);
     }
 }

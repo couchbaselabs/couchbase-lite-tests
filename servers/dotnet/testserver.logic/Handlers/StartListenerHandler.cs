@@ -1,8 +1,10 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using Couchbase.Lite.P2P;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using JetBrains.Annotations;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
@@ -10,25 +12,31 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct TLSIdentityData
     {
         public required string encoding { get; init; }
 
         public required string data { get; init; }
 
+        [UsedImplicitly]
         public string? password { get; init; }
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StartListenerBody
     {
         public required string database { get; init; }
 
         public required string[] collections { get; init; }
 
+        [UsedImplicitly]
         public ushort port { get; init; }
 
+        [UsedImplicitly]
         public bool disableTLS { get; init; }
 
+        [UsedImplicitly]
         public TLSIdentityData? identity { get; init; }
     }
 
@@ -57,10 +65,11 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("startListener")]
-    public static Task StartListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task StartListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StartListenerBody>(response, out var deserializedBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<StartListenerBody>(out var deserializedBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var dbObject = session.ObjectManager.GetDatabase(deserializedBody.database);
@@ -72,8 +81,8 @@ internal static partial class HandlerList
                 message = $"database '{deserializedBody.database}' not registered!"
             };
 
-            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         var collectionObjects = new List<Collection>();
@@ -99,8 +108,8 @@ internal static partial class HandlerList
                     message = $"Failed to import TLS identity for label '{label}': {e.Message}"
                 };
 
-                response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-                return Task.CompletedTask;
+                await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+                return;
             }
 
             if (tlsIdentity == null) {
@@ -111,8 +120,8 @@ internal static partial class HandlerList
                     message = $"TLS enabled but no existing TLS identity found for label '{label}'"
                 };
 
-                response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-                return Task.CompletedTask;
+                await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+                return;
             }
         }
         var listenerConfig = new URLEndpointListenerConfiguration(collectionObjects)
@@ -122,7 +131,7 @@ internal static partial class HandlerList
             TlsIdentity = tlsIdentity
         };
 
-        (var listener, var id) = session.ObjectManager.RegisterObject(() => new URLEndpointListener(listenerConfig));
+        var (listener, id) = session.ObjectManager.RegisterObject(() => new URLEndpointListener(listenerConfig));
         listener.Start();
 
         var responseBody = new Dictionary<string, object>
@@ -131,7 +140,6 @@ internal static partial class HandlerList
             { "port", listener.Port }
         };
 
-        response.WriteBody(responseBody);
-        return Task.CompletedTask;
+        await response.WriteBody(responseBody).ConfigureAwait(false);
     }
 }

@@ -1,5 +1,6 @@
+import asyncio
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -9,6 +10,9 @@ from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
+
+AUDIT_FLUSH_WAIT = 5
+"""Seconds to let the Edge Server put its records on disk, measured at about one."""
 
 AUDIT_ASSERTIONS: dict[str, list[tuple[str, bool, str]]] = {
     "default": [
@@ -82,22 +86,23 @@ class TestLogging(CBLTestClass):
         cblpytest: CBLPyTest,
         dataset_path: Path,
         audit_mode: str,
+        tmp_path: Path,
     ) -> None:
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
             doc_id = f"doc_{i}"
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
-            server.upsert_document(bucket_name, doc_id, doc)
+            await server.upsert_document(bucket_name, doc_id, doc)
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"
@@ -128,6 +133,7 @@ class TestLogging(CBLTestClass):
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -140,9 +146,12 @@ class TestLogging(CBLTestClass):
         self.mark_test_step("Checking that Edge Server has 5 documents.")
         assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
 
+        self.mark_test_step("Waiting for the Edge Server to write its audit records.")
+        await asyncio.sleep(AUDIT_FLUSH_WAIT)
+
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
-            log = await edge_server.check_log(event_id)
+            log = await edge_server.check_audit_log(event_id)
             if expected_non_empty:
                 assert len(log) > 0, f"Audit log for {step_name} event not found"
             else:
@@ -154,7 +163,7 @@ class TestLogging(CBLTestClass):
             doc = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             response = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
             assert response is not None, f"Failed to create document {doc_id} via Edge Server."
@@ -164,7 +173,7 @@ class TestLogging(CBLTestClass):
             updated_doc_body = {
                 "id": doc_id,
                 "channels": ["public"],
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "changed": "yes",
             }
             updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id, es_db_name, rev=rev_id)
@@ -175,8 +184,10 @@ class TestLogging(CBLTestClass):
                 f"Failed to delete document {doc_id} via Edge Server."
             )
 
+            await asyncio.sleep(AUDIT_FLUSH_WAIT)
+
             self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
             for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
-                log = await edge_server.check_log(event_id)
+                log = await edge_server.check_audit_log(event_id)
                 assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"

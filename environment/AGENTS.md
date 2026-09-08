@@ -124,23 +124,22 @@ Granular destroy targets individual `aws_instance` resources by index, e.g. `-ta
 - Pre-existing: VPC subnet 10.0.1.0/24, routing rules
 - Required version: `>= 1.2.0`
 
-## Setup Script Pattern (every `*_setup/setup_*.py`)
+## Setup Script Pattern (new `*_setup/setup_*.py`)
 
 ```python
-import paramiko
 from environment.aws.common.docker import start_container, remote_exec
 from environment.aws.common.io import sftp_progress_bar, get_ec2_hostname
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 
 def main(topology: TopologyConfig) -> None:
     hostname = get_ec2_hostname(...)  # Hostname from Terraform state
-    ssh = paramiko.SSHClient()
-    ssh.connect(hostname, username="ec2-user", pkey=pkey)
-    sftp_progress_bar(sftp, local_path, remote_path)  # Upload via SFTP
-    remote_exec(ssh, "install_command", "Installing…")
-    start_container(name, image, hostname, pkey, ...)  # Docker / systemd
+    with connect_ssh(hostname, pkey=pkey) as ssh:
+        sftp_progress_bar(sftp, local_path, remote_path)  # Upload via SFTP
+        remote_exec(ssh, "install_command", "Installing…")
+        start_container(name, image, hostname, pkey, ...)  # Docker / systemd
 ```
 
 ## Topology System
@@ -222,7 +221,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - Terraform `>= 1.2.0`
 - SSH config: `Host *.amazonaws.com` with `StrictHostKeyChecking accept-new`
 - Git LFS (datasets)
-- Python 3.10+ with `uv`
+- Python 3.13+ with `uv`
 - iOS only: Xcode 16+, `libimobiledevice`, iPhone Private WiFi OFF
 
 ## Rules
@@ -231,10 +230,10 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - **Always tear down via `stop_backend.py`** — prevents orphaned EC2 instances ($$$)
 - **AWS SSO must be active** — `aws sso login` before any orchestrator op
 - **Topology files are generated** by `jenkins/` setup scripts — don't hand-edit for CI
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`
+- **Python 3.13+** — modern syntax enforced by ruff `UP` + pyupgrade (see root [AGENTS.md](../AGENTS.md))
 - **`uv run` is required** for AWS scripts (uses root workspace deps — there is no separate `orchestrator` dep group)
 - **Use `click`** for all CLI argument parsing
-- **Use `paramiko`** for all SSH operations
+- **Use `common/ssh.py::connect_ssh`** for every SSH connection — it waits out an instance that is still booting. Pass `pkey=`/`username=` by keyword. New code uses `with connect_ssh(...) as ssh:`
 - **Reuse `common/` utilities** — don't reinvent file transfer, Docker ops, or Terraform parsing
 
 ## Commands

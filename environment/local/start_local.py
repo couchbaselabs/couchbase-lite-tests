@@ -36,6 +36,7 @@ if __name__ == "__main__":
 
 from environment.aws import download_tool
 from environment.aws.common.output import header
+from environment.aws.common.versions import resolve_latest_version
 from environment.aws.topology_setup import setup_topology
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
 
@@ -849,9 +850,7 @@ def get_cbl_platform() -> str:
 
 
 def get_latest_released_cbl_c_version() -> str:
-    r = requests.get("http://proget.build.couchbase.com:8080/api/latest_release?product=couchbase-lite-c")
-    r.raise_for_status()
-    return r.json()["version"]
+    return resolve_latest_version("couchbase-lite-c")
 
 
 if __name__ == "__main__":

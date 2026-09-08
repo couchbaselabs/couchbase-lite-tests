@@ -51,7 +51,8 @@ client/
     │   ├── multipeer_replicator_types.py
     │   ├── syncgateway.py        # SyncGateway admin API
     │   ├── couchbaseserver.py    # CBS bucket/scope/collection mgmt (via SDK)
-    │   ├── edgeserver.py
+    │   ├── edgeserver.py         # EdgeServer REST client + EdgeServerConfig, its parsed config file
+    │   ├── edgeservermanager.py  # EdgeServerManager — Edge Server state, via the shell2http sidecar
     │   ├── cluster.py            # CouchbaseCluster — SGW+CBS cluster grouping
     │   ├── error.py              # CblTestServerBadResponseError etc.
     │   ├── error_types.py
@@ -75,7 +76,7 @@ client/
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
-        └── cluster_cleanup.py          # cluster_cleanup (autouse) — wipes SGW DBs + CBS/Rosmar buckets
+        └── cluster_cleanup.py          # cluster_cleanup (autouse) — resets Edge Servers, wipes SGW DBs + CBS/Rosmar buckets
 ```
 
 ## Core Concepts
@@ -152,7 +153,7 @@ CLI options added by `cblpytest_fixture`:
 
 ## Rules
 
-- **Python 3.10+** — `X | Y`, never `Union[X, Y]` / `Optional[X]`.
+- **Python 3.13+** — modern syntax enforced by ruff `UP` + pyupgrade (see root [AGENTS.md](../AGENTS.md)).
 - **Async everywhere** — `aiohttp`, `pytest-asyncio`, `async def`.
 - **Type hints on every public method** — checked by `ty`.
 - **Imports**: `ruff` import sort (`I` rules); relative imports inside `cbltest`.

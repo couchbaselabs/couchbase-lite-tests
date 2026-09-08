@@ -20,7 +20,7 @@ foreach (var arg in args) {
     }
 }
 
-ServiceCollection collection = new ServiceCollection();
+var collection = new ServiceCollection();
 collection.AddSingleton<IDeviceInformation, DeviceInformation>();
 collection.AddSingleton<IFileSystem, CLIFileSystem>();
 
@@ -45,37 +45,12 @@ LogSinks.Console = null;
 
 CBLTestServer.ServiceProvider = collection.BuildServiceProvider();
 
-static bool IsInterfaceValid(NetworkInterface ni)
-{
-    if (ni.OperationalStatus != OperationalStatus.Up) {
-        return false;
-    }
-
-    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback || ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel
-        || ni.Description.IndexOf("Loopback", StringComparison.OrdinalIgnoreCase) >= 0) {
-        return false;
-    }
-
-    if (ni.Description.IndexOf("virtual", StringComparison.OrdinalIgnoreCase) >= 0) {
-        return false;
-    }
-
-    return true;
-}
-
 var server = new CBLTestServer()
 {
     Port = port
 };
-var _ = server.Start();
-void Log(string message)
-{
-    if(silent) {
-        return;
-    }
 
-    Console.WriteLine(message);
-}
+_ = server.Start();
 
 Log($"Test Server Version: {CBLTestServer.Version}");
 Log("CBL Version: " + typeof(Couchbase.Lite.Database).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion);
@@ -92,3 +67,27 @@ Log(ipAddresses);
 await Task.Delay(Timeout.Infinite);
 
 server.Stop();
+return;
+
+void Log(string message)
+{
+    if(silent) {
+        return;
+    }
+
+    Console.WriteLine(message);
+}
+
+static bool IsInterfaceValid(NetworkInterface ni)
+{
+    if (ni.OperationalStatus != OperationalStatus.Up) {
+        return false;
+    }
+
+    if (ni.NetworkInterfaceType == NetworkInterfaceType.Loopback || ni.NetworkInterfaceType == NetworkInterfaceType.Tunnel
+                                                                 || ni.Description.Contains("Loopback", StringComparison.OrdinalIgnoreCase)) {
+        return false;
+    }
+
+    return !ni.Description.Contains("virtual", StringComparison.OrdinalIgnoreCase);
+}

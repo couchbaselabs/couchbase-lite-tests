@@ -148,13 +148,12 @@ class TestReplicationBehavior(CBLTestClass):
             "collection": "_default",
             "scope": "_default",
         }
-        cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
+        await cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
 
         self.mark_test_step(f"Wait until Sync Gateway has imported the resurrected `{loc_deleted}`")
 
         async def _confirm_resurrected_on_sg() -> None:
             remote_doc = await sync_gateway.get_document("names", loc_deleted)
-            assert remote_doc is not None, f"{loc_deleted} not yet visible on Sync Gateway"
             assert remote_doc.body.get("name") == resurrected_body["name"], (
                 f"{loc_deleted} on Sync Gateway does not reflect the resurrected content yet"
             )

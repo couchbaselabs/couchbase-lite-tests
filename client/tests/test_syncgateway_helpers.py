@@ -9,25 +9,34 @@ against SGW's /_config endpoint during bootstrap, which is orthogonal to the
 async helpers under test here.
 """
 
+import asyncio
+import inspect
 from collections.abc import AsyncIterator
+from json import loads
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from aiohttp import encode_basic_auth, web
 from aiohttp.test_utils import TestServer
-from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.syncgateway import (
+    ChangesResponse,
     DatabaseConfig,
     DatabaseState,
+    DocumentUpdateEntry,
     ScopeConfig,
     SyncGateway,
+    SyncGatewayUserClient,
 )
 from cbltest.httplog import _HttpLogWriter
 from pydantic import ValidationError
 
 # (SyncGateway, response specs the test server serves, headers the server saw)
 SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
+
+# Key under which each `received` entry carries the request target (path plus query string).
+_URL_KEY = "__url__"
 
 
 class _FakeConfigResponse:
@@ -49,7 +58,8 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online). `received` accumulates the headers of
-    every request the server saw, so tests can assert on what went out on the wire."""
+    every request the server saw (plus its target under `_URL_KEY`), so tests can assert on
+    what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
@@ -60,7 +70,7 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     received: list[dict[str, str]] = []
 
     async def handle(request: web.Request) -> web.Response:
-        received.append(dict(request.headers))
+        received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url)})
         spec = specs.pop(0) if len(specs) > 1 else specs[0]
         if "text" in spec:
             return web.Response(
@@ -99,35 +109,46 @@ class TestSessionAuth:
         assert received[0].get("Content-Type") == "application/json"
 
     @pytest.mark.asyncio
-    async def test_anonymous_session_sends_no_auth_header(self, sync_gateway: SyncGatewayFixture) -> None:
-        sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"ok": True}}]
+    async def test_create_session_sets_the_auth_header_only_when_given_credentials(
+        self, sync_gateway: SyncGatewayFixture
+    ) -> None:
+        """The public-port reachability probe in start_sgw builds an anonymous session, so
+        _create_session has to leave the Authorization header off when handed no credentials."""
+        sg, _, _ = sync_gateway
 
-        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, None) as session:
-            await sg._send_request("get", "/_status", session=session)
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None) as session:
+            assert "Authorization" not in session.headers
 
-        assert "Authorization" not in received[0]
+        auth_header = encode_basic_auth("alice", "s3cret", "ascii")
+        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, auth_header) as session:
+            assert session.headers["Authorization"] == auth_header
 
     @pytest.mark.asyncio
-    async def test_get_document_revision_public_authenticates_as_given_user(
+    async def test_user_client_get_document_revision_authenticates_as_given_user(
         self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         sg, specs, received = sync_gateway
-        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}}]
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc", "type": "test"}}]
 
-        # get_document_revision_public hardcodes the public port, so redirect its
-        # session to the test server while leaving the credentials it builds alone.
+        # A user client talks to the public port, so redirect its session to the test
+        # server while leaving the credentials it builds alone.
         create_session = sg._create_session
         monkeypatch.setattr(
-            sg,
+            SyncGatewayUserClient,
             "_create_session",
-            lambda secure, scheme, url, port, auth_header: create_session(secure, scheme, url, sg.port, auth_header),
+            lambda self, secure, scheme, url, port, auth_header: create_session(
+                secure, scheme, url, sg.port, auth_header
+            ),
         )
 
-        doc = await sg.get_document_revision_public("db1", "doc1", "1-abc", username="alice", password="s3cret")
+        async with sg.get_user_client("alice", "s3cret") as user_client:
+            doc = await user_client.get_document("db1", "doc1", revision="1-abc")
 
-        assert doc == {"_id": "doc1", "_rev": "1-abc"}
-        # Authenticated as the passed-in user, not as the admin the session was built with.
+        assert doc is not None
+        assert doc.revid == "1-abc"
+        assert doc.body == {"type": "test"}
+        assert received[0][_URL_KEY] == "/db1._default._default/doc1?rev=1-abc"
+        # Authenticated as the passed-in user, not as the admin the sg session was built with.
         assert received[0].get("Authorization") == encode_basic_auth("alice", "s3cret", "ascii")
 
 
@@ -158,6 +179,8 @@ class TestSendRequest:
         assert "get /db/ returned 503" in message
         assert "Service Unavailable" in message
         assert "db offline" in message
+        # Also available on its own, so callers matching on it needn't parse the message.
+        assert loads(exc_info.value.body) == {"error": "Service Unavailable", "reason": "db offline"}
 
     @pytest.mark.asyncio
     async def test_error_includes_non_json_response_body(self, sync_gateway: SyncGatewayFixture) -> None:
@@ -324,6 +347,17 @@ class TestWaitForDbUp:
 
         assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
+    @pytest.mark.asyncio
+    async def test_get_user_client_makes_no_admin_calls(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, _, received = sync_gateway
+
+        async with sg.get_user_client("test_user", "test_pass") as client:
+            assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+
+        assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
+        # Unlike create_user_client, this does not create the user.
+        assert received == []
+
 
 class TestDatabaseConfig:
     def test_init_with_nested_config(self) -> None:
@@ -362,3 +396,294 @@ class TestDatabaseConfig:
     def test_invalid_input(self) -> None:
         with pytest.raises(ValidationError):
             DatabaseConfig(scopes="not_a_dict")  # ty: ignore[invalid-argument-type]
+
+
+MISSING_BUCKET_ENTRY_REASON = 'couldn\'t remove database "db2" from bucket "data-bucket-2": Not Found'
+
+
+def _missing_bucket_entry_500() -> dict:
+    """The 500 SGW returns when a database's registry entry is already gone (CBG-5731)."""
+    return {"status": 500, "json": {"error": "Internal Server Error", "reason": MISSING_BUCKET_ENTRY_REASON}}
+
+
+def _all_dbs(*db_names: str) -> dict:
+    return {"status": 200, "json": [{"db_name": name, "bucket": "b", "state": "Online"} for name in db_names]}
+
+
+class TestDeleteDatabase:
+    """The delete waits for the node to stop serving the database, and still reports 500s
+    that mean anything else."""
+
+    @pytest.mark.asyncio
+    async def test_waits_out_the_node_on_missing_bucket_entry(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The CBG-5731 500 means the node is still serving it, so the delete must wait."""
+        sg, specs, received = sync_gateway
+        wait_for_database_gone = sg._wait_for_database_gone
+        monkeypatch.setattr(
+            sg,
+            "_wait_for_database_gone",
+            lambda db_name: wait_for_database_gone(db_name, retry_delay=0),
+        )
+        specs[:] = [
+            _missing_bucket_entry_500(),
+            _all_dbs("db2"),  # still serving it
+            _all_dbs("db2"),
+            _all_dbs(),  # config poll caught up
+        ]
+
+        await sg._delete_database("db2")
+
+        assert len(received) == 4  # The DELETE plus the polls it took.
+
+    @pytest.mark.asyncio
+    async def test_raises_if_the_node_never_stops_serving_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A node that never catches up is a failure. Exercised on the wait, which owns the
+        budget and which the delete awaits."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [_all_dbs("db2")]
+
+        with pytest.raises(TimeoutError, match="still serving database db2"):
+            await sg._wait_for_database_gone("db2", timeout=0.2, retry_delay=0)
+
+    @pytest.mark.asyncio
+    async def test_retries_then_raises_on_other_500(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": "boom"}}]
+
+        async def no_sleep(_seconds: float) -> None:
+            return None
+
+        monkeypatch.setattr(asyncio, "sleep", no_sleep)
+
+        with pytest.raises(CblSyncGatewayBadResponseError):
+            await sg._delete_database("db2")
+
+        assert len(received) == 4  # Initial attempt plus three retries.
+
+
+class TestWaitForCachingFeed:
+    """update_document(wait_for_caching_feed=True) has to read the unfiltered changes feed.
+
+    Sync Gateway only honours `request_plus` there: `RequestPlusSeq` is consumed by
+    `SimpleMultiChangesFeed`, while supplying `doc_ids` routes the request to
+    `DocIDChangesFeed`, which reads each document straight out of the bucket and never waits
+    for the channel cache.  Asking for both silently produced no wait at all.
+    """
+
+    @staticmethod
+    def _record_get_changes(sg: SyncGateway, calls: list[dict], deleted: bool = False) -> None:
+        """Record how get_changes was called, binding positional arguments to their names.
+
+        `doc_ids` is the fifth positional parameter of `get_changes`, so a guard that only
+        inspected **kwargs would pass even if it were being supplied.
+        """
+        signature = inspect.signature(SyncGateway.get_changes)
+
+        async def fake_get_changes(*args: object, **kwargs: object) -> ChangesResponse:
+            bound = signature.bind(sg, *args, **kwargs)
+            calls.append({k: v for k, v in bound.arguments.items() if k != "self"})
+            entry: dict = {"seq": 5, "id": "doc1", "changes": [{"rev": "2-abc"}]}
+            if deleted:
+                entry["deleted"] = True
+            return ChangesResponse({"results": [entry], "last_seq": "5"})
+
+        # An instance attribute, so only this SyncGateway is affected.
+        sg.get_changes = fake_get_changes  # ty: ignore[invalid-assignment]
+
+    @pytest.mark.asyncio
+    async def test_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.update_document("db", "doc1", {"foo": "bar"}, "1-abc", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True, "request_plus is what does the waiting"
+        assert "doc_ids" not in calls[0], (
+            "a _doc_ids feed is served from the bucket, not the channel cache, and silently "
+            "ignores request_plus - so passing it here means no wait happens"
+        )
+        assert doc.seq == 5, "the sequence should come from the entry matching the revision written"
+
+    @pytest.mark.asyncio
+    async def test_create_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert doc.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_create_does_not_read_the_feed_by_default(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.create_document("db", "doc1", {"foo": "bar"})
+
+        assert calls == []
+        with pytest.raises(CblTestError, match="No sequence recorded"):
+            _ = doc.seq
+
+    @pytest.mark.asyncio
+    async def test_delete_waits_for_the_tombstone(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls, deleted=True)
+
+        tombstone = await sg.delete_document("doc1", "1-abc", "db", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert tombstone.tombstone is True
+        assert tombstone.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_delete_does_not_settle_for_a_live_revision(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A feed still showing the document alive must not satisfy a wait for its deletion."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        # deleted=False: the tombstone has not reached the cache yet.
+        self._record_get_changes(sg, [], deleted=False)
+
+        with pytest.raises(AssertionError, match="superseded"):
+            await sg.delete_document("doc1", "1-abc", "db", wait_for_caching_feed=True)
+
+    @pytest.mark.asyncio
+    async def test_delete_does_not_read_the_feed_by_default(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        tombstone = await sg.delete_document("doc1", "1-abc", "db")
+
+        assert calls == []
+        assert tombstone.tombstone is True
+        with pytest.raises(CblTestError, match="No sequence recorded"):
+            _ = tombstone.seq
+
+    @pytest.mark.asyncio
+    async def test_since_bounds_the_feed_read(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Writing in a loop, the previous write's sequence keeps each wait off the whole feed."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True, since=41)
+
+        assert calls[0].get("since") == 41
+
+    @pytest.mark.asyncio
+    async def test_feed_body_is_kept_out_of_the_http_log(self, sync_gateway: SyncGatewayFixture) -> None:
+        """The feed is read to find one document, so its body is noise in the log."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.create_document("db", "doc1", {"foo": "bar"}, wait_for_caching_feed=True)
+
+        assert calls[0].get("log_response") is False
+
+    @pytest.mark.asyncio
+    async def test_no_feed_read_when_not_requested(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 201, "json": {"id": "doc1", "ok": True, "rev": "2-abc"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_document("db", "doc1", {"foo": "bar"}, "1-abc")
+
+        assert calls == [], "the default must not pay for a changes feed read"
+
+    @pytest.mark.asyncio
+    async def test_read_waits_on_the_unfiltered_feed(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A read imports a document Couchbase Server wrote, so it has a cache to wait for too."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "2-abc", "foo": "bar"}}]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        doc = await sg.get_document("db", "doc1", wait_for_caching_feed=True)
+
+        assert len(calls) == 1
+        assert calls[0].get("request_plus") is True
+        assert "doc_ids" not in calls[0]
+        assert doc.seq == 5
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_waits_on_the_last_revision(self, sync_gateway: SyncGatewayFixture) -> None:
+        """The last write's sequence covers the earlier ones, so only it is read back."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            # update_documents rewrites revision IDs off _all_docs before it writes
+            {"status": 200, "json": {"rows": []}},
+            {"status": 201, "json": [{"id": "doc0", "rev": "2-aaa"}, {"id": "doc1", "rev": "2-abc"}]},
+        ]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_documents(
+            "db",
+            [
+                DocumentUpdateEntry("doc0", None, {"foo": "bar"}),
+                DocumentUpdateEntry("doc1", None, {"foo": "bar"}),
+            ],
+            wait_for_caching_feed=True,
+        )
+
+        assert len(calls) == 1, "one wait on the newest revision covers the whole batch"
+        assert calls[0].get("request_plus") is True
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_waits_for_a_tombstone(self, sync_gateway: SyncGatewayFixture) -> None:
+        """A batch can end on a deletion, which the feed reports as deleted rather than live."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"rows": [{"id": "doc1", "value": {"rev": "1-abc"}}]}},
+            {"status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]},
+        ]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls, deleted=True)
+
+        await sg.update_documents(
+            "db",
+            [DocumentUpdateEntry("doc1", "1-abc", {"_deleted": True})],
+            wait_for_caching_feed=True,
+        )
+
+        assert len(calls) == 1
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_fails_on_a_rejected_write(self, sync_gateway: SyncGatewayFixture) -> None:
+        """_bulk_docs answers 201 even for writes it rejected, so the entries have to be checked."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"rows": []}},
+            {"status": 201, "json": [{"id": "doc0", "error": "conflict", "status": 409}]},
+        ]
+        self._record_get_changes(sg, [])
+
+        with pytest.raises(AssertionError, match="rejected"):
+            await sg.update_documents(
+                "db",
+                [DocumentUpdateEntry("doc0", None, {"foo": "bar"})],
+                wait_for_caching_feed=True,
+            )

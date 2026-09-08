@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite.Sync;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite.Sync;
 using System.Net;
 using System.Text.Json;
 using TestServer.Utilities;
@@ -7,16 +8,18 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StopReplicatorConfig
     {
         public required string id { get; init; }
     }
 
     [HttpHandler("stopReplicator")]
-    public static Task StopReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task StopReplicatorHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StopReplicatorConfig>(response, out var deserializedBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<StopReplicatorConfig>(out var deserializedBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var replicator = session.ObjectManager.GetObject<Replicator>(deserializedBody.id);
@@ -26,7 +29,6 @@ internal static partial class HandlerList
 
         replicator.Stop();
 
-        response.WriteEmptyBody();
-        return Task.CompletedTask;
+        await response.WriteEmptyBody().ConfigureAwait(false);
     }
 }

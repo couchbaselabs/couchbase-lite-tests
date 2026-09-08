@@ -86,6 +86,56 @@ print_box() {
   echo "$border"
 }
 
+# Colored, timed section banners for Jenkins console output (rendered by the
+# ansiColor('xterm') pipeline option; the raw escape codes are harmless on a
+# plain terminal too). Sections are explicitly paired:
+#   section_start "$COLOR_CYAN" "INFRA SETUP"
+#   ...work...
+#   section_end
+# section_end prints how long the section took and clears the state, so a
+# script that exits mid-section (a failed test, a Jenkins timeout) simply
+# leaves that banner unprinted rather than needing an EXIT trap here.
+readonly COLOR_RESET='\033[0m'
+readonly COLOR_CYAN='\033[1;36m'
+readonly COLOR_YELLOW='\033[1;33m'
+readonly COLOR_GREEN='\033[1;32m'
+
+_section_color=""
+_section_label=""
+_section_start_ts=""
+
+_format_duration() {
+  local total=$1 h m s
+  h=$((total / 3600))
+  m=$(((total % 3600) / 60))
+  s=$((total % 60))
+  if [ "$h" -gt 0 ]; then
+    printf '%dh%dm%ds' "$h" "$m" "$s"
+  elif [ "$m" -gt 0 ]; then
+    printf '%dm%ds' "$m" "$s"
+  else
+    printf '%ds' "$s"
+  fi
+}
+
+section_start() {
+  _section_color="$1"
+  _section_label="$2"
+  _section_start_ts=$(date +%s)
+  echo -e "${_section_color}=== ${_section_label} START ===${COLOR_RESET}"
+}
+
+# No-op if no section is open, so a stray call can't emit a bogus banner.
+section_end() {
+  [ -z "$_section_label" ] && return 0
+  local end_ts
+  end_ts=$(date +%s)
+  echo -e "${_section_color}=== ${_section_label} END (took $(_format_duration $((end_ts - _section_start_ts)))) ===${COLOR_RESET}"
+  _section_color=""
+  _section_label=""
+  _section_start_ts=""
+}
+
 if ! command -v uv >/dev/null 2>&1; then
   echo "Installing uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh

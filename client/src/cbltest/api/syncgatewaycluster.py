@@ -71,6 +71,30 @@ class SyncGatewayCluster:
         version = await self.random_node._put_database(db_name, config)
         await self.wait_for_db_online(db_name, version)
 
+    async def wait_for_no_database(self, db_name: str) -> None:
+        """
+        Wait until no node in the cluster serves db_name, polling all nodes concurrently.
+
+        :param db_name: Database name to poll.
+        """
+        async with asyncio.TaskGroup() as group:
+            for sg in self.__sync_gateways:
+                group.create_task(sg._wait_for_database_gone(db_name))
+
+    async def delete_database(self, db_name: str) -> None:
+        """
+        Delete a database from the cluster, and wait until no node serves it.
+
+        A database that no node serves is not an error.
+
+        :param db_name: The name of the database to delete
+        :raises TimeoutError: if a node is still serving the database when the wait budget
+            runs out
+        :raises CblSyncGatewayBadResponseError: if the delete fails for any other reason
+        """
+        await self.random_node._delete_database(db_name)
+        await self.wait_for_no_database(db_name)
+
     async def update_database_config(self, db_name: str, config: DatabaseConfig) -> None:
         """
         Update the config of an existing database on one node of the cluster, and wait

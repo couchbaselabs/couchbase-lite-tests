@@ -31,9 +31,10 @@ System-level test harness for Couchbase Lite releases across all supported platf
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.13+
 - `uv` ([docs](https://docs.astral.sh/uv/))
 - Git LFS (install **before** cloning — the repo carries binary datasets via LFS)
+- .NET SDK matching `servers/dotnet/global.json` (only needed for `servers/dotnet/` work). If `dotnet` on `PATH` doesn't satisfy the pinned version, also check `$HOME/.dotnetX/dotnet` (or platform equivalent), where `X` is the major version from `global.json`'s `sdk.version` (e.g. `.dotnet10` for `10.0.200`) — a common location for a dotnet-install.sh/.ps1-managed side-by-side SDK install.
 
 ## Setup
 
@@ -90,7 +91,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Coding Standards
 
-- **Python 3.10+** — use `X | Y`, never `Union[X, Y]` / `Optional[X]`. Enforced by `pyupgrade --py310-plus` in pre-commit.
+- **Python 3.13+** — modern syntax (`X | Y`, not `Union`/`Optional`) is enforced by ruff `UP` rules and `pyupgrade --py313-plus` in pre-commit.
 - **Async everywhere** — test and framework I/O use `aiohttp` + `pytest-asyncio`.
 - **Formatting / linting** — `ruff` (with `I` import sorting) and `ruff-format`.
 - **Type checking** — `ty` (config in `[tool.ty.environment]`).
@@ -105,6 +106,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`, etc.
 - Behavior markers: `@pytest.mark.sgw`, `.cbl`, `.upg_sgw`.
 - All tests auto-clean via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`).
+- `cblpytest.edge_servers` holds `EdgeServerManager` objects: state changes live there, and every `EdgeServer` REST client comes from one. `configure_dataset(...)`, `start_server(...)` and `get_admin_client()` return a client the manager closes at teardown; `get_user_client(...)` and `get_anonymous_client()` yield one that closes with the `async with`. `cluster_cleanup` resets every Edge Server before each test.
 
 ## Config Files (Generated — Do Not Hand-Edit)
 

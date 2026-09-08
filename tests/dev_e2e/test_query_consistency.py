@@ -88,7 +88,7 @@ class TestQueryConsistency(CBLTestClass):
         local_results = await TestQueryConsistency.__database.run_query(query_for_logging)
 
         self.mark_test_step(f"Run '{query_for_logging}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(query, "travel", "travel", collection)
+        remote_results = await cblpytest.couchbase_servers[0].run_query(query, "travel", "travel", collection)
 
         self.mark_test_step("Check that the results are equivalent")
         if sort is not None:
@@ -111,7 +111,7 @@ class TestQueryConsistency(CBLTestClass):
         # If running this test standalone, you may need to CREATE PRIMARY INDEX
         # on both the airlines and routes collections.
         self.mark_test_step(f"Run '{server_query}' on Couchbase Server")
-        remote_results = cblpytest.couchbase_servers[0].run_query(server_query, "travel", "travel", "airlines")
+        remote_results = await cblpytest.couchbase_servers[0].run_query(server_query, "travel", "travel", "airlines")
 
         assert json_equivalent(local_results, remote_results)
 

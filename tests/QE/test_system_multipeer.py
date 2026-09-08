@@ -1,6 +1,6 @@
 import asyncio
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -94,13 +94,13 @@ class TestSystemMultipeer(CBLTestClass):
         ]
         await asyncio.gather(*[r.start() for r in multipeer_replicators])
 
-        start_time = datetime.now(timezone.utc)
+        start_time = datetime.now(UTC)
         end_time = start_time + TEST_DURATION
 
         await asyncio.sleep(CRUD_INTERVAL.total_seconds())
 
         self.mark_test_step(f"Starting the System test for {NUM_DEVICES} devices ")
-        while datetime.now(timezone.utc) < end_time:
+        while datetime.now(UTC) < end_time:
             insert_testserver = random.randint(0, NUM_DEVICES - 1)
             delete_testserver = random.randint(0, NUM_DEVICES - 1)
             update_testserver = random.randint(0, NUM_DEVICES - 1)
@@ -151,7 +151,7 @@ class TestSystemMultipeer(CBLTestClass):
                         end = min(start + 10, len(to_update))
                         async with all_dbs[update_testserver].batch_updater() as b:
                             for doc_id in to_update[start:end]:
-                                b.upsert_document("_default._default", doc_id, updated_docs[doc_id])
+                                b.upsert_document("_default._default", doc_id, [updated_docs[doc_id]])
                         docs_to_update = updated_docs
 
             async def stop_restart_task() -> None:
@@ -401,7 +401,7 @@ class TestSystemMultipeer(CBLTestClass):
             docgen = JSONGenerator(random.randint(1, 10), size=DOC_COUNT)
             server_docs = docgen.generate_all_documents()
             for key, value in server_docs.items():
-                server.upsert_document(bucket, key, value)
+                await server.upsert_document(bucket, key, value)
 
         async def insert_sgw(sgw: SyncGateway, db_name: str = "names") -> None:
             docgen = JSONGenerator(random.randint(11, 20), size=DOC_COUNT)
