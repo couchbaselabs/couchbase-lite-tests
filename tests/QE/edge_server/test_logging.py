@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,6 +10,9 @@ from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
+
+AUDIT_FLUSH_WAIT = 5
+"""Seconds to let the Edge Server put its records on disk, measured at about one."""
 
 AUDIT_ASSERTIONS: dict[str, list[tuple[str, bool, str]]] = {
     "default": [
@@ -142,9 +146,12 @@ class TestLogging(CBLTestClass):
         self.mark_test_step("Checking that Edge Server has 5 documents.")
         assert len(response.rows) == 5, f"Expected 5 documents, but got {len(response.rows)} documents."
 
+        self.mark_test_step("Waiting for the Edge Server to write its audit records.")
+        await asyncio.sleep(AUDIT_FLUSH_WAIT)
+
         for event_id, expected_non_empty, step_name in AUDIT_ASSERTIONS[audit_mode]:
             self.mark_test_step(f"Checking audit logs for {step_name}.")
-            log = await edge_server.check_log(event_id)
+            log = await edge_server.check_audit_log(event_id)
             if expected_non_empty:
                 assert len(log) > 0, f"Audit log for {step_name} event not found"
             else:
@@ -177,8 +184,10 @@ class TestLogging(CBLTestClass):
                 f"Failed to delete document {doc_id} via Edge Server."
             )
 
+            await asyncio.sleep(AUDIT_FLUSH_WAIT)
+
             self.mark_test_step("Verifying that audit logs are generated for CRUD operations.")
             for event_id, expected_non_empty, step_name in AUDIT_CRUD_ASSERTIONS:
                 self.mark_test_step(f"Checking audit log for {step_name} after CRUD.")
-                log = await edge_server.check_log(event_id)
+                log = await edge_server.check_audit_log(event_id)
                 assert expected_non_empty and len(log) > 0, f"Audit log for {step_name} event not found"

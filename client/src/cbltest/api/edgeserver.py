@@ -1,6 +1,7 @@
 import asyncio
 import json
 import ssl
+import tempfile
 import urllib.parse
 import uuid
 from json import dumps
@@ -11,6 +12,7 @@ from urllib.parse import urljoin
 import pyjson5 as json5
 from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
+from pydantic import BaseModel, ConfigDict
 
 from cbltest.api import caddy
 from cbltest.api.error import (
@@ -29,6 +31,79 @@ from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
+
+
+class _EdgeServerModel(BaseModel):
+    """A part of the config, keeping keys it does not declare, since Edge Server adds them between versions."""
+
+    model_config = ConfigDict(extra="allow")
+
+
+class HttpsConfig(_EdgeServerModel):
+    """The ``https`` block, whose presence is what makes the Edge Server serve TLS."""
+
+    tls_cert_path: str | None = None
+    tls_key_path: str | None = None
+    client_cert_path: str | None = None
+
+
+class AuditConfig(_EdgeServerModel):
+    """The ``logging.audit`` block."""
+
+    file: str | None = None
+    enable: str | None = None
+    disable: str | None = None
+
+
+class LoggingConfig(_EdgeServerModel):
+    """The ``logging`` block."""
+
+    audit: AuditConfig | None = None
+
+
+class EdgeServerConfig(_EdgeServerModel):
+    """One Edge Server config file."""
+
+    interface: str = "0.0.0.0:59840"
+    https: HttpsConfig | None = None
+    users: str | None = None
+    logging: LoggingConfig | None = None
+
+    @classmethod
+    def load(cls, config_file: str | Path) -> "EdgeServerConfig":
+        """
+        Reads and parses an Edge Server config file, which is JSON5.
+
+        :param config_file: Local path to the config file
+        :return: The parsed config
+        """
+        with open(config_file, encoding="utf-8") as file:
+            return cls.model_validate(json5.loads(file.read()))
+
+    @property
+    def port(self) -> int:
+        """The port the Edge Server listens on."""
+        return int(self.interface.split(":")[1])
+
+    @property
+    def is_tls(self) -> bool:
+        """Whether the Edge Server serves TLS."""
+        return self.https is not None
+
+    @property
+    def is_mtls(self) -> bool:
+        """Whether the Edge Server asks the client for a certificate."""
+        return self.https is not None and self.https.client_cert_path is not None
+
+    @property
+    def declares_users(self) -> bool:
+        """Whether the config declares users, so the Edge Server accepts credentials."""
+        return bool(self.users)
+
+    @property
+    def audit_log(self) -> str | None:
+        """Where the Edge Server writes its audit log, or None if the config declares none."""
+        return self.logging.audit.file if self.logging is not None and self.logging.audit is not None else None
 
 
 class EdgeServerVersion(CouchbaseVersion):
@@ -115,19 +190,18 @@ class EdgeServer:
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
             raise CblTestError("Config file cannot be None")
-        port, secure, mtls, needs_auth = self._decode_config_file(config_file)
+        self.__config = EdgeServerConfig.load(config_file)
         self._caddy = caddy.Caddy(url)
-        self.__secure: bool = secure
-        self.__mtls: bool = mtls
+        self.__secure: bool = self.__config.is_tls
+        self.__mtls: bool = self.__config.is_mtls
         self.__hostname: str = url
-        self.__port: int = port
-        self.__config_file: str = config_file
-        ws_scheme = "wss://" if secure else "ws://"
-        self.__replication_url = f"{ws_scheme}{url}:{port}"
-        self.scheme = "https://" if secure else "http://"
+        self.__port: int = self.__config.port
+        ws_scheme = "wss://" if self.__secure else "ws://"
+        self.__replication_url = f"{ws_scheme}{url}:{self.__port}"
+        self.scheme = "https://" if self.__secure else "http://"
         # A config that declares no users turns credentials away, so send none against one.
-        self.__needs_auth = needs_auth
-        credentials = encode_basic_auth(user, password or "", "ascii") if needs_auth and user else None
+        self.__needs_auth = self.__config.declares_users
+        credentials = encode_basic_auth(user, password or "", "ascii") if self.__needs_auth and user else None
         self.__session = self._create_session(credentials)
 
     @property
@@ -150,27 +224,18 @@ class EdgeServer:
         """Gets the Caddy file server running alongside this Edge Server"""
         return self._caddy
 
-    def _decode_config_file(self, config_file: str) -> tuple[int, bool, bool, bool]:
-        """Read the port, whether it is TLS, whether it is mTLS, and whether it wants users."""
-        with open(config_file, encoding="utf-8") as file:
-            config_content = file.read()
-        config = json5.loads(config_content)
-        https = config.get("https", False)
-        interface = config.get("interface", "0.0.0.0:59840")
-        port = int(interface.split(":")[1])
-        mtls = False
-        if https:
-            client_cert_path = https.get("client_cert_path", False)
-            if client_cert_path:
-                mtls = True
-            https = True
-        users = bool(config.get("users", False))
-        return (
-            port,
-            https,
-            mtls,
-            users,
-        )
+    @property
+    def audit_log_path(self) -> str:
+        """
+        Where the running config writes its audit log on the Edge Server host.
+
+        :raises CblTestError: If the config declares no audit log
+        """
+        audit_log = self.__config.audit_log
+        if audit_log is None:
+            raise CblTestError(f"Edge Server [{self.__hostname}] runs a config that declares no audit log")
+
+        return audit_log
 
     def _create_session(self, auth_header: str | None) -> ClientSession:
         """Create a session, where `auth_header` is an `Authorization` header value
@@ -861,52 +926,55 @@ class EdgeServer:
             if isinstance(resp, list):
                 return cast(list, resp)
 
-    async def get_log_content(
-        self,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-    ) -> str:
+    async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
-        Fetch raw log file content from the Edge Server host via Caddy (port :data:`~cbltest.api.caddy.DEFAULT_PORT`).
+        Downloads a log file from the Edge Server host via its Caddy HTTP server
+        (port :data:`~cbltest.api.caddy.DEFAULT_PORT`), writing it straight to disk so a log of
+        any size never has to fit in memory.
 
-        :param log_file: Path to the log file on the Edge Server host (under /home/ec2-user).
-        :return: Full log file content as string, or empty string on error.
+        :param log_file: Path to the log file on the Edge Server host, absolute or relative to Caddy's root
+        :param local_path: Local path to write the log file to
+        :return: The local path the log file was written to
+        :raises FileNotFoundError: If the log file does not exist
+        :raises CblTimeoutError: If the transfer stops making progress
+        :raises CblTestError: For other HTTP or network errors
         """
-        with self.__tracer.start_as_current_span(
-            "get_log_content",
-            attributes={"cbl.log_file": log_file},
-        ):
-            try:
-                prefix = "/home/ec2-user/"
-                path = log_file[len(prefix) :].lstrip("/") if log_file.startswith(prefix) else log_file.lstrip("/")
-                return await self._caddy.fetch(path)
-            except Exception as e:
-                # Callers treat "" as "nothing in the log", which is indistinguishable from
-                # a fetch that failed -- so say which one this was.
-                cbl_warning(f"Failed to fetch {log_file} via Caddy, treating as empty: {e}")
-                return ""
+        with self.__tracer.start_as_current_span("download_log_file", attributes={"cbl.log_file": log_file}):
+            return await self._caddy.download(log_file.lstrip("/"), local_path)
 
-    async def check_log(
-        self,
-        search_string: str,
-        log_file: str = "/home/ec2-user/audit/EdgeServerAuditLog.txt",
-    ) -> list[str]:
+    async def check_audit_log(self, search_string: str) -> list[str]:
         """
-        Fetch log content from the server and return lines matching search_string.
-        Filtering is done in Python on the client.
+        Downloads the audit log the running config declares and returns the lines that contain
+        search_string.  Matches on raw bytes, one line at a time, so a log of any size never
+        has to fit in memory and a record quoting bytes that are not valid UTF-8 still scans.
 
         :param search_string: String to search for (e.g. audit event id).
-        :param log_file: Path to the log file on the Edge Server host.
-        :return: List of matching lines, or empty list if none or on error.
+        :return: The matching lines, or an empty list if the audit log does not exist
+        :raises CblTimeoutError: If the transfer stops making progress
+        :raises CblTestError: If the config declares no audit log, or for HTTP or network errors
         """
-        with self.__tracer.start_as_current_span(
-            "check_log",
-            attributes={
-                "cbl.search_string": search_string,
-                "cbl.log_file": log_file,
-            },
+        log_file = self.audit_log_path
+        with (
+            self.__tracer.start_as_current_span(
+                "check_audit_log",
+                attributes={
+                    "cbl.search_string": search_string,
+                    "cbl.log_file": log_file,
+                },
+            ),
+            tempfile.TemporaryDirectory() as tmpdir,
         ):
-            content = await self.get_log_content(log_file)
-            return [line for line in content.splitlines() if search_string in line]
+            try:
+                local_path = await self.download_log_file(log_file, Path(tmpdir) / Path(log_file).name)
+            except FileNotFoundError:
+                # Nothing was ever logged, so there are no matching lines.  Every other
+                # failure raises, or an unreachable host would read as an empty log.
+                cbl_warning(f"{log_file} does not exist on {self.__hostname}, treating as empty")
+                return []
+
+            needle = search_string.encode()
+            with local_path.open("rb") as f:
+                return [line.decode(errors="replace").rstrip("\r\n") for line in f if needle in line]
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
         is_idle = False
