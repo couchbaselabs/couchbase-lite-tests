@@ -88,7 +88,11 @@ class JavascriptBridge(PlatformBridge):
 
             # Terminating bun leaves the node child running vite behind, so take the
             # children down first.
-            for child in proc.children(recursive=True):
+            try:
+                children = proc.children(recursive=True)
+            except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+                children = []
+            for child in children:
                 self.__terminate(child)
             self.__terminate(proc)
             stopped = True
