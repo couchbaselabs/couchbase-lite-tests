@@ -232,5 +232,4 @@ class TestJWTSimple(CBLTestClass):
         assert len(response.rows) > 0, "No documents found on Edge Server."
         first_doc_id = response.rows[0].id
         edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id=first_doc_id)
-        assert edge_doc is not None, f"Document {first_doc_id} not retrievable from Edge Server."
         assert "name" in edge_doc.body, f"Document missing 'name' field: {edge_doc.body}"

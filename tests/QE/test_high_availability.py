@@ -55,7 +55,7 @@ class TestHighAvailability(CBLTestClass):
         docs = [
             DocumentUpdateEntry(
                 id=f"doc_{i}",
-                revid=None,
+                revision=None,
                 body={"type": "test_doc", "index": i, "content": f"Document {i}"},
             )
             for i in range(num_docs)
@@ -110,7 +110,7 @@ class TestHighAvailability(CBLTestClass):
         final_docs = [
             DocumentUpdateEntry(
                 id=f"final_doc_{i}",
-                revid=None,
+                revision=None,
                 body={"type": "final_test", "index": i},
             )
             for i in range(10)

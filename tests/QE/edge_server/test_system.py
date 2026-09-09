@@ -123,7 +123,6 @@ class TestSystem(CBLTestClass):
                 remote_doc = await edge_server.get_document(es_db_name, doc_id)
                 assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server."
                 assert remote_doc.id == doc_id, f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
-                assert remote_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
                 rev_id = remote_doc.revid
 
@@ -169,7 +168,6 @@ class TestSystem(CBLTestClass):
                 self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                 sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
                 assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
-                assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
                 rev_id = sg_doc.revid
 
@@ -256,7 +254,6 @@ class TestSystem(CBLTestClass):
                     remote_doc = await edge_server.get_document(es_db_name, doc_id)
                     assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server."
                     assert remote_doc.id == doc_id, f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
-                    assert remote_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
                 rev_id = created_doc.revid
 
@@ -303,7 +300,6 @@ class TestSystem(CBLTestClass):
                     self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
                     assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
-                    assert sg_doc.revid is not None, "Revision ID (_rev) missing in the document"
 
                     rev_id = sg_doc.revid
 
@@ -369,7 +365,6 @@ class TestSystem(CBLTestClass):
                     assert remote_doc.id == doc_id, (
                         f"[Client {client_id}] Doc ID mismatch: expected {doc_id}, got {remote_doc.id}"
                     )
-                    assert remote_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Edge Server"
                     rev_id = remote_doc.revid
 
                     if "update" in operations:
@@ -413,7 +408,6 @@ class TestSystem(CBLTestClass):
                     self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                     sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
                     assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
-                    assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                     rev_id = sg_doc.revid
 
                     if "update" in operations:
@@ -527,9 +521,6 @@ class TestSystem(CBLTestClass):
                         assert remote_doc.id == doc_id, (
                             f"[Client {client_id}] Doc ID mismatch: expected {doc_id}, got {remote_doc.id}"
                         )
-                        assert remote_doc.revid is not None, (
-                            f"[Client {client_id}] {doc_id} missing _rev on Edge Server"
-                        )
                         if len(recent_docs) >= 10:
                             recent_docs.pop(0)
                         recent_docs.append(doc_id)
@@ -583,7 +574,6 @@ class TestSystem(CBLTestClass):
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
                         sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
                         assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
-                        assert sg_doc.revid is not None, f"[Client {client_id}] {doc_id} missing _rev on Sync Gateway"
                         rev_id = sg_doc.revid
                         if len(recent_docs) >= 10:
                             recent_docs.pop(0)

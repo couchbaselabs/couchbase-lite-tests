@@ -74,7 +74,6 @@ class TestEdgeServerChaos(CBLTestClass):
             for id, doc in update_docs.items()
         ]
         result = await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        assert result is not None, "Bulk doc operation returned no result"
 
         await cblpytest.edge_servers[0].set_firewall_rules(deny=[sgw.hostname])
         revmap = {doc.get("id"): doc.get("rev") for doc in result}

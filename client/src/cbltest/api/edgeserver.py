@@ -15,6 +15,7 @@ from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, ConfigDict
 
 from cbltest.api import caddy
+from cbltest.api.bulk_docs import analyze_bulk_docs_response
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
@@ -380,7 +381,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         revid: str | None = None,
-    ) -> RemoteDocument | None:
+    ) -> RemoteDocument:
         with self.__tracer.start_as_current_span(
             "get_document",
             attributes={
@@ -396,33 +397,16 @@ class EdgeServer:
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server get /doc (not JSON)")
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                if cast_resp.get("reason") == "missing" or cast_resp.get("reason") == "deleted":
-                    return None
-
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"Get doc from edge server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-
-            return RemoteDocument(cast_resp)
+            return RemoteDocument(cast(dict, response))
 
     async def get_all_dbs(self) -> list:
         with self.__tracer.start_as_current_span("get all database"):
             response = await self._send_request("get", "/_all_dbs")
             if isinstance(response, list):
                 return response
-            if isinstance(response, dict) and "error" in response:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"_all_dbs with Edge Server had error '{response.get('reason')}'",
-                    body=dumps(response),
-                )
             raise CblEdgeServerBadResponseError(
                 500,
-                f"Unexpected response type from adhoc query: {type(response)}",
+                f"Unexpected response type from _all_dbs: {type(response)}",
                 body=str(response),
             )
 
@@ -432,12 +416,6 @@ class EdgeServer:
             if isinstance(response, list):
                 return response
 
-            if isinstance(response, dict) and "error" in response:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get_active_tasks with Edge Server had error '{response.get('reason')}'",
-                    body=dumps(response),
-                )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from get_active_tasks: {type(response)}",
@@ -456,15 +434,9 @@ class EdgeServer:
             keyspace = self.keyspace_builder(db_name, scope, collection)
             response = await self._send_request("get", f"/{keyspace}")
             if not isinstance(response, dict):
-                raise ValueError("Inappropriate response from edge server get /  (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get database info  from edge server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+                raise ValueError("Inappropriate response from edge server get / (not JSON)")
+
+            return cast(dict, response)
 
     async def start_replication(
         self,
@@ -525,14 +497,7 @@ class EdgeServer:
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post /_replicate (not JSON)")
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"start replication with edge server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp.get("session_id")
+            return cast(dict, response).get("session_id")
 
     async def replication_status(self, replicator_id: str) -> dict:
         with self.__tracer.start_as_current_span(
@@ -541,28 +506,15 @@ class EdgeServer:
         ):
             response = await self._send_request("get", f"/_replicate/{replicator_id}")
             if not isinstance(response, dict):
-                raise ValueError("Inappropriate response from edge server get status  /_replicate (not JSON)")
+                raise ValueError("Inappropriate response from edge server get status /_replicate (not JSON)")
 
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get replication status with Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+            return cast(dict, response)
 
     async def all_replication_status(self) -> list:
         with self.__tracer.start_as_current_span("All Replication status with Edge Server"):
             response = await self._send_request("get", "/_replicate")
             if isinstance(response, list):
                 return response
-            if isinstance(response, dict) and "error" in response:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"all_replication_status with Edge Server had error '{response.get('reason')}'",
-                    body=dumps(response),
-                )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from all_replication_status: {type(response)}",
@@ -577,15 +529,7 @@ class EdgeServer:
             response = await self._send_request("delete", f"/_replicate/{replicator_id}")
 
             if response and not isinstance(response, dict):
-                raise ValueError("Inappropriate response from edge server  stop  /_replicate (not JSON)")
-
-            cast_resp = cast(dict, response) if response else {}
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"stop replication  with Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
+                raise ValueError("Inappropriate response from edge server stop /_replicate (not JSON)")
 
     def replication_url(self, db_name: str) -> str:
         _assert_not_null(db_name, "db_name")
@@ -634,14 +578,8 @@ class EdgeServer:
 
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post /_changes (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"get changes feed with Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+
+            return cast(dict, response)
 
     async def named_query(
         self,
@@ -669,12 +607,6 @@ class EdgeServer:
             if isinstance(response, list):
                 return response
 
-            if isinstance(response, dict) and "error" in response:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"named query with Edge Server had error '{response.get('reason')}'",
-                    body=dumps(response),
-                )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from named query: {type(response)}",
@@ -706,12 +638,6 @@ class EdgeServer:
             if isinstance(response, list):
                 return response
 
-            if isinstance(response, dict) and "error" in response:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"adhoc query with Edge Server had error '{response.get('reason')}'",
-                    body=dumps(response),
-                )
             raise CblEdgeServerBadResponseError(
                 500,
                 f"Unexpected response type from adhoc query: {type(response)}",
@@ -747,14 +673,8 @@ class EdgeServer:
 
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server add doc auto ID (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"add document with auto ID Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+
+            return cast(dict, response)
 
     # single create or update . For update provide rev_id
     async def put_document_with_id(
@@ -794,14 +714,8 @@ class EdgeServer:
 
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server add doc (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"add document with ID Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+
+            return cast(dict, response)
 
     async def delete_sub_document(
         self,
@@ -826,14 +740,8 @@ class EdgeServer:
 
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server delete sub-document (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"delete sub-document Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+
+            return cast(dict, response)
 
     async def put_sub_document(
         self,
@@ -862,14 +770,8 @@ class EdgeServer:
 
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server put sub-document (not JSON)")
-            cast_resp = cast(dict, response)
-            if "error" in cast_resp:
-                raise CblEdgeServerBadResponseError(
-                    500,
-                    f"put sub-document Edge Server had error '{cast_resp.get('reason')}'",
-                    body=dumps(cast_resp),
-                )
-            return cast_resp
+
+            return cast(dict, response)
 
     async def get_sub_document(self, id: str, key: str, db_name: str, scope: str = "", collection: str = "") -> Any:
         with self.__tracer.start_as_current_span(
@@ -881,19 +783,7 @@ class EdgeServer:
             },
         ):
             keyspace = self.keyspace_builder(db_name, scope, collection)
-            resp = await self._send_request("get", f"{keyspace}/{id}/{key}")
-
-            if isinstance(resp, dict):
-                cast_resp = cast(dict, resp)
-                if "error" in cast_resp:
-                    raise CblEdgeServerBadResponseError(
-                        500,
-                        f"get sub-document Edge Server had error '{cast_resp.get('reason')}'",
-                        body=dumps(cast_resp),
-                    )
-                return cast_resp
-            else:
-                return resp
+            return await self._send_request("get", f"{keyspace}/{id}/{key}")
 
     async def bulk_doc_op(
         self,
@@ -902,7 +792,7 @@ class EdgeServer:
         scope: str = "",
         collection: str = "",
         new_edits: bool = True,
-    ) -> list | None:
+    ) -> list:
         with self.__tracer.start_as_current_span(
             "bulk_documents_operation",
             attributes={
@@ -915,16 +805,14 @@ class EdgeServer:
             body = {"docs": [u.body for u in docs], "new_edits": new_edits}
             resp = await self._send_request("post", f"/{keyspace}/_bulk_docs", JSONDictionary(body))
 
-            if isinstance(resp, dict):
-                cast_resp = cast(dict, resp)
-                if "error" in cast_resp:
-                    raise CblEdgeServerBadResponseError(
-                        500,
-                        f"bulk_documents_operation Edge Server had error '{cast_resp.get('reason')}'",
-                        body=dumps(cast_resp),
-                    )
-            if isinstance(resp, list):
-                return cast(list, resp)
+            if not isinstance(resp, list):
+                raise CblEdgeServerBadResponseError(
+                    500,
+                    f"Unexpected response type from _bulk_docs: {type(resp)}",
+                    body=str(resp),
+                )
+
+            return analyze_bulk_docs_response(resp, CblEdgeServerBadResponseError)
 
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
