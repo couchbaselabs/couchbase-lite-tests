@@ -8,7 +8,9 @@ closes every client it hands out.
 
 import json
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
+from pathlib import Path
 
 import aiofiles
 import tenacity
@@ -20,6 +22,7 @@ from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.sidecar import Shell2Http
 from cbltest.configparser import EdgeServerInfo
+from cbltest.logging import cbl_warning
 from cbltest.version import VERSION
 
 
@@ -188,6 +191,28 @@ class EdgeServerManager:
         """
         with self.__tracer.start_as_current_span("write file on edge server host"):
             await self.__shell2http.post("/write-file", JSONDictionary({"path": path, "content": content}))
+
+    async def collect_logs(self, output_dir: Path) -> Path:
+        """
+        Bundle the host's logs, audit logs, live config and system info into an archive,
+        then download it.
+
+        :param output_dir: Local directory to download the archive into
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span("collect edge server logs"):
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.__info.hostname.replace(".", "-").replace(":", "-")
+            filename = f"es-collect-{safe_host}-{timestamp}.tar.gz"
+            response = await self.__shell2http.post("/collect-logs", JSONDictionary({"filename": filename}))
+            # tar reports a file that changed as it was read, which still leaves a usable
+            # archive.  A body that is not the JSON the script emits is not worth losing it over.
+            with suppress(json.JSONDecodeError, AttributeError):
+                if warnings := json.loads(response).get("warnings"):
+                    cbl_warning(f"Edge Server [{self.__info.hostname}] archived its logs with warnings: {warnings}")
+
+            client = self.get_admin_client()
+            return await client.caddy.download(f"collect/{filename}", output_dir / filename)
 
     async def set_firewall_rules(self, allow: list[str] | None = None, deny: list[str] | None = None) -> None:
         """
