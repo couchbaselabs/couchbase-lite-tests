@@ -2231,24 +2231,55 @@ class SyncGateway(_SyncGatewayBase):
             is asked to re-read it.  A database it still serves re-reads in any state,
             Offline and Resyncing included, so there is no transient failure to retry.
         """
+        await self._wait_for_db_present(db_name, max_retries=max_retries, retry_delay=retry_delay)
+        await self._refresh_database_config(db_name)
+        await self._wait_for_db_state_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
 
-        wait = tenacity.wait_fixed(retry_delay)
-        stop = tenacity.stop_after_attempt(max_retries)
+    async def _wait_for_db_present(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node serves the database at all, in any state.
 
-        async def _wait_for_db_present_poll() -> None:
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+
+        async def _poll() -> None:
             dbs = await self.get_all_databases_verbose()
             assert db_name in dbs, f"{self} does not serve database {db_name} (not present in /_all_dbs?verbose=true)"
 
-        await async_retry_assert(_wait_for_db_present_poll, wait, stop)
-        await self._refresh_database_config(db_name)
+        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
-        async def _wait_for_db_online_poll() -> None:
+    async def _wait_for_db_state_online(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node reports the database Online.  Sync Gateway brings a database
+        online in the background, so every config write and every config re-read leaves it
+        Starting for a while, and a request to a database that is not Online gets a 503.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+
+        async def _poll() -> None:
             dbs = await self.get_all_databases_verbose()
             entry = dbs.get(db_name)
             assert entry is not None, f"{self} stopped serving database {db_name} while it was coming online"
             assert entry.state == DatabaseState.ONLINE, f"Database {db_name} is not online: {entry}"
 
-        await async_retry_assert(_wait_for_db_online_poll, wait, stop)
+        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
     async def get_import_count(self, db_name: str) -> int:
         """

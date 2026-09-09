@@ -47,7 +47,8 @@ class SyncGatewayCluster:
         Wait until every node in the cluster serves the database, re-reads its config and
         reports it Online, polling all nodes concurrently.  Only for waits on something
         outside our control, such as a restored bucket or a node that is still starting:
-        after a config write, :func:`_refresh_database_config` gets there without polling.
+        after a config write, :func:`_refresh_database_config` gets the config there
+        without polling.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each wait a node makes.
@@ -63,9 +64,10 @@ class SyncGatewayCluster:
     async def _refresh_database_config(self, db_name: str, *, skip: SyncGateway | None = None) -> None:
         """
         Make every node apply the database config from the bucket now, rather than at
-        its next config poll.  A node returns only once it has applied the config, and
-        a node that has not loaded the database at all loads it here, so a caller that
-        has just written the config does not need to poll for it to land.
+        its next config poll.  A node that has not loaded the database at all loads it
+        here, so a caller that has just written the config does not need to poll for it
+        to land.  The node starts applying the config before returning but comes online
+        in the background, so pair this with :func:`_wait_for_db_state_online`.
 
         :param db_name: The database whose config the nodes must reload.
         :param skip: A node that has applied this config already.  A re-read re-opens the
@@ -75,10 +77,19 @@ class SyncGatewayCluster:
         """
         await asyncio.gather(*(sg._refresh_database_config(db_name) for sg in self.__sync_gateways if sg is not skip))
 
+    async def _wait_for_db_state_online(self, db_name: str) -> None:
+        """
+        Wait until every node reports the database Online, without asking any of them to
+        re-read the config first.
+
+        :param db_name: Database name to poll.
+        """
+        await asyncio.gather(*(sg._wait_for_db_state_online(db_name) for sg in self.__sync_gateways))
+
     async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
         """
         Create a database on one node of the cluster, and make every node apply the
-        config that was just written before returning.
+        config that was just written and bring the database online before returning.
 
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
@@ -86,6 +97,7 @@ class SyncGatewayCluster:
         node = self.random_node
         await node._put_database(db_name, config)
         await self._refresh_database_config(db_name, skip=node)
+        await self._wait_for_db_state_online(db_name)
 
     async def wait_for_no_database(self, db_name: str) -> None:
         """
@@ -114,7 +126,7 @@ class SyncGatewayCluster:
     async def update_database_config(self, db_name: str, config: DatabaseConfig) -> None:
         """
         Update the config of an existing database on one node of the cluster, and make
-        every node apply it before returning.
+        every node apply it and bring the database online again before returning.
 
         :param db_name: The name of the database to update
         :param config: The configuration to apply
@@ -122,3 +134,4 @@ class SyncGatewayCluster:
         node = self.random_node
         await node._update_database_config(db_name, config)
         await self._refresh_database_config(db_name, skip=node)
+        await self._wait_for_db_state_online(db_name)
