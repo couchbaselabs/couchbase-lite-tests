@@ -22,7 +22,8 @@ sudo docker exec "$CBS_CONTAINER" sv start /etc/service/couchbase-server
 TIMEOUT=60
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do
-  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:$PORT/pools/default" 2>/dev/null || echo "000")
+  # Authenticated, since /pools/default answers 401 to an anonymous request and never the 200 below.
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -u Administrator:password "http://localhost:$PORT/pools/default" 2>/dev/null || echo "000")
   if [ "$HTTP_CODE" = "200" ]; then
     echo "CBS started successfully on port $PORT"
     exit 0

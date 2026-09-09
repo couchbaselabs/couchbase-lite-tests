@@ -2,9 +2,12 @@ from json import loads
 
 import pytest
 import tenacity
+from cbltest import responses
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
+    CblHttpError,
     CblSyncGatewayBadResponseError,
+    CblTestServerBadResponseError,
 )
 from cbltest.utils import async_retry_assert, retry_assert
 
@@ -103,7 +106,7 @@ class TestRetryAssert:
 
 
 class TestBadResponseErrors:
-    """Edge Server and Sync Gateway errors should expose the same detail."""
+    """Every service's bad-response error is one CblHttpError, exposing the same detail."""
 
     def test_edge_server_error_exposes_code_and_body(self) -> None:
         body = '{"status": 404, "error": "Not Found"}'
@@ -125,3 +128,16 @@ class TestBadResponseErrors:
 
         assert (es.code, es.body) == (500, "es body")
         assert (sg.code, sg.body) == (500, "sg body")
+        assert isinstance(es, CblHttpError) and isinstance(sg, CblHttpError), (
+            "one except clause covers them all, whichever service answered"
+        )
+
+    def test_test_server_error_carries_the_response_as_its_body(self) -> None:
+        response = responses.TestServerResponse(404, "uuid", {"reason": "no such session"}, "reset")
+        err = CblTestServerBadResponseError(404, response, "returned 404")
+
+        assert isinstance(err, CblHttpError)
+        assert err.code == 404
+        assert err.response is response
+        assert loads(err.body)["reason"] == "no such session"
+        assert str(err) == "returned 404"

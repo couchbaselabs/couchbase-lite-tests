@@ -14,7 +14,7 @@ from typing import Any
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.error import CblTestError
-from cbltest.api.shell2http import Shell2Http
+from cbltest.api.sidecar import Shell2Http
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info

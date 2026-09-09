@@ -1,15 +1,16 @@
-"""Tests for the Shell2Http sidecar client, against a fake shell2http on loopback."""
+"""Tests for the Caddy and Shell2Http sidecar clients, against fake sidecars on loopback."""
 
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import pytest
 from aiohttp import web
-from cbltest.api.error import CblTestError, CblTimeoutError
+from cbltest.api.error import CblHttpError, CblTestError, CblTimeoutError
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.shell2http import Shell2Http
+from cbltest.api.sidecar import Caddy, Shell2Http
 
 # A port nothing listens on, for the calls that must fail rather than reach a server.
 _DEAD_PORT = 20002
@@ -96,8 +97,12 @@ async def test_a_failing_script_says_which_call_failed_where() -> None:
         fake.status = 500
         fake.reply = "start-sgw.sh: no such config"
 
-        with pytest.raises(CblTestError, match=r"POST /restart-sgw failed on 127.0.0.1: 500 - .*no such config"):
+        with pytest.raises(
+            CblHttpError, match=r"POST /restart-sgw failed on 127.0.0.1: 500 - .*no such config"
+        ) as raised:
             await sidecar.post("/restart-sgw", "bootstrap")
+
+        assert (raised.value.code, raised.value.body) == (500, "start-sgw.sh: no such config")
 
 
 @pytest.mark.asyncio
@@ -124,3 +129,86 @@ async def test_an_unreachable_host_fails_rather_than_hanging() -> None:
 async def test_a_host_with_no_sidecar_is_not_reachable() -> None:
     async with Shell2Http("127.0.0.1", _DEAD_PORT) as sidecar:
         assert not sidecar.is_reachable()
+
+
+class _FakeFileServer:
+    """Serves the files a test put in it, and a browse listing of them."""
+
+    def __init__(self) -> None:
+        self.files: dict[str, bytes] = {}
+        self.browsable = True
+
+    async def handle(self, request: web.Request) -> web.StreamResponse:
+        if request.path == "/":
+            if not self.browsable:
+                return web.Response(status=404, text="not found")
+            listing = [{"name": name, "is_dir": False} for name in self.files] + [{"name": "logs", "is_dir": True}]
+            return web.json_response(listing)
+
+        content = self.files.get(request.path.lstrip("/"))
+        if content is None:
+            return web.Response(status=404, text="not found")
+
+        return web.Response(body=content)
+
+
+@asynccontextmanager
+async def _fake_file_server() -> AsyncIterator[tuple[Caddy, _FakeFileServer]]:
+    """A Caddy pointed at a fake file server, both torn down on the way out."""
+    fake = _FakeFileServer()
+    app = web.Application()
+    app.router.add_route("*", "/{tail:.*}", fake.handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    try:
+        await web.TCPSite(runner, "127.0.0.1", 0).start()
+        port = next(iter(runner.addresses))[1]
+        caddy = Caddy("127.0.0.1", port)
+        try:
+            yield caddy, fake
+        finally:
+            await caddy.close()
+    finally:
+        await runner.cleanup()
+
+
+@pytest.mark.asyncio
+async def test_download_writes_the_bytes_it_was_served(tmp_path: Path) -> None:
+    async with _fake_file_server() as (caddy, fake):
+        # Larger than one chunk, so the streaming path is what runs.
+        fake.files["sgcollectinfo-abc.zip"] = bytes(range(256)) * 1024
+
+        destination = await caddy.download("/sgcollectinfo-abc.zip", tmp_path / "logs" / "sgcollect.zip")
+
+    assert destination.read_bytes() == fake.files["sgcollectinfo-abc.zip"]
+
+
+@pytest.mark.asyncio
+async def test_download_of_a_missing_file_leaves_nothing_behind(tmp_path: Path) -> None:
+    destination = tmp_path / "sg_debug.log"
+    async with _fake_file_server() as (caddy, _):
+        with pytest.raises(CblHttpError, match="Download /sg_debug.log failed on 127.0.0.1: 404") as raised:
+            await caddy.download("/sg_debug.log", destination)
+
+    assert raised.value.code == 404, "a caller reads the code to tell a missing file from a failed call"
+    assert not destination.exists(), "a failed download creates no file to mistake for a real one"
+
+
+@pytest.mark.asyncio
+async def test_list_returns_the_files_a_pattern_matches() -> None:
+    async with _fake_file_server() as (caddy, fake):
+        fake.files = {"sgcollectinfo-abc-redacted.zip": b"", "sgcollectinfo-abc.zip": b"", "sg_debug.log": b""}
+
+        assert await caddy.list() == ["sgcollectinfo-abc-redacted.zip", "sgcollectinfo-abc.zip", "sg_debug.log"], (
+            "a directory is not a file"
+        )
+        assert await caddy.list(pattern=r"sgcollect.*redacted\.zip") == ["sgcollectinfo-abc-redacted.zip"]
+
+
+@pytest.mark.asyncio
+async def test_list_without_browsing_enabled_says_so() -> None:
+    async with _fake_file_server() as (caddy, fake):
+        fake.browsable = False
+
+        with pytest.raises(CblTestError, match="file_server browse"):
+            await caddy.list()

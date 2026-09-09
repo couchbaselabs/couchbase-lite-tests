@@ -10,13 +10,27 @@ class CblTestError(Exception):
         super().__init__(*args)
 
 
-class CblTestServerBadResponseError(Exception):
-    """A bad HTTP code was returned from the test server"""
+class CblHttpError(CblTestError):
+    """A bad HTTP code was returned by an HTTP endpoint the framework called"""
 
     @property
     def code(self) -> int:
-        """Gets the code that the test server returned"""
+        """Gets the code that the endpoint returned"""
         return self.__code
+
+    @property
+    def body(self) -> str:
+        """Gets the response body that the endpoint returned"""
+        return self.__body
+
+    def __init__(self, code: int, *args: Any, body: str) -> None:
+        self.__code = code
+        self.__body = body
+        super().__init__(*args)
+
+
+class CblTestServerBadResponseError(CblHttpError):
+    """A bad HTTP code was returned from the test server"""
 
     @property
     def response(self) -> TestServerResponse:
@@ -24,13 +38,8 @@ class CblTestServerBadResponseError(Exception):
         return self.__response
 
     def __init__(self, code: int, response: TestServerResponse, message: str) -> None:
-        self.__code = code
         self.__response = response
-        self.__message = message
-        super().__init__(message)
-
-    def __str__(self) -> str:
-        return self.__message
+        super().__init__(code, message, body=response.serialize())
 
 
 class CblTimeoutError(Exception):
@@ -40,39 +49,9 @@ class CblTimeoutError(Exception):
         super().__init__(*args)
 
 
-class CblSyncGatewayBadResponseError(Exception):
+class CblSyncGatewayBadResponseError(CblHttpError):
     """A bad HTTP code was returned from Sync Gateway"""
 
-    @property
-    def code(self) -> int:
-        """Gets the code that Sync Gateway returned"""
-        return self.__code
 
-    @property
-    def body(self) -> str:
-        """Gets the response body that Sync Gateway returned"""
-        return self.__body
-
-    def __init__(self, code: int, *args: Any, body: str) -> None:
-        self.__code = code
-        self.__body = body
-        super().__init__(*args)
-
-
-class CblEdgeServerBadResponseError(Exception):
+class CblEdgeServerBadResponseError(CblHttpError):
     """A bad HTTP code was returned from Edge Server"""
-
-    @property
-    def code(self) -> int:
-        """Gets the code that Edge Server returned"""
-        return self.__code
-
-    @property
-    def body(self) -> str:
-        """Gets the response body that Edge Server returned"""
-        return self.__body
-
-    def __init__(self, code: int, *args: Any, body: str) -> None:
-        self.__code = code
-        self.__body = body
-        super().__init__(*args)

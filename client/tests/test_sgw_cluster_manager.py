@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 from cbltest.api.error import CblTestError
-from cbltest.api.shell2http import Shell2Http
+from cbltest.api.sidecar import Shell2Http
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.plugins.sgw_cluster_manager import (
@@ -69,7 +69,13 @@ def _stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: SyncGatewayClusterMa
     for index, node in enumerate(manager.nodes):
 
         async def _send_request(
-            method: str, path: str, data: str | None = None, timeout: float | None = None, index: int = index
+            method: str,
+            path: str,
+            operation: str,
+            data: str | None = None,
+            headers: dict[str, str] | None = None,
+            timeout: float | None = None,
+            index: int = index,
         ) -> str:
             calls.append((f"{index}:{method}", path, data))
             return ""

@@ -18,7 +18,7 @@ from opentelemetry.trace import get_tracer
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.shell2http import Shell2Http
+from cbltest.api.sidecar import Shell2Http
 from cbltest.configparser import EdgeServerInfo
 from cbltest.version import VERSION
 

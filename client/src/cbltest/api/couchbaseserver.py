@@ -33,7 +33,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
-from cbltest.api.shell2http import Shell2Http
+from cbltest.api.sidecar import Shell2Http
 from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION

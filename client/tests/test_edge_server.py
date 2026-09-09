@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from cbltest.api.edgeserver import EdgeServer, EdgeServerConfig
-from cbltest.api.error import CblTestError
+from cbltest.api.error import CblHttpError, CblTestError
 
 HOSTNAME = "es.example.com"
 AUDIT_LOG = "/home/ec2-user/audit/EdgeServerAuditLog.txt"
@@ -20,7 +20,7 @@ def no_network() -> Iterator[None]:
     """Keep the sessions an Edge Server client opens off the network."""
     with (
         patch("cbltest.api.edgeserver.ClientSession", autospec=True),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
+        patch("cbltest.api.sidecar.ClientSession", autospec=True),
     ):
         yield
 
@@ -125,3 +125,20 @@ def test_audit_log_path_raises_without_an_audit_log(tmp_path: Path) -> None:
 
     with pytest.raises(CblTestError, match="declares no audit log"):
         _ = client.audit_log_path
+
+
+@pytest.mark.asyncio
+async def test_a_log_the_host_never_wrote_reads_as_missing(tmp_path: Path) -> None:
+    """check_audit_log treats a missing log as an empty one, so a 404 must arrive as such."""
+    config_file = write_config(tmp_path, "audit.json", {"logging": {"audit": {"file": AUDIT_LOG}}})
+    with no_network():
+        client = EdgeServer(HOSTNAME, config_file=config_file)
+
+        async def download(uri: str, local_path: str | Path) -> Path:
+            raise CblHttpError(404, f"Download {uri} failed on {HOSTNAME}: 404 - not found", body="not found")
+
+        with patch.object(client.caddy, "download", download):
+            with pytest.raises(FileNotFoundError, match="does not exist on es.example.com"):
+                await client.download_log_file(AUDIT_LOG, tmp_path / "audit.txt")
+
+            assert await client.check_audit_log("anything") == []
