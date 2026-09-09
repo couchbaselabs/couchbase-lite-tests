@@ -30,5 +30,6 @@ the topology lists as an upstream of that load balancer.
   node's position in the load balancer's upstream list. Use this to address a single node
   through the load balancer. Such a request is never served by another node, so it fails
   if that node is down: 502 when the node refuses the connection, 504 when it is gone.
-- A request with an `X-Backend` value that names none of the upstreams gets a 500, so a
-  stale or mistyped index fails instead of quietly falling back to the round robin pool.
+- A request with an `X-Backend` value that names none of the upstreams, an empty value
+  included, gets a 500, so a stale or mistyped index fails instead of quietly falling back
+  to the round robin pool.

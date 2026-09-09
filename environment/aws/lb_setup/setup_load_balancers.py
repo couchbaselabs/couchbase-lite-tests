@@ -91,12 +91,13 @@ def _create_unknown_pin_router(admin: bool) -> dict:
     The route an ``X-Backend`` value that names no upstream takes: a 500.
 
     Without it the pool router would catch the request and round robin it, so a stale or
-    mistyped pin would silently become no pin at all.
+    mistyped pin would silently become no pin at all. ``.*`` also catches a header that is
+    present but empty, while a header that is absent has no value to match and so misses.
     """
     name = "admin" if admin else "public"
     return {
         "entryPoints": [name],
-        "rule": "HeaderRegexp(`X-Backend`, `.`) && PathPrefix(`/`)",
+        "rule": "HeaderRegexp(`X-Backend`, `.*`) && PathPrefix(`/`)",
         "priority": 5,
         "service": f"sgw-{name}-pool",
         "middlewares": ["reject-unknown-pin"],
