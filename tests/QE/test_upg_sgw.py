@@ -85,6 +85,10 @@ class TestSgwUpgrade(CBLTestClass):
         if is_initial_upgrade_phase():
             # Also creates the backing bucket and collections.
             await cblpytest.clusters[0].create_database(sg_db, db_payload)
+        else:
+            # A re-provisioned node serves the REST API before its database is online, so
+            # later phases have to wait for the nodes that inherited the database.
+            await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Create user1 for replication")
         collection_access = sg.create_collection_access_dict({"_default._default": ["*"]})
