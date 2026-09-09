@@ -152,7 +152,6 @@ class CouchbaseServer:
                 raise
 
             await self.__cluster.wait_until_ready(timedelta(seconds=10))
-            self.__shell2http = Shell2Http(self.__hostname)
 
     @property
     def _cluster(self) -> Cluster:
@@ -165,9 +164,13 @@ class CouchbaseServer:
     @property
     def _shell2http(self) -> Shell2Http:
         """
-        The shell2http sidecar on this node's host.
+        The shell2http sidecar on this node's host, opened on first use because its session
+        needs a running event loop.  It does not go through the SDK, so it answers for a node
+        whose service is stopped, which is what :meth:`start_server` is for.
         """
-        assert self.__shell2http is not None, f"{self} is not connected, call connect() first"
+        if self.__shell2http is None:
+            self.__shell2http = Shell2Http(self.__hostname)
+
         return self.__shell2http
 
     async def close(self) -> None:

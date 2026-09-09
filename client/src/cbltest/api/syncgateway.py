@@ -2015,7 +2015,6 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, username, password, port, secure, public_port)
-        self.__shell2http = Shell2Http(url)
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2031,6 +2030,10 @@ class SyncGateway(_SyncGatewayBase):
             raise CblTestError(
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
+
+        # After the query above, which raises on a host whose admin API is not up yet, so a
+        # session is not opened for a client that never gets returned.
+        self.__shell2http = Shell2Http(url)
 
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.

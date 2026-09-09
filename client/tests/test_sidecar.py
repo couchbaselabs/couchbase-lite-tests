@@ -1,6 +1,7 @@
 """Tests for the Caddy and Shell2Http sidecar clients, against fake sidecars on loopback."""
 
 import asyncio
+import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,8 +13,12 @@ from cbltest.api.error import CblHttpError, CblTestError, CblTimeoutError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.sidecar import Caddy, Shell2Http
 
-# A port nothing listens on, for the calls that must fail rather than reach a server.
-_DEAD_PORT = 20002
+
+def _dead_port() -> int:
+    """A port nothing listens on, for the calls that must fail rather than reach a server."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        return int(probe.getsockname()[1])
 
 
 class _FakeSidecar:
@@ -23,6 +28,7 @@ class _FakeSidecar:
         self.calls: list[dict[str, Any]] = []
         self.status = 200
         self.reply = "ok"
+        self.raw: bytes | None = None
         self.hang = False
         # Released at teardown, so a hung handler does not hold the server open.
         self.released = asyncio.Event()
@@ -39,6 +45,9 @@ class _FakeSidecar:
         if self.hang:
             # Answers only once the test is over, so the client is what gives up.
             await self.released.wait()
+        if self.raw is not None:
+            return web.Response(status=self.status, body=self.raw, content_type="text/plain")
+
         return web.Response(status=self.status, text=self.reply)
 
 
@@ -116,7 +125,7 @@ async def test_a_script_that_never_answers_times_out_with_its_budget() -> None:
 
 @pytest.mark.asyncio
 async def test_an_unreachable_host_fails_rather_than_hanging() -> None:
-    sidecar = Shell2Http("127.0.0.1", _DEAD_PORT)
+    sidecar = Shell2Http("127.0.0.1", _dead_port())
     async with sidecar:
         with pytest.raises(CblTestError, match="GET /stop-cbs failed to reach 127.0.0.1"):
             await sidecar.get("/stop-cbs")
@@ -127,7 +136,7 @@ async def test_an_unreachable_host_fails_rather_than_hanging() -> None:
 
 @pytest.mark.asyncio
 async def test_a_host_with_no_sidecar_is_not_reachable() -> None:
-    async with Shell2Http("127.0.0.1", _DEAD_PORT) as sidecar:
+    async with Shell2Http("127.0.0.1", _dead_port()) as sidecar:
         assert not sidecar.is_reachable()
 
 
@@ -212,3 +221,53 @@ async def test_list_without_browsing_enabled_says_so() -> None:
 
         with pytest.raises(CblTestError, match="file_server browse"):
             await caddy.list()
+
+
+@pytest.mark.asyncio
+async def test_a_failing_script_keeps_the_log_it_printed() -> None:
+    """A script that cats a log on failure prints the diagnostic, so it must survive the trip."""
+    async with _fake_sidecar() as (sidecar, fake):
+        fake.status = 500
+        fake.reply = "edge.log line\n" * 2000
+
+        with pytest.raises(CblHttpError) as raised:
+            await sidecar.post("/start-edgeserver", "{}")
+
+    assert len(raised.value.body) > 16 * 1024, "a Caddy-sized 4 KiB budget would cut the log short"
+
+
+@pytest.mark.asyncio
+async def test_output_that_is_not_utf8_still_comes_back() -> None:
+    """A stray byte in a script's output is not a reason to fail a call that worked."""
+    async with _fake_sidecar() as (sidecar, fake):
+        fake.raw = b"restarted \xff\xfe now serving"
+
+        reply = await sidecar.get("/restart-sgw")
+
+    assert reply.startswith("restarted "), reply
+    assert reply.endswith(" now serving"), reply
+
+
+@pytest.mark.asyncio
+async def test_a_transfer_that_breaks_midway_does_not_read_as_unreachable(tmp_path: Path) -> None:
+    """ "Failed to reach" would contradict the progress a broken transfer reports."""
+
+    async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        while await reader.readline() not in (b"\r\n", b""):
+            pass
+        # Promises a megabyte, sends 4 KiB, hangs up: the client breaks part way through a
+        # body it was already reading.
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 1048576\r\n\r\n" + b"x" * 4096)
+        await writer.drain()
+        writer.close()
+
+    server = await asyncio.start_server(serve, "127.0.0.1", 0)
+    try:
+        async with Caddy("127.0.0.1", server.sockets[0].getsockname()[1]) as caddy:
+            with pytest.raises(CblTestError, match="Download /sg_debug.log failed mid-transfer on 127.0.0.1") as e:
+                await caddy.download("/sg_debug.log", tmp_path / "sg_debug.log")
+
+        assert "having received 4.0 KiB of 1.0 MiB" in str(e.value), str(e.value)
+    finally:
+        server.close()
+        await server.wait_closed()

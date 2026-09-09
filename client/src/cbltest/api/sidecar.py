@@ -85,6 +85,9 @@ class _Sidecar:
     _NAME: ClassVar[str]
     """What this sidecar calls itself in the HTTP log and in spans."""
 
+    _ERROR_BODY_LIMIT: ClassVar[int] = 4 * 1024
+    """How much of a failed response goes in the error, for a body that is worth reading."""
+
     def __init__(self, hostname: str, port: int, timeout: ClientTimeout) -> None:
         self._hostname = hostname
         self._port = port
@@ -211,7 +214,7 @@ class _Sidecar:
                 writer.write_error(str(e))
                 raise
 
-        text = b"".join(chunks).decode("utf-8")
+        text = b"".join(chunks).decode("utf-8", errors="replace")
         writer.write_end(f"{self._NAME} [{self._hostname}] <- {operation}", text)
         return text
 
@@ -249,9 +252,10 @@ class _Sidecar:
         try:
             async with self._session.request(method, path, data=data, headers=headers, timeout=budget) as response:
                 if not response.ok:
-                    # An error page can be arbitrarily large, and its body goes in the
-                    # message, so keep only the head of it, as bytes if it is not text.
-                    body = await response.content.read(4 * 1024)
+                    # A body can be arbitrarily large, and it goes in the message, so keep
+                    # only as much as this sidecar's failures are worth, as bytes if it is
+                    # not text.
+                    body = await response.content.read(self._ERROR_BODY_LIMIT)
                     received += len(body)
                     try:
                         detail = body.decode("utf-8")
@@ -284,7 +288,10 @@ class _Sidecar:
                     f"{f' (with {budgets})' if budgets else ''}{detail}"
                 ) from e
 
-            raise CblTestError(f"{operation} failed to reach {self._hostname}{progress}: {e}") from e
+            if progress:
+                raise CblTestError(f"{operation} failed mid-transfer on {self._hostname}{progress}: {e}") from e
+
+            raise CblTestError(f"{operation} failed to reach {self._hostname}: {e}") from e
 
 
 class Caddy(_Sidecar):
@@ -345,6 +352,10 @@ class Shell2Http(_Sidecar):
     """
 
     _NAME = "shell2http"
+
+    # A failing script prints what went wrong, and one that cats a log prints the log, so the
+    # budget is set to hold a real one rather than the first few lines of it.
+    _ERROR_BODY_LIMIT = 64 * 1024
 
     def __init__(self, hostname: str, port: int = SHELL2HTTP_PORT) -> None:
         """
