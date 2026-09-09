@@ -150,7 +150,7 @@ pipeline {
                     when { beforeAgent true; expression { params.RUN_ANDROID } }
                     agent { label 'qe-mac-india' }
                     options {
-                        lock('45291VDJH01660')
+                        lock('56141JEBF18456')
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
