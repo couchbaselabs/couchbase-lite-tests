@@ -254,7 +254,8 @@ class TestReplicatorEncryptionHook(CBLTestClass):
                 DocumentUpdateEntry(
                     "hotel_400",
                     original_doc.revid,
-                    {
+                    original_doc.body
+                    | {
                         "name": "SGW",
                         "encrypted_field": EncryptedValue("secret_password"),
                     },

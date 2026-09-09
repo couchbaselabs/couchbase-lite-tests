@@ -506,7 +506,7 @@ class TestDeltaSync(CBLTestClass):
                 DocumentUpdateEntry(
                     "post_1",
                     original_doc.revid,
-                    {"channels": ["group1"], "name": "SGW"},
+                    original_doc.body | {"channels": ["group1"], "name": "SGW"},
                 )
             ],
             collection="posts",
@@ -640,7 +640,7 @@ class TestDeltaSync(CBLTestClass):
                     DocumentUpdateEntry(
                         "doc1",
                         old_revision,
-                        {"name": "SGW"},
+                        sgw_doc_before_update.body | {"name": "SGW"},
                     )
                 ],
             )
