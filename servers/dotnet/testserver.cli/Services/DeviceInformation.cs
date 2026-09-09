@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using TestServer.Services;
 
 namespace TestServer.Cli.Services
@@ -14,14 +9,13 @@ namespace TestServer.Cli.Services
 
         public string SystemName
         {
-            get {
+            get
+            {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) {
                     return "Windows";
-                } else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX)) {
-                    return "macOS";
-                } else {
-                    return "Linux";
                 }
+
+                return RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "macOS" : "Linux";
             }
         }
 

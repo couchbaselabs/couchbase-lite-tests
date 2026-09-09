@@ -95,6 +95,7 @@ class TestRetryAssert:
             raise AssertionError("still not ready")
 
         with pytest.raises(TypeError) as exc_info:
+            # ty: ignore[unused-awaitable] - the async poll is the point: it must be rejected, never awaited
             retry_assert(poll, tenacity.wait_fixed(0), tenacity.stop_after_attempt(5))
 
         assert "async_retry_assert" in str(exc_info.value)

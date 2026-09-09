@@ -36,6 +36,7 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
+@pytest.mark.skip("These tests are marked for 6 hours each and flake as is - see CBL-8867")
 class TestSystem(CBLTestClass):
     async def _setup_system_test(
         self, cblpytest: CBLPyTest, tmp_path: Path
@@ -48,11 +49,11 @@ class TestSystem(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 10 documents to bucket.")
         for i in range(1, 11):
             doc_id = f"doc_{i}"
-            server.upsert_document(bucket_name, doc_id, _doc_body(doc_id))
+            await server.upsert_document(bucket_name, doc_id, _doc_body(doc_id))
 
         self.mark_test_step("Creating a database on Sync Gateway.")
         sg_db_name = "db-1"

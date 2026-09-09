@@ -23,39 +23,43 @@ namespace TestServer.Handlers
 {
     internal static partial class HandlerList
     {
+        private static readonly JsonSerializerOptions SerializerOptions = new()
+        {
+            IncludeFields = true
+        };
+        
         public static (string scope, string name) CollectionSpec(string inputName)
         {
             var split = inputName.Split('.');
-            if(split.Length == 1) {
-                throw new JsonException($"Invalid collection name (must be scope qualified): {inputName}");
-            }
-
-            return (split[0], split[1]);
+            return split.Length == 1 
+                ? throw new JsonException($"Invalid collection name (must be scope qualified): {inputName}") 
+                : (split[0], split[1]);
         }
 
-        private static bool TryDeserialize<T>(this JsonElement element, HttpListenerResponse response, [NotNullWhen(true)]out T? result)
+        private static bool TryDeserialize<T>(this JsonElement element, [NotNullWhen(true)]out T? result, 
+            [NotNullWhen(false)]out JsonException? exception)
         {
             result = default;
+            exception = null;
             try {
-                result = element.Deserialize<T>(new JsonSerializerOptions
-                {
-                    IncludeFields = true
-                })!;
+                result = element.Deserialize<T>(SerializerOptions)!;
                 return true;
             } catch (JsonException ex) {
-                response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), HttpStatusCode.BadRequest);
+                exception = ex;
             }
 
             return false;
         }
 
+        private static async Task WriteDeserializationError(this HttpListenerResponse response, JsonException ex)
+        {
+            await response.WriteBody(Router.CreateErrorResponse($"Invalid json received: {ex.Message}"), 
+                HttpStatusCode.BadRequest).ConfigureAwait(false);
+        }
+
         private static IEnumerable<T> NotNull<T>(this IEnumerable<T?>? input) where T : class
         {
-            if(input == null) {
-                return Enumerable.Empty<T>();
-            }
-
-            return input.Where(x => x != null).Select(x => x!);
+            return input == null ? [] : input.Where(x => x != null).Select(x => x!);
         }
     }
 }
@@ -163,22 +167,22 @@ namespace TestServer
 
         #region Internal Methods
 
-        internal static void HandleException(Exception ex, Uri endpoint, HttpListenerResponse response)
+        private static async Task HandleException(Exception ex, Uri endpoint, HttpListenerResponse response)
         {
             if(ex is JsonException) {
-                response.WriteBody(CreateErrorResponse(ex.Message), HttpStatusCode.BadRequest);
+                await response.WriteBody(CreateErrorResponse(ex.Message), HttpStatusCode.BadRequest).ConfigureAwait(false);
                 return;
             }
 
             if(ex is ApplicationStatusException e) {
-                response.WriteBody(CreateErrorResponse(ex.Message), e.StatusCode);
+                await response.WriteBody(CreateErrorResponse(ex.Message), e.StatusCode).ConfigureAwait(false);
                 return;
             }
 
             var msg = MultiExceptionString(ex);
             Serilog.Log.Logger.Warning("Error in handler for {endpoint}", endpoint);
             Serilog.Log.Logger.Warning("{msg}", msg);
-            response.WriteBody(CreateErrorResponse(msg), HttpStatusCode.InternalServerError);
+            await response.WriteBody(CreateErrorResponse(msg), HttpStatusCode.InternalServerError).ConfigureAwait(false);
         }
 
         internal static async Task Handle(string? clientId, Uri endpoint, Stream body, HttpListenerResponse response, int version)
@@ -186,19 +190,20 @@ namespace TestServer
             var path = endpoint.AbsolutePath!.TrimStart('/');
             if (path != "") {
                 if (version == 0) {
-                    response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint",
-                        HttpStatusCode.Forbidden);
+                    await response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint",
+                        HttpStatusCode.Forbidden).ConfigureAwait(false);
                     return;
                 }
 
                 if(version != CBLTestServer.ApiVersion) {
-                    response.WriteBody("The API version specified does not match this server", HttpStatusCode.Forbidden);
+                    await response.WriteBody("The API version specified does not match this server", 
+                        HttpStatusCode.Forbidden).ConfigureAwait(false);
                     return;
                 }
             }
 
             if (!RouteMap.TryGetValue(path, out var action)) {
-                response.WriteEmptyBody(HttpStatusCode.NotFound);
+                await response.WriteEmptyBody(HttpStatusCode.NotFound).ConfigureAwait(false);
                 return;
             }
 
@@ -214,7 +219,7 @@ namespace TestServer
                 Serilog.Log.Logger.Error("Error deserializing POST body for {endpoint}", endpoint);
                 Serilog.Log.Logger.Error("{msg}", msg);
                 var topEx = new ApplicationException($"Error deserializing POST body for {endpoint}", ex);
-                response.WriteBody(CreateErrorResponse(topEx), HttpStatusCode.BadRequest);
+                await response.WriteBody(CreateErrorResponse(topEx), HttpStatusCode.BadRequest).ConfigureAwait(false);
                 return;
             }
 
@@ -223,14 +228,14 @@ namespace TestServer
             } catch (TargetInvocationException ex) {
                 switch(ex.InnerException) {
                     case null:
-                        HandleException(ex, endpoint, response);
+                        await HandleException(ex, endpoint, response).ConfigureAwait(false);
                         break;
                     default:
-                        HandleException(ex.InnerException, endpoint, response);
+                        await HandleException(ex.InnerException, endpoint, response).ConfigureAwait(false);
                         break;
                 }
             } catch (Exception ex) {
-                HandleException(ex, endpoint, response);
+                await HandleException(ex, endpoint, response).ConfigureAwait(false);
             }
         }
 

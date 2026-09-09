@@ -1,11 +1,13 @@
 #!/bin/bash
 
-# Wipe every Edge Server database and restore the provisioned datasets. Unlike /reset-db
-# this takes no request body, so it needs no name and no working Edge Server.
+# Wipe every Edge Server database and audit log, and restore the provisioned datasets.
+# Unlike /reset-db this takes no request body, so it needs no name and no working Edge
+# Server.  The Edge Server recreates the audit log its config names on its next start.
 
 set -euo pipefail
 
 DB_DIR="$HOME/database"
+AUDIT_DIR="$HOME/audit"
 
 shopt -s nullglob
 
@@ -19,4 +21,9 @@ for zip in "$DB_DIR"/*.cblite2.zip; do
   echo "Restored $(basename "$zip" .zip)"
 done
 
-echo "Databases reset"
+for log in "$AUDIT_DIR"/*; do
+  rm -f "$log"
+  echo "Removed $(basename "$log")"
+done
+
+echo "Databases and audit logs reset"

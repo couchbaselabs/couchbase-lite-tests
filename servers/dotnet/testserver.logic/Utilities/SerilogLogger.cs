@@ -3,13 +3,8 @@ using Serilog.Events;
 
 namespace TestServer.Utilities
 {
-    public sealed class SerilogLogger : BaseLogSink
+    public sealed class SerilogLogger(LogLevel level) : BaseLogSink(level)
     {
-        public SerilogLogger(LogLevel level)
-            : base(level)
-        {
-        }
-
         protected override void WriteLog(LogLevel level, LogDomain domain, string message)
         {
             var outLevel = LogEventLevel.Information;
@@ -28,6 +23,7 @@ namespace TestServer.Utilities
                     break;
                 case LogLevel.None:
                     return;
+                case LogLevel.Info:
                 default:
                     break;
             }

@@ -1,34 +1,32 @@
 ﻿using Couchbase.Lite;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Nito.AsyncEx;
 using System.IO.Compression;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using System.Xml.Linq;
 using TestServer.Handlers;
-using TestServer.Services;
 
 namespace TestServer
 {
     public sealed class ObjectManager
     {
-        private const string GithubBaseUrl = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
+        private const string GITHUB_BASE_URL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/";
 
         private readonly Dictionary<string, Database> _activeDatabases = new();
         private readonly Dictionary<string, IDisposable> _activeDisposables = new();
-        private readonly HashSet<object> _keepAlives = new();
-        private readonly AsyncReaderWriterLock _lock = new AsyncReaderWriterLock();
-        private readonly HttpClient _httpClient = new HttpClient();
+        // ReSharper disable once CollectionNeverQueried.Local
+        // Putting the object in the set is how to keep it from being GC
+        private readonly HashSet<object> _keepAlives = [];
+        private readonly AsyncReaderWriterLock _lock = new();
+        private readonly HttpClient _httpClient = new();
 
-        public readonly string FilesDirectory;
+        private readonly string _filesDirectory;
 
         public ObjectManager(string filesDirectory)
         {
-            FilesDirectory = filesDirectory;
-            Directory.CreateDirectory(FilesDirectory);
+            _filesDirectory = filesDirectory;
+            Directory.CreateDirectory(_filesDirectory);
         }
 
         public void Reset()
@@ -56,51 +54,20 @@ namespace TestServer
             _keepAlives.Clear();
         }
 
-        public async Task LoadDatabase(string? datasetUrlString, IEnumerable<string> targetDbNames, IEnumerable<string>? collections = null)
+        public async Task LoadDatabase(string? datasetUrlString, IReadOnlyList<string> targetDbNames, IReadOnlyList<string>? collections = null)
         {
             Uri? datasetUrl = null;
             string? datasetName = null;
             if (datasetUrlString != null) {
-                datasetUrl = new(datasetUrlString);
+                datasetUrl = new Uri(datasetUrlString);
                 datasetName = datasetUrl.AbsolutePath.Split('/').Last().Split('.').First();
             }
 
             IEnumerable<string> targetsToCreate;
-            using (var rl = _lock.ReaderLock()) {
+            using (_ = _lock.ReaderLock()) {
                 targetsToCreate = targetDbNames.Where(x => !_activeDatabases.ContainsKey(x)).ToArray();
                 if (!targetsToCreate.Any()) {
                     return;
-                }
-            }
-
-            void CreateNewDatabases()
-            {
-                foreach (var targetName in targetsToCreate) {
-                    if (Database.Exists(targetName, FilesDirectory)) {
-                        Database.Delete(targetName, FilesDirectory);
-                    }
-
-                    var dbConfig = new DatabaseConfiguration
-                    {
-                        Directory = FilesDirectory
-                    };
-
-                    if (datasetName != null) {
-                        Database.Copy(Path.Join(FilesDirectory, $"{datasetName}.cblite2"), targetName, dbConfig);
-                        _activeDatabases[targetName] = new(targetName, dbConfig);
-                    } else {
-                        var newDb = new Database(targetName, dbConfig);
-                        _activeDatabases[targetName] = newDb;
-                        if (collections == null) {
-                            continue;
-                        }
-
-                        foreach (var c in collections) {
-                            var collSpec = HandlerList.CollectionSpec(c);
-                            using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
-                        }
-                    }
-
                 }
             }
 
@@ -113,7 +80,7 @@ namespace TestServer
             if(asset == null) {
                 throw new JsonException($"Request for nonexistent dataset '{datasetName}'");
             }
-            var destinationZip = Path.Combine(FilesDirectory, $"{datasetName}.cblite2.zip");
+            var destinationZip = Path.Combine(_filesDirectory, $"{datasetName}.cblite2.zip");
             using var wl = _lock.WriterLock();
             if (File.Exists(destinationZip)) {
                 File.Delete(destinationZip);
@@ -123,13 +90,45 @@ namespace TestServer
                 await asset.CopyToAsync(fout);
             }
 
-            if (Database.Exists(datasetName, FilesDirectory)) {
-                Database.Delete(datasetName, FilesDirectory);
+            if (Database.Exists(datasetName, _filesDirectory)) {
+                Database.Delete(datasetName, _filesDirectory);
             }
 
-            ZipFile.ExtractToDirectory(destinationZip, FilesDirectory);
+            ZipFile.ExtractToDirectory(destinationZip, _filesDirectory);
             CreateNewDatabases();
-            Database.Delete(datasetName, FilesDirectory);
+            Database.Delete(datasetName, _filesDirectory);
+            return;
+
+            void CreateNewDatabases()
+            {
+                foreach (var targetName in targetsToCreate) {
+                    if (Database.Exists(targetName, _filesDirectory)) {
+                        Database.Delete(targetName, _filesDirectory);
+                    }
+
+                    var dbConfig = new DatabaseConfiguration
+                    {
+                        Directory = _filesDirectory
+                    };
+
+                    if (datasetName != null) {
+                        Database.Copy(Path.Join(_filesDirectory, $"{datasetName}.cblite2"), targetName, dbConfig);
+                        _activeDatabases[targetName] = new Database(targetName, dbConfig);
+                    } else {
+                        var newDb = new Database(targetName, dbConfig);
+                        _activeDatabases[targetName] = newDb;
+                        if (collections == null) {
+                            continue;
+                        }
+
+                        foreach (var collSpec in collections.Select(HandlerList.CollectionSpec))
+                        {
+                            using var coll = newDb.CreateCollection(collSpec.name, collSpec.scope);
+                        }
+                    }
+
+                }
+            }
         }
 
         public async Task<Stream> LoadBlob(string blobUrlString)
@@ -145,7 +144,7 @@ namespace TestServer
 
         public Database? GetDatabase(string name)
         {
-            return _activeDatabases.TryGetValue(name, out var db) ? db : null;
+            return _activeDatabases.GetValueOrDefault(name);
         }
 
         public (T, string) RegisterObject<T>(Func<T> generator, string? id = null) where T : class, IDisposable
@@ -184,7 +183,7 @@ namespace TestServer
         {
             var localFile = datasetUrl.AbsolutePath.Split('/').Last();
             var subfolder = SHA1.HashData(Encoding.ASCII.GetBytes(datasetUrl.AbsolutePath));
-            var downloadedPath = Path.Combine(FilesDirectory, "downloaded", ToHexFolderName(subfolder), localFile);
+            var downloadedPath = Path.Combine(_filesDirectory, "downloaded", ToHexFolderName(subfolder), localFile);
             if (File.Exists(downloadedPath)) {
                 return File.OpenRead(downloadedPath);
             }

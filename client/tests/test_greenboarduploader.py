@@ -1,19 +1,22 @@
 """Tests for GreenboardUploader and the greenboard fixture."""
 
 import inspect
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any, Literal, cast
-from unittest.mock import MagicMock, patch
+from typing import Literal, cast
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pluggy._result
 import pytest
 from _pytest.reports import TestReport
+from acouchbase.bucket import Bucket
+from acouchbase.cluster import Cluster
+from acouchbase.collection import Collection
 from cbltest import CBLPyTest
 from cbltest.api import testserver
-from cbltest.api.edgeserver import EdgeServerVersion
+from cbltest.api.edgeserver import EdgeServer, EdgeServerVersion
+from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.syncgateway import CouchbaseVersion, SyncGateway, SyncGatewayVersion
 from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
@@ -25,8 +28,6 @@ from cbltest.greenboarduploader import (
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
-from couchbase.cluster import Cluster
-from couchbase.collection import Collection
 
 FIXED_NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=UTC)
 FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
@@ -115,29 +116,27 @@ class FakeSyncGateway(SyncGateway):
         return SyncGatewayVersion(self._version_str)
 
 
-class FakeEdgeServer:
-    """Test-only stand-in for EdgeServer that returns a fixed version.
+class FakeEdgeServer(EdgeServer):
+    """Test-only EdgeServer that returns a fixed version.
 
-    Unlike :class:`FakeSyncGateway` this does not subclass the real
-    ``EdgeServer``: that constructor reads and decodes a config file off disk.
-    The greenboard fixture only ever calls ``get_version()``, so a duck type
-    is enough.
+    The real constructor reads and decodes a config file off disk, so it is
+    skipped; the greenboard fixture only ever calls ``get_version()``.
     """
 
     def __init__(self, version_str: str) -> None:
         self._version_str = version_str
 
-    async def get_version(self) -> EdgeServerVersion:
+    async def get_version(self) -> CouchbaseVersion:
         return EdgeServerVersion(self._version_str)
 
 
-class FakeEdgeServerManager:
+class FakeEdgeServerManager(EdgeServerManager):
     """``CBLPyTest.edge_servers`` holds managers, and greenboard takes a client from one."""
 
-    def __init__(self, edge_server: Any) -> None:
+    def __init__(self, edge_server: EdgeServer) -> None:
         self._edge_server = edge_server
 
-    def get_admin_client(self) -> Any:
+    def get_admin_client(self) -> EdgeServer:
         return self._edge_server
 
 
@@ -152,14 +151,52 @@ class FakeTestServer(testserver.TestServer):
         return self._get_info_fn()
 
 
+class FakeCBLPyTest(CBLPyTest):
+    """Test-only CBLPyTest that supplies fakes directly.
+
+    The real constructor builds TestServer/SyncGateway/CouchbaseServer objects
+    from the config, and SyncGateway.__init__ makes a network call, so it cannot
+    be used here. Only the three properties greenboard actually reads are
+    overridden; the rest of CBLPyTest is deliberately left unwired.
+    """
+
+    def __init__(
+        self,
+        config: ParsedConfig,
+        test_servers: Sequence[testserver.TestServer],
+        sync_gateways: Sequence[SyncGateway],
+        edge_servers: Sequence[EdgeServerManager],
+    ) -> None:
+        self._config = config
+        self._test_servers = test_servers
+        self._sync_gateways = sync_gateways
+        self._edge_servers = edge_servers
+
+    @property
+    def config(self) -> ParsedConfig:
+        return self._config
+
+    @property
+    def test_servers(self) -> Sequence[testserver.TestServer]:
+        return self._test_servers
+
+    @property
+    def sync_gateways(self) -> Sequence[SyncGateway]:
+        return self._sync_gateways
+
+    @property
+    def edge_servers(self) -> Sequence[EdgeServerManager]:
+        return self._edge_servers
+
+
 def _make_cblpytest(
     *,
     url: str | None = "couchbase://greenboard.example.com",
     username: str | None = "fakeuser",
     password: str | None = "fakepass",
-    test_servers: list | None = None,
-    sync_gateways: list | None = None,
-    edge_servers: list | None = None,
+    test_servers: Sequence[testserver.TestServer] | None = None,
+    sync_gateways: Sequence[SyncGateway] | None = None,
+    edge_servers: Sequence[EdgeServerManager] | None = None,
 ) -> CBLPyTest:
     if url is not None and username is not None and password is not None:
         config = ParsedConfig(
@@ -173,16 +210,7 @@ def _make_cblpytest(
         )
     else:
         config = ParsedConfig({})
-    cblpytest = CBLPyTest.__new__(CBLPyTest)
-    cblpytest._CBLPyTest__config = config
-    cblpytest._CBLPyTest__test_servers = test_servers if test_servers is not None else []
-    cblpytest._CBLPyTest__edge_servers = edge_servers if edge_servers is not None else []
-    cluster = SimpleNamespace(
-        sync_gateways=sync_gateways if sync_gateways is not None else [],
-        couchbase_servers=[],
-    )
-    cblpytest._CBLPyTest__clusters = [cluster]
-    return cblpytest
+    return FakeCBLPyTest(config, test_servers or [], sync_gateways or [], edge_servers or [])
 
 
 def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") -> pytest.Config:
@@ -257,14 +285,15 @@ class TestCblpytestHelperFidelity:
 
 
 class TestGreenboardUploaderDocument:
-    def test_pass_and_fail_counts_in_document(self) -> None:
+    @pytest.mark.asyncio
+    async def test_pass_and_fail_counts_in_document(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=False))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
 
         mock_upload.assert_called_once()
         assert mock_upload.call_args[0][0] == RunResult(
@@ -279,12 +308,13 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_document_platform_and_os(self) -> None:
+    @pytest.mark.asyncio
+    async def test_document_platform_and_os(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-net", "Android", "3.2.0-b0050", None, None)
+            await uploader.upload("couchbase-lite-net", "Android", "3.2.0-b0050", None, None)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=50,
@@ -298,12 +328,13 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_version_and_build_parsed_from_version_string(self) -> None:
+    @pytest.mark.asyncio
+    async def test_version_and_build_parsed_from_version_string(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.1-b0136", None, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.1-b0136", None, None)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=136,
@@ -317,13 +348,14 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_sgw_version_field_with_sgw(self) -> None:
+    @pytest.mark.asyncio
+    async def test_sgw_version_field_with_sgw(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("3.3.3(271;abc)")
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", sgw, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", sgw, None)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
@@ -337,13 +369,14 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_sgw_platform_uses_sgw_version_for_build(self) -> None:
+    @pytest.mark.asyncio
+    async def test_sgw_platform_uses_sgw_version_for_build(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("4.0.0(350;def)")
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("sync-gateway", "n/a", "n/a", sgw, None)
+            await uploader.upload("sync-gateway", "n/a", "n/a", sgw, None)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=350,
@@ -357,12 +390,13 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_no_sgw_version_sets_na(self) -> None:
+    @pytest.mark.asyncio
+    async def test_no_sgw_version_sets_na(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
@@ -376,14 +410,15 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_es_version_field_with_es(self) -> None:
+    @pytest.mark.asyncio
+    async def test_es_version_field_with_es(self) -> None:
         """An ES version on a CBL run is recorded but does not key the run."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         es = EdgeServerVersion("1.1.0(45;abc)")
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, es)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, es)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
@@ -397,14 +432,15 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_es_platform_uses_es_version_for_build(self) -> None:
+    @pytest.mark.asyncio
+    async def test_es_platform_uses_es_version_for_build(self) -> None:
         """An edge-server run is keyed on the ES build, with no CBL version at all."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         es = EdgeServerVersion("1.1.0(45;abc)")
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("edge-server", "n/a", None, None, es)
+            await uploader.upload("edge-server", "n/a", None, None, es)
 
         assert mock_upload.call_args[0][0] == RunResult(
             build=45,
@@ -418,14 +454,15 @@ class TestGreenboardUploaderDocument:
             jobUrl="local",
         )
 
-    def test_es_platform_without_es_version_skips_upload(self) -> None:
+    @pytest.mark.asyncio
+    async def test_es_platform_without_es_version_skips_upload(self) -> None:
         """platform == edge-server with no ES version has nothing to key on, so
         the doc is dropped rather than written as build 0 of 0.0.0."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("edge-server", "n/a", None, None, None)
+            await uploader.upload("edge-server", "n/a", None, None, None)
 
         mock_upload.assert_not_called()
 
@@ -435,33 +472,36 @@ class TestOverallFailureGuard:
     suppresses the in-process counter, which stops tallying at that point, but
     not counts supplied by the caller, which are a full tally from a JUnit XML."""
 
-    def test_no_counts_skips_upload(self) -> None:
+    @pytest.mark.asyncio
+    async def test_no_counts_skips_upload(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("setup", passed=False))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
 
         mock_upload.assert_not_called()
 
-    def test_explicit_counts_still_upload(self) -> None:
+    @pytest.mark.asyncio
+    async def test_explicit_counts_still_upload(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("setup", passed=False))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None, pass_count=7, fail_count=2)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None, pass_count=7, fail_count=2)
 
         doc = mock_upload.call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (7, 2)
 
-    def test_partial_counts_skip_upload(self) -> None:
+    @pytest.mark.asyncio
+    async def test_partial_counts_skip_upload(self) -> None:
         """One override leaves the other on the truncated in-process counter."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("setup", passed=False))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None, pass_count=7)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None, pass_count=7)
 
         mock_upload.assert_not_called()
 
@@ -486,65 +526,72 @@ def write_junit_xml(path: Path, *, tests: int, failures: int, errors: int, skipp
     return path
 
 
-def upload_junit(uploader: GreenboardUploader, xml: Path) -> MagicMock:
+async def upload_junit(uploader: GreenboardUploader, xml: Path) -> MagicMock:
     """Drive the JUnit upload path, returning the patched ``_upload_document``."""
     with patch.object(uploader, "_upload_document") as mock_upload:
-        uploader.upload_from_junit_file(xml, "couchbase-lite-ios", "iOS", "3.2.0-b0001", None)
+        await uploader.upload_from_junit_file(xml, "couchbase-lite-ios", "iOS", "3.2.0-b0001", None)
     return mock_upload
 
 
 class TestUploadFromJunitFile:
-    def test_counts_derived_from_xml(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_counts_derived_from_xml(self, tmp_path: Path) -> None:
         # 5 tests - 1 failure - 1 error - 1 skip = 2 passes. Errors fold into
         # failCount; the greenboard schema has no separate field for them.
         xml = write_junit_xml(tmp_path / "junit.xml", tests=5, failures=1, errors=1, skipped=1)
 
-        doc = upload_junit(make_uploader(), xml).call_args[0][0]
+        doc = (await upload_junit(make_uploader(), xml)).call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (2, 2)
 
-    def test_uploads_despite_setup_failure(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_uploads_despite_setup_failure(self, tmp_path: Path) -> None:
         """The regression this change fixes: a fixture crash used to discard the
         whole run, even though the XML tally is complete."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("setup", passed=False))
         xml = write_junit_xml(tmp_path / "junit.xml", tests=3, failures=1, errors=1)
 
-        doc = upload_junit(uploader, xml).call_args[0][0]
+        doc = (await upload_junit(uploader, xml)).call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (1, 2)
 
-    def test_all_failed_still_uploads(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_all_failed_still_uploads(self, tmp_path: Path) -> None:
         """Tests that ran and failed are a real result: a red bar is the signal."""
         xml = write_junit_xml(tmp_path / "junit.xml", tests=3, failures=3, errors=0)
 
-        doc = upload_junit(make_uploader(), xml).call_args[0][0]
+        doc = (await upload_junit(make_uploader(), xml)).call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (0, 3)
 
-    def test_all_errored_skips_upload(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_all_errored_skips_upload(self, tmp_path: Path) -> None:
         """Nothing ran: a harness failure, not a test result."""
         xml = write_junit_xml(tmp_path / "junit.xml", tests=3, failures=0, errors=3)
 
-        upload_junit(make_uploader(), xml).assert_not_called()
+        (await upload_junit(make_uploader(), xml)).assert_not_called()
 
-    def test_no_tests_collected_skips_upload(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_no_tests_collected_skips_upload(self, tmp_path: Path) -> None:
         xml = write_junit_xml(tmp_path / "junit.xml", tests=0, failures=0, errors=0)
 
-        upload_junit(make_uploader(), xml).assert_not_called()
+        (await upload_junit(make_uploader(), xml)).assert_not_called()
 
-    def test_missing_file_falls_back_to_in_process_counter(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_missing_file_falls_back_to_in_process_counter(self, tmp_path: Path) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=False))
 
-        doc = upload_junit(uploader, tmp_path / "absent.xml").call_args[0][0]
+        doc = (await upload_junit(uploader, tmp_path / "absent.xml")).call_args[0][0]
         assert (doc.pass_count, doc.fail_count) == (1, 1)
 
-    def test_missing_file_with_setup_failure_skips_upload(self, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_missing_file_with_setup_failure_skips_upload(self, tmp_path: Path) -> None:
         """The missing-file fall-back reads the in-process counter, so the guard
         still applies."""
         uploader = make_uploader()
         drive_hook(uploader, make_report("setup", passed=False))
 
-        upload_junit(uploader, tmp_path / "absent.xml").assert_not_called()
+        (await upload_junit(uploader, tmp_path / "absent.xml")).assert_not_called()
 
 
 class TestGreenboardFixture:
@@ -826,12 +873,12 @@ class TestGreenboardFixture:
         the platform is still edge-server, and upload() skips instead of
         publishing a 0.0.0 doc."""
 
-        class UnreachableEdgeServer:
-            async def get_version(self) -> EdgeServerVersion:
+        class UnreachableEdgeServer(FakeEdgeServer):
+            async def get_version(self) -> CouchbaseVersion:
                 raise RuntimeError("connection refused")
 
         cblpytest = _make_cblpytest(
-            test_servers=[], sync_gateways=[], edge_servers=[FakeEdgeServerManager(UnreachableEdgeServer())]
+            test_servers=[], sync_gateways=[], edge_servers=[FakeEdgeServerManager(UnreachableEdgeServer("n/a"))]
         )
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
@@ -888,7 +935,7 @@ class TestRunResultFullDocument:
     freeze datetime.now so the uploaded / date fields are deterministic.
     """
 
-    def _upload_and_capture(
+    async def _upload_and_capture(
         self,
         uploader: GreenboardUploader,
         platform: str,
@@ -898,27 +945,34 @@ class TestRunResultFullDocument:
         es: EdgeServerVersion | None = None,
     ) -> dict:
         mock_collection = MagicMock(spec=Collection)
+        mock_collection.upsert = AsyncMock()
+        mock_bucket = MagicMock(spec=Bucket)
+        mock_bucket.on_connect = AsyncMock()
+        mock_bucket.default_collection.return_value = mock_collection
         mock_cluster = MagicMock(spec=Cluster)
-        mock_cluster.bucket.return_value.default_collection.return_value = mock_collection
+        mock_cluster.wait_until_ready = AsyncMock()
+        mock_cluster.close = AsyncMock()
+        mock_cluster.bucket.return_value = mock_bucket
 
         with (
-            patch("cbltest.greenboarduploader.Cluster", return_value=mock_cluster),
+            patch("cbltest.greenboarduploader.Cluster.connect", AsyncMock(return_value=mock_cluster)),
             patch("cbltest.greenboarduploader.datetime") as mock_dt,
         ):
             mock_dt.now.return_value = FIXED_NOW
             mock_dt.side_effect = datetime
-            uploader.upload(platform, os_name, version, sgw, es)
+            await uploader.upload(platform, os_name, version, sgw, es)
 
         _, doc = mock_collection.upsert.call_args[0]
         return doc
 
-    def test_all_fields_standard_run(self) -> None:
+    @pytest.mark.asyncio
+    async def test_all_fields_standard_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=True))
         drive_hook(uploader, make_report("call", passed=False))
 
-        doc = self._upload_and_capture(uploader, "couchbase-lite-ios", "iOS", "3.2.0-b1234")
+        doc = await self._upload_and_capture(uploader, "couchbase-lite-ios", "iOS", "3.2.0-b1234")
 
         assert doc == {
             **RunResult(
@@ -936,12 +990,13 @@ class TestRunResultFullDocument:
             "date": "2024-03-15",
         }
 
-    def test_all_fields_sgw_run(self) -> None:
+    @pytest.mark.asyncio
+    async def test_all_fields_sgw_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         sgw = SyncGatewayVersion("4.0.0(350;def)")
 
-        doc = self._upload_and_capture(uploader, "sync-gateway", "n/a", "n/a", sgw)
+        doc = await self._upload_and_capture(uploader, "sync-gateway", "n/a", "n/a", sgw)
 
         assert doc == {
             **RunResult(
@@ -959,12 +1014,13 @@ class TestRunResultFullDocument:
             "date": "2024-03-15",
         }
 
-    def test_all_fields_es_run(self) -> None:
+    @pytest.mark.asyncio
+    async def test_all_fields_es_run(self) -> None:
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
         es = EdgeServerVersion("1.1.0(45;abc)")
 
-        doc = self._upload_and_capture(uploader, "edge-server", "n/a", None, None, es)
+        doc = await self._upload_and_capture(uploader, "edge-server", "n/a", None, None, es)
 
         assert doc == {
             **RunResult(
@@ -1013,18 +1069,20 @@ class TestJobUrlPropagation:
     on both upload paths (standard ``upload`` and ``upload_upgrade_batch``).
     """
 
-    def test_build_url_propagates_to_standard_upload(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    @pytest.mark.asyncio
+    async def test_build_url_propagates_to_standard_upload(self, monkeypatch: pytest.MonkeyPatch) -> None:
         build_url = "https://jenkins.example.com/job/cbl-ios/456/"
         monkeypatch.setenv("BUILD_URL", build_url)
         uploader = make_uploader()
         drive_hook(uploader, make_report("call", passed=True))
 
         with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
+            await uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
 
         assert mock_upload.call_args[0][0].job_url == build_url
 
-    def test_build_url_propagates_to_upgrade_batch(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    @pytest.mark.asyncio
+    async def test_build_url_propagates_to_upgrade_batch(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
         build_url = "https://jenkins.example.com/job/upg-sgw/789/"
         monkeypatch.setenv("BUILD_URL", build_url)
 
@@ -1042,7 +1100,7 @@ class TestJobUrlPropagation:
 
         uploader = make_uploader()
         with patch.object(uploader, "_upsert") as mock_upsert:
-            uploader.upload_upgrade_batch(str(results_file))
+            await uploader.upload_upgrade_batch(str(results_file))
 
         doc = mock_upsert.call_args[0][0]
         assert doc["jobUrl"] == build_url

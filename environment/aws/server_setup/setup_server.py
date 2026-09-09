@@ -25,6 +25,7 @@ from environment.aws.common.io import (
     sftp_progress_bar,
 )
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -89,9 +90,7 @@ def setup_node(
         cluster (Optional[str]): The cluster to join, if any.
     """
     header(f"Setting up server {hostname} with version {version}")
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(hostname, username="ec2-user", pkey=pkey)
+    ssh = connect_ssh(hostname, pkey)
 
     sftp = ssh.open_sftp()
     sftp_progress_bar(sftp, SCRIPT_DIR / "configure-node.sh", "/tmp/configure-node.sh")

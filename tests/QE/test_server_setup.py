@@ -49,7 +49,7 @@ class TestServerSetup(CBLTestClass):
                 "index": i,
                 "content": f"Document {i} written via SDK for import test",
             }
-            cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
+            await cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         self.mark_test_step("Verify documents were imported via SGW")
         all_docs = await sg.wait_for_document_count(sg_db, num_docs)
@@ -76,7 +76,7 @@ class TestServerSetup(CBLTestClass):
         sg_db = "db"
 
         self.mark_test_step("Create bucket on CBS")
-        cbs.create_bucket(bucket_name)
+        await cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Fetch CBS root CA certificate and upload to every SGW node")
         ca_cert_pem = await cbs.get_root_ca_certificate()
@@ -101,7 +101,7 @@ class TestServerSetup(CBLTestClass):
 
         doc_id = "test_cacert_auth"
         doc_body = {"type": "test", "message": "x509 ca_cert_path auth works"}
-        cbs.upsert_document(bucket_name, doc_id, doc_body)
+        await cbs.upsert_document(bucket_name, doc_id, doc_body)
         await sg.wait_for_documents(sg_db, [doc_id])
         sg_doc = await sg.get_document(sg_db, doc_id)
         assert sg_doc.body["message"] == "x509 ca_cert_path auth works"

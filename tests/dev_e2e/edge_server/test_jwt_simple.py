@@ -54,8 +54,8 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         self.mark_test_step("Creating travel bucket on Couchbase Server.")
         bucket_name = "travel"
-        server.create_bucket(bucket_name)
-        server.create_collections(bucket_name, "travel", ["airlines"])
+        await server.create_bucket(bucket_name)
+        await server.create_collections(bucket_name, "travel", ["airlines"])
 
         # =====================================================================
         # STEP 3: Create SGW database with local_jwt provider.
@@ -110,7 +110,7 @@ class TestJWTSimple(CBLTestClass):
                 "type": "airline",
                 "name": f"JWT Test Airline {i}",
             }
-            server.upsert_document(bucket_name, doc_id, doc, scope="travel", collection="airlines")
+            await server.upsert_document(bucket_name, doc_id, doc, scope="travel", collection="airlines")
 
         # =====================================================================
         # STEP 6: Wait for SGW to import docs from CBS.

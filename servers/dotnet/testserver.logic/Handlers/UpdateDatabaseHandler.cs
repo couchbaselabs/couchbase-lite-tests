@@ -1,13 +1,9 @@
-﻿using Couchbase.Lite;
-using System;
-using System.Collections.Generic;
-using System.Collections.Specialized;
-using System.Linq;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
+using JetBrains.Annotations;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
@@ -21,59 +17,40 @@ internal static partial class HandlerList
         Purge
     }
 
-    internal readonly record struct UpdateDatabaseEntry
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct UpdateDatabaseEntry(
+        string type,
+        string collection,
+        string documentID,
+        [property: UsedImplicitly] IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties = null,
+        [property: UsedImplicitly] IReadOnlyList<string>? removedProperties = null,
+        [property: UsedImplicitly] IReadOnlyDictionary<string, string>? updatedBlobs = null)
     {
         [JsonIgnore]
-        public UpdateDatabaseType Type { get; }
-
-        public required string type { get; init; }
-
-        public required string collection { get; init; }
-
-        public required string documentID { get; init; }
-
-        public IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties { get; init; }
-
-        public IReadOnlyList<string>? removedProperties { get; init; }
-
-        public IReadOnlyDictionary<string, string>? updatedBlobs { get; init; }
-
-        [JsonConstructor]
-        public UpdateDatabaseEntry(string type, string collection, string documentID,
-            IReadOnlyList<IReadOnlyDictionary<string, object>>? updatedProperties = null,
-            IReadOnlyList<string>? removedProperties = null, IReadOnlyDictionary<string, string>? updatedBlobs = null)
+        public UpdateDatabaseType Type { get; } = type.ToUpperInvariant() switch
         {
-            if(type.ToUpperInvariant() == "UPDATE") {
-                Type = UpdateDatabaseType.Update;
-            } else if(type.ToUpperInvariant() == "DELETE") {
-                Type = UpdateDatabaseType.Delete;
-            } else if(type.ToUpperInvariant() == "PURGE") {
-                Type = UpdateDatabaseType.Purge;
-            } else {
-                throw new JsonException($"Invalid 'type' in database update: {type}");
-            }
+            "UPDATE" => UpdateDatabaseType.Update,
+            "DELETE" => UpdateDatabaseType.Delete,
+            "PURGE" => UpdateDatabaseType.Purge,
+            _ => throw new JsonException($"Invalid 'type' in database update: {type}")
+        };
 
-            this.type = type;
-            this.documentID = documentID;
-            this.collection = collection;
-            this.updatedProperties = updatedProperties;
-            this.removedProperties = removedProperties;
-            this.updatedBlobs = updatedBlobs;
-        }
+        [UsedImplicitly]
+        public required string type { get; init; } = type;
+
+        public required string collection { get; init; } = collection;
+
+        public required string documentID { get; init; } = documentID;
     }
 
-    internal readonly record struct UpdateDatabaseBody
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct UpdateDatabaseBody(string database, IReadOnlyList<UpdateDatabaseEntry> updates)
     {
-        public required string database { get; init; }
+        public required string database { get; init; } = database;
 
-        public required IReadOnlyList<UpdateDatabaseEntry> updates { get; init; }
-
-        [JsonConstructor]
-        public UpdateDatabaseBody(string database, IReadOnlyList<UpdateDatabaseEntry> updates)
-        {
-            this.database = database;
-            this.updates = updates;
-        }
+        public required IReadOnlyList<UpdateDatabaseEntry> updates { get; init; } = updates;
     }
 
     private static readonly IReadOnlyDictionary<string, string> BlobTypeMap = new Dictionary<string, string>
@@ -82,16 +59,14 @@ internal static partial class HandlerList
     };
 
     private static string BlobType(string filename) =>
-        BlobTypeMap.TryGetValue(filename.Split(".").Last(), out var type) ? type : "application/octet-stream";
+        BlobTypeMap.GetValueOrDefault(filename.Split(".").Last(), "application/octet-stream");
 
     private static Collection GetCollection(Database db, string name)
     {
         var collSpec = CollectionSpec(name);
-        if(collSpec.name == "_default") {
-            return db.GetCollection(collSpec.name, collSpec.scope)!;
-        }
-
-        return db.CreateCollection(collSpec.name, collSpec.scope);
+        return collSpec.name == "_default" 
+            ? db.GetCollection(collSpec.name, collSpec.scope)! 
+            : db.CreateCollection(collSpec.name, collSpec.scope);
     }
 
     private static void UpdateDictionaryProperties(IMutableDictionary dict, IReadOnlyList<IReadOnlyDictionary<string, object>> updates)
@@ -113,13 +88,14 @@ internal static partial class HandlerList
     [HttpHandler("updateDatabase")]
     public static async Task UpdateDatabaseHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(response, out var updateBody)) {
+        if(!body.RootElement.TryDeserialize<UpdateDatabaseBody>(out var updateBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
             return;
         }
 
         var db = session.ObjectManager.GetDatabase(updateBody.database);
         if(db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), HttpStatusCode.BadRequest);
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find database named '{updateBody.database}'"), HttpStatusCode.BadRequest).ConfigureAwait(false);
             return;
         }
 
@@ -179,18 +155,20 @@ internal static partial class HandlerList
                 }
             });
         } catch(KeyPathException e) {
-            response.WriteBody(new ErrorReturnBody
+            await response.WriteBody(new ErrorReturnBody
             {
                 domain = TestServerErrorDomain.TestServer,
                 code = 1,
                 message = e.Message
-            }, HttpStatusCode.BadRequest);
-        } finally {
-            foreach(var blob in blobUpdate.Values) {
-                ((Blob)blob).ContentStream?.Dispose();
+            }, HttpStatusCode.BadRequest).ConfigureAwait(false);
+        } finally
+        {
+            foreach (var cs in blobUpdate.Values.Select(blob => ((Blob)blob).ContentStream).OfType<Stream>())
+            {
+                await cs.DisposeAsync().ConfigureAwait(false);
             }
         }
 
-        response.WriteEmptyBody();
+        await response.WriteEmptyBody().ConfigureAwait(false);
     }
 }
