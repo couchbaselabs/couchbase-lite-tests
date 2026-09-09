@@ -8,7 +8,9 @@ closes every client it hands out.
 
 import json
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
+from datetime import UTC, datetime
+from pathlib import Path
 
 import aiofiles
 import tenacity
@@ -16,10 +18,11 @@ from aiohttp import ClientConnectorError, ClientSession
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.edgeserver import EdgeServer
-from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
+from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError, CblTimeoutError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.configparser import EdgeServerInfo
 from cbltest.httplog import get_next_writer
+from cbltest.logging import cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT
 from cbltest.version import VERSION
 
@@ -59,20 +62,37 @@ class EdgeServerManager:
             await client.close()
         self.__clients.clear()
 
-    async def _call_sidecar(self, method: str, path: str, payload: JSONDictionary | None = None) -> None:
-        """Call a shell2http endpoint on the Edge Server host, raising on anything but a 2xx."""
+    async def _call_sidecar(self, method: str, path: str, payload: JSONDictionary | None = None) -> str:
+        """Call a shell2http endpoint on the Edge Server host, raising on anything but a 2xx.
+
+        :return: The response body, which every endpoint but this one ignores
+        """
         data = "" if payload is None else payload.serialize()
         headers = {"Content-Type": "application/json"} if payload is not None else None
         writer = get_next_writer()
         writer.write_begin(f"Edge Server host [{self.__info.hostname}] -> {method.upper()} {path}", data)
-        resp = await self.__shell2http_session.request(method, path, data=data, headers=headers)
-        body = await resp.text()
+        try:
+            resp = await self.__shell2http_session.request(method, path, data=data, headers=headers)
+            # A sidecar echoes raw files back -- start-edgeserver cats the Edge Server's log
+            # on a failed start -- so one odd byte must not fail the whole call.
+            body = await resp.text(errors="replace")
+        # A total timeout raises a bare TimeoutError that stringifies to "", so say what
+        # expired and against which budget, or the caller reports an empty message.
+        except TimeoutError as e:
+            detail = f": {e}" if str(e) else ""
+            budgets = self.__shell2http_session.timeout
+            raise CblTimeoutError(
+                f"{method.upper()} {path} timed out on Edge Server host [{self.__info.hostname}] "
+                f"(connect {budgets.sock_connect}s, total {budgets.total}s){detail}"
+            ) from e
         writer.write_end(
             f"Edge Server host [{self.__info.hostname}] <- {method.upper()} {path} {resp.status}",
             body,
         )
         if not resp.ok:
             raise CblEdgeServerBadResponseError(resp.status, f"{method} {path} returned {resp.status}", body=body)
+
+        return body
 
     async def kill_server(self) -> None:
         """Stop the Edge Server process."""
@@ -204,6 +224,28 @@ class EdgeServerManager:
         """
         with self.__tracer.start_as_current_span("write file on edge server host"):
             await self._call_sidecar("post", "/write-file", JSONDictionary({"path": path, "content": content}))
+
+    async def collect_logs(self, output_dir: Path) -> Path:
+        """
+        Bundle the host's logs, audit logs, live config and system info into an archive,
+        then download it.
+
+        :param output_dir: Local directory to download the archive into
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span("collect edge server logs"):
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.__info.hostname.replace(".", "-").replace(":", "-")
+            filename = f"es-collect-{safe_host}-{timestamp}.tar.gz"
+            response = await self._call_sidecar("post", "/collect-logs", JSONDictionary({"filename": filename}))
+            # tar reports a file that changed as it was read, which still leaves a usable
+            # archive.  A body that is not the JSON the script emits is not worth losing it over.
+            with suppress(json.JSONDecodeError, AttributeError):
+                if warnings := json.loads(response).get("warnings"):
+                    cbl_warning(f"Edge Server [{self.__info.hostname}] archived its logs with warnings: {warnings}")
+
+            client = self.get_admin_client()
+            return await client.caddy.download(f"collect/{filename}", output_dir / filename)
 
     async def set_firewall_rules(self, allow: list[str] | None = None, deny: list[str] | None = None) -> None:
         """
