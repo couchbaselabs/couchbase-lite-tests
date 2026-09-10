@@ -148,8 +148,8 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         )
 
         self.mark_test_step("Create doc1 (Channel A) and doc2 (Channel B)")
-        await sg.create_document(db_name, "doc1", {"channels": ["A"]})
-        await sg.create_document(db_name, "doc2", {"channels": ["B"]})
+        await sg.create_document(db_name, "doc1", {"channels": ["A"]}, wait_for_caching_feed=True)
+        await sg.create_document(db_name, "doc2", {"channels": ["B"]}, wait_for_caching_feed=True)
 
         async with sg.get_user_client("bob", password) as bob:
             self.mark_test_step(
