@@ -15,7 +15,7 @@ two SG clusters.
 4. Start XDCR between cluster 1 and cluster 2.
 5. Wait 5 secs to ensure that clusters are ready.
 6. Reset local database, and load `names` dataset.
-7. Start a replicator to SG1 via load balancer:
+7. Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
     * endpoint: `/names`
     * collections : `_default._default`
     * type: push_and_pull
@@ -52,7 +52,7 @@ data sync continues when one SG node goes offline.
 4.	Start XDCR between cluster 1 and 2.
 5.	Wait 5 seconds to ensure clusters are ready.
 6.	Reset local database and load `names` dataset.
-7.	Start a replicator to SG1 via load balancer:
+7.	Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
 	* endpoint: /names
 	* collections: _default._default
 	* type: push_and_pull
