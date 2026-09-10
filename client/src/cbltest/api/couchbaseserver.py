@@ -7,14 +7,10 @@ import zipfile
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import TypeVar, cast
-
-import aiohttp
-
-T = TypeVar("T")
-import json
+from typing import cast
 from urllib.parse import quote_plus, urlparse
 
+import aiohttp
 import requests
 import tenacity
 from acouchbase.bucket import Bucket
@@ -36,6 +32,8 @@ from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
+from cbltest.api.jsonserializable import JSONDictionary
+from cbltest.api.sidecar import Shell2Http
 from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
@@ -124,6 +122,7 @@ class CouchbaseServer:
         self.__username = username
         self.__password = password
         self.__cluster: Cluster | None = None
+        self.__shell2http: Shell2Http | None = None
 
         # Create a reusable HTTP session for REST API calls
         self.__http_session = requests.Session()
@@ -162,10 +161,26 @@ class CouchbaseServer:
         assert self.__cluster is not None, f"{self} is not connected, call connect() first"
         return self.__cluster
 
+    @property
+    def _shell2http(self) -> Shell2Http:
+        """
+        The shell2http sidecar on this node's host, opened on first use because its session
+        needs a running event loop.  It does not go through the SDK, so it answers for a node
+        whose service is stopped, which is what :meth:`start_server` is for.
+        """
+        if self.__shell2http is None:
+            self.__shell2http = Shell2Http(self.__hostname)
+
+        return self.__shell2http
+
     async def close(self) -> None:
         """
-        Closes the SDK connection to the cluster, and the REST session.
+        Closes the SDK connection to the cluster, the sidecar session, and the REST session.
         """
+        if self.__shell2http is not None:
+            await self.__shell2http.close()
+            self.__shell2http = None
+
         if self.__cluster is not None:
             await self.__cluster.close()
             self.__cluster = None
@@ -1050,7 +1065,7 @@ class CouchbaseServer:
             # Wait for rebalance to complete
             self._wait_for_rebalance_completion()
 
-    def _retry(
+    def _retry[T](
         self,
         func: Callable[[], T],
         max_attempts: int = 3,
@@ -1238,13 +1253,7 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        async with (
-            aiohttp.ClientSession() as session,
-            session.get(f"http://{self.hostname}:20001/stop-cbs") as resp,
-        ):
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+        await self._shell2http.get("/stop-cbs")
 
     async def start_server(self, port: int = 8091) -> None:
         """
@@ -1252,17 +1261,7 @@ class CouchbaseServer:
 
         :param port: REST API port to wait for readiness (default 8091)
         """
-        async with (
-            aiohttp.ClientSession() as session,
-            session.post(
-                f"http://{self.hostname}:20001/start-cbs",
-                data=json.dumps({"port": port}),
-                headers={"Content-Type": "application/json"},
-            ) as resp,
-        ):
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+        await self._shell2http.post("/start-cbs", JSONDictionary({"port": port}))
 
     async def get_root_ca_certificate(self) -> bytes:
         """

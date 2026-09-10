@@ -14,13 +14,14 @@ from aiohttp import ClientSession, TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, ConfigDict
 
-from cbltest.api import caddy
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
+    CblHttpError,
     CblTestError,
     CblTimeoutError,
 )
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.sidecar import Caddy
 from cbltest.api.syncgateway import (
     AllDocumentsResponse,
     CouchbaseVersion,
@@ -191,7 +192,7 @@ class EdgeServer:
         if config_file is None:
             raise CblTestError("Config file cannot be None")
         self.__config = EdgeServerConfig.load(config_file)
-        self._caddy = caddy.Caddy(url)
+        self._caddy = Caddy(url)
         self.__secure: bool = self.__config.is_tls
         self.__mtls: bool = self.__config.is_mtls
         self.__hostname: str = url
@@ -220,7 +221,7 @@ class EdgeServer:
         return self.__hostname
 
     @property
-    def caddy(self) -> caddy.Caddy:
+    def caddy(self) -> Caddy:
         """Gets the Caddy file server running alongside this Edge Server"""
         return self._caddy
 
@@ -929,10 +930,10 @@ class EdgeServer:
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
         Downloads a log file from the Edge Server host via its Caddy HTTP server
-        (port :data:`~cbltest.api.caddy.DEFAULT_PORT`), writing it straight to disk so a log of
+        (port :data:`~cbltest.api.sidecar.CADDY_PORT`), writing it straight to disk so a log of
         any size never has to fit in memory.
 
-        :param log_file: Path to the log file on the Edge Server host, absolute or relative to Caddy's root
+        :param log_file: Absolute path to the log file on the Edge Server host
         :param local_path: Local path to write the log file to
         :return: The local path the log file was written to
         :raises FileNotFoundError: If the log file does not exist
@@ -940,7 +941,12 @@ class EdgeServer:
         :raises CblTestError: For other HTTP or network errors
         """
         with self.__tracer.start_as_current_span("download_log_file", attributes={"cbl.log_file": log_file}):
-            return await self._caddy.download(log_file.lstrip("/"), local_path)
+            try:
+                return await self._caddy.download(log_file, local_path)
+            except CblHttpError as e:
+                if e.code != 404:
+                    raise
+                raise FileNotFoundError(f"{log_file} does not exist on {self.__hostname}") from e
 
     async def check_audit_log(self, search_string: str) -> list[str]:
         """

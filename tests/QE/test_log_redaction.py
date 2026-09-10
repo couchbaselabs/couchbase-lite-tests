@@ -216,7 +216,7 @@ class TestLogRedaction(CBLTestClass):
             self.mark_test_step(f"Download redacted zip: {redacted_zip_filename}")
             with tempfile.TemporaryDirectory() as tmpdir:
                 local_zip_path = Path(tmpdir) / redacted_zip_filename
-                await sg.caddy.download(redacted_zip_filename, local_zip_path)
+                await sg.caddy.download(f"/{redacted_zip_filename}", local_zip_path)
 
                 assert local_zip_path.exists(), f"Downloaded zip not found at {local_zip_path}"
 

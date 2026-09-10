@@ -21,14 +21,14 @@ from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
-from cbltest.api import caddy
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
+from cbltest.api.sidecar import Caddy, Shell2Http
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
-from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
+from cbltest.utils import assert_not_null, async_retry_assert
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -733,7 +733,7 @@ class _SyncGatewayBase:
         self.__public_port: int = public_port if public_port is not None else port
         self.__replication_url = f"{ws_scheme}{url}:{self.__public_port}"
         self._tracer = get_tracer(__name__, VERSION)
-        self._caddy = caddy.Caddy(url)
+        self._caddy = Caddy(url)
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
@@ -1870,7 +1870,7 @@ class _SyncGatewayBase:
             return _config_version(headers)
 
     @property
-    def caddy(self) -> caddy.Caddy:
+    def caddy(self) -> Caddy:
         """Gets the Caddy file server running alongside this Sync Gateway"""
         return self._caddy
 
@@ -1882,11 +1882,11 @@ class _SyncGatewayBase:
         :param log_type: Type of log file to fetch (e.g., 'debug', 'info', 'warn', 'error')
         :param local_path: Local path to write the log file to
         :return: The local path the log file was written to
-        :raises FileNotFoundError: If the log file doesn't exist
+        :raises CblHttpError: If Sync Gateway's Caddy is not serving that log, 404 among the reasons
         :raises CblTimeoutError: If the transfer stops making progress
         :raises CblTestError: For other HTTP or network errors
         """
-        return await self._caddy.download(f"sg_{log_type}.log", local_path)
+        return await self._caddy.download(f"/sg_{log_type}.log", local_path)
 
     async def start_sgcollect(
         self,
@@ -1992,7 +1992,7 @@ class _SyncGatewayBase:
             (zip_name,) = new_files
             safe_host = self.hostname.replace(".", "_")
             local_path = local_output_dir / f"{safe_host}-{zip_name}"
-            await self.caddy.download(zip_name, local_path)
+            await self.caddy.download(f"/{zip_name}", local_path)
             return local_path
 
 
@@ -2042,10 +2042,19 @@ class SyncGateway(_SyncGatewayBase):
                 f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
             ) from None
 
+        # After the query above, which raises on a host whose admin API is not up yet, so a
+        # session is not opened for a client that never gets returned.
+        self.__shell2http = Shell2Http(url)
+
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
-        self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
+        self.has_shell2http_sidecar: bool = self.__shell2http.is_reachable()
+
+    async def close(self) -> None:
+        """Closes what the base class owns, and this client's shell2http session"""
+        await super().close()
+        await self.__shell2http.close()
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """

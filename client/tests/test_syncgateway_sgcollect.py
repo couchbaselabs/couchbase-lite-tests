@@ -7,9 +7,9 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from cbltest.api.caddy import Caddy
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.sidecar import Caddy
 from cbltest.api.syncgateway import DatabaseConfig, SGCollectRedactLevel, SyncGateway
 from cbltest.plugins.sgcollect_fixture import run_sgcollects
 
@@ -21,15 +21,15 @@ class FakeCaddy(Caddy):
     """
 
     def __init__(self, owner: "FakeSyncGateway") -> None:
-        with patch("cbltest.api.caddy.ClientSession", autospec=True):
+        with patch("cbltest.api.sidecar.ClientSession", autospec=True):
             super().__init__(owner.hostname)
         self.__owner = owner
 
     async def list(self, pattern: str | None = None) -> list[str]:
         return self.__owner.caddy_snapshots.pop(0)
 
-    async def download(self, filename: str, local_path: str | Path) -> Path:
-        self.__owner.downloaded.append((filename, str(local_path)))
+    async def download(self, uri: str, local_path: str | Path) -> Path:
+        self.__owner.downloaded.append((uri, str(local_path)))
         return Path(local_path)
 
 
@@ -43,7 +43,7 @@ class FakeSyncGateway(SyncGateway):
     def __init__(self, hostname: str = "sg.example.com") -> None:
         with (
             patch("cbltest.api.syncgateway.ClientSession", autospec=True),
-            patch("cbltest.api.caddy.ClientSession", autospec=True),
+            patch("cbltest.api.sidecar.ClientSession", autospec=True),
             patch("cbltest.api.syncgateway.requests.get", autospec=True),
         ):
             super().__init__(url=hostname, username="user", password="pass")
@@ -120,7 +120,7 @@ class TestRunSGCollect:
         safe_host = sg.hostname.replace(".", "_")
         expected = tmp_path / f"{safe_host}-sgcollectinfo-abc.zip"
         assert result == expected
-        assert sg.downloaded == [("sgcollectinfo-abc.zip", str(expected))]
+        assert sg.downloaded == [("/sgcollectinfo-abc.zip", str(expected))]
         # start_sgcollect() ran for real, so confirm no redact level was sent by default.
         _, _, payload = sg.sent_requests[-1]
         assert payload is not None
@@ -137,7 +137,7 @@ class TestRunSGCollect:
         await sg.run_sgcollect(tmp_path)
 
         assert len(sg.downloaded) == 1
-        assert sg.downloaded[0][0] == "sgcollectinfo-new.zip"
+        assert sg.downloaded[0][0] == "/sgcollectinfo-new.zip"
 
     @pytest.mark.asyncio
     async def test_raises_when_no_new_zip_appears(self, tmp_path: Path) -> None:

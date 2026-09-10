@@ -14,9 +14,11 @@ import inspect
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
+import requests
 from aiohttp import encode_basic_auth, web
 from aiohttp.test_utils import TestServer
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
@@ -687,3 +689,25 @@ class TestWaitForCachingFeed:
                 [DocumentUpdateEntry("doc0", None, {"foo": "bar"})],
                 wait_for_caching_feed=True,
             )
+
+
+class TestBootstrap:
+    """A client that never gets returned must not leave sessions behind."""
+
+    def test_no_sidecar_session_when_the_admin_api_is_not_up(self) -> None:
+        """A host answers on :22000 well before Sync Gateway answers on its admin port."""
+
+        class _Unavailable:
+            def raise_for_status(self) -> None:
+                raise requests.HTTPError("503 Server Error: Service Unavailable")
+
+        with (
+            patch("cbltest.api.syncgateway.requests.get", lambda *args, **kwargs: _Unavailable()),
+            patch("cbltest.api.syncgateway.Shell2Http", autospec=True) as shell2http,
+            patch("cbltest.api.syncgateway.ClientSession", autospec=True),
+            patch("cbltest.api.sidecar.ClientSession", autospec=True),
+            pytest.raises(requests.HTTPError),
+        ):
+            SyncGateway(url="sgw.example.com", username="user", password="pass")
+
+        shell2http.assert_not_called()
