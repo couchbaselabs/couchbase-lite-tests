@@ -89,7 +89,8 @@ android {
             ndk.debugSymbolLevel 'FULL'
 
             debuggable true
-            minifyEnabled false
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.config
         }
     }
