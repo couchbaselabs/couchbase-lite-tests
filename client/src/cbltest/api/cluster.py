@@ -11,6 +11,7 @@ from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.assertions import _assert_not_null
+from cbltest.globals import CBLPyTestGlobal
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.version import VERSION
 
@@ -171,4 +172,15 @@ class CouchbaseCluster:
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
                 await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
-        await self.sync_gateway_cluster.create_database(db_name, config)
+        try:
+            await self.sync_gateway_cluster.create_database(db_name, config)
+        except TimeoutError:
+            # CBG-5733: Sync Gateway can retry a stuck CBS index install forever instead of
+            # surfacing it, so the client just sees this call time out.  Record that this
+            # signature occurred -- but only when there is a real CBS backing this cluster
+            # (Rosmar has no indexer to stall) -- for the cbcollect_session fixture to act
+            # on once the whole test session finishes, the same way sgcollect/es_collect
+            # wait for session end rather than collecting from inside the failing test.
+            if self.couchbase_servers:
+                CBLPyTestGlobal.cbcollect_needed = True
+            raise

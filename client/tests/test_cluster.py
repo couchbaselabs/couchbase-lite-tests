@@ -4,9 +4,11 @@ from contextlib import contextmanager
 import pytest
 from cbltest.api import couchbaseserver
 from cbltest.api.cluster import CouchbaseCluster
+from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.error import CblTestError
-from cbltest.api.syncgateway import SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
+from cbltest.globals import CBLPyTestGlobal
 from conftest import fake_sync_gateways
 
 
@@ -14,6 +16,75 @@ from conftest import fake_sync_gateways
 def fake_sync_gateway() -> Iterator[SyncGateway]:
     with fake_sync_gateways(1) as gateways:
         yield gateways[0]
+
+
+class FakeCouchbaseServer(CouchbaseServer):
+    """Test-only server: the real constructor opens a session to a host that is not there."""
+
+    def __init__(self) -> None:
+        pass
+
+    def __str__(self) -> str:
+        return "fake-cbs"
+
+    async def create_bucket(self, name: str, num_replicas: int = 0, retries: int = 60, interval: float = 2.0) -> bool:
+        return True
+
+    async def wait_for_indexes_removed(self, bucket: str) -> None:
+        return None
+
+
+def cluster_that_times_out_on_create_database(
+    monkeypatch: pytest.MonkeyPatch, sync_gateway: SyncGateway, cbs: CouchbaseServer, *, error: Exception
+) -> CouchbaseCluster:
+    """A cluster whose Sync Gateway side always raises `error` from create_database, so
+    tests can drive CouchbaseCluster.create_database's except-and-maybe-collect branch
+    without a real timeout."""
+    sync_gateway.using_rosmar = False
+    cluster = CouchbaseCluster([sync_gateway], [cbs])
+
+    async def _raise(db_name: str, config: DatabaseConfig) -> None:
+        raise error
+
+    monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", _raise)
+    return cluster
+
+
+class TestCbcollectNeededOnDatabaseTimeout:
+    """CouchbaseCluster.create_database: sets CBLPyTestGlobal.cbcollect_needed only for a
+    TimeoutError, and only with a real Couchbase Server present -- CBG-5733 must not turn
+    into 'collect on any test failure' again. Actual collection happens later, once, at
+    session end (see test_cbcollect.py for run_cbcollects, the function the cbcollect_session
+    fixture calls when this flag is set)."""
+
+    def teardown_method(self) -> None:
+        CBLPyTestGlobal.cbcollect_needed = False
+
+    @pytest.mark.asyncio
+    async def test_sets_flag_on_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cbs = FakeCouchbaseServer()
+        with fake_sync_gateway() as sync_gateway:
+            cluster = cluster_that_times_out_on_create_database(monkeypatch, sync_gateway, cbs, error=TimeoutError())
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is True, "a timeout with a real CBS present must flag for collection"
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_on_a_different_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        cbs = FakeCouchbaseServer()
+        with fake_sync_gateway() as sync_gateway:
+            cluster = cluster_that_times_out_on_create_database(
+                monkeypatch, sync_gateway, cbs, error=CblTestError("some unrelated failure")
+            )
+
+            with pytest.raises(CblTestError, match="some unrelated failure"):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, (
+            "this must stay narrow to CBG-5733's timeout signature, not any create_database failure"
+        )
 
 
 def test_cluster_without_couchbase_server() -> None:
