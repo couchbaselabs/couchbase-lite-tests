@@ -22,7 +22,6 @@ class TestHighAvailability(CBLTestClass):
     async def test_sgw_high_availability_with_load_balancer(
         self, cblpytest: CBLPyTest, sg_cluster_manager: SyncGatewayClusterManager
     ) -> None:
-        sg_cluster = cblpytest.sync_gateway_cluster
         self.skip_if_not(
             sg_cluster_manager.has_shell2http_sidecar,
             "shell2http sidecar is not reachable on every Sync Gateway host",
@@ -105,7 +104,6 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step("Bring SG2 back online")
         await sg2.start()
-        await sg_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Write final documents through the load balancer, round robin over all 3 nodes")
         final_docs = [
