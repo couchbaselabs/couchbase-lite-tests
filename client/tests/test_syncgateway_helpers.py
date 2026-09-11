@@ -120,7 +120,9 @@ class TestSessionAuth:
             assert "Authorization" not in session.headers
 
         auth_header = encode_basic_auth("alice", "s3cret", "ascii")
-        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, auth_header) as session:
+        async with sg._create_session(
+            sg.secure, sg.scheme, sg.hostname, sg.port, {"Authorization": auth_header}
+        ) as session:
             assert session.headers["Authorization"] == auth_header
 
     @pytest.mark.asyncio
@@ -136,9 +138,7 @@ class TestSessionAuth:
         monkeypatch.setattr(
             SyncGatewayUserClient,
             "_create_session",
-            lambda self, secure, scheme, url, port, auth_header: create_session(
-                secure, scheme, url, sg.port, auth_header
-            ),
+            lambda self, secure, scheme, url, port, headers=None: create_session(secure, scheme, url, sg.port, headers),
         )
 
         async with sg.get_user_client("alice", "s3cret") as user_client:

@@ -140,7 +140,8 @@ javascript/
     └── webSocketClient.ts      # WebSocket transport
 ```
 
-Build: `npm install && npm run dev`.
+Build: `bun install && bun run dev` — the two steps `js_register.py` drives, so `bun` must be
+on `PATH` wherever the orchestrator runs. `npm` works for hand runs.
 **Note:** JS uses **WebSocket** instead of HTTP. The framework handles this via `client/src/cbltest/websocket_router.py`. A `Hello` handshake message replaces HTTP headers for API version + server ID.
 
 ## Build Script Pattern (every platform)

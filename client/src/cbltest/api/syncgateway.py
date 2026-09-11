@@ -8,7 +8,8 @@ from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
 from pathlib import Path
-from typing import Any, cast
+from types import TracebackType
+from typing import Any, Self, cast
 from urllib.parse import urlencode, urljoin
 
 import aiofiles
@@ -704,12 +705,15 @@ class _SyncGatewayBase:
         port: int,
         secure: bool = False,
         public_port: int | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         """
         :param port: The port this client sends its own requests to.
         :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
             correct for a client that already talks to the public API; an admin client must pass it,
             since its own `port` is the admin one.
+        :param headers: Headers to send with every request, e.g. the `X-Backend` header that
+            tells a load balancer which node to use.
         """
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -726,7 +730,7 @@ class _SyncGatewayBase:
             scheme,
             url,
             port,
-            encode_basic_auth(username, password, "ascii"),
+            {"Authorization": encode_basic_auth(username, password, "ascii")} | dict(headers or {}),
         )
 
     def __str__(self) -> str:
@@ -767,10 +771,17 @@ class _SyncGatewayBase:
         """Gets the REST API base URL of the instance's public port, whichever port this client uses"""
         return f"{self.scheme}{self.hostname}:{self.__public_port}"
 
-    def _create_session(self, secure: bool, scheme: str, url: str, port: int, auth_header: str | None) -> ClientSession:
-        """Create a session, where `auth_header` is an `Authorization` header value
-        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
-        headers = {"Authorization": auth_header} if auth_header is not None else None
+    def _create_session(
+        self,
+        secure: bool,
+        scheme: str,
+        url: str,
+        port: int,
+        headers: Mapping[str, str] | None = None,
+    ) -> ClientSession:
+        """Create a session that sends `headers` with every request, e.g. the
+        `Authorization` header from `aiohttp.encode_basic_auth`.  None for a session that
+        sends none, such as an anonymous one."""
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
@@ -2598,6 +2609,7 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         password: str,
         port: int = 4984,
         secure: bool = False,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         """
         Initialize a SyncGatewayUserClient for public API access.
@@ -2607,5 +2619,17 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
+        :param headers: Headers to send with every request, e.g. Authorization.
         """
-        super().__init__(url, username, password, port, secure)
+        super().__init__(url, username, password, port, secure, headers=headers)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self.close()
