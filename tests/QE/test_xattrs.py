@@ -73,7 +73,7 @@ class TestXattrs(CBLTestClass):
             sg_created_count = len([doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")])
             assert sg_created_count == num_docs, f"Expected {num_docs} SG docs, but found {sg_created_count}"
             supports_version_vectors = await sg.supports_version_vectors()
-            original_revisions = {row.id: row.revision for row in sg_all_docs.rows}
+            original_revisions = {row.id: row.revid for row in sg_all_docs.rows}
             if supports_version_vectors:
                 original_vv = {row.id: row.cv for row in sg_all_docs.rows}
 
@@ -199,7 +199,7 @@ class TestXattrs(CBLTestClass):
             assert len(sg_all_docs.rows) == num_docs * 2, (
                 f"Expected {num_docs * 2} docs via SG, got {len(sg_all_docs.rows)}"
             )
-            all_doc_revisions: dict[str, str] = {row.id: row.revision for row in sg_all_docs.rows}
+            all_doc_revisions: dict[str, str] = {row.id: row.revid for row in sg_all_docs.rows}
 
             supports_version_vectors = await sg.supports_version_vectors()
             all_doc_version_vectors: dict[str, str | None] = {}

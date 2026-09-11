@@ -260,8 +260,8 @@ class TestGetAllDatabasesVerbose:
 class TestGetAllDocuments:
     @pytest.mark.asyncio
     async def test_asks_for_and_reports_both_revisions(self, sync_gateway: SyncGatewayFixture) -> None:
-        """Sync Gateway 4.0 and later report a CV alongside the revid, but only the revid is
-        guaranteed, so a row carries both and `revision` stays the revid."""
+        """Sync Gateway 4.0 and later report a CV alongside the revid, so a row carries both and
+        the caller picks the one it wants."""
         sg, specs, received = sync_gateway
         specs[:] = [
             {
@@ -279,7 +279,6 @@ class TestGetAllDocuments:
         row = response.rows[0]
         assert row.revid == "1-abc"
         assert row.cv == "18d3@src"
-        assert row.revision == "1-abc"
 
     @pytest.mark.asyncio
     async def test_reports_no_cv_when_the_server_sends_none(self, sync_gateway: SyncGatewayFixture) -> None:

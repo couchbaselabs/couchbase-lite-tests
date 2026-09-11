@@ -119,7 +119,7 @@ class TestMultipleServers(CBLTestClass):
             self.mark_test_step("Verify all docs were created and store original revisions and version vectors")
             all_docs = await sg_user.get_all_documents(sg_db)
             assert len(all_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(all_docs.rows)}"
-            original_revs = {row.id: row.revision for row in all_docs.rows}
+            original_revs = {row.id: row.revid for row in all_docs.rows}
             original_vvs = {}
 
             supports_version_vectors = await sg.supports_version_vectors()
@@ -139,7 +139,7 @@ class TestMultipleServers(CBLTestClass):
                     for attempt in range(max_retries):
                         try:
                             current_docs = await sg_user.get_all_documents(sg_db)
-                            rev_map = {row.id: row.revision for row in current_docs.rows}
+                            rev_map = {row.id: row.revid for row in current_docs.rows}
 
                             updates = [
                                 DocumentUpdateEntry(
@@ -195,9 +195,9 @@ class TestMultipleServers(CBLTestClass):
             for row in all_docs_final.rows:
                 original_rev = original_revs.get(row.id)
                 assert original_rev is not None, f"Document {row.id} not found in original revisions"
-                assert row.revision != original_rev, (
+                assert row.revid != original_rev, (
                     f"Document {row.id} revision should have changed after {num_updates} "
-                    f"updates. Original: {original_rev}, Current: {row.revision}"
+                    f"updates. Original: {original_rev}, Current: {row.revid}"
                 )
                 if supports_version_vectors:
                     original_vv = original_vvs.get(row.id)

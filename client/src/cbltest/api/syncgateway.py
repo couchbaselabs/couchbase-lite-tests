@@ -286,11 +286,6 @@ class AllDocumentsResponseRow:
         return self.__cv
 
     @property
-    def revision(self) -> str:
-        """Gets the revision ID of the row"""
-        return self.__revid
-
-    @property
     def doc(self) -> dict | None:
         """Gets the document body (only available if include_docs=True was used)"""
         return self.__doc
