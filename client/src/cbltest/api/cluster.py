@@ -11,7 +11,6 @@ from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.assertions import _assert_not_null
-from cbltest.globals import CBLPyTestGlobal
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.version import VERSION
 
@@ -172,20 +171,8 @@ class CouchbaseCluster:
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
                 await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
-        try:
-            version = await self.sync_gateway_cluster._put_database(db_name, config)
-        except TimeoutError:
-            # CBG-5733: Sync Gateway can retry a stuck CBS index install forever instead of
-            # surfacing it, so the client just sees this PUT call time out.  Record that this
-            # signature occurred -- but only when there is a real CBS backing this cluster AND
-            # Sync Gateway is actually using it (Rosmar has no indexer to stall, even if the
-            # topology happens to configure CBS nodes alongside it) -- for the cbcollect_session
-            # fixture to act on once the whole test session finishes, the same way
-            # sgcollect/es_collect wait for session end rather than collecting from inside the
-            # failing test.  Scoped to just the PUT: a timeout from the subsequent wait-for-online
-            # poll is a different failure and not this signature.
-            if self.couchbase_servers and not self.sync_gateways[0].using_rosmar:
-                CBLPyTestGlobal.cbcollect_needed = True
-            raise
-
+        # CBG-5733's timeout handling (flagging cbcollect_needed on a stuck-indexer-shaped
+        # timeout) lives in SyncGatewayCluster._put_database itself, so it applies equally
+        # here and to every test that calls SyncGatewayCluster.create_database directly.
+        version = await self.sync_gateway_cluster._put_database(db_name, config)
         await self.sync_gateway_cluster.wait_for_db_online(db_name, version)

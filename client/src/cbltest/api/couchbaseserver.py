@@ -42,6 +42,12 @@ from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
+# The collect-logs shell2http endpoint runs `timeout --kill-after=15 300 cbcollect_info`,
+# a ~315s server-side worst case, plus a few seconds to zip and respond; 360s leaves
+# comfortable margin so the client outlasts the endpoint rather than racing its own default
+# 300s aiohttp timeout against it.
+_COLLECT_LOGS_TIMEOUT = aiohttp.ClientTimeout(total=360)
+
 
 class CouchbaseServer:
     """
@@ -1281,15 +1287,21 @@ class CouchbaseServer:
                 body = await resp.text()
                 raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
 
-    async def _call_sidecar(self, method: str, path: str, data: str | None = None) -> str:
+    async def _call_sidecar(
+        self, method: str, path: str, data: str | None = None, timeout: aiohttp.ClientTimeout | None = None
+    ) -> str:
         """
         Call a shell2http endpoint on this node's host, raising on anything but a 200.
 
+        :param timeout: Overrides aiohttp's default 300s total timeout, for endpoints whose
+            server-side work can legitimately run that long or longer. Left as the default
+            for cheap operations, so a hang there is still caught reasonably quickly.
         :return: The response body
         """
         headers = {"Content-Type": "application/json"} if data is not None else None
+        session = aiohttp.ClientSession() if timeout is None else aiohttp.ClientSession(timeout=timeout)
         async with (
-            aiohttp.ClientSession() as session,
+            session,
             session.request(method, f"http://{self.hostname}:20001{path}", data=data, headers=headers) as resp,
         ):
             body = await resp.text()
@@ -1310,7 +1322,9 @@ class CouchbaseServer:
             safe_host = self.hostname.replace(".", "-").replace(":", "-")
             filename = f"cbcollect-{safe_host}-{timestamp}.zip"
 
-            response = await self._call_sidecar("post", "/collect-logs", data=json.dumps({"filename": filename}))
+            response = await self._call_sidecar(
+                "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
+            )
             # cbcollect_info can finish with a bundle but still have logged a non-fatal
             # complaint (an unreachable stat endpoint, a skipped component); worth surfacing
             # without failing a collection that otherwise succeeded.

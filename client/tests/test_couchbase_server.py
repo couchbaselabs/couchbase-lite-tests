@@ -3,11 +3,12 @@
 import json
 from pathlib import Path
 
+import aiohttp
 import pytest
 from cbltest.api.caddy import Caddy
-from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.couchbaseserver import _COLLECT_LOGS_TIMEOUT, CouchbaseServer
 
-SidecarCall = tuple[str, str, str | None]
+SidecarCall = tuple[str, str, str | None, aiohttp.ClientTimeout | None]
 
 
 def make_server() -> CouchbaseServer:
@@ -18,8 +19,10 @@ def stub_sidecar(monkeypatch: pytest.MonkeyPatch, server: CouchbaseServer, respo
     """Record what a server sends to its sidecar, so nothing reaches the network."""
     calls: list[SidecarCall] = []
 
-    async def _call_sidecar(method: str, path: str, data: str | None = None) -> str:
-        calls.append((method, path, data))
+    async def _call_sidecar(
+        method: str, path: str, data: str | None = None, timeout: aiohttp.ClientTimeout | None = None
+    ) -> str:
+        calls.append((method, path, data, timeout))
         return response
 
     monkeypatch.setattr(server, "_call_sidecar", _call_sidecar)
@@ -43,12 +46,16 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
 
     archive = await server.collect_logs(tmp_path)
 
-    assert [(method, path) for method, path, _ in calls] == [("post", "/collect-logs")]
-    (_, _, body) = calls[0]
+    assert [(method, path) for method, path, _, _ in calls] == [("post", "/collect-logs")]
+    (_, _, body, timeout) = calls[0]
     assert body is not None
     filename = json.loads(body)["filename"]
     assert filename.startswith("cbcollect-cbs-example-com-"), filename
     assert filename.endswith(".zip"), filename
+    assert timeout == _COLLECT_LOGS_TIMEOUT, (
+        "must outlast the shell2http endpoint's own kill-after-bounded worst case, not race "
+        "aiohttp's shorter 300s default against it"
+    )
     assert downloads == [(filename, tmp_path / filename)], (
         "the archive is fetched by the plain filename cbcollect_info wrote, through this node's Caddy"
     )

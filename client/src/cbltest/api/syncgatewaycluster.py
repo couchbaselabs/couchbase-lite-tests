@@ -3,6 +3,7 @@ import random
 from collections.abc import Sequence
 
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
+from cbltest.globals import CBLPyTestGlobal
 
 
 class SyncGatewayCluster:
@@ -77,15 +78,31 @@ class SyncGatewayCluster:
         waiting for it to come online on any node.
 
         Private: `create_database` bundles this with `wait_for_db_online` for ordinary
-        callers. `CouchbaseCluster.create_database` calls this directly so it can scope
-        its own timeout handling (CBG-5733) to just the PUT -- a timeout from the
-        wait-for-online phase has a different cause and must not be mistaken for it.
+        callers; `CouchbaseCluster.create_database` calls this directly so its own
+        timeout handling isn't also exposed to the wait-for-online phase's unrelated
+        timeouts. Every caller of this method shares the CBG-5733 timeout handling below,
+        so it fires equally for `CouchbaseCluster.create_database` and for every test that
+        calls `SyncGatewayCluster.create_database` (or this method) directly.
 
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         :return: The version of the resulting config, or None if not reported
         """
-        return await self.random_node._put_database(db_name, config)
+        try:
+            return await self.random_node._put_database(db_name, config)
+        except TimeoutError:
+            # CBG-5733: Sync Gateway can retry a stuck CBS index install forever instead of
+            # surfacing it, so the client just sees this PUT call time out.  Record that this
+            # signature occurred -- but only when Sync Gateway is actually backed by a real
+            # Couchbase Server (Rosmar has no indexer to stall) -- for the cbcollect_session
+            # fixture to act on once the whole test session finishes, the same way
+            # sgcollect/es_collect wait for session end rather than collecting from inside the
+            # failing test.  A cluster with `using_rosmar` false is always backed by at least
+            # one real Couchbase Server node -- CouchbaseCluster.__init__ enforces that for
+            # every cluster the framework builds -- so this needs no other node to check.
+            if not self.sync_gateways[0].using_rosmar:
+                CBLPyTestGlobal.cbcollect_needed = True
+            raise
 
     async def wait_for_no_database(self, db_name: str) -> None:
         """
