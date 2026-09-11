@@ -3,7 +3,7 @@ import re
 import ssl
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Collection
+from collections.abc import AsyncIterator, Collection, Mapping
 from contextlib import asynccontextmanager
 from enum import Enum
 from json import dumps, loads
