@@ -171,4 +171,8 @@ class CouchbaseCluster:
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
                 await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
-        await self.sync_gateway_cluster.create_database(db_name, config)
+        # CBG-5733's timeout handling (flagging cbcollect_needed on a stuck-indexer-shaped
+        # timeout) lives in SyncGatewayCluster._put_database itself, so it applies equally
+        # here and to every test that calls SyncGatewayCluster.create_database directly.
+        version = await self.sync_gateway_cluster._put_database(db_name, config)
+        await self.sync_gateway_cluster.wait_for_db_online(db_name, version)

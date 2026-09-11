@@ -5,7 +5,8 @@ import tempfile
 import time
 import zipfile
 from collections.abc import Callable, Sequence
-from datetime import timedelta
+from contextlib import suppress
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TypeVar, cast
 
@@ -35,10 +36,17 @@ from couchbase.options import ClusterOptions, ClusterTimeoutOptions
 from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
+from cbltest.api import caddy
 from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
+
+# The collect-logs shell2http endpoint runs `timeout --kill-after=15 300 cbcollect_info`,
+# a ~315s server-side worst case, plus a few seconds to zip and respond; 360s leaves
+# comfortable margin so the client outlasts the endpoint rather than racing its own default
+# 300s aiohttp timeout against it.
+_COLLECT_LOGS_TIMEOUT = aiohttp.ClientTimeout(total=360)
 
 
 class CouchbaseServer:
@@ -128,6 +136,9 @@ class CouchbaseServer:
         # Create a reusable HTTP session for REST API calls
         self.__http_session = requests.Session()
         self.__http_session.auth = (username, password)
+        # Created lazily (see _caddy): the constructor cannot assume a running event loop,
+        # but some sync test code paths construct a CouchbaseServer without one.
+        self.__caddy: caddy.Caddy | None = None
 
     async def connect(self) -> None:
         """
@@ -162,6 +173,16 @@ class CouchbaseServer:
         assert self.__cluster is not None, f"{self} is not connected, call connect() first"
         return self.__cluster
 
+    @property
+    def _caddy(self) -> caddy.Caddy:
+        """
+        This node's Caddy client, created on first use rather than in the constructor,
+        since building it opens a `ClientSession` that needs a running event loop.
+        """
+        if self.__caddy is None:
+            self.__caddy = caddy.Caddy(self.__hostname)
+        return self.__caddy
+
     async def close(self) -> None:
         """
         Closes the SDK connection to the cluster, and the REST session.
@@ -171,6 +192,8 @@ class CouchbaseServer:
             self.__cluster = None
 
         self.__http_session.close()
+        if self.__caddy is not None:
+            await self.__caddy.close()
 
     def _parse_connection_url(self, url: str) -> None:
         """
@@ -1263,6 +1286,53 @@ class CouchbaseServer:
             if resp.status != 200:
                 body = await resp.text()
                 raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+
+    async def _call_sidecar(
+        self, method: str, path: str, data: str | None = None, timeout: aiohttp.ClientTimeout | None = None
+    ) -> str:
+        """
+        Call a shell2http endpoint on this node's host, raising on anything but a 200.
+
+        :param timeout: Overrides aiohttp's default 300s total timeout, for endpoints whose
+            server-side work can legitimately run that long or longer. Left as the default
+            for cheap operations, so a hang there is still caught reasonably quickly.
+        :return: The response body
+        """
+        headers = {"Content-Type": "application/json"} if data is not None else None
+        session = aiohttp.ClientSession() if timeout is None else aiohttp.ClientSession(timeout=timeout)
+        async with (
+            session,
+            session.request(method, f"http://{self.hostname}:20001{path}", data=data, headers=headers) as resp,
+        ):
+            body = await resp.text()
+            if resp.status != 200:
+                raise CblTestError(f"{method.upper()} {path} failed on {self}: {resp.status} - {body}")
+            return body
+
+    async def collect_logs(self, output_dir: Path) -> Path:
+        """
+        Runs cbcollect_info inside this node's Couchbase Server container via shell2http,
+        then downloads the resulting archive through this node's Caddy.
+
+        :param output_dir: Local directory to download the archive into
+        :return: Local path of the downloaded archive
+        """
+        with self.__tracer.start_as_current_span("collect couchbase server logs"):
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.hostname.replace(".", "-").replace(":", "-")
+            filename = f"cbcollect-{safe_host}-{timestamp}.zip"
+
+            response = await self._call_sidecar(
+                "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
+            )
+            # cbcollect_info can finish with a bundle but still have logged a non-fatal
+            # complaint (an unreachable stat endpoint, a skipped component); worth surfacing
+            # without failing a collection that otherwise succeeded.
+            with suppress(json.JSONDecodeError, AttributeError):
+                if warnings := json.loads(response).get("warnings"):
+                    cbl_warning(f"Couchbase Server [{self.hostname}] collected logs with warnings: {warnings}")
+
+            return await self._caddy.download(filename, output_dir / filename)
 
     async def get_root_ca_certificate(self) -> bytes:
         """
