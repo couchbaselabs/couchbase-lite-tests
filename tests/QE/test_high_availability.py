@@ -80,7 +80,7 @@ class TestHighAvailability(CBLTestClass):
                     "index": i,
                     "content": f"Document {i} written via SDK",
                 }
-                await cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
+                cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
         write_task = asyncio.create_task(write_docs_via_sdk())
 
