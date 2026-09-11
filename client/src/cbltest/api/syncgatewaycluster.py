@@ -68,8 +68,24 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        version = await self.random_node._put_database(db_name, config)
+        version = await self._put_database(db_name, config)
         await self.wait_for_db_online(db_name, version)
+
+    async def _put_database(self, db_name: str, config: DatabaseConfig) -> str | None:
+        """
+        Create a database on one node of the cluster (the PUT phase only), without
+        waiting for it to come online on any node.
+
+        Private: `create_database` bundles this with `wait_for_db_online` for ordinary
+        callers. `CouchbaseCluster.create_database` calls this directly so it can scope
+        its own timeout handling (CBG-5733) to just the PUT -- a timeout from the
+        wait-for-online phase has a different cause and must not be mistaken for it.
+
+        :param db_name: The name of the database to create
+        :param config: The configuration of the database to create
+        :return: The version of the resulting config, or None if not reported
+        """
+        return await self.random_node._put_database(db_name, config)
 
     async def wait_for_no_database(self, db_name: str) -> None:
         """

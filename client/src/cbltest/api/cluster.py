@@ -173,14 +173,19 @@ class CouchbaseCluster:
             if bucket_created:
                 await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
         try:
-            await self.sync_gateway_cluster.create_database(db_name, config)
+            version = await self.sync_gateway_cluster._put_database(db_name, config)
         except TimeoutError:
             # CBG-5733: Sync Gateway can retry a stuck CBS index install forever instead of
-            # surfacing it, so the client just sees this call time out.  Record that this
-            # signature occurred -- but only when there is a real CBS backing this cluster
-            # (Rosmar has no indexer to stall) -- for the cbcollect_session fixture to act
-            # on once the whole test session finishes, the same way sgcollect/es_collect
-            # wait for session end rather than collecting from inside the failing test.
-            if self.couchbase_servers:
+            # surfacing it, so the client just sees this PUT call time out.  Record that this
+            # signature occurred -- but only when there is a real CBS backing this cluster AND
+            # Sync Gateway is actually using it (Rosmar has no indexer to stall, even if the
+            # topology happens to configure CBS nodes alongside it) -- for the cbcollect_session
+            # fixture to act on once the whole test session finishes, the same way
+            # sgcollect/es_collect wait for session end rather than collecting from inside the
+            # failing test.  Scoped to just the PUT: a timeout from the subsequent wait-for-online
+            # poll is a different failure and not this signature.
+            if self.couchbase_servers and not self.sync_gateways[0].using_rosmar:
                 CBLPyTestGlobal.cbcollect_needed = True
             raise
+
+        await self.sync_gateway_cluster.wait_for_db_online(db_name, version)

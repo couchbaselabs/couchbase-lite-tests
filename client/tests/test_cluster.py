@@ -37,16 +37,16 @@ class FakeCouchbaseServer(CouchbaseServer):
 def cluster_that_times_out_on_create_database(
     monkeypatch: pytest.MonkeyPatch, sync_gateway: SyncGateway, cbs: CouchbaseServer, *, error: Exception
 ) -> CouchbaseCluster:
-    """A cluster whose Sync Gateway side always raises `error` from create_database, so
-    tests can drive CouchbaseCluster.create_database's except-and-maybe-collect branch
-    without a real timeout."""
+    """A cluster whose Sync Gateway side always raises `error` from the PUT phase of
+    create_database, so tests can drive CouchbaseCluster.create_database's except-and-
+    maybe-collect branch without a real timeout."""
     sync_gateway.using_rosmar = False
     cluster = CouchbaseCluster([sync_gateway], [cbs])
 
-    async def _raise(db_name: str, config: DatabaseConfig) -> None:
+    async def _raise(db_name: str, config: DatabaseConfig) -> str | None:
         raise error
 
-    monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", _raise)
+    monkeypatch.setattr(cluster.sync_gateway_cluster, "_put_database", _raise)
     return cluster
 
 
@@ -84,6 +84,56 @@ class TestCbcollectNeededOnDatabaseTimeout:
 
         assert CBLPyTestGlobal.cbcollect_needed is False, (
             "this must stay narrow to CBG-5733's timeout signature, not any create_database failure"
+        )
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_on_post_put_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A timeout from wait_for_db_online -- after the PUT already succeeded -- must
+        not trigger cbcollect; only a stuck PUT itself is CBG-5733's signature."""
+        cbs = FakeCouchbaseServer()
+        with fake_sync_gateway() as sync_gateway:
+            sync_gateway.using_rosmar = False
+            cluster = CouchbaseCluster([sync_gateway], [cbs])
+
+            async def _put_ok(db_name: str, config: DatabaseConfig) -> str | None:
+                return None
+
+            async def _wait_times_out(db_name: str, version: str | None = None) -> None:
+                raise TimeoutError()
+
+            monkeypatch.setattr(cluster.sync_gateway_cluster, "_put_database", _put_ok)
+            monkeypatch.setattr(cluster.sync_gateway_cluster, "wait_for_db_online", _wait_times_out)
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, (
+            "a timeout after the PUT already succeeded is not CBG-5733's signature"
+        )
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_when_using_rosmar_despite_configured_cbs(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A cluster can carry CBS entries in its topology while its Sync Gateway node is
+        actually running against Rosmar (using_rosmar is read live per-node, independent of
+        which CBS nodes are grouped into the cluster) -- Rosmar has no indexer to stall, so
+        this must not flag for collection even though couchbase_servers is non-empty."""
+        cbs = FakeCouchbaseServer()
+        with fake_sync_gateway() as sync_gateway:
+            sync_gateway.using_rosmar = True
+            cluster = CouchbaseCluster([sync_gateway], [cbs])
+
+            async def _raise(db_name: str, config: DatabaseConfig) -> str | None:
+                raise TimeoutError()
+
+            monkeypatch.setattr(cluster.sync_gateway_cluster, "_put_database", _raise)
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, (
+            "Rosmar has no indexer to stall even if CBS entries happen to be configured"
         )
 
 

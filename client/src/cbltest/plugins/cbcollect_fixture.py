@@ -59,4 +59,15 @@ async def cbcollect_session(cblpytest: CBLPyTest) -> AsyncGenerator[None]:
     # the same reason sgcollect/es_collect wait for teardown instead of collecting inline.
     if CBLPyTestGlobal.cbcollect_needed:
         servers = [cbs for cluster in cblpytest.clusters for cbs in cluster.couchbase_servers]
-        await run_cbcollects(servers, Path.cwd())
+        try:
+            await run_cbcollects(servers, Path.cwd())
+        except* Exception as eg:
+            # A diagnostics-collection attempt must never fail the session teardown itself --
+            # e.g. a local --server cbs run has a real Couchbase Server but no AWS
+            # shell2http/Caddy sidecar for collect_logs to reach, and any other transient
+            # infra failure deserves the same treatment.  run_cbcollects already logged each
+            # node's own error; this is just the last-resort backstop.
+            cbl_error(
+                f"cbcollect: giving up, no logs collected from any node: {eg.exceptions}",
+                include_stack=False,
+            )
