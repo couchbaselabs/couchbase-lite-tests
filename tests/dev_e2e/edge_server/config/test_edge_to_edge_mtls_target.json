@@ -1,0 +1,29 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "https": {
+        "tls_cert_path": "/home/ec2-user/cert/server.crt",
+        "tls_key_path": "/home/ec2-user/cert/server.key",
+        "client_cert_path": "/home/ec2-user/cert/ca.crt"
+    },
+    "databases": {
+        "db": {
+            "path": "/home/ec2-user/database/db.cblite2",
+            "create": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "users": "/home/ec2-user/user/users.json",
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}
