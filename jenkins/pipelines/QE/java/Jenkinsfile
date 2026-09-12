@@ -63,6 +63,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown macOS Desktop Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'
@@ -100,6 +104,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Windows Desktop Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 bat '''
@@ -135,6 +143,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Linux Desktop Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/java/desktop/teardown.sh'

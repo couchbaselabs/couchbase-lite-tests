@@ -77,6 +77,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Dotnet Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
@@ -105,6 +109,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Dotnet macOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
@@ -137,6 +145,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Dotnet iOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
@@ -168,6 +180,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown Dotnet Android Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/dotnet/teardown.sh'

@@ -60,6 +60,10 @@ pipeline {
             }
             post {
                 always {
+                    // Publish pytest's JUnit XML so per-test failures (messages and
+                    // tracebacks) are surfaced in Jenkins even if teardown fails.
+                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                     echo "=== Teardown Android Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/android/android_teardown.sh"
