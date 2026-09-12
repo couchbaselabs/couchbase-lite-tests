@@ -3,6 +3,9 @@
 
 # Sync Gateway local builds
 sync_gateway
+# Extra binaries kept aside to switch versions without rebuilding, e.g. a pre-CBG-5713-fix build
+# used to corrupt a rev tree before testing the repair (spec/tests/QE/test_revtree_repair.md)
+sync_gateway.*
 sync_gateway_clone/
 *.log
 
