@@ -140,6 +140,13 @@ To stop the background Sync Gateway process independently:
 uv run environment/local/start_local.py --stop-sync-gateway
 ```
 
+`--stop-testserver` does the same for the test server, and the two can be combined to stop
+everything this checkout started:
+
+```bash
+uv run environment/local/start_local.py --stop-testserver --stop-sync-gateway
+```
+
 - **Logs:** Written to `environment/local/sync_gateway_instanceN.log`, one per instance
   (`sync_gateway_instance1.log` for a single-instance run). Wiped at the start of each run.
 - **Configuration:**
@@ -152,6 +159,13 @@ instead, pass `--build-testserver` with a version string:
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --build-testserver 4.0.3
 ```
+
+Every run stops the test server the previous one started — matched on executable path under
+`servers/`, so a server from another checkout is left alone — before starting the new one. If
+something is still answering on port 8080 after that, the run stops with an error instead of
+starting a server that cannot bind the port: the startup check would be answered by whatever is
+already there, and the tests would then run against the wrong build. Stop it, or pass
+`--skip-testserver` to test against it deliberately.
 
 ## Running Tests
 

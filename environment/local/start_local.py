@@ -38,6 +38,7 @@ from environment.aws import download_tool
 from environment.aws.common.output import header
 from environment.aws.common.versions import resolve_latest_version
 from environment.aws.topology_setup import setup_topology
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
 
 TOPOLOGY_CONFIG_OUTPUT = SCRIPT_DIR / "topology_config"
@@ -53,6 +54,11 @@ TEST_CONFIG = {
     "cbs": TOPOLOGY_CONFIG_DIR / "cbs_config.json",
 }
 SYNC_GATEWAY_EXE_NAME = SYNC_GATEWAY_BIN.name
+# Every test server binary this script can start carries this name and sits somewhere under
+# servers/, which is what tells ours apart from one run out of a second checkout.
+TEST_SERVER_EXE_NAME = "testserver.exe" if sys.platform == "win32" else "testserver"
+# The port every local test server listens on, and the one the generated topology config names.
+TEST_SERVER_PORT = 8080
 # Stem shared by every per-instance file, so a whole run's worth can be swept as a set.
 SG_INSTANCE_STEM = "sync_gateway_instance"
 # Matches the per-instance logs of any run, plus the single sync_gateway.log written before instances
@@ -64,8 +70,8 @@ SG_BASE_ADMIN_PORT = 4985
 SG_BASE_METRICS_PORT = 4986
 # A port block is the default ports plus block * stride, leaving room between instances.
 SG_PORT_STRIDE = 10
-# How long a terminated Sync Gateway gets to release its ports before it is killed outright.
-SG_STOP_TIMEOUT_SECONDS = 10
+# How long a terminated process gets to exit and release its ports before it is killed outright.
+STOP_TIMEOUT_SECONDS = 10
 # How many port blocks are scanned for free ones before giving up.
 SG_MAX_PORT_BLOCKS = 20
 
@@ -177,7 +183,7 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
 @click.option(
     "--server",
     type=click.Choice(["rosmar", "cbs"]),
-    help="The Sync Gateway backing store to use. Required unless --stop-sync-gateway is set.",
+    help="The Sync Gateway backing store to use. Required unless a --stop-* flag is set.",
 )
 @click.option(
     "--connstr",
@@ -250,6 +256,12 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     is_flag=True,
     help="Stop the running Sync Gateway process and exit, skipping all other stages.",
 )
+@click.option(
+    "--stop-testserver",
+    is_flag=True,
+    help="Stop the running test server and exit, skipping all other stages. May be combined with "
+    "--stop-sync-gateway to stop both.",
+)
 def main(
     server: str,
     connstr: str | None,
@@ -264,7 +276,11 @@ def main(
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
     stop_sync_gateway: bool,
+    stop_testserver: bool,
 ) -> None:
+    if stop_testserver:
+        stop_all_test_servers()
+
     if stop_sync_gateway:
         if stop_all_sync_gateways():
             forget_topology_config()
@@ -273,10 +289,12 @@ def main(
                 f"Leaving {TOPOLOGY_CONFIG_OUTPUT} as it is, since an instance it names is still running",
                 fg="yellow",
             )
+
+    if stop_sync_gateway or stop_testserver:
         return
 
     if not server:
-        raise click.UsageError("--server is required unless --stop-sync-gateway is set.")
+        raise click.UsageError("--server is required unless --stop-sync-gateway or --stop-testserver is set.")
 
     if sync_gateways < 1:
         raise click.UsageError(f"--sync-gateways must be at least 1; got {sync_gateways}.")
@@ -359,8 +377,34 @@ def _validate_single_node_connstr(connstr: str) -> None:
         raise click.UsageError(f"--connstr must specify exactly one Couchbase Server node; got {len(hosts)}: {connstr}")
 
 
+def _test_server_port_answered() -> bool:
+    """Whether something already answers HTTP on the port a test server is about to be started on."""
+    try:
+        requests.get(f"http://localhost:{TEST_SERVER_PORT}", timeout=2)
+    except requests.exceptions.RequestException:
+        return False
+
+    return True
+
+
 def run_test_server(build_testserver: str | None) -> None:
-    """Download/build and run the local CBL test server based on --build-testserver."""
+    """Stop any test server left from a previous run, then download/build and run a new one."""
+    # A server left running holds the port the new one needs, so the new one dies inside its own log
+    # while the startup check, answered by the old build, goes on to report a successful start.
+    if not stop_all_test_servers(warn_if_none=False):
+        raise click.ClickException(
+            "A test server from a previous run could not be stopped and is still holding port "
+            f"{TEST_SERVER_PORT}. Stop it and try again."
+        )
+
+    # Whatever still answers now is not ours to stop -- a test server from a second checkout, most
+    # likely -- and would answer that startup check just as convincingly.
+    if _test_server_port_answered():
+        raise click.ClickException(
+            f"Something this script did not start is already answering on port {TEST_SERVER_PORT}. "
+            "Stop it and try again, or pass --skip-testserver to test against it as it is."
+        )
+
     if build_testserver:
         cbl_version = f"{build_testserver}-0"
         download = False
@@ -583,41 +627,54 @@ def _wait_for_exit(procs: list[psutil.Process]) -> None:
     if not procs:
         return
 
-    _, alive = psutil.wait_procs(procs, timeout=SG_STOP_TIMEOUT_SECONDS)
+    _, alive = psutil.wait_procs(procs, timeout=STOP_TIMEOUT_SECONDS)
     for proc in alive:
-        click.secho(f"PID {proc.pid} did not exit within {SG_STOP_TIMEOUT_SECONDS}s; killing it", fg="yellow")
+        click.secho(f"PID {proc.pid} did not exit within {STOP_TIMEOUT_SECONDS}s; killing it", fg="yellow")
         try:
             proc.kill()
         except psutil.NoSuchProcess:
             continue
 
     if alive:
-        psutil.wait_procs(alive, timeout=SG_STOP_TIMEOUT_SECONDS)
+        psutil.wait_procs(alive, timeout=STOP_TIMEOUT_SECONDS)
 
 
-def stop_all_sync_gateways() -> bool:
+def _is_our_test_server(proc: psutil.Process) -> bool:
     """
-    Terminate every sync_gateway process started from this checkout, and wait for its ports to free.
+    Whether proc is a test server started from this checkout, rather than some other copy of it.
 
-    Returns whether every instance found was stopped, since one this user cannot signal keeps running.
+    Built and downloaded servers live at different paths under servers/, and each version has its
+    own, so the whole tree identifies ours -- not the single path this run is about to start.
+    An unreadable executable is treated as ours for the same reason as in _is_our_sync_gateway.
+    """
+    try:
+        return TEST_SERVER_DIR in pathlib.Path(proc.exe()).parents
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return True
+
+
+def _stop_processes(exe_name: str, is_ours: Callable[[psutil.Process], bool], *, warn_if_none: bool = True) -> bool:
+    """
+    Terminate every process named exe_name that is_ours accepts, and wait for its ports to free.
+
+    Returns whether every process found was stopped, since one this user cannot signal keeps running.
 
     ExeBridge.stop() stops only the first process matching the executable name, which is not enough
     once more than one instance is running. Processes are matched on their executable path rather
-    than that name alone: a name match would also kill a system-installed Sync Gateway, or one run
-    from a second checkout of this repo, neither of which is ours to stop.
+    than that name alone: a name match would also kill a system-installed binary, or one run from a
+    second checkout of this repo, neither of which is ours to stop.
     """
-    header(f"Stopping all '{SYNC_GATEWAY_EXE_NAME}' processes from {SYNC_GATEWAY_BIN}")
     terminated: list[psutil.Process] = []
     refused: list[psutil.Process] = []
     for proc in psutil.process_iter():
         try:
-            if proc.name() != SYNC_GATEWAY_EXE_NAME:
+            if proc.name() != exe_name:
                 continue
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             # The process list is a snapshot; anything that exits from under us is not our concern.
             continue
 
-        if not _is_our_sync_gateway(proc):
+        if not is_ours(proc):
             continue
 
         try:
@@ -633,15 +690,27 @@ def stop_all_sync_gateways() -> bool:
 
     for proc in refused:
         click.secho(
-            f"Not allowed to stop PID {proc.pid} -- it may still be holding Sync Gateway's ports",
+            f"Not allowed to stop PID {proc.pid} -- it may still be holding the ports the next one needs",
             fg="red",
         )
 
-    if not terminated and not refused:
-        click.secho(f"Unable to find process to stop ({SYNC_GATEWAY_EXE_NAME})", fg="yellow")
+    if warn_if_none and not terminated and not refused:
+        click.secho(f"Unable to find process to stop ({exe_name})", fg="yellow")
 
     _wait_for_exit(terminated)
     return not refused
+
+
+def stop_all_sync_gateways() -> bool:
+    """Stop every sync_gateway process started from this checkout. See _stop_processes."""
+    header(f"Stopping all '{SYNC_GATEWAY_EXE_NAME}' processes from {SYNC_GATEWAY_BIN}")
+    return _stop_processes(SYNC_GATEWAY_EXE_NAME, _is_our_sync_gateway)
+
+
+def stop_all_test_servers(*, warn_if_none: bool = True) -> bool:
+    """Stop every test server process started from this checkout. See _stop_processes."""
+    header(f"Stopping all '{TEST_SERVER_EXE_NAME}' processes under {TEST_SERVER_DIR}")
+    return _stop_processes(TEST_SERVER_EXE_NAME, _is_our_test_server, warn_if_none=warn_if_none)
 
 
 def previous_topology_config() -> pathlib.Path | None:
