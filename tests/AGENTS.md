@@ -203,6 +203,27 @@ uv run ruff check tests/
 uv run ruff format tests/
 ```
 
+### Hunting a flake
+
+`pytest-repeat` and `pytest-randomly` come with the default install. For these suites shuffling is
+opt-in — the root `pyproject.toml` carries `addopts = "-p no:randomly"` — so an ordinary run stays in
+file order and `-p randomly` turns the shuffling on. `client/tests` has its own config and shuffles.
+
+```bash
+# Repeat one test 20 times, stopping at the first failure
+cd tests/dev_e2e && uv run pytest -x -v --config config.json test_basic_replication.py -k test_push --count=20
+
+# Shuffle the order to expose leakage between tests; replay a failure with the seed it printed
+cd tests/QE && uv run pytest -v --config config.json -m sgw -p randomly
+cd tests/QE && uv run pytest -v --config config.json -m sgw -p randomly --randomly-seed=4250359956
+```
+
+- `--count=N` repeats each selected test N times in place. `--repeat-scope=session` repeats the whole
+  selection instead, which is what reproduces a flake that needs another test to run in between.
+- `--randomly-seed=N` needs `-p randomly` alongside it, since the option only exists while the plugin
+  is loaded. The seed line (`Using --randomly-seed=…`) is the only way back to a shuffled order, so
+  capture it with the failure.
+
 ## Cross-References
 
 | What | Where | Relationship |
