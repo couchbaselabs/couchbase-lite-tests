@@ -380,11 +380,10 @@ def _validate_single_node_connstr(connstr: str) -> None:
 def _test_server_port_answered() -> bool:
     """Whether something already answers HTTP on the port a test server is about to be started on."""
     try:
-        requests.get(f"http://localhost:{TEST_SERVER_PORT}", timeout=2)
-    except requests.exceptions.RequestException:
+        with socket.create_connection(("localhost", TEST_SERVER_PORT), timeout=2):
+            return True
+    except OSError:
         return False
-
-    return True
 
 
 def run_test_server(build_testserver: str | None) -> None:
