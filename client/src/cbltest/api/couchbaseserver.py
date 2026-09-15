@@ -7,7 +7,7 @@ import zipfile
 from collections.abc import Callable, Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast
 
 import aiohttp
 
@@ -17,6 +17,7 @@ from urllib.parse import quote_plus, urlparse
 
 import requests
 import tenacity
+from couchbase import subdocument
 from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
@@ -31,8 +32,7 @@ from couchbase.exceptions import (
 )
 from couchbase.management.buckets import CreateBucketSettings
 from couchbase.management.options import CreatePrimaryQueryIndexOptions
-from couchbase.options import ClusterOptions, ClusterTimeoutOptions
-from couchbase.subdocument import upsert
+from couchbase.options import ClusterOptions, ClusterTimeoutOptions, MutateInOptions, ReplaceOptions
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError
@@ -540,6 +540,7 @@ class CouchbaseServer:
         document: dict,
         scope: str = "_default",
         collection: str = "_default",
+        xattrs: dict[str, Any] | None = None,
     ) -> None:
         """
         Inserts a document into the specified bucket.scope.collection.
@@ -549,6 +550,7 @@ class CouchbaseServer:
         :param collection: The collection name.
         :param doc_id: The document ID.
         :param document: The document content (a dictionary).
+        :param xattrs: Xattrs to write in the same mutation as the body.
         """
         with self.__tracer.start_as_current_span(
             "insert_document",
@@ -559,12 +561,87 @@ class CouchbaseServer:
                 "cbl.document.id": doc_id,
             },
         ):
-            try:
-                bucket_obj = self.get_bucket(bucket)
-                coll = bucket_obj.scope(scope).collection(collection)
+            coll = self.get_bucket(bucket).scope(scope).collection(collection)
+            if not xattrs:
                 coll.upsert(doc_id, document)
-            except Exception as e:
-                raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}") from e
+                return
+
+            specs = [subdocument.upsert(key, value, xattr=True, create_parents=True) for key, value in xattrs.items()]
+            specs.append(subdocument.replace("", document))
+            coll.mutate_in(
+                doc_id,
+                specs,
+                MutateInOptions(store_semantics=subdocument.StoreSemantics.UPSERT),
+            )
+
+    def get_document_with_cas(
+        self,
+        *,
+        bucket: str,
+        doc_id: str,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> tuple[dict, int]:
+        """
+        Gets a document and the CAS it was read at, for a caller that means to write it back
+        without clobbering whoever got in first.
+
+        :param bucket: The bucket name.
+        :param doc_id: The document ID.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :return: The content and its CAS.
+        :raises DocumentNotFoundException: if the document does not exist.
+        """
+        with self.__tracer.start_as_current_span(
+            "get_document_with_cas",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            coll = self.get_bucket(bucket).scope(scope).collection(collection)
+            result = coll.get(doc_id)
+
+            cas = result.cas
+            assert cas is not None, f"Couchbase Server returned no CAS for document '{doc_id}'"
+            return result.content_as[dict], cas
+
+    def update_document(
+        self,
+        *,
+        bucket: str,
+        doc_id: str,
+        document: dict,
+        cas: int,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Writes a document, but only while it is still at the given CAS.
+
+        :param bucket: The bucket name.
+        :param doc_id: The document ID.
+        :param document: The document content (a dictionary).
+        :param cas: The CAS the content was read at, from get_document_with_cas.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :raises CasMismatchException: if the document changed since it was read at cas.
+            Whether to retry, and how often, is the caller's to decide.
+        """
+        with self.__tracer.start_as_current_span(
+            "update_document",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.id": doc_id,
+            },
+        ):
+            coll = self.get_bucket(bucket).scope(scope).collection(collection)
+            coll.replace(doc_id, document, ReplaceOptions(cas=cas))
 
     def delete_document(
         self,
@@ -575,6 +652,13 @@ class CouchbaseServer:
     ) -> None:
         """
         Deletes a document from the specified bucket.scope.collection.
+
+        :param bucket: The bucket name.
+        :param doc_id: The document ID.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :raises DocumentNotFoundException: if the document is already gone, so a caller racing
+            another writer can tell its own delete from one it lost.
         """
         with self.__tracer.start_as_current_span(
             "delete_document",
@@ -585,14 +669,8 @@ class CouchbaseServer:
                 "cbl.document.id": doc_id,
             },
         ):
-            try:
-                bucket_obj = self.get_bucket(bucket)
-                coll = bucket_obj.scope(scope).collection(collection)
-                coll.remove(doc_id)
-            except DocumentNotFoundException:
-                pass
-            except Exception as e:
-                raise CblTestError(f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}") from e
+            coll = self.get_bucket(bucket).scope(scope).collection(collection)
+            coll.remove(doc_id)
 
     def get_document(
         self,
@@ -620,10 +698,13 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = self.get_bucket(bucket)
-                coll = bucket_obj.scope(scope).collection(collection)
-                result = coll.get(doc_id)
-                return result.content_as[dict] if result else None
+                body, _ = self.get_document_with_cas(
+                    bucket=bucket,
+                    doc_id=doc_id,
+                    scope=scope,
+                    collection=collection,
+                )
+                return body
             except DocumentNotFoundException:
                 return None
             except Exception as e:
@@ -658,16 +739,11 @@ class CouchbaseServer:
                 "cbl.xattr.key": xattr_key,
             },
         ):
-            try:
-                col = self.get_bucket(bucket).scope(scope).collection(collection)
-                col.mutate_in(
-                    doc_id,
-                    [upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
-                )
-            except Exception as e:
-                raise CblTestError(
-                    f"Failed to upsert xattr '{xattr_key}' on document '{doc_id}' in {bucket}.{scope}.{collection}"
-                ) from e
+            col = self.get_bucket(bucket).scope(scope).collection(collection)
+            col.mutate_in(
+                doc_id,
+                [subdocument.upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
+            )
 
     def delete_document_xattr(
         self,
@@ -696,16 +772,11 @@ class CouchbaseServer:
                 "cbl.xattr.key": xattr_key,
             },
         ):
-            try:
-                from couchbase.subdocument import remove
-
-                col = self.get_bucket(bucket).scope(scope).collection(collection)
-                col.mutate_in(
-                    doc_id,
-                    [remove(xattr_key, xattr=True)],
-                )
-            except Exception:
-                pass
+            col = self.get_bucket(bucket).scope(scope).collection(collection)
+            col.mutate_in(
+                doc_id,
+                [subdocument.remove(xattr_key, xattr=True)],
+            )
 
     def start_xdcr(self, target: "CouchbaseServer", bucket_name: str) -> None:
         """
