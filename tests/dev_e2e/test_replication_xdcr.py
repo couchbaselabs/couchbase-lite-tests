@@ -13,6 +13,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_ids, compare_local_and_remote
+from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
 
 
@@ -53,6 +54,9 @@ class TestReplicationXdcr(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+        # These tests pin the replicator to one Sync Gateway with an X-Backend header,
+        # which the JS test server cannot send due to limitations of Websocket library.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")
@@ -62,7 +66,7 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator to SG1 via load balancer: 
+            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
@@ -76,6 +80,7 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=True,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            headers={"X-Backend": "sg-0"},
         )
         await replicator.start()
 
@@ -191,6 +196,9 @@ class TestReplicationXdcr(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+        # These tests pin the replicator to one Sync Gateway with an X-Backend header,
+        # which the JS test server cannot send due to limitations of Websocket library.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")
@@ -200,7 +208,7 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator to SG1 via load balancer: 
+            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
@@ -214,6 +222,7 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=False,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            headers={"X-Backend": "sg-0"},
         )
         await replicator.start()
 

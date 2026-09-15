@@ -4,7 +4,9 @@ http:
       insecureSkipVerify: true
       maxIdleConnsPerHost: 1000
       forwardingTimeouts:
-        dialTimeout: 30s
+        # A node that is gone black-holes the connection, and the pool waits this long on it
+        # before retrying the next node, so keep it just long enough for a healthy dial.
+        dialTimeout: 5s
         responseHeaderTimeout: 360s
         idleConnTimeout: 360s
 
@@ -12,7 +14,14 @@ http:
     limit-body:
       buffering:
         maxRequestBodyBytes: 20971520
-    retry-once:
+    # attempts is rewritten to the node count by setup_load_balancers.py
+    retry-next-node:
       retry:
         attempts: 2
         initialInterval: 100ms
+    # No client IP can match this range, so every request routed here is rejected.
+    reject-unknown-pin:
+      ipAllowList:
+        sourceRange:
+          - "255.255.255.255/32"
+        rejectStatusCode: 500

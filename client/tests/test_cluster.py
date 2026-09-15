@@ -1,5 +1,6 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import pytest
 from cbltest.api import couchbaseserver
@@ -32,22 +33,24 @@ def test_cluster_without_couchbase_server() -> None:
 
 
 def test_cluster_with_couchbase_server() -> None:
-    cbs = couchbaseserver.CouchbaseServer(
-        url="https://example.com",
-        username="user",
-        password="pass",
-    )
+    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+        cbs = couchbaseserver.CouchbaseServer(
+            url="https://example.com",
+            username="user",
+            password="pass",
+        )
     with fake_sync_gateway() as sync_gateway:
         cluster = CouchbaseCluster([sync_gateway], [cbs])
     assert cluster.couchbase_servers[0] is cbs
 
 
 def test_cluster_with_multiple_sync_gateways() -> None:
-    cbs = couchbaseserver.CouchbaseServer(
-        url="https://example.com",
-        username="user",
-        password="pass",
-    )
+    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+        cbs = couchbaseserver.CouchbaseServer(
+            url="https://example.com",
+            username="user",
+            password="pass",
+        )
     with fake_sync_gateways(3) as sync_gateways:
         cluster = CouchbaseCluster(sync_gateways, [cbs])
         assert cluster.sync_gateways == sync_gateways

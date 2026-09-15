@@ -20,7 +20,7 @@ extension ContentTypes {
         let replicatorType: ReplicatorType
         let continuous: Bool
         let authenticator: ReplicatorAuthenticator?
-        let headers: String?
+        let headers: [String: String]?
         let pinnedServerCert: String?
         let enableDocumentListener: Bool
         let enableAutoPurge: Bool
@@ -57,7 +57,7 @@ extension ContentTypes {
                 result += "\tauthenticatorType: \(auth.type.rawValue)\n"
             }
             
-            result += "\theaders: \(headers ?? "nil")\n"
+            result += "\theaders: \(headers?.description ?? "nil")\n"
             result += "\tpinnedServerCert: \(pinnedServerCert != nil ? "true" : "false")\n"
             result += "\tenableDocumentListener: \(enableDocumentListener.description)\n"
             result += "\tenableAutoPeruge: \(enableAutoPurge.description)\n"
@@ -88,7 +88,7 @@ extension ContentTypes {
                 authenticator = nil
             }
             
-            headers = try container.decodeIfPresent(String.self, forKey: .headers)
+            headers = try container.decodeIfPresent([String: String].self, forKey: .headers)
             pinnedServerCert = try container.decodeIfPresent(String.self, forKey: .pinnedServerCert)
         }
 

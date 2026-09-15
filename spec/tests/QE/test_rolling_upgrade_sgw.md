@@ -76,7 +76,7 @@ and cluster cleanup is skipped so that documents from earlier phases survive.
    - Start individual continuous push-pull replicators from CBL to **each** node
    - All replicators must reach IDLE with no errors
    - **If load balancer in topology**: Start additional replicator through LB, verify IDLE with no errors
-5. **Revision consistency in mixed-version**: 
+5. **Revision consistency in mixed-version**:
    - Get all documents from all 3 nodes
    - For each document, assert revision ID is identical across all nodes
    - Mixed-version cluster must maintain revision synchronization
