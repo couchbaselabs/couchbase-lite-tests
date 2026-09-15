@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest.mock import patch
 
 import aiohttp
 import pytest
@@ -12,7 +13,8 @@ SidecarCall = tuple[str, str, str | None, aiohttp.ClientTimeout | None]
 
 
 def make_server() -> CouchbaseServer:
-    return CouchbaseServer(url="https://cbs.example.com", username="user", password="pass")
+    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+        return CouchbaseServer(url="https://cbs.example.com", username="user", password="pass")
 
 
 def stub_sidecar(monkeypatch: pytest.MonkeyPatch, server: CouchbaseServer, response: str = "{}") -> list[SidecarCall]:

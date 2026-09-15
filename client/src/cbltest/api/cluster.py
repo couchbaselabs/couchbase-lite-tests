@@ -58,6 +58,8 @@ class CouchbaseCluster:
         """Closes all the resources in the cluster"""
         for sgw in self.sync_gateways:
             await sgw.close()
+        for cbs in self.couchbase_servers:
+            await cbs.close()
 
     def create_collections(self, db_payload: DatabaseConfig) -> None:
         """
@@ -167,7 +169,5 @@ class CouchbaseCluster:
             # Stale indexes only linger from a previous incarnation of the bucket, so
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
-                await self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
-        version = await self.sync_gateway_cluster._put_database(db_name, config)
-        await self.sync_gateway_cluster.wait_for_db_online(db_name, version)
-
+                self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
+        await self.sync_gateway_cluster.create_database(db_name, config)

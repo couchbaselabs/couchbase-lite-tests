@@ -113,12 +113,8 @@ class CouchbaseServer:
             if "://" not in url:
                 url = f"couchbase://{url}"
 
-        # Create a reusable HTTP session for REST API calls
-        self.__http_session = requests.Session()
-        self.__http_session.auth = (username, password)
-        # Created lazily (see _caddy): the constructor cannot assume a running event loop,
-        # but some sync test code paths construct a CouchbaseServer without one.
-        self.__caddy: caddy.Caddy | None = None
+            # Parse URL to extract hostname and REST port
+            self._parse_connection_url(url)
 
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(
@@ -139,15 +135,12 @@ class CouchbaseServer:
                 raise
             self.__cluster.wait_until_ready(timedelta(seconds=10))
 
-            await self.__cluster.wait_until_ready(timedelta(seconds=10))
-
-    @property
-    def _cluster(self) -> Cluster:
-        """
-        The connected SDK cluster.
-        """
-        assert self.__cluster is not None, f"{self} is not connected, call connect() first"
-        return self.__cluster
+            # Create a reusable HTTP session for REST API calls
+            self.__http_session = requests.Session()
+            self.__http_session.auth = (username, password)
+            # Created lazily (see _caddy): building it opens a `ClientSession` that needs
+            # a running event loop, which the constructor cannot assume.
+            self.__caddy: caddy.Caddy | None = None
 
     @property
     def _caddy(self) -> caddy.Caddy:
@@ -161,13 +154,8 @@ class CouchbaseServer:
 
     async def close(self) -> None:
         """
-        Closes the SDK connection to the cluster, and the REST session.
+        Closes this node's Caddy client, if it was ever created.
         """
-        if self.__cluster is not None:
-            await self.__cluster.close()
-            self.__cluster = None
-
-        self.__http_session.close()
         if self.__caddy is not None:
             await self.__caddy.close()
 

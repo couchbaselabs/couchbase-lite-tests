@@ -1,6 +1,6 @@
 """Tests for run_cbcollects, the best-effort multi-node collection the cbcollect_session
-fixture runs at session end when CouchbaseCluster.create_database flagged a CBG-5733-shaped
-timeout (see test_cluster.py for where that flag gets set)."""
+fixture runs at session end when SyncGatewayCluster.create_database flagged a stuck-indexer
+timeout (see test_syncgatewaycluster.py for where that flag gets set)."""
 
 import asyncio
 from pathlib import Path

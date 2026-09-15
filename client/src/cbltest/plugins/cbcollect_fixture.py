@@ -53,10 +53,8 @@ async def run_cbcollects(couchbase_servers: Sequence[CouchbaseServer], output_di
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def cbcollect_session(cblpytest: CBLPyTest) -> AsyncGenerator[None]:
     yield
-    # CBG-5733 sets this flag from CouchbaseCluster.create_database the moment its Sync
-    # Gateway call times out; collection itself waits until here, session end, so that a
-    # test hitting this doesn't stall behind a multi-minute cbcollect_info run of its own --
-    # the same reason sgcollect/es_collect wait for teardown instead of collecting inline.
+    # Collection is deferred to session end, once, rather than run inline where the timeout
+    # occurred -- the same reason sgcollect/es_collect wait for teardown.
     if CBLPyTestGlobal.cbcollect_needed:
         servers = [cbs for cluster in cblpytest.clusters for cbs in cluster.couchbase_servers]
         try:
