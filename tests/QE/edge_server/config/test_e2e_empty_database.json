@@ -13,16 +13,18 @@
     },
     "replications": [
         {
-            "source": "ws://localhost:4984/db-1",
+            "source": "wss://sgw.example.com:4984/db-1",
             "target": "db",
             "bidirectional": true,
             "continuous": true,
             "auth": {
                 "user": "sync_gateway",
                 "password": "password"
-            }
+            },
+            "pinned_cert": "/home/ec2-user/cert/sg_cert.pem"
         }
     ],
+    "users": "/home/ec2-user/user/users.json",
     "logging": {
         "console": false,
         "file": {

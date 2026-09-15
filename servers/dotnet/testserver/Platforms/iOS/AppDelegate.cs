@@ -1,12 +1,6 @@
-﻿using System.Net;
-using System.Net.NetworkInformation;
+﻿using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
-
 using Foundation;
-
-using Microsoft.Maui.LifecycleEvents;
-
 using UIKit;
 
 using Makaretu.Dns;
@@ -22,7 +16,7 @@ public class AppDelegate : MauiUIApplicationDelegate
 	private ServiceDiscovery? _serviceDiscovery;
 	protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();
 
-	public override bool FinishedLaunching(UIApplication application, NSDictionary launchOptions)
+	public override bool FinishedLaunching(UIApplication application, NSDictionary? launchOptions)
 	{
 		var retVal = base.FinishedLaunching(application, launchOptions);
 
@@ -34,13 +28,13 @@ public class AppDelegate : MauiUIApplicationDelegate
 			}
 			
 			_serviceProfile = new ServiceProfile(ipAddress.Replace('.', '-'), SERVICE_RECORD_NAME, 8888);
-			_serviceDiscovery = new();
+			_serviceDiscovery = new ServiceDiscovery();
 			_serviceDiscovery.Advertise(_serviceProfile);
 		});
 		return retVal;
 	}
 
-	private string? GetIpAddress()
+	private static string? GetIpAddress()
 	{
 		return NetworkInterface.GetAllNetworkInterfaces().FirstOrDefault(nic => nic.Name == "en0")
 			?.GetIPProperties().UnicastAddresses

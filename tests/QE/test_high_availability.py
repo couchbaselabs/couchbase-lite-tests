@@ -10,7 +10,7 @@ from cbltest.api.syncgateway import (
     ScopeConfig,
     SyncGatewayUserClient,
 )
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
+from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
 
 @pytest.mark.sgw
@@ -19,9 +19,13 @@ from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 @pytest.mark.min_load_balancers(1)
 class TestHighAvailability(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_high_availability_with_load_balancer(self, cblpytest: CBLPyTest) -> None:
-        sgs = cblpytest.sync_gateways
-        sg_cluster = SyncGatewayCluster(sgs)
+    async def test_sgw_high_availability_with_load_balancer(
+        self, cblpytest: CBLPyTest, sg_cluster_manager: SyncGatewayClusterManager
+    ) -> None:
+        self.skip_if_not(
+            sg_cluster_manager.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on every Sync Gateway host",
+        )
         cbs = cblpytest.couchbase_servers[0]
         lb_url = cblpytest.load_balancers[0]
         sg_db = "db_ha"
@@ -30,8 +34,7 @@ class TestHighAvailability(CBLTestClass):
         channels = ["*"]
         username = "vipul"
         password = "pass"
-        sg2 = sgs[1]
-        await sg2.start()
+        sg2 = sg_cluster_manager.nodes[1]
 
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
@@ -42,7 +45,7 @@ class TestHighAvailability(CBLTestClass):
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
 
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
-        await sgs[0].reset_user(sg_db, username, password, channels)
+        await cblpytest.sync_gateways[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
         # Hardcoded because `load_balancers` config carries no port of its own.
         lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
@@ -60,7 +63,9 @@ class TestHighAvailability(CBLTestClass):
         all_doc_ids = [d.id for d in docs]
 
         self.mark_test_step("Verify all documents are visible via load balancer")
-        lb_docs = await lb_user.get_all_documents(sg_db)
+        # The load balancer round robins, so this read can land on a node other than the
+        # one that took the writes, and that node may not have caught up yet.
+        lb_docs = await lb_user.wait_for_document_count(sg_db, len(docs))
         lb_doc_ids = {row.id for row in lb_docs.rows}
         missing = set(all_doc_ids) - lb_doc_ids
         assert len(missing) == 0, f"LB missing {len(missing)} docs: {list(missing)[:5]}..."
@@ -98,11 +103,9 @@ class TestHighAvailability(CBLTestClass):
         assert final_doc_count >= num_docs + 50, f"Expected at least {num_docs + 50} docs via LB, got {final_doc_count}"
 
         self.mark_test_step("Bring SG2 back online")
-        await sg2.start(config_name="bootstrap")
-        await sg_cluster.wait_for_db_online(sg_db)
+        await sg2.start()
 
-        self.mark_test_step("Verify load balancer now routes to all 3 nodes")
-        # Create some final test docs through LB to verify all nodes are working
+        self.mark_test_step("Write final documents through the load balancer, round robin over all 3 nodes")
         final_docs = [
             DocumentUpdateEntry(
                 id=f"final_doc_{i}",
@@ -113,9 +116,21 @@ class TestHighAvailability(CBLTestClass):
         ]
         await lb_user.update_documents(sg_db, final_docs)
         final_doc_ids = [d.id for d in final_docs]
-        lb_final_check = await lb_user.wait_for_document_count(sg_db, num_docs + 50 + len(final_docs))
+        total_docs = num_docs + 50 + len(final_docs)
+        lb_final_check = await lb_user.wait_for_document_count(sg_db, total_docs)
         lb_final_ids = {row.id for row in lb_final_check.rows}
         for doc_id in final_doc_ids:
             assert doc_id in lb_final_ids, f"Final doc {doc_id} not accessible via LB"
 
         await lb_user.close()
+
+        for index in range(len(cblpytest.sync_gateways)):
+            self.mark_test_step(f"Force the load balancer to node sg-{index}, and verify that node serves every doc")
+            async with SyncGatewayUserClient(
+                lb_url, username, password, port=4984, secure=False, headers={"X-Backend": f"sg-{index}"}
+            ) as pinned_user:
+                pinned_docs = await pinned_user.wait_for_document_count(sg_db, total_docs)
+
+            pinned_ids = {row.id for row in pinned_docs.rows}
+            missing_from_node = set(final_doc_ids) - pinned_ids
+            assert not missing_from_node, f"Node sg-{index} is missing {len(missing_from_node)} docs via LB"

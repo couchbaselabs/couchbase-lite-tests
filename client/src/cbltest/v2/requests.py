@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 from cbltest.api.jsonserializable import JSONSerializable
@@ -152,7 +152,7 @@ class PostUpdateDatabaseRequestBody(JSONSerializable):
         raw_entries = []
 
         if self.updates is not None:
-            for e in cast(list[DatabaseUpdateEntry], self.updates):
+            for e in self.updates:
                 raw_entry = e.to_json()
                 if raw_entry is None:
                     cbl_warning("Skipping invalid DatabaseUpdateEntry in body serialization!")

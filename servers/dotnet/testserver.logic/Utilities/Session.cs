@@ -1,11 +1,5 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
 using TestServer.Services;
 
 namespace TestServer.Utilities
@@ -45,11 +39,9 @@ namespace TestServer.Utilities
                 throw new ApplicationStatusException($"Header '{Router.ClientIdHeader}' missing", HttpStatusCode.BadRequest);
             }
 
-            if (!ActiveSessions.TryGetValue(id, out var session)) {
-                throw new BadRequestException($"Session '{id}' never started or already finished!");
-            }
-
-            return session;
+            return !ActiveSessions.TryGetValue(id, out var session) 
+                ? throw new BadRequestException($"Session '{id}' never started or already finished!") 
+                : session;
         }
 
         public override string ToString()

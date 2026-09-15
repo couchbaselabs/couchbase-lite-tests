@@ -1,16 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Runtime.InteropServices;
 using TestServer.Services;
 
 namespace TestServer.Cli.Services
 {
     internal sealed class CLIFileSystem : IFileSystem
     {
-        public string AppDataDirectory => Path.GetDirectoryName(typeof(CLIFileSystem).Assembly.Location) ?? throw new ApplicationException("Bad app data directory");
+        public string AppDataDirectory => Path.GetDirectoryName(typeof(CLIFileSystem).Assembly.Location)  
+                                          ?? throw new ApplicationException("Bad app data directory");
 
         public Task<Stream> OpenAppPackageFileAsync(string path)
         {

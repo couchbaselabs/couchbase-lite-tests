@@ -13,6 +13,8 @@ pipeline {
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Run Windows tests')
     }
     options {
+        ansiColor('xterm')
+        timestamps()
         timeout(time: 150, unit: 'MINUTES')
     }
     stages {
@@ -75,6 +77,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown C macOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
@@ -113,6 +119,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown C iOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
@@ -151,6 +161,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown C Android Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
@@ -181,6 +195,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown C Linux Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 sh 'jenkins/pipelines/QE/c/teardown.sh'
@@ -211,6 +229,10 @@ pipeline {
                     }
                     post {
                         always {
+                            // Publish pytest's JUnit XML so per-test failures (messages and
+                            // tracebacks) are surfaced in Jenkins even if teardown fails.
+                            junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                             echo "=== Teardown C Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
                                 powershell 'jenkins\\pipelines\\QE\\c\\teardown.ps1'

@@ -15,7 +15,7 @@ import click
 import requests
 
 from environment.aws.start_backend import script_entry as start_backend
-from jenkins.pipelines.shared.setup_test import TopologyConfig
+from jenkins.pipelines.shared.setup_test import TopologyConfig, resolved_version
 
 if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
@@ -393,7 +393,7 @@ def setup_multiplatform_test(
     sgw_version: str,
     config_file_in: Path,
     topology_tag: str,
-    couchbase_version: str = "7.6.4",
+    couchbase_version: str | None = None,
     setup_dir: str = "QE",
     auto_fetch_builds: bool = True,
     topology_file: str = "",
@@ -425,7 +425,7 @@ def setup_multiplatform_test(
     # Set topology defaults (use versions as-is for local testing)
     topology["defaults"] = {
         "cbs": {
-            "version": couchbase_version,
+            "version": resolved_version("couchbase-server", couchbase_version),
         },
         "sgw": {
             "version": sgw_version,

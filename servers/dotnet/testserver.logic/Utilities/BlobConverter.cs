@@ -1,19 +1,12 @@
 ﻿using Couchbase.Lite;
-using sly.lexer;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using System.Threading.Tasks;
 
 namespace TestServer.Utilities
 {
     internal sealed class BlobConverter : JsonConverter<Blob>
     {
-        public override Blob? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        public override Blob Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
             throw new NotImplementedException();
         }

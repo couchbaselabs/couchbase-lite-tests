@@ -1,32 +1,19 @@
 ﻿using Couchbase.Lite;
 using sly.buildresult;
 using sly.lexer;
-using System;
 using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 
 namespace TestServer.Utilities
 {
-    internal sealed class KeyPathTokenEnumerator : IEnumerator<Token<KeyPathToken>>
+    internal sealed class KeyPathTokenEnumerator(Token<KeyPathToken> token, bool reverse)
+        : IEnumerator<Token<KeyPathToken>>
     {
-        private readonly bool _reverse;
-        private readonly Token<KeyPathToken> _original;
+        private readonly Token<KeyPathToken> _original = token;
 
-        public Token<KeyPathToken> Current { get; private set; }
+        public Token<KeyPathToken> Current { get; private set; } = token;
 
         object IEnumerator.Current => Current;
-
-        public KeyPathTokenEnumerator(Token<KeyPathToken> token, bool reverse)
-        {
-            Current = token;
-            _reverse = reverse;
-            _original = token;
-        }
 
         public void Dispose()
         {
@@ -35,11 +22,7 @@ namespace TestServer.Utilities
 
         public bool MoveNext()
         {
-            if(_reverse) {
-                Current = Current.Previous(0);
-            } else {
-                Current = Current.Next(0);
-            }
+            Current = reverse ? Current.Previous(0) : Current.Next(0);
 
             return Current != null;
         }
@@ -50,33 +33,20 @@ namespace TestServer.Utilities
         }
     }
 
-    internal sealed class KeyPathTokenEnumerable : IEnumerable<Token<KeyPathToken>>
+    internal sealed class KeyPathTokenEnumerable(Token<KeyPathToken> token, bool reverse)
+        : IEnumerable<Token<KeyPathToken>>
     {
-        private readonly Token<KeyPathToken> _token;
-        private readonly bool _reverse;
-
-        public KeyPathTokenEnumerable(Token<KeyPathToken> token, bool reverse)
-        {
-            _token = token;
-            _reverse = reverse;
-        }
-
-        public IEnumerator<Token<KeyPathToken>> GetEnumerator() => new KeyPathTokenEnumerator(_token, _reverse);
+        public IEnumerator<Token<KeyPathToken>> GetEnumerator() => new KeyPathTokenEnumerator(token, reverse);
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    internal sealed class KeyPathException : Exception
+    internal sealed class KeyPathException(string prefix, Token<KeyPathToken> token)
+        : Exception($"{prefix} {BadToken(token)}")
     {
-        public KeyPathException(string prefix, Token<KeyPathToken> token)
-            :base($"{prefix} {BadToken(token)}")
-        {
-
-        }
-
         private static string BadToken(Token<KeyPathToken> token)
         {
-            if(token.TokenID == KeyPathToken.NONE) {
+            if(token.TokenID == KeyPathToken.None) {
                 if(token.Previous(0) == null) {
                     return "";
                 }
@@ -120,30 +90,30 @@ namespace TestServer.Utilities
 
     internal enum KeyPathToken
     {
-        NONE,
+        None,
 
         [Lexeme("\\[")]
-        OPEN_BRACKET,
+        OpenBracket,
 
         [Lexeme("\\]")]
-        CLOSE_BRACKET,
+        CloseBracket,
 
         [Lexeme("\\-?[0-9]+")]
-        INT,
+        Int,
 
         [Lexeme("\\.")]
-        DOT,
+        Dot,
 
         [Lexeme("\\\\")]
-        BACKSLASH,
+        Backslash,
 
         [Lexeme("[^\\\\\\]\\[\\.]+")]
-        IDENTIFIER
+        Identifier
     }
 
     internal static class KeyPathParser
     {
-        private static readonly ILexer<KeyPathToken> _lexer;
+        private static readonly ILexer<KeyPathToken> Lexer;
 
         static KeyPathParser()
         {
@@ -152,17 +122,15 @@ namespace TestServer.Utilities
                 throw new ApplicationException("KeyPathParser failed to build");
             }
 
-            _lexer = buildResult.Result;
+            Lexer = buildResult.Result;
         }
 
         private static IEnumerable<Token<KeyPathToken>> Lex(string keypath)
         {
-            var tokenizeResult = _lexer.Tokenize(keypath);
-            if (tokenizeResult.IsError) {
-                throw new ApplicationException($"Failed to lex keypath '{keypath}'");
-            }
-
-            return tokenizeResult.Tokens;
+            var tokenizeResult = Lexer.Tokenize(keypath);
+            return tokenizeResult.IsError 
+                ? throw new ApplicationException($"Failed to lex keypath '{keypath}'") 
+                : tokenizeResult.Tokens;
         }
 
         
@@ -226,15 +194,15 @@ namespace TestServer.Utilities
             var currentIndex = -1;
             foreach (var token in Lex(keypath)) {
                 switch (token.TokenID) {
-                    case KeyPathToken.CLOSE_BRACKET: {
+                    case KeyPathToken.CloseBracket: {
                         // If it is escaped, it is part of the dictionary key, so append it
-                        if (token.Previous(0).TokenID == KeyPathToken.BACKSLASH) {
+                        if (token.Previous(0).TokenID == KeyPathToken.Backslash) {
                             currentKey += "]";
                             break;
                         }
 
                         CheckBracket(inBracket, true, token);
-                        if(token.Previous(0).TokenID != KeyPathToken.INT) {
+                        if(token.Previous(0).TokenID != KeyPathToken.Int) {
                             // Close bracket can only come after backslash (handled above) or int
                             throw new KeyPathException("Invalid closing bracket in keypath", token);
                         }
@@ -257,13 +225,13 @@ namespace TestServer.Utilities
                         pathStack.Push(nextNode);
                         break;
                     }
-                    case KeyPathToken.BACKSLASH:
+                    case KeyPathToken.Backslash:
                         if (inBracket) {
                             throw new KeyPathException("Invalid KeyPath (backslash inside brackets)", token);
                         }
 
                         break;
-                    case KeyPathToken.INT: {
+                    case KeyPathToken.Int: {
                         if (!inBracket) {
                             throw new KeyPathException("Invalid KeyPath (raw int outside of bracket)", token);
                         }
@@ -275,19 +243,19 @@ namespace TestServer.Utilities
                         currentIndex = token.IntValue;
                         break;
                     }
-                    case KeyPathToken.OPEN_BRACKET:
-                    case KeyPathToken.DOT: {
+                    case KeyPathToken.OpenBracket:
+                    case KeyPathToken.Dot: {
                         // If it is escaped, it is part of the dictionary key, so append it
-                        if (token.Previous(0).TokenID == KeyPathToken.BACKSLASH) {
-                            currentKey += token.TokenID == KeyPathToken.DOT ? "." : "[";
+                        if (token.Previous(0).TokenID == KeyPathToken.Backslash) {
+                            currentKey += token.TokenID == KeyPathToken.Dot ? "." : "[";
                             break;
                         }
 
-                        if(token.Previous(0).TokenID != KeyPathToken.IDENTIFIER) {
+                        if(token.Previous(0).TokenID != KeyPathToken.Identifier) {
                             throw new KeyPathException("Invalid keypath component", token);
                         }
 
-                        if(token.TokenID == KeyPathToken.OPEN_BRACKET) {
+                        if(token.TokenID == KeyPathToken.OpenBracket) {
                             CheckBracket(inBracket, false, token);
                             inBracket = true;
                         }
@@ -305,14 +273,14 @@ namespace TestServer.Utilities
                         currentKey = "";
                         break;
                     }
-                    case KeyPathToken.IDENTIFIER:
-                        if(currentKey.Length == 0 && token.Previous(0)?.TokenID == KeyPathToken.OPEN_BRACKET) {
+                    case KeyPathToken.Identifier:
+                        if(currentKey.Length == 0 && token.Previous(0)?.TokenID == KeyPathToken.OpenBracket) {
                             throw new KeyPathException("Non-integer found inside of index brackets", token);
                         }
 
                         currentKey += token.StringWithoutQuotes;
                         break;
-                    case KeyPathToken.NONE: {
+                    case KeyPathToken.None: {
                         // This comes as the final token
                         if(token.Previous(0) == null) {
                             throw new KeyPathException("Empty keypath", token);
@@ -365,8 +333,8 @@ namespace TestServer.Utilities
             var currentIndex = -1;
             foreach(var token in Lex(keypath)) {
                 switch(token.TokenID) {
-                    case KeyPathToken.OPEN_BRACKET:
-                        if(token.Previous(0).TokenID == KeyPathToken.BACKSLASH) {
+                    case KeyPathToken.OpenBracket:
+                        if(token.Previous(0).TokenID == KeyPathToken.Backslash) {
                             currentKey += "[";
                             break;
                         }
@@ -374,9 +342,9 @@ namespace TestServer.Utilities
                         CheckBracket(inBracket, false, token);
                         inBracket = true;
                         break;
-                    case KeyPathToken.CLOSE_BRACKET: {
+                    case KeyPathToken.CloseBracket: {
                         // If it is escaped, it is part of the dictionary key, so append it
-                        if (token.Previous(0).TokenID == KeyPathToken.BACKSLASH) {
+                        if (token.Previous(0).TokenID == KeyPathToken.Backslash) {
                             currentKey += "]";
                             break;
                         }
@@ -405,13 +373,13 @@ namespace TestServer.Utilities
                         pathStack.Push(nextNode);
                         break;
                     }
-                    case KeyPathToken.BACKSLASH:
+                    case KeyPathToken.Backslash:
                         if (inBracket) {
                             throw new KeyPathException("Invalid KeyPath (backslash inside brackets)", token);
                         }
 
                         break;
-                    case KeyPathToken.INT: {
+                    case KeyPathToken.Int: {
                         if (!inBracket) {
                             throw new KeyPathException("Invalid KeyPath (raw int outside of bracket)", token);
                         }
@@ -419,9 +387,9 @@ namespace TestServer.Utilities
                         currentIndex = token.IntValue;
                         break;
                     } 
-                    case KeyPathToken.DOT: {
+                    case KeyPathToken.Dot: {
                         // If it is escaped, it is part of the dictionary key, so append it
-                        if (token.Previous(0).TokenID == KeyPathToken.BACKSLASH) {
+                        if (token.Previous(0).TokenID == KeyPathToken.Backslash) {
                             currentKey += ".";
                             break;
                         }
@@ -443,10 +411,10 @@ namespace TestServer.Utilities
                         pathStack.Push(nextNode);
                         break;
                     }
-                    case KeyPathToken.IDENTIFIER:
+                    case KeyPathToken.Identifier:
                         currentKey += token.StringWithoutQuotes;
                         break;
-                    case KeyPathToken.NONE: {
+                    case KeyPathToken.None: {
                         // This comes as the final token
                         var current = pathStack.Peek();
                         if (current.Type == PathNodeType.Dict) {

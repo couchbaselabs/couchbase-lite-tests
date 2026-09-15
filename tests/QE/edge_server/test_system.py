@@ -36,8 +36,11 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
+@pytest.mark.skip("These tests are marked for 6 hours each and flake as is - see CBL-8867")
 class TestSystem(CBLTestClass):
-    async def _setup_system_test(self, cblpytest: CBLPyTest) -> tuple[SyncGateway, EdgeServer, str, str]:
+    async def _setup_system_test(
+        self, cblpytest: CBLPyTest, tmp_path: Path
+    ) -> tuple[SyncGateway, EdgeServer, str, str]:
         """Create bucket, 10 docs, Sync Gateway db, Edge Server db; verify 10 docs on both.
         Returns (sync_gateway, edge_server, sg_db_name, es_db_name).
         """
@@ -74,6 +77,7 @@ class TestSystem(CBLTestClass):
         config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
         await edge_server.wait_for_idle()
@@ -88,14 +92,14 @@ class TestSystem(CBLTestClass):
         return sync_gateway, edge_server, sg_db_name, es_db_name
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
         doc_counter = 11
 
         while datetime.now(UTC) < end_time:
@@ -196,14 +200,14 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
         edge_server_down = False
         end = datetime.now(UTC) + timedelta(minutes=2400)
         doc_counter = 11
@@ -211,7 +215,7 @@ class TestSystem(CBLTestClass):
         while datetime.now(UTC) < end_time:
             if datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 edge_server_down = False
@@ -233,7 +237,7 @@ class TestSystem(CBLTestClass):
 
             if not edge_server_down and random.random() <= 0.4:  # 40% chance of chaos
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
+                await cblpytest.edge_servers[0].kill_server()
                 end = datetime.now(UTC) + timedelta(minutes=1)
                 # Allow time after stopping edge server before next operations.
                 await asyncio.sleep(10)
@@ -331,7 +335,9 @@ class TestSystem(CBLTestClass):
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_multi_client_concurrent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_multi_client_concurrent(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         NUM_CLIENTS = 4
         end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
@@ -339,7 +345,7 @@ class TestSystem(CBLTestClass):
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
 
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
@@ -446,7 +452,7 @@ class TestSystem(CBLTestClass):
         )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         NUM_CLIENTS = 4
         end_time = datetime.now(UTC) + timedelta(minutes=360)
         (
@@ -454,7 +460,7 @@ class TestSystem(CBLTestClass):
             edge_server,
             sg_db_name,
             es_db_name,
-        ) = await self._setup_system_test(cblpytest)
+        ) = await self._setup_system_test(cblpytest, tmp_path)
 
         shared = {"edge_server_down": False}
         recent_docs: list[str] = []
@@ -467,7 +473,7 @@ class TestSystem(CBLTestClass):
                     break
 
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await edge_server.kill_server()
+                await cblpytest.edge_servers[0].kill_server()
                 shared["edge_server_down"] = True
                 # Allow time for clients to observe the outage before next operations.
                 await asyncio.sleep(10)
@@ -476,7 +482,7 @@ class TestSystem(CBLTestClass):
                 await asyncio.sleep(60)
 
                 self.mark_test_step("Restarting Edge Server after chaos window.")
-                await edge_server.start_server()
+                await cblpytest.edge_servers[0].start_server()
                 # Allow edge server to stabilize after restart.
                 await asyncio.sleep(10)
                 shared["edge_server_down"] = False

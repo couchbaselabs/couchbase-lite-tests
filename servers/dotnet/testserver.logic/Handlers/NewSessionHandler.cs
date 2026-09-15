@@ -1,4 +1,5 @@
-﻿using Serilog;
+﻿using System.Diagnostics.CodeAnalysis;
+using Serilog;
 using Serilog.Configuration;
 using Serilog.Core;
 using Serilog.Events;
@@ -8,15 +9,16 @@ using System.Net;
 using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using JetBrains.Annotations;
 using TestServer.Utilities;
 
 namespace TestServer.Handlers;
 
 internal sealed class LogSlurpSink : ILogEventSink
 {
-    private ClientWebSocket _ws = new();
-    private ManualResetEventSlim _connectWait = new();
-    private ManualResetEventSlim _sendWait = new();
+    private readonly ClientWebSocket _ws = new();
+    private readonly ManualResetEventSlim _connectWait = new();
+    private readonly ManualResetEventSlim _sendWait = new();
     private readonly ITextFormatter _formatter;
 
     public LogSlurpSink(string url, string id, string tag, ITextFormatter textFormatter)
@@ -25,7 +27,7 @@ internal sealed class LogSlurpSink : ILogEventSink
         _ws.Options.SetRequestHeader("CBL-Log-Tag", tag);
         _formatter = textFormatter;
         _ws.ConnectAsync(new Uri($"ws://{url}/openLogStream"), CancellationToken.None)
-            .ContinueWith(t => _connectWait.Set());
+            .ContinueWith(_ => _connectWait.Set());
     }
 
     public void Emit(LogEvent logEvent)
@@ -38,7 +40,7 @@ internal sealed class LogSlurpSink : ILogEventSink
         using var sw = new StringWriter();
         _formatter.Format(logEvent, sw);
         _ws.SendAsync(Encoding.UTF8.GetBytes(sw.ToString().TrimEnd()), WebSocketMessageType.Text, true, CancellationToken.None)
-            .ContinueWith(t => _sendWait.Set());
+            .ContinueWith(_ => _sendWait.Set());
 
         if (!_sendWait.Wait(TimeSpan.FromSeconds(5))) {
             throw new TimeoutException("LogSlurpSink hung on send");
@@ -48,42 +50,45 @@ internal sealed class LogSlurpSink : ILogEventSink
 
 internal static class SerilogExtensions
 {
-    internal const string DefaultSlurpOutputTemplate = "[{@l:u3}]: {@m}\n{@x}";
+    private const string DEFAULT_SLURP_OUTPUT_TEMPLATE = "[{@l:u3}]: {@m}\n{@x}";
 
     public static LoggerConfiguration LogSlurp(this LoggerSinkConfiguration config, string url, string id, string tag,
-        string outputTemplate = DefaultSlurpOutputTemplate)
+        string outputTemplate = DEFAULT_SLURP_OUTPUT_TEMPLATE)
     {
         return config.Sink(new LogSlurpSink(url, id, tag, new ExpressionTemplate(outputTemplate)));
     }
 }
 
+[UsedImplicitly]
+[SuppressMessage("ReSharper", "InconsistentNaming")]
 internal record NewSessionLoggingInfo(string url, string tag);
 
+[SuppressMessage("ReSharper", "InconsistentNaming")]
 internal readonly record struct NewSessionBody(string id, NewSessionLoggingInfo? logging = null);
 
 internal static partial class HandlerList
 {
-    private static Serilog.ILogger? Original = null;
+    private static ILogger? Original;
 
     [HttpHandler("newSession", noSession: true)]
-    public static Task NewSessionHandler(JsonDocument body, HttpListenerResponse response)
+    [UsedImplicitly]
+    public static async Task NewSessionHandler(JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<NewSessionBody>(response, out var newSessionBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<NewSessionBody>(out var newSessionBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         Session.Create(CBLTestServer.ServiceProvider, newSessionBody.id);
 
         if(newSessionBody.logging == null) {
-            response.WriteEmptyBody();
-            return Task.CompletedTask;
+            await response.WriteEmptyBody().ConfigureAwait(false);
+            return;
         }
 
         // A little trick I learned from Serilog.  Instead of trying to mess with the existing
         // configurations, create a new one that logs to the existing one AND the new sink
-        if(Original == null) {
-            Original = Log.Logger;
-        }
+        Original ??= Log.Logger;
 
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Verbose()
@@ -93,7 +98,6 @@ internal static partial class HandlerList
 
         Log.Information("Test server consolidated logging started");
 
-        response.WriteEmptyBody();
-        return Task.CompletedTask;
+        await response.WriteEmptyBody().ConfigureAwait(false);
     }
 }

@@ -8,6 +8,10 @@ pipeline {
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
     }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
     stages {
         stage('Init') {
             steps {
@@ -47,6 +51,10 @@ pipeline {
             }
             post {
                 always {
+                    // Publish pytest's JUnit XML so per-test failures (messages and
+                    // tracebacks) are surfaced in Jenkins even if teardown fails.
+                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                     echo "Teardown Android Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh '''

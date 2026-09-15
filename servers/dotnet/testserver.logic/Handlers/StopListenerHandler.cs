@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using Couchbase.Lite.P2P;
 using System.Net;
 using System.Text.Json;
@@ -9,16 +10,18 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct StopListenerBody
     {
         public required string id { get; init; }
     }
 
     [HttpHandler("stopListener")]
-    public static Task StopListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task StopListenerHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<StopListenerBody>(response, out var deserializedBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<StopListenerBody>(out var deserializedBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var listenerObject = session.ObjectManager.GetObject<URLEndpointListener>(deserializedBody.id);
@@ -30,12 +33,11 @@ internal static partial class HandlerList
                 message = $"listener with specified ID not registered!"
             };
 
-            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         listenerObject.Stop();
-        response.WriteEmptyBody();
-        return Task.CompletedTask;
+        await response.WriteEmptyBody().ConfigureAwait(false);
     }
 }

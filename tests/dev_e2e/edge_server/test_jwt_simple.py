@@ -30,7 +30,9 @@ JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
 @pytest.mark.min_edge_servers(1)
 class TestJWTSimple(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_jwt_replication_reconnect_false(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_jwt_replication_reconnect_false(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         """ES replicates with SGW using a static JWT token (reconnect_on_token_change=false)."""
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]
@@ -172,6 +174,7 @@ class TestJWTSimple(CBLTestClass):
             "reconnect_on_token_change": False,
         }
 
+        config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
 
         es_manager = cblpytest.edge_servers[0]

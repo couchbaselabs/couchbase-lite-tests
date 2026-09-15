@@ -64,9 +64,9 @@ class _RequestHttpTransport(RequestTransport):
                 cbl_warning(f"Response version for {resp_version} does not match request version {request.version}!")
 
         if isinstance(request, GetRootRequest):
-            ret_val = await request._create_response(cast(str, uuid), http=resp)
+            ret_val = await request._create_response(uuid, http=resp)
         else:
-            ret_val = await self._create_response(type(request), resp, resp_version, cast(str, uuid))
+            ret_val = await self._create_response(type(request), resp, resp_version, uuid)
 
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if not resp.ok:
@@ -115,7 +115,7 @@ class _RequestWebSocketTransport(RequestTransport):
         if CBLPyTestGlobal.running_test_name is not None:
             data["ts_testName"] = CBLPyTestGlobal.running_test_name
 
-        future = self.__ws_router.register(data["ts_id"])
+        future = self.__ws_router.register(message_no)
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
         resp = await future

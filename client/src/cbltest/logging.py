@@ -14,12 +14,15 @@ from logging import (
 from sys import stdout
 
 import requests
-from websocket import create_connection
+from websocket import WebSocketException, create_connection
 
 from .version import VERSION
 
 
 class LogSlurpHandler(Handler):
+    # Stop sending after this many consecutive non-connection errors.
+    MAX_TRANSIENT_ERRORS = 3
+
     @property
     def id(self) -> str:
         return self.__id
@@ -28,13 +31,29 @@ class LogSlurpHandler(Handler):
         super().__init__()
         self.__url = url
         self.__id = id
+        self.__disconnected = False
+        self.__transient_errors = 0
         self.__ws = create_connection(
             f"ws://{url}/openLogStream",
             header=[f"CBL-Log-ID: {id}", "CBL-Log-Tag: test-client"],
         )
 
     def emit(self, record: logging.LogRecord) -> None:
-        self.__ws.send_text(self.format(record))
+        if self.__disconnected:
+            return
+
+        try:
+            self.__ws.send_text(self.format(record))
+            self.__transient_errors = 0
+        except (OSError, WebSocketException):
+            # Connection is gone; stop sending.
+            self.__disconnected = True
+            self.handleError(record)
+        except Exception:
+            self.handleError(record)
+            self.__transient_errors += 1
+            if self.__transient_errors >= self.MAX_TRANSIENT_ERRORS:
+                self.__disconnected = True
 
     def close(self) -> None:
         super().close()

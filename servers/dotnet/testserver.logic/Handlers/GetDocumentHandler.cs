@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using Couchbase.Lite.Unsupported;
 using System.Net;
 using System.Text.Json;
@@ -9,6 +10,7 @@ namespace TestServer.Handlers;
 
 internal static partial class HandlerList
 {
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     internal readonly record struct GetDocumentBody
     {
         public required string database { get; init; }
@@ -17,10 +19,12 @@ internal static partial class HandlerList
     }
 
     [HttpHandler("getDocument")]
-    public static Task GetDocumentHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task GetDocumentHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<GetDocumentBody>(response, out var deserializedBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<GetDocumentBody>(out var deserializedBody, out var ex))
+        {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var dbObject = session.ObjectManager.GetDatabase(deserializedBody.database);
@@ -32,8 +36,8 @@ internal static partial class HandlerList
                 message = $"database '{deserializedBody.database}' not registered!"
             };
 
-            response.WriteBody(errorObject, HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(errorObject, HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         var collSpec = CollectionSpec(deserializedBody.document.collection);
@@ -42,15 +46,14 @@ internal static partial class HandlerList
 
         using var doc = collection.GetDocument(deserializedBody.document.id);
         if(doc == null) {
-            response.WriteEmptyBody(HttpStatusCode.NotFound);
-            return Task.CompletedTask;
+            await response.WriteEmptyBody(HttpStatusCode.NotFound).ConfigureAwait(false);
+            return;
         }
 
         var documentBody = doc.ToDictionary();
         documentBody["_id"] = deserializedBody.document.id;
         documentBody["_revs"] = doc.RevisionIDs();
 
-        response.WriteBody(documentBody);
-        return Task.CompletedTask;
+        await response.WriteBody(documentBody).ConfigureAwait(false);
     }
 }

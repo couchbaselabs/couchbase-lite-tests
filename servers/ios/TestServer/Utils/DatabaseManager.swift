@@ -212,18 +212,8 @@ class DatabaseManager {
             replConfig.authenticator = try DatabaseManager.getCBLAuthenticator(from: auth)
         }
         
-        if let headersString = config.headers {
-            // Decode as [String: String] as per CBL type
-            if let data = headersString.data(using: .utf8) {
-                do {
-                    let decoded = try JSONDecoder().decode([String: String].self, from: data)
-                    replConfig.headers = decoded
-                } catch {
-                    throw TestServerError.badRequest("Invalid headers. Must be a JSON object with string key-value pairs with single quotes." )
-                }
-            } else {
-                replConfig.headers = nil
-            }
+        if let headers = config.headers {
+            replConfig.headers = headers
         }
         
         if let pinnedCert = config.pinnedServerCert {

@@ -1,4 +1,3 @@
-import platform
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -21,6 +20,9 @@ JS_TEST_SERVER_DIR = TEST_SERVER_DIR / "javascript"
 ZIP_FOLDER_NAME = "compressed"
 ZIP_DIR = JS_TEST_SERVER_DIR / ZIP_FOLDER_NAME
 SCRIPT_DIR = Path(__file__).resolve().parent
+# "bun" and "node" are generic names, so a match is only the dev server if it runs out of
+# the bridge's own working directory.
+DEV_SERVER_PROCESS_NAMES = frozenset({"bun", "bun.exe", "node", "node.exe"})
 
 
 class JavascriptBridge(PlatformBridge):
@@ -28,7 +30,7 @@ class JavascriptBridge(PlatformBridge):
         """
         Initialize the JavascriptBridge with the working directory containing the site files
         """
-        self.__working_dir = working_dir
+        self.__working_dir = Path(working_dir)
 
     def validate(self, location: str) -> None:
         """
@@ -59,7 +61,7 @@ class JavascriptBridge(PlatformBridge):
         """
         header("Running bun run dev")
 
-        log_file = JS_TEST_SERVER_DIR / "server.log"
+        log_file = self.__working_dir / "server.log"
         with open(log_file, "w") as log_fd:
             process = subprocess.Popen(
                 ["bun", "run", "dev"],
@@ -78,24 +80,39 @@ class JavascriptBridge(PlatformBridge):
         Args:
             location (str): The location of the Javascript (e.g., "localhost").
         """
-        proc_name = "bun.exe" if platform.system() == "Windows" else "bun"
-        node_name = "node.exe" if platform.system() == "Windows" else "node"
         header("Stopping test server")
-        for proc in psutil.process_iter():
-            if proc.name() == proc_name:
-                try:
-                    # For some reason terminating bun leaves this child behind
-                    node_process = next(p for p in proc.children(True) if p.name() == node_name)
-                    node_process.terminate()
-                    click.secho(f"Stopped node child PID {node_process.pid}", fg="green")
-                except StopIteration:
-                    click.secho("No child node process found...", fg="yellow")
+        stopped = False
+        for proc in psutil.process_iter(["name"]):
+            if proc.info["name"] not in DEV_SERVER_PROCESS_NAMES or not self.__runs_here(proc):
+                continue
 
-                proc.terminate()
-                click.secho(f"Stopped PID {proc.pid}", fg="green")
-                return
+            # Terminating bun leaves the node child running vite behind, so take the
+            # children down first.
+            try:
+                children = proc.children(recursive=True)
+            except (psutil.AccessDenied, psutil.NoSuchProcess, psutil.ZombieProcess):
+                children = []
+            for child in children:
+                self.__terminate(child)
+            self.__terminate(proc)
+            stopped = True
 
-        click.secho(f"Unable to find process to stop ({proc_name})", fg="yellow")
+        if not stopped:
+            click.secho(f"Unable to find a test server to stop in {self.__working_dir}", fg="yellow")
+
+    def __runs_here(self, proc: psutil.Process) -> bool:
+        try:
+            return Path(proc.cwd()) == self.__working_dir
+        except (psutil.AccessDenied, psutil.NoSuchProcess):
+            return False
+
+    @staticmethod
+    def __terminate(proc: psutil.Process) -> None:
+        try:
+            proc.terminate()
+            click.secho(f"Stopped PID {proc.pid}", fg="green")
+        except psutil.NoSuchProcess:
+            pass
 
     def uninstall(self, location: str) -> None:
         """

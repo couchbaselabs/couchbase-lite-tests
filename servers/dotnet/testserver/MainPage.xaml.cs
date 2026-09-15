@@ -1,13 +1,12 @@
-﻿using System.Net;
-using System.Net.NetworkInformation;
+﻿using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Reflection;
 
 namespace TestServer;
 
-public partial class MainPage : ContentPage
+public partial class MainPage
 {
-    private const int PortToUse = 5555;
+    private const int PORT_TO_USE = 5555;
 
     public MainPage()
     {
@@ -15,7 +14,7 @@ public partial class MainPage : ContentPage
 
         var server = new CBLTestServer
         {
-            Port = PortToUse
+            Port = PORT_TO_USE
         };
         server.Start();
     }
@@ -31,11 +30,7 @@ public partial class MainPage : ContentPage
             return false;
         }
 
-        if (ni.Description.IndexOf("virtual", StringComparison.OrdinalIgnoreCase) >= 0) {
-            return false;
-        }
-
-        return true;
+        return ni.Description.IndexOf("virtual", StringComparison.OrdinalIgnoreCase) < 0;
     }
 
     protected override void OnAppearing()
@@ -52,7 +47,7 @@ public partial class MainPage : ContentPage
         var ipAddresses = "Server running at:" +
             Environment.NewLine +
             String.Join(Environment.NewLine, validIPs
-            .Select(x => $"http://{x.Address}:{PortToUse}"));
+            .Select(x => $"http://{x.Address}:{PORT_TO_USE}"));
         _urlLabel.Text = ipAddresses;
     }
 }

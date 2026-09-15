@@ -16,6 +16,7 @@ if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
+from environment.aws.common.versions import resolve_latest_version
 from environment.aws.start_backend import script_entry as start_backend
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
@@ -63,8 +64,8 @@ def generate_topology(
     "topology_file",
     type=click.Path(exists=True, path_type=Path),
 )
-@click.option("--sgw-version", default="4.0.0", help="Provision Sync Gateway")
-@click.option("--cbs-version", default="7.6.8", help="Provision Couchbase Server")
+@click.option("--sgw-version", default=None, help="Provision Sync Gateway (omit for latest release)")
+@click.option("--cbs-version", default=None, help="Provision Couchbase Server (omit for latest release)")
 @click.option("--config-file", default="config.json", help="Backend config file")
 def main(
     es_version: str,
@@ -79,9 +80,9 @@ def main(
     config_out = SCRIPT_DIR.parents[3] / "tests" / "QE" / "config.json"
 
     if sgw_version is None or len(sgw_version) == 0:
-        sgw_version = "4.0.0"
+        sgw_version = resolve_latest_version("sync-gateway")
     if cbs_version is None or len(cbs_version) == 0:
-        cbs_version = "7.6.8"
+        cbs_version = resolve_latest_version("couchbase-server")
 
     click.secho("🚀 Backend setup", fg="blue", bold=True)
     click.echo(f"Edge Server Version : {es_version}")

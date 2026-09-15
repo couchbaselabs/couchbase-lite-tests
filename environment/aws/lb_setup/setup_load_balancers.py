@@ -22,6 +22,7 @@ from environment.aws.common.docker import (
 )
 from environment.aws.common.io import LIGHT_GRAY, get_ec2_hostname, sftp_progress_bar
 from environment.aws.common.output import header
+from environment.aws.common.ssh import connect_ssh
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -56,24 +57,60 @@ def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error:
     click.echo()
 
 
-def _create_router(index: int, admin: bool) -> dict:
+def _create_pool_router(admin: bool) -> dict:
+    """The route a request with no ``X-Backend`` header takes: round robin over every node."""
     name = "admin" if admin else "public"
-    rule = "PathPrefix(`/`)" if index == 0 else f"Header(`X-Backend`, `sg-{index}`) && PathPrefix(`/`)"
     return {
         "entryPoints": [name],
-        "rule": rule,
-        "priority": 10 * (index + 1),
-        "service": f"sgw-{name}-{index}",
-        "middlewares": ["limit-body", "retry-once"],
+        "rule": "PathPrefix(`/`)",
+        "priority": 1,
+        "service": f"sgw-{name}-pool",
+        "middlewares": ["limit-body", "retry-next-node"],
     }
 
 
-def _create_service(index: int, admin: bool, server: str) -> dict:
+def _create_pinned_router(index: int, admin: bool) -> dict:
+    """
+    The route ``X-Backend: sg-<index>`` takes: that one node, whatever state it is in.
+
+    No retry, because the service behind this route holds only the node that was asked
+    for, so a retry would re-run the request against the same node that just failed.
+    """
+    name = "admin" if admin else "public"
+    return {
+        "entryPoints": [name],
+        "rule": f"Header(`X-Backend`, `sg-{index}`) && PathPrefix(`/`)",
+        "priority": 10,
+        "service": f"sgw-{name}-{index}",
+        "middlewares": ["limit-body"],
+    }
+
+
+def _create_unknown_pin_router(admin: bool) -> dict:
+    """
+    The route an ``X-Backend`` value that names no upstream takes: a 500.
+
+    Without it the pool router would catch the request and round robin it, so a stale or
+    mistyped pin would silently become no pin at all. ``.*`` also catches a header that is
+    present but empty, while a header that is absent has no value to match and so misses.
+    """
+    name = "admin" if admin else "public"
+    return {
+        "entryPoints": [name],
+        "rule": "HeaderRegexp(`X-Backend`, `.*`) && PathPrefix(`/`)",
+        "priority": 5,
+        "service": f"sgw-{name}-pool",
+        "middlewares": ["reject-unknown-pin"],
+    }
+
+
+def _create_service(admin: bool, servers: list[str]) -> dict:
+    port = 4985 if admin else 4984
     return {
         "loadBalancer": {
             "passHostHeader": False,
             "serversTransport": "sg-upstream",
-            "servers": [{"url": f"https://{server}:{4985 if admin else 4984}"}],
+            "servers": [{"url": f"https://{server}:{port}"} for server in servers],
         }
     }
 
@@ -82,16 +119,27 @@ def create_traefik_config(upstreams: list[str]) -> None:
     config: Any = None
     with open(SCRIPT_DIR / "http_config.yml.in") as fin:
         config = yaml.load(fin, Loader=yaml.SafeLoader)
-        routers: dict = {}
-        services: dict = {}
+        routers: dict = {
+            "public": _create_pool_router(False),
+            "admin": _create_pool_router(True),
+            "public-unknown-pin": _create_unknown_pin_router(False),
+            "admin-unknown-pin": _create_unknown_pin_router(True),
+        }
+        services: dict = {
+            "sgw-public-pool": _create_service(False, upstreams),
+            "sgw-admin-pool": _create_service(True, upstreams),
+        }
         for i, upstream in enumerate(upstreams):
-            routers[f"public-{i}"] = _create_router(i, False)
-            routers[f"admin-{i}"] = _create_router(i, True)
-            services[f"sgw-public-{i}"] = _create_service(i, False, upstream)
-            services[f"sgw-admin-{i}"] = _create_service(i, True, upstream)
+            routers[f"public-{i}"] = _create_pinned_router(i, False)
+            routers[f"admin-{i}"] = _create_pinned_router(i, True)
+            services[f"sgw-public-{i}"] = _create_service(False, [upstream])
+            services[f"sgw-admin-{i}"] = _create_service(True, [upstream])
 
         config["http"]["routers"] = routers
         config["http"]["services"] = services
+        # A node that is down refuses the connection, which Traefik retries against the next
+        # node in the pool, so trying as many times as there are nodes reaches a live one.
+        config["http"]["middlewares"]["retry-next-node"]["retry"]["attempts"] = max(2, len(upstreams))
 
     with open(SCRIPT_DIR / "http_config.yml", "w") as fout:
         yaml.dump(config, fout)
@@ -113,9 +161,7 @@ def main(topology: TopologyConfig) -> None:
     for lb in topology.load_balancers:
         create_traefik_config(lb.upstreams)
         ec2_hostname = get_ec2_hostname(lb.hostname)
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(ec2_hostname, username="ec2-user", pkey=topology.ssh_key)
+        ssh = connect_ssh(ec2_hostname, topology.ssh_key)
 
         global current_ssh
         current_ssh = lb.hostname

@@ -2,6 +2,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
 
 @pytest.mark.sgw
@@ -9,12 +10,14 @@ from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 @pytest.mark.min_couchbase_servers(1)
 class TestServerSetup(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_sgw_server_alternative_address(self, cblpytest: CBLPyTest) -> None:
+    async def test_sgw_server_alternative_address(
+        self, cblpytest: CBLPyTest, sg_cluster_manager: SyncGatewayClusterManager
+    ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         self.skip_if_not(
-            sg.has_shell2http_sidecar,
-            "shell2http sidecar is not reachable on this Sync Gateway host",
+            sg_cluster_manager.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on every Sync Gateway host",
         )
         sg_db = "db"
         bucket_name = "alternate-addr-bucket"
@@ -34,8 +37,8 @@ class TestServerSetup(CBLTestClass):
         sg_version = await sg.get_version()
         assert sg_version is not None, "SGW should be running with default config"
 
-        self.mark_test_step("Restart SGW with alternate address config (explicit port)")
-        await sg.restart_with_config("bootstrap-alternate")
+        self.mark_test_step("Restart every SGW node with alternate address config (explicit port)")
+        await sg_cluster_manager.restart_with_config("bootstrap-alternate")
 
         self.mark_test_step(f"Create {num_docs} documents via SDK")
         counts_before = [await node.get_import_count(sg_db) for node in cblpytest.sync_gateways]
@@ -58,15 +61,16 @@ class TestServerSetup(CBLTestClass):
         assert any(after > before for before, after in zip(counts_before, counts_after, strict=True)), (
             f"Expected at least one SGW node to report a new import, got {counts_before} -> {counts_after}"
         )
-        await sg.restart_with_config("bootstrap")
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_remove_dcp_cacert_handling(self, cblpytest: CBLPyTest) -> None:
+    async def test_remove_dcp_cacert_handling(
+        self, cblpytest: CBLPyTest, sg_cluster_manager: SyncGatewayClusterManager
+    ) -> None:
         sg = cblpytest.sync_gateways[0]
         cbs = cblpytest.couchbase_servers[0]
         self.skip_if_not(
-            sg.has_shell2http_sidecar,
-            "shell2http sidecar is not reachable on this Sync Gateway host",
+            sg_cluster_manager.has_shell2http_sidecar,
+            "shell2http sidecar is not reachable on every Sync Gateway host",
         )
         bucket_name = "data-bucket"
         sg_db = "db"
@@ -74,12 +78,12 @@ class TestServerSetup(CBLTestClass):
         self.mark_test_step("Create bucket on CBS")
         cbs.create_bucket(bucket_name)
 
-        self.mark_test_step("Fetch CBS root CA certificate and upload to SGW")
+        self.mark_test_step("Fetch CBS root CA certificate and upload to every SGW node")
         ca_cert_pem = await cbs.get_root_ca_certificate()
-        await sg.upload_certificate(cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem")
+        await sg_cluster_manager.upload_certificate(cert_content=ca_cert_pem, cert_name="cbs-ca-cert.pem")
 
-        self.mark_test_step("Restart SGW with x509 cacert config")
-        await sg.restart_with_config("bootstrap-x509-cacert-only")
+        self.mark_test_step("Restart every SGW node with x509 cacert config")
+        await sg_cluster_manager.restart_with_config("bootstrap-x509-cacert-only")
 
         self.mark_test_step("Verify SGW starts successfully")
         sg_version = await sg.get_version()
@@ -101,5 +105,3 @@ class TestServerSetup(CBLTestClass):
         await sg.wait_for_documents(sg_db, [doc_id])
         sg_doc = await sg.get_document(sg_db, doc_id)
         assert sg_doc.body["message"] == "x509 ca_cert_path auth works"
-
-        await sg.restart_with_config()

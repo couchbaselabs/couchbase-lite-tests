@@ -1,4 +1,5 @@
-﻿using Couchbase.Lite;
+﻿using System.Diagnostics.CodeAnalysis;
+using Couchbase.Lite;
 using System.Net;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,57 +11,46 @@ internal static partial class HandlerList
 {
     internal sealed class Snapshot : Dictionary<string, Document?>, IDisposable
     {
-        private readonly Dictionary<string, Document?> _documents = new();
-
         public void Dispose()
         {
-            foreach(var doc in _documents.Values.NotNull()) {
+            foreach(var doc in Values.NotNull()) {
                 doc.Dispose();
             }
 
-            _documents.Clear();
+            Clear();
         }
     }
 
-    internal readonly record struct DocumentEntry
+    [method: JsonConstructor]
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    internal readonly record struct DocumentEntry(string collection, string id)
     {
-        public required string collection { get; init; }
+        public required string collection { get; init; } = collection;
 
-        public required string id { get; init; }
-
-        [JsonConstructor]
-        public DocumentEntry(string collection, string id)
-        {
-            this.collection = collection;
-            this.id = id;
-        }
+        public required string id { get; init; } = id;
     }
 
-    internal readonly record struct SnapshotDocumentBody
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
+    [method: JsonConstructor]
+    internal readonly record struct SnapshotDocumentBody(string database, IReadOnlyList<DocumentEntry> documents)
     {
-        public required string database { get; init; }
+        public required string database { get; init; } = database;
 
-        public required IReadOnlyList<DocumentEntry> documents { get; init; }
-
-        [JsonConstructor]
-        public SnapshotDocumentBody(string database, IReadOnlyList<DocumentEntry> documents)
-        {
-            this.database = database;
-            this.documents = documents;
-        }
+        public required IReadOnlyList<DocumentEntry> documents { get; init; } = documents;
     }
 
     [HttpHandler("snapshotDocuments")]
-    public static Task SnapshotDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
+    public static async Task SnapshotDocumentsHandler(Session session, JsonDocument body, HttpListenerResponse response)
     {
-        if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(response, out var snapshotBody)) {
-            return Task.CompletedTask;
+        if (!body.RootElement.TryDeserialize<SnapshotDocumentBody>(out var snapshotBody, out var ex)) {
+            await response.WriteDeserializationError(ex).ConfigureAwait(false);
+            return;
         }
 
         var db = session.ObjectManager.GetDatabase(snapshotBody.database);
         if (db == null) {
-            response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), HttpStatusCode.BadRequest);
-            return Task.CompletedTask;
+            await response.WriteBody(Router.CreateErrorResponse($"Unable to find db named '{snapshotBody.database}'!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
+            return;
         }
 
         var (snapshot, id) = session.ObjectManager.RegisterObject(() => new Snapshot());
@@ -70,7 +60,6 @@ internal static partial class HandlerList
             snapshot[$"{collSpec.scope}.{collSpec.name}.{snapshotEntry.id}"] = doc;
         }
 
-        response.WriteBody(new { id });
-        return Task.CompletedTask;
+        await response.WriteBody(new { id }).ConfigureAwait(false);
     }
 }

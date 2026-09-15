@@ -5,32 +5,18 @@ namespace TestServer
 {
     public sealed class CBLTestServer
     {
-        #region Constants
-
         public static readonly int ApiVersion = 2;
-
         public static readonly string ServerID = Guid.NewGuid().ToString();
-
-        private const ushort DefaultPort = 8080;
-
-        private static readonly Stream NullStream = new MemoryStream(Array.Empty<byte>());
-
-        #endregion
-
-        public ushort Port { get; set; } = DefaultPort;
-
-        #region Variables
-
+        private const ushort DEFAULT_PORT = 8080;
+        
         private CancellationTokenSource? _cancelSource;
         private HttpListener? _httpListener;
 
-        #endregion
+        public ushort Port { get; init; } = DEFAULT_PORT;
 
         public static string Version => typeof(CBLTestServer).Assembly.GetCustomAttribute<AssemblyFileVersionAttribute>()!.Version;
 
-        public static IServiceProvider ServiceProvider { get; set; } = default!;
-
-        #region Public Methods
+        public static IServiceProvider ServiceProvider { get; set; } = null!;
 
         public Task Start()
         {
@@ -48,11 +34,7 @@ namespace TestServer
             Interlocked.Exchange(ref _cancelSource, null)?.Cancel();
         }
 
-        #endregion
-
-        #region Private Methods
-
-        private bool IsValidMethod(HttpListenerRequest request)
+        private static bool IsValidMethod(HttpListenerRequest request)
         {
             if(request.Url?.AbsolutePath == "/") {
                 return request.HttpMethod == "GET";
@@ -71,34 +53,27 @@ namespace TestServer
 
             while (!cancelSource.IsCancellationRequested) {
                 var nextRequest = await httpListener.GetContextAsync().ConfigureAwait(false);
-                if (nextRequest?.Request == null) {
-                    Serilog.Log.Logger.Warning("Weird error: null request, skipping...");
-                    continue;
-                }
-
-                if (nextRequest.Request?.Url == null) {
+                if (nextRequest.Request.Url == null) {
                     Serilog.Log.Logger.Warning("Weird error: null url, skipping...");
                     continue;
                 }
 
                 if (!IsValidMethod(nextRequest.Request)) {
-                    nextRequest.Response.WriteEmptyBody(HttpStatusCode.MethodNotAllowed);
+                    _ = nextRequest.Response.WriteEmptyBody(HttpStatusCode.MethodNotAllowed).ConfigureAwait(false);
                     continue;
                 }
 
                 var version = 0;
                 var versionHeader = nextRequest.Request.Headers.Get(Router.ApiVersionHeader);
                 if(versionHeader != null) {
-                    int.TryParse(versionHeader, out version);
+                    Int32.TryParse(versionHeader, out version);
                 }
 
                 var clientId = nextRequest.Request.Headers.Get(Router.ClientIdHeader);
-                var _ = Router.Handle(clientId, nextRequest.Request.Url, nextRequest.Request.InputStream ?? NullStream, nextRequest.Response, version)
+                _ = Router.Handle(clientId, nextRequest.Request.Url, nextRequest.Request.InputStream, nextRequest.Response, version)
                     .ContinueWith(t => Serilog.Log.Logger.Warning("Exception caught during router handling: {e}", t.Exception?.InnerException),
                     TaskContinuationOptions.OnlyOnFaulted);
             }
         }
-
-        #endregion
     }
 }

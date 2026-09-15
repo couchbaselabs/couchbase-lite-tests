@@ -64,8 +64,15 @@ class CblEdgeServerBadResponseError(Exception):
 
     @property
     def code(self) -> int:
+        """Gets the code that Edge Server returned"""
         return self.__code
 
-    def __init__(self, code: int, *args: Any) -> None:
+    @property
+    def body(self) -> str:
+        """Gets the response body that Edge Server returned"""
+        return self.__body
+
+    def __init__(self, code: int, *args: Any, body: str) -> None:
         self.__code = code
+        self.__body = body
         super().__init__(*args)

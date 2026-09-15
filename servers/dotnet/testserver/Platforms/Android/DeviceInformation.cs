@@ -1,5 +1,5 @@
 ﻿using TestServer.Services;
-using Droid = global::Android;
+using Droid = Android;
 
 namespace TestServer.Platforms.Android
 {

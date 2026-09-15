@@ -12,36 +12,28 @@ namespace TestServer.Utilities
 
     internal sealed class PathNode
     {
-        private readonly IMutableDictionary? _dict;
-        private readonly IMutableArray? _array;
         private int? _parentIndex;
         private string? _parentKey;
 
         public PathNodeType Type { get; }
 
-        public IMutableDictionary Dict => _dict ?? throw new InvalidOperationException("This path node is not a dict");
+        public IMutableDictionary Dict => field ?? throw new InvalidOperationException("This path node is not a dict");
 
-        public IMutableArray Array => _array ?? throw new InvalidOperationException("This path node is not an array");
+        public IMutableArray Array => field ?? throw new InvalidOperationException("This path node is not an array");
 
-        public int ParentIndex => _parentIndex.HasValue ? _parentIndex.Value : throw new InvalidOperationException("Parent index not set");
+        public int ParentIndex => _parentIndex ?? throw new InvalidOperationException("Parent index not set");
 
         public string ParentKey => _parentKey ?? throw new InvalidOperationException("Parent key not set");
 
         private static PathNode CreateInternal(object? input)
         {
-            if (input == null) {
-                return new PathNode(true);
-            }
-
-            if (input is IMutableDictionary dict) {
-                return new PathNode(dict);
-            }
-
-            if (input is IMutableArray array) {
-                return new PathNode(array);
-            }
-
-            return new PathNode(false);
+            return input switch
+            {
+                null => new PathNode(true),
+                IMutableDictionary dict => new PathNode(dict),
+                IMutableArray array => new PathNode(array),
+                _ => new PathNode(false)
+            };
         }
 
         public static PathNode Create(object? input, string parentKey)
@@ -58,20 +50,20 @@ namespace TestServer.Utilities
             return retVal;
         }
 
-        public PathNode(bool empty)
+        private PathNode(bool empty)
         {
             Type = empty ? PathNodeType.Missing : PathNodeType.Scalar;
         }
 
         public PathNode(IMutableDictionary dict)
         {
-            _dict = dict;
+            Dict = dict;
             Type = PathNodeType.Dict;
         }
 
-        public PathNode(IMutableArray array)
+        private PathNode(IMutableArray array)
         {
-            _array = array;
+            Array = array;
             Type = PathNodeType.Array;
         }
     }
