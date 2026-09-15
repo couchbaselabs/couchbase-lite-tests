@@ -21,7 +21,7 @@ environment/
 │   ├── start_backend.py                # Main entry — provisions everything
 │   ├── stop_backend.py                 # Teardown — destroys resources
 │   ├── main.tf                         # Terraform: EC2, VPC, subnets (us-east-1, AL2023)
-│   ├── download_tool.py                # Downloads cbbackupmgr etc.
+│   ├── download_tool.py                # Downloads cbbackupmgr and bucketpool into tests/.tools
 │   │
 │   ├── common/                         # Shared utilities (reuse these — don't duplicate)
 │   │   ├── docker.py                   # start_container(), remote_exec()

@@ -1,6 +1,10 @@
 """
 Return the backend to a clean slate between tests: every Edge Server reset to its
-provisioned state, and every Couchbase Server bucket and Sync Gateway database removed.
+provisioned state, every Sync Gateway database removed, and every Couchbase Server bucket
+emptied.
+
+``--bucketpool`` decides how a bucket is emptied: ``delete`` drops it, ``purge`` empties it
+in place.
 
 Failures are never swallowed: running against a half-cleaned environment fails later in a
 much harder way to diagnose.
@@ -21,8 +25,8 @@ from cbltest.logging import cbl_info, cbl_trace
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Reset every Edge Server, then remove all Couchbase Server buckets and Sync Gateway
-    databases.
+    Reset every Edge Server, then remove all Sync Gateway databases and empty all Couchbase
+    Server buckets.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -52,7 +56,7 @@ async def reset_all_edge_servers(managers: Sequence[EdgeServerManager]) -> None:
 
 async def perform_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Remove all Couchbase Server buckets and Sync Gateway databases.
+    Remove all Sync Gateway databases and empty all Couchbase Server buckets.
 
     No-ops when no Sync Gateway is configured (e.g. framework unit/smoke tests),
     since there is nothing to clean up and `SyncGatewayCluster` requires at least
@@ -63,8 +67,8 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
 
     cbl_info("🧹 Couchbase Server and Sync Gateway cleanup started")
 
-    # Databases are deleted before their backing buckets are dropped, so a failure in
-    # the first phase stops the second rather than pulling a bucket out from under a
+    # Databases are deleted before their backing buckets are emptied, so a failure in
+    # the first phase stops the second rather than purging data out from under a
     # Sync Gateway database that is still configured to use it.
     async with asyncio.TaskGroup() as group:
         for cluster in cblpytest.clusters:
@@ -72,51 +76,70 @@ async def perform_cleanup(cblpytest: CBLPyTest) -> None:
 
     async with asyncio.TaskGroup() as group:
         for cluster in cblpytest.clusters:
-            group.create_task(delete_all_buckets(cluster))
+            group.create_task(clean_all_buckets(cluster))
 
     cbl_info("🧹 Couchbase Server and Sync Gateway cleanup finished")
 
 
 async def delete_all_databases(cluster: SyncGatewayCluster) -> None:
     """
-    Delete every database on every node of the given Sync Gateway cluster, in parallel.
+    Delete every database the given Sync Gateway cluster serves.
 
     Each node is asked for its own list, since a node that never learned about a database
-    is not covered by deleting it elsewhere.  Once this returns no node serves any
-    database, so the backing buckets are safe to drop.
+    is not covered by deleting it elsewhere.  Each database is then deleted on one node
+    only: Sync Gateway keeps a single registry document per bucket, and deleting the same
+    database from every node at once makes those writes collide on it, which fails the
+    delete after five attempts.  The other nodes drop the database when they next re-read
+    the config, which is what the wait below is for.
+
+    Each database deletes and then waits in its own task, so one slow delete does not hold
+    up the waits for the others, and every node is polled at once.
+
+    Once this returns no node serves any database, so the backing buckets are safe to empty.
     """
-    async with asyncio.TaskGroup() as group:
-        for sg in cluster.sync_gateways:
-            group.create_task(delete_all_databases_on_node(sg))
+    node_databases = await asyncio.gather(*(sg.get_all_databases_verbose() for sg in cluster.sync_gateways))
 
+    # Databases in different buckets have separate registries, so deleting them at the
+    # same time does not contend.
+    owners: dict[str, SyncGateway] = {}
+    rosmar_buckets: dict[SyncGateway, set[str]] = {}
+    for sg, databases in zip(cluster.sync_gateways, node_databases, strict=True):
+        cbl_trace(f"🧹 {sg}: found databases {list(databases)}")
+        for db_name, entry in databases.items():
+            owners.setdefault(db_name, sg)
+            if sg.using_rosmar:
+                rosmar_buckets.setdefault(sg, set()).add(entry.bucket)
 
-async def delete_all_databases_on_node(sg: SyncGateway) -> None:
-    """
-    Delete every database on a single Sync Gateway node, along with its backing Rosmar
-    bucket if the node is using Rosmar (Rosmar bucket data is not deleted by removing
-    the database that uses it).
-    """
-    dbs = await sg.get_all_databases_verbose()
-    cbl_trace(f"🧹 {sg}: found databases {list(dbs)}, deleting...")
+    async def delete_and_wait(db_name: str, sg: SyncGateway) -> None:
+        """Delete one database, then wait for the nodes that did not take the write."""
+        await sg._delete_database(db_name)
+        await cluster.wait_for_no_database(db_name)
 
-    async with asyncio.TaskGroup() as group:
-        for db_name in dbs:
-            group.create_task(sg._delete_database(db_name))
+    if owners:
+        cbl_trace(f"🧹 deleting databases {sorted(owners)}...")
+        async with asyncio.TaskGroup() as group:
+            for db_name, sg in owners.items():
+                group.create_task(delete_and_wait(db_name, sg))
 
-    if sg.using_rosmar:
-        bucket_names = {entry.bucket for entry in dbs.values()}
+    # Rosmar bucket data outlives the database that used it, and each node has its own.
+    for sg, bucket_names in rosmar_buckets.items():
         cbl_trace(f"🧹 {sg}: dropping Rosmar buckets {bucket_names}...")
         async with asyncio.TaskGroup() as group:
             for bucket_name in bucket_names:
                 group.create_task(sg.drop_rosmar_bucket(bucket_name))
 
 
-async def delete_all_buckets(cluster: CouchbaseCluster) -> None:
+async def clean_all_buckets(cluster: CouchbaseCluster) -> None:
     """
-    Delete every bucket in the given cluster, and wait for them to be gone.
+    Empty every bucket in the given cluster, the way the server's cleanup mode asks for.
 
-    Buckets are cluster-wide, so the deletes are issued against a single node. No-ops
-    for a cluster with no Couchbase Server nodes (e.g. Rosmar).
+    Purging keeps the bucket, so the next test reuses its collections and indexes instead of
+    paying to rebuild them, and the bucket pool caps how many are kept.  It removes every
+    document and every xattr, including the Sync Gateway tombstones that a query cannot see.
+    Deleting drops the bucket instead, and the next test creates a new one.
+
+    Buckets are cluster-wide, so the work is issued against a single node. No-ops for a
+    cluster with no Couchbase Server nodes (e.g. Rosmar).
     """
     if not cluster.couchbase_servers:
         return
@@ -124,12 +147,10 @@ async def delete_all_buckets(cluster: CouchbaseCluster) -> None:
     cbs = cluster.couchbase_servers[0]
     bucket_names = cbs.get_bucket_names()
     if not bucket_names:
-        cbl_trace(f"🧹 {cbs}: no buckets to delete")
+        cbl_trace(f"🧹 {cbs}: no buckets to clean")
         return
 
-    cbl_trace(f"🧹 {cbs}: found buckets {bucket_names}, deleting...")
-    for bucket_name in bucket_names:
-        cbs.drop_bucket(bucket_name)
-
-    cbl_trace(f"🧹 {cbs}: waiting for all buckets to be deleted...")
-    await cbs.wait_for_no_buckets()
+    cbl_trace(f"🧹 {cbs}: found buckets {bucket_names}, cleaning ({cbs.cleanup_mode})...")
+    async with asyncio.TaskGroup() as group:
+        for bucket_name in bucket_names:
+            group.create_task(cbs.clean_bucket(bucket_name))

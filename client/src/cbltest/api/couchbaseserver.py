@@ -4,8 +4,10 @@ import subprocess
 import tempfile
 import time
 import zipfile
+from collections import OrderedDict
 from collections.abc import Callable, Sequence
 from datetime import timedelta
+from enum import StrEnum
 from pathlib import Path
 from typing import TypeVar, cast
 
@@ -35,10 +37,109 @@ from couchbase.options import ClusterOptions, ClusterTimeoutOptions
 from couchbase.subdocument import upsert
 from opentelemetry.trace import get_tracer
 
+from cbltest import bucketpool
 from cbltest.api.error import CblTestError
-from cbltest.logging import cbl_warning
+from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
+
+
+class BucketCleanupMode(StrEnum):
+    """How the harness returns a Couchbase Server bucket to an empty state between tests."""
+
+    #: Drop the bucket and create a new one for the next test.
+    DELETE = "delete"
+
+    #: Empty the bucket in place and keep its scopes, collections and indexes.
+    PURGE = "purge"
+
+
+#: How many buckets may exist on the cluster at once when buckets are reused.
+MAX_BUCKETS = 10
+
+
+class BucketPool:
+    """
+    Tracks the buckets on one Couchbase Server cluster and caps how many exist at once.
+
+    Only :attr:`BucketCleanupMode.PURGE` needs a pool.  Purging keeps a bucket alive after
+    every test, so without a cap the cluster collects one bucket per distinct name a run
+    asks for.  The pool adopts buckets it did not create, so a run that was interrupted
+    before its buckets were cleaned up does not push the cluster over the cap.
+    """
+
+    def __init__(self, server: "CouchbaseServer", max_buckets: int = MAX_BUCKETS) -> None:
+        """
+        :param server: The Couchbase Server node the pool creates and deletes buckets through
+        :param max_buckets: The most buckets that may exist at once (default 10)
+        """
+        if max_buckets < 1:
+            raise ValueError(f"max_buckets must be at least 1, got {max_buckets}")
+
+        self.__server = server
+        self.__max_buckets = max_buckets
+        # Least recently used first, so the head is what gets evicted.
+        self.__buckets: OrderedDict[str, None] = OrderedDict()
+
+    @property
+    def max_buckets(self) -> int:
+        """The most buckets that may exist on the cluster at once."""
+        return self.__max_buckets
+
+    @property
+    def bucket_names(self) -> list[str]:
+        """The buckets the pool knows about, least recently used first."""
+        return list(self.__buckets)
+
+    def create_bucket(
+        self,
+        name: str,
+        num_replicas: int = 0,
+        retries: int = 60,
+        interval: float = 2.0,
+    ) -> bool:
+        """
+        Returns a ready bucket with the given name, creating it if the cluster does not have
+        one already.  If the cluster is at its bucket cap, the least recently used bucket is
+        deleted first to make room.
+
+        :param name: The name of the bucket
+        :param num_replicas: The number of replicas for the bucket (default 0)
+        :param retries: Number of readiness checks to perform (default 60)
+        :param interval: Seconds to wait between checks (default 2.0)
+        :return: True if the bucket was created, False if it already existed
+        """
+        self.__adopt_existing()
+        if name not in self.__buckets:
+            self.__make_room()
+
+        created = self.__server._create_bucket(name, num_replicas, retries, interval)
+        self.__buckets[name] = None
+        self.__buckets.move_to_end(name)
+        return created
+
+    def __adopt_existing(self) -> None:
+        """
+        Lines the pool up with the cluster: buckets that are gone are forgotten, and buckets
+        the pool never created are adopted as the oldest, so they are evicted first.
+        """
+        existing = set(self.__server.get_bucket_names())
+
+        for name in [name for name in self.__buckets if name not in existing]:
+            del self.__buckets[name]
+
+        for name in existing:
+            if name not in self.__buckets:
+                self.__buckets[name] = None
+                self.__buckets.move_to_end(name, last=False)
+
+    def __make_room(self) -> None:
+        """Deletes least recently used buckets until one more bucket fits under the cap."""
+        while len(self.__buckets) >= self.__max_buckets:
+            oldest, _ = self.__buckets.popitem(last=False)
+            cbl_info(f"Bucket pool is full ({self.__max_buckets}), deleting '{oldest}' to make room")
+            self.__server.delete_bucket(oldest)
+            self.__server._block_until_bucket_deleted(oldest)
 
 
 class CouchbaseServer:
@@ -99,7 +200,19 @@ class CouchbaseServer:
         if not self.wait_for_cluster_healthy(timeout=120):
             raise CblTestError("CBS cluster did not become healthy")
 
-    def __init__(self, url: str, username: str, password: str) -> None:
+    def __init__(
+        self,
+        url: str,
+        username: str,
+        password: str,
+        cleanup_mode: BucketCleanupMode = BucketCleanupMode.PURGE,
+    ) -> None:
+        """
+        :param url: The URL of any node in the cluster
+        :param username: The administrator username to connect with
+        :param password: The administrator password to connect with
+        :param cleanup_mode: How buckets are emptied between tests (default purge)
+        """
         self.__tracer = get_tracer(__name__, VERSION)
         with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
             if "://" not in url:
@@ -107,6 +220,7 @@ class CouchbaseServer:
 
             # Parse URL to extract hostname and REST port
             self._parse_connection_url(url)
+            self.__url = url
 
             auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(
@@ -131,6 +245,10 @@ class CouchbaseServer:
             self.__http_session = requests.Session()
             self.__http_session.auth = (username, password)
 
+            self.__cleanup_mode = cleanup_mode
+            # Deleting a bucket between tests leaves nothing to reuse, so nothing needs capping.
+            self.__bucket_pool = BucketPool(self) if cleanup_mode is BucketCleanupMode.PURGE else None
+
     def _parse_connection_url(self, url: str) -> None:
         """
         Parse connection URL to extract hostname and REST port.
@@ -152,6 +270,19 @@ class CouchbaseServer:
         :return: The hostname
         """
         return self.__hostname
+
+    @property
+    def cleanup_mode(self) -> BucketCleanupMode:
+        """How :func:`clean_bucket` empties a bucket between tests."""
+        return self.__cleanup_mode
+
+    @property
+    def bucket_pool(self) -> BucketPool | None:
+        """
+        The pool that caps how many buckets exist on this cluster at once, or None when
+        buckets are deleted between tests and there is nothing to reuse.
+        """
+        return self.__bucket_pool
 
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),
@@ -237,13 +368,36 @@ class CouchbaseServer:
         interval: float = 2.0,
     ) -> bool:
         """
-        Creates a bucket with a given name that Sync Gateway can use
+        Creates a bucket with a given name that Sync Gateway can use, reusing an existing
+        bucket of that name if the cluster still has one.
+
+        In :attr:`BucketCleanupMode.PURGE` this goes through :attr:`bucket_pool`, so asking
+        for a bucket when the cluster is already at its cap deletes the least recently used
+        one to make room.
 
         :param name: The name of the bucket to create
         :param num_replicas: The number of replicas for the bucket (default 0)
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
         :return: True if the bucket was created, False if it already existed
+        """
+        if self.__bucket_pool is not None:
+            return self.__bucket_pool.create_bucket(name, num_replicas, retries, interval)
+
+        return self._create_bucket(name, num_replicas, retries, interval)
+
+    def _create_bucket(
+        self,
+        name: str,
+        num_replicas: int = 0,
+        retries: int = 60,
+        interval: float = 2.0,
+    ) -> bool:
+        """
+        Creates a bucket without consulting the pool.
+
+        Not public: callers want :func:`create_bucket`, which keeps the cluster under its
+        bucket cap.  This exists for :class:`BucketPool` to call once it has made room.
         """
         with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
             mgr = self.__cluster.buckets()
@@ -302,18 +456,61 @@ class CouchbaseServer:
         count = self.indexes_count(bucket)
         assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
 
-    def drop_bucket(self, name: str) -> None:
+    def delete_bucket(self, name: str) -> None:
         """
-        Drops a bucket from the Couchbase cluster
+        Removes a bucket, and everything in it, from the Couchbase cluster.
 
-        :param name: The name of the bucket to drop
+        Between tests call :func:`clean_bucket` instead, which follows :attr:`cleanup_mode`.
+        Delete a bucket when a test needs it to be gone, or when the bucket pool needs room.
+
+        :param name: The name of the bucket to delete
         """
-        with self.__tracer.start_as_current_span("drop_bucket", attributes={"cbl.bucket.name": name}):
+        with self.__tracer.start_as_current_span("delete_bucket", attributes={"cbl.bucket.name": name}):
             try:
                 mgr = self.__cluster.buckets()
                 mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
+
+    async def clean_bucket(self, name: str) -> None:
+        """
+        Returns a bucket to an empty state, the way :attr:`cleanup_mode` asks for.
+
+        In delete mode the bucket is dropped and this waits until the cluster reports it
+        gone.  In purge mode the documents go but the bucket, its scopes, its collections
+        and its indexes stay, so the next test does not pay to rebuild them.
+
+        :param name: The name of the bucket to empty
+        """
+        if self.__cleanup_mode is BucketCleanupMode.PURGE:
+            await self.purge_bucket(name)
+            return
+
+        self.delete_bucket(name)
+        await self.wait_for_bucket_deleted(name)
+
+    async def purge_bucket(self, name: str, timeout: float = 120.0) -> str:
+        """
+        Removes every document, and every xattr, from all collections of a bucket.  The
+        bucket, its scopes, its collections and its indexes stay as they are.
+
+        A Sync Gateway tombstone is a deleted document that still carries a ``_sync`` xattr.
+        Neither a query nor a key/value read can see one, so the work is done over a DCP feed
+        by the ``bucketpool`` helper, downloaded into ``tests/.tools``.
+
+        :param name: The name of the bucket to empty
+        :param timeout: Seconds the feed and the purge together are allowed to take
+        :return: A one line summary of how many documents were seen and purged
+        """
+        with self.__tracer.start_as_current_span("purge_bucket", attributes={"cbl.bucket.name": name}):
+            return await bucketpool.purge_bucket(
+                connection_string=self.__url,
+                management_url=f"http://{self.__hostname}:8091",
+                username=self.__username,
+                password=self.__password,
+                bucket=name,
+                timeout=timeout,
+            )
 
     def bucket_healthy(self, bucket_name: str) -> bool:
         """
@@ -363,6 +560,16 @@ class CouchbaseServer:
             buckets_data = buckets_resp.json()
             return [bucket["name"] for bucket in buckets_data]
 
+    def _check_bucket_deleted(self, bucket_name: str) -> None:
+        """Asserts that the cluster no longer reports the bucket."""
+        try:
+            # If bucket no longer exists, deletion is complete
+            still_present = self.bucket_healthy(bucket_name)
+        except Exception:
+            # Treat errors as "bucket gone"
+            return
+        assert not still_present, f"bucket '{bucket_name}' is still present"
+
     async def wait_for_bucket_deleted(
         self,
         bucket_name: str,
@@ -375,13 +582,7 @@ class CouchbaseServer:
         """
 
         async def _wait_for_bucket_deleted_poll() -> None:
-            try:
-                # If bucket no longer exists, deletion is complete
-                still_present = self.bucket_healthy(bucket_name)
-            except Exception:
-                # Treat errors as "bucket gone"
-                return
-            assert not still_present, f"bucket '{bucket_name}' is still present"
+            self._check_bucket_deleted(bucket_name)
 
         with self.__tracer.start_as_current_span(
             "wait_for_bucket_deleted", attributes={"cbl.bucket.name": bucket_name}
@@ -392,23 +593,23 @@ class CouchbaseServer:
                 tenacity.stop_after_attempt(max_retries),
             )
 
-    async def wait_for_no_buckets(
+    def _block_until_bucket_deleted(
         self,
+        bucket_name: str,
         max_retries: int = 30,
         retry_delay: float = 2.0,
     ) -> None:
         """
-        Waits for the Couchbase cluster to have no buckets at all.
-        Async because deletion is eventual and requires polling remote state.
+        Blocks until the cluster stops reporting the bucket.
+
+        Not public: callers running in an event loop want :func:`wait_for_bucket_deleted`.
+        This exists for :class:`BucketPool`, which evicts buckets from synchronous code.
         """
-
-        async def _wait_for_no_buckets_poll() -> None:
-            bucket_names = self.get_bucket_names()
-            assert not bucket_names, f"Cluster still has buckets: {bucket_names}"
-
-        with self.__tracer.start_as_current_span("wait_for_no_buckets"):
-            await async_retry_assert(
-                _wait_for_no_buckets_poll,
+        with self.__tracer.start_as_current_span(
+            "wait_for_bucket_deleted", attributes={"cbl.bucket.name": bucket_name}
+        ):
+            retry_assert(
+                lambda: self._check_bucket_deleted(bucket_name),
                 tenacity.wait_fixed(retry_delay),
                 tenacity.stop_after_attempt(max_retries),
             )
@@ -424,7 +625,7 @@ class CouchbaseServer:
         reset_expired_ttl: bool = False,
     ) -> None:
         """
-        Restores a bucket from a backup source
+        Restores a bucket from a backup source, replacing whatever the bucket held before.
 
         :param name: The name of the bucket to restore
         :param backup_source: The path to the backup source
@@ -472,6 +673,9 @@ class CouchbaseServer:
                     "-p",
                     self.__password,
                     "--auto-create-buckets",
+                    # Without this, cbbackupmgr skips every document the cluster holds a
+                    # newer copy of, and the tombstones a purge leaves behind always are.
+                    "--force-updates",
                     "--no-progress-bar",
                     "--disable-ft-indexes",  # requires access to private ports
                     "--disable-gsi-indexes",  # requires access to private ports

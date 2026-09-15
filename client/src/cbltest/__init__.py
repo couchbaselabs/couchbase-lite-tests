@@ -4,7 +4,7 @@ from json import dumps
 from cbltest.api.error import CblTestError
 
 from .api.cluster import CouchbaseCluster
-from .api.couchbaseserver import CouchbaseServer
+from .api.couchbaseserver import BucketCleanupMode, CouchbaseServer
 from .api.edgeservermanager import EdgeServerManager
 from .api.syncgateway import SyncGateway
 from .api.syncgatewaycluster import SyncGatewayCluster
@@ -130,8 +130,9 @@ class CBLPyTest:
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
+        bucket_cleanup: BucketCleanupMode = BucketCleanupMode.PURGE,
     ) -> "CBLPyTest":
-        ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version)
+        ret_val = CBLPyTest(config, log_level, extra_props_path, test_server_only, dataset_version, bucket_cleanup)
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
@@ -155,6 +156,7 @@ class CBLPyTest:
         extra_props_path: str | None = None,
         test_server_only: bool = False,
         dataset_version: str = "4.0",
+        bucket_cleanup: BucketCleanupMode = BucketCleanupMode.PURGE,
     ) -> None:
         self.__config = config
         self.__log_level = LogLevel(log_level)
@@ -190,7 +192,12 @@ class CBLPyTest:
             for cbs in self.__config.couchbase_servers:
                 cbs_info = CouchbaseServerInfo(cbs)
                 cluster_builder.add_entry(
-                    CouchbaseServer(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password),
+                    CouchbaseServer(
+                        cbs_info.hostname,
+                        cbs_info.admin_user,
+                        cbs_info.admin_password,
+                        bucket_cleanup,
+                    ),
                     cbs_info.cluster_index,
                 )
 

@@ -546,6 +546,7 @@ def resolve_sync_gateway_config(server: str, connstr: str | None, admin_user: st
 
     cbs_version = get_cbs_version(hostname, cbs_user, cbs_password)
     download_tool.download_tool(download_tool.ToolName.BackupManager, cbs_version)
+    download_tool.download_tool(download_tool.ToolName.BucketPool)
 
     if connstr:
         config_path = _write_patched_json(
