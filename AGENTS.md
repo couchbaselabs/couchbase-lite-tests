@@ -85,7 +85,9 @@ uv run environment/local/start_local.py --server rosmar --git-tag main
 - `client/pyproject.toml` — the `cbltest` package (hatchling build)
 
 Dependency groups in root:
+- `dev` — `pytest-repeat` + `pytest-randomly` for flake hunting, installed by default. The root `addopts = "-p no:randomly"` keeps `tests/` runs in file order (`client/tests` shuffles); see [tests/AGENTS.md](tests/AGENTS.md)
 - `lint` — `ty`, `ruff`, type stubs (use `uv run --group lint …`)
+- `dotnet-build` — `dotnetenv`, for building the .NET test server (use `uv run --group dotnet-build …`)
 
 AWS orchestrator scripts run from the root workspace — there is **no** separate `orchestrator` group.
 
