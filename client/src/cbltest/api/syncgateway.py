@@ -1300,13 +1300,74 @@ class _SyncGatewayBase:
             cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
             found.swap_rev(new_rev_id)
 
+    async def _bulk_update(
+        self,
+        db_name: str,
+        updates: list[DocumentUpdateEntry],
+        *,
+        scope: str,
+        collection: str,
+        wait_for_caching_feed: bool,
+        since: int | str | None = None,
+    ) -> None:
+        await self._rewrite_rev_ids(db_name, updates, scope, collection)
+
+        body = {"docs": [u.to_json() for u in updates]}
+
+        response = await self._send_request(
+            "post",
+            f"/{db_name}.{scope}.{collection}/_bulk_docs",
+            JSONDictionary(body),
+        )
+
+        if not wait_for_caching_feed:
+            return
+
+        assert isinstance(response, list), f"Bulk update returned {response!r}, not a JSON array"
+        entries = cast(list[dict], response)
+        assert entries, f"Bulk update of {len(updates)} documents returned no entries"
+        for entry in entries:
+            # _bulk_docs answers 201 even for writes it rejected
+            assert "error" not in entry, f"Bulk update was rejected: {dumps(entry)}"
+
+        # The last revision's wait covers the earlier ones
+        last = entries[-1]
+        doc_id = last.get("id")
+        assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
+        written = {"_id": doc_id}
+        if "rev" in last:
+            written["_rev"] = last["rev"]
+        if "cv" in last:
+            written["_cv"] = last["cv"]
+
+        # A batch can end on a deletion, which the feed reports as deleted rather than live
+        last_update = assert_not_null(
+            next((u for u in updates if u.id == doc_id), None),
+            f"Bulk update response names {doc_id}, which was not in the batch",
+        )
+
+        await self._document_with_sequence(
+            written,
+            db_name=db_name,
+            doc_id=doc_id,
+            scope=scope,
+            collection=collection,
+            tombstone=last_update.deleted,
+            since=since,
+        )
+
     async def update_documents(
         self,
         db_name: str,
         updates: list[DocumentUpdateEntry],
         scope: str = "_default",
         collection: str = "_default",
+        *,
         wait_for_caching_feed: bool = False,
+        since: int | str | None = None,
+        # Large enough that no _bulk_docs request is slow on its own, small enough that Sync
+        # Gateway is not asked to cache a huge batch in one go
+        batch_size: int = 500,
     ) -> None:
         """
         Sends a list of documents to be updated on Sync Gateway
@@ -1320,9 +1381,17 @@ class _SyncGatewayBase:
                                       any update Sync Gateway rejected.  A replication started straight
                                       after would otherwise read a feed that still has the documents at
                                       their previous revisions (default False)
-        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway rejected an update,
-            answered with no usable entries, or the feed never reported the last revision written
+        :param since: Only meaningful with `wait_for_caching_feed`. Optimizes the wait loop.
+        :param batch_size: Split the updates into batches of at most this many documents and send the
+                           batches in parallel (default 500).  Each batch is checked on its own, so
+                           `wait_for_caching_feed` waits for the last revision of every batch.  Pass a
+                           value larger than `updates` to send a single request
+        :raises ExceptionGroup: wrapping any batch's failure, as the batches run as a task group.
+        :raises ValueError: if `batch_size` is less than 1
         """
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+
         with self._tracer.start_as_current_span(
             "update_documents",
             attributes={
@@ -1331,50 +1400,24 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            await self._rewrite_rev_ids(db_name, updates, scope, collection)
+            if wait_for_caching_feed and since is None and len(updates) > batch_size:
+                # Every batch waits on the unfiltered feed, so read it once to bound those waits to
+                # this call's own writes instead of the whole collection once per batch
+                changes = await self.get_changes(db_name, scope, collection, log_response=False)
+                since = changes.last_seq
 
-            body = {"docs": [u.to_json() for u in updates]}
-
-            response = await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary(body),
-            )
-
-            if not wait_for_caching_feed:
-                return
-
-            assert isinstance(response, list), f"Bulk update returned {response!r}, not a JSON array"
-            entries = cast(list[dict], response)
-            assert entries, f"Bulk update of {len(updates)} documents returned no entries"
-            for entry in entries:
-                # _bulk_docs answers 201 even for writes it rejected
-                assert "error" not in entry, f"Bulk update was rejected: {dumps(entry)}"
-
-            # The last revision's wait covers the earlier ones
-            last = entries[-1]
-            doc_id = last.get("id")
-            assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
-            written = {"_id": doc_id}
-            if "rev" in last:
-                written["_rev"] = last["rev"]
-            if "cv" in last:
-                written["_cv"] = last["cv"]
-
-            # A batch can end on a deletion, which the feed reports as deleted rather than live
-            last_update = assert_not_null(
-                next((u for u in updates if u.id == doc_id), None),
-                f"Bulk update response names {doc_id}, which was not in the batch",
-            )
-
-            await self._document_with_sequence(
-                written,
-                db_name=db_name,
-                doc_id=doc_id,
-                scope=scope,
-                collection=collection,
-                tombstone=last_update.deleted,
-            )
+            async with asyncio.TaskGroup() as group:
+                for i in range(0, len(updates), batch_size):
+                    group.create_task(
+                        self._bulk_update(
+                            db_name,
+                            updates[i : i + batch_size],
+                            scope=scope,
+                            collection=collection,
+                            wait_for_caching_feed=wait_for_caching_feed,
+                            since=since,
+                        )
+                    )
 
     async def upsert_documents(
         self,

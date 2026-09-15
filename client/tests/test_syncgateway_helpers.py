@@ -14,6 +14,7 @@ import inspect
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 import pytest_asyncio
@@ -57,7 +58,9 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     against real ClientSession/ClientResponse objects. `specs` controls what the
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
-    polling loops like wait_for_db_online). `received` accumulates the headers of
+    polling loops like wait_for_db_online). Give every spec a `path` instead, and each
+    request is served by the specs whose path its target contains, in that order - requests
+    a test sends in parallel arrive in no fixed order. `received` accumulates the headers of
     every request the server saw (plus its target under `_URL_KEY`), so tests can assert on
     what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
@@ -69,9 +72,17 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     specs: list[dict] = []
     received: list[dict[str, str]] = []
 
+    def next_spec(url: str) -> dict:
+        keyed = [s for s in specs if "path" in s]
+        assert not keyed or len(keyed) == len(specs), "either every spec carries a path or none does"
+        matching = [i for i, s in enumerate(specs) if not keyed or s["path"] in url]
+        assert matching, f"No response spec matches {url}"
+        # The last one to match repeats, so a polling loop keeps being answered
+        return specs.pop(matching[0]) if len(matching) > 1 else specs[matching[0]]
+
     async def handle(request: web.Request) -> web.Response:
         received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url)})
-        spec = specs.pop(0) if len(specs) > 1 else specs[0]
+        spec = next_spec(str(request.rel_url))
         if "text" in spec:
             return web.Response(
                 status=spec["status"],
@@ -704,9 +715,69 @@ class TestWaitForCachingFeed:
         ]
         self._record_get_changes(sg, [])
 
-        with pytest.raises(AssertionError, match="rejected"):
+        # Every call sends its batches as a task group, so one batch fails the same way as many
+        with pytest.raises(ExceptionGroup) as failure:
             await sg.update_documents(
                 "db",
                 [DocumentUpdateEntry("doc0", None, {"foo": "bar"})],
                 wait_for_caching_feed=True,
             )
+
+        assert "rejected" in str(failure.value.exceptions[0])
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_since_bounds_the_feed_read(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Writing in a loop, the previous write's sequence keeps each batch's wait off the whole feed."""
+        sg, specs, _ = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"rows": []}},
+            {"status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]},
+        ]
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_documents(
+            "db",
+            [DocumentUpdateEntry("doc1", None, {"foo": "bar"})],
+            wait_for_caching_feed=True,
+            since=41,
+        )
+
+        assert len(calls) == 1, "the given bound needs no read to find one"
+        assert calls[0].get("since") == 41
+
+    # Two updates to one document, so each batch is answered by the same pair of specs
+    # however the parallel requests interleave.
+    _TWO_BATCH_UPDATES: ClassVar[list[DocumentUpdateEntry]] = [
+        DocumentUpdateEntry("doc1", None, {"foo": "bar"}),
+        DocumentUpdateEntry("doc1", "1-abc", {"foo": "baz"}),
+    ]
+    _TWO_BATCH_SPECS: ClassVar[list[dict]] = [
+        {"path": "_all_docs", "status": 200, "json": {"rows": [{"id": "doc1", "value": {"rev": "1-abc"}}]}},
+        {"path": "_bulk_docs", "status": 201, "json": [{"id": "doc1", "rev": "2-abc"}]},
+    ]
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_reads_its_own_bound_when_batching(self, sync_gateway: SyncGatewayFixture) -> None:
+        """Without a bound, one feed read serves every batch instead of each re-reading the collection."""
+        sg, specs, _ = sync_gateway
+        specs[:] = self._TWO_BATCH_SPECS
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_documents("db", self._TWO_BATCH_UPDATES, wait_for_caching_feed=True, batch_size=1)
+
+        assert len(calls) == 3, "one read to find the bound, then one wait per batch"
+        assert calls[0].get("since") is None, "the first read is the one finding the bound"
+        assert [c.get("since") for c in calls[1:]] == ["5", "5"], "both batches wait from that bound"
+
+    @pytest.mark.asyncio
+    async def test_bulk_update_finds_no_bound_when_not_waiting(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = self._TWO_BATCH_SPECS
+        calls: list[dict] = []
+        self._record_get_changes(sg, calls)
+
+        await sg.update_documents("db", self._TWO_BATCH_UPDATES, batch_size=1)
+
+        assert calls == [], "the default must not pay for a changes feed read"

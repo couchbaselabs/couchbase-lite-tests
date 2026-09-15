@@ -1,20 +1,17 @@
+import json
 import os
 import platform
 import subprocess
 import tempfile
 import time
 import zipfile
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
 from typing import TypeVar, cast
-
-import aiohttp
-
-T = TypeVar("T")
-import json
 from urllib.parse import quote_plus, urlparse
 
+import aiohttp
 import requests
 import tenacity
 from couchbase.auth import PasswordAuthenticator
@@ -39,6 +36,8 @@ from cbltest.api.error import CblTestError
 from cbltest.logging import cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
+
+T = TypeVar("T")
 
 
 class CouchbaseServer:
@@ -565,6 +564,58 @@ class CouchbaseServer:
                 coll.upsert(doc_id, document)
             except Exception as e:
                 raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}") from e
+
+    def update_documents(
+        self,
+        bucket: str,
+        documents: Mapping[str, dict],
+        scope: str = "_default",
+        collection: str = "_default",
+        *,
+        # Every operation in one upsert_multi shares the dispatch window, so anything still
+        # queued past the KV timeout fails.  Batches of this size measure as fast as one
+        # unbounded call
+        batch_size: int = 1000,
+    ) -> None:
+        """
+        Upserts a batch of documents into the specified bucket.scope.collection with multi
+        operations, which the SDK pipelines rather than sending one round trip per document.
+
+        :param bucket: The bucket name.
+        :param documents: The documents to write, keyed by document ID.
+        :param scope: The scope name.
+        :param collection: The collection name.
+        :param batch_size: Send the documents in batches of at most this many (default 1000).
+        :raises CblTestError: if the SDK rejected any document
+        :raises ValueError: if `batch_size` is less than 1
+        """
+        if batch_size < 1:
+            raise ValueError(f"batch_size must be at least 1, got {batch_size}")
+
+        with self.__tracer.start_as_current_span(
+            "update_documents",
+            attributes={
+                "cbl.bucket.name": bucket,
+                "cbl.scope.name": scope,
+                "cbl.collection.name": collection,
+                "cbl.document.count": len(documents),
+            },
+        ):
+            coll = self.get_bucket(bucket).scope(scope).collection(collection)
+            items = list(documents.items())
+            for i in range(0, len(items), batch_size):
+                batch = dict(items[i : i + batch_size])
+                result = coll.upsert_multi(batch)
+                if result.all_ok:
+                    continue
+
+                # upsert_multi collects per-document errors instead of raising them
+                failures = result.exceptions
+                raise CblTestError(
+                    f"Failed to update {len(failures)} of the {len(batch)} documents in this batch in "
+                    f"{bucket}.{scope}.{collection}, leaving {len(items) - i - len(batch)} not attempted: "
+                    + "; ".join(f"{doc_id}: {error}" for doc_id, error in failures.items())
+                )
 
     def delete_document(
         self,
