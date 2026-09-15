@@ -6,7 +6,6 @@ emits a single doc to greenboard with the full iteration history plus a
 ``failedAt`` marker pointing at the first failed step (if any).
 """
 
-import asyncio
 import json
 import sys
 from pathlib import Path
@@ -38,7 +37,7 @@ def cli_entry(config_path: str, results_file: str) -> None:
         return
 
     uploader = GreenboardUploader(gb["hostname"], gb["username"], gb["password"])
-    asyncio.run(uploader.upload_upgrade_batch(results_file))
+    uploader.upload_upgrade_batch(results_file)
 
 
 if __name__ == "__main__":

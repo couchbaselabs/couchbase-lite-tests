@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 from aiohttp import encode_basic_auth
+from cbltest.api.caddy import Caddy
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
@@ -76,8 +77,9 @@ def stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: EdgeServerManager) ->
     """Record what a manager sends to its sidecar, so nothing reaches the network."""
     calls: list[SidecarCall] = []
 
-    async def _call_sidecar(method: str, path: str, payload: JSONSerializable | None = None) -> None:
+    async def _call_sidecar(method: str, path: str, payload: JSONSerializable | None = None) -> str:
         calls.append((method, path, None if payload is None else payload.to_json()))
+        return ""
 
     monkeypatch.setattr(manager, "_call_sidecar", _call_sidecar)
     return calls
@@ -134,6 +136,34 @@ async def test_close_closes_every_client_handed_out(tmp_path: Path, monkeypatch:
             monkeypatch.setattr(client, "close", lambda client=client: close_one(client))
 
     assert closed == handed_out, "every client the manager handed out is closed with it"
+
+
+@pytest.mark.asyncio
+async def test_collect_logs_downloads_the_archive_the_sidecar_made(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloads: list[tuple[str, Path]] = []
+
+    async def fake_download(self: Caddy, filename: str, local_path: str | Path) -> Path:
+        downloads.append((filename, Path(local_path)))
+        return Path(local_path)
+
+    monkeypatch.setattr(Caddy, "download", fake_download)
+
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        manager = managers[0]
+        calls = stub_sidecar(monkeypatch, manager)
+
+        archive = await manager.collect_logs(tmp_path)
+
+    assert [(method, path) for method, path, _ in calls] == [("post", "/collect-logs")]
+    filename = calls[0][2]["filename"]
+    assert filename.startswith("es-collect-es-example-com-"), filename
+    assert filename.endswith(".tar.gz"), filename
+    assert downloads == [(f"collect/{filename}", tmp_path / filename)], (
+        "the archive is fetched from the collect directory through an Edge Server client's Caddy"
+    )
+    assert archive == tmp_path / filename
 
 
 @pytest.mark.asyncio

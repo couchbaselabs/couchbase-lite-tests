@@ -16,7 +16,6 @@ from cbltest.api.replicator_types import (
     WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import RemoteDocument
-from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
 from cbltest.plugins.cluster_cleanup import perform_cleanup
@@ -84,7 +83,7 @@ async def setup_upgrade_env(
 
     test_case.mark_test_step("Wait for SG to bring the restored database online.")
 
-    await SyncGatewayCluster(cblpytest.sync_gateways[:1]).wait_for_db_online("upgrade", max_retries=120, retry_delay=1)
+    await cblpytest.sync_gateway_cluster.wait_for_db_online("upgrade", max_retries=120, retry_delay=1)
 
     test_case.mark_test_step("Reset local database, and load `upgrade` dataset.")
     dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="upgrade")

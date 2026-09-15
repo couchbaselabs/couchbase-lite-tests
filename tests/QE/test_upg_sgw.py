@@ -86,7 +86,8 @@ class TestSgwUpgrade(CBLTestClass):
             # Also creates the backing bucket and collections.
             await cblpytest.clusters[0].create_database(sg_db, db_payload)
         else:
-            # Later phases inherit the bucket and database, so just wait for the nodes.
+            # A re-provisioned node serves the REST API before its database is online, so
+            # later phases have to wait for the nodes that inherited the database.
             await cblpytest.sync_gateway_cluster.wait_for_db_online(sg_db)
 
         self.mark_test_step("Create user1 for replication")
@@ -186,7 +187,7 @@ class TestSgwUpgrade(CBLTestClass):
 
         self.mark_test_step("Verify data persistence on CBS and CBL for all docs")
         for row in docs_before.rows:
-            cbs_doc = await cbs.get_document(bucket, row.id)
+            cbs_doc = cbs.get_document(bucket, row.id)
             assert cbs_doc is not None, f"Doc {row.id} not found on CBS"
             assert "version" in cbs_doc, f"Doc {row.id} missing 'version' field!"
             assert cbs_doc["type"] == "upgrade_test_doc", (

@@ -17,9 +17,9 @@ from urllib.parse import quote_plus, urlparse
 
 import requests
 import tenacity
-from acouchbase.bucket import Bucket
-from acouchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
+from couchbase.bucket import Bucket
+from couchbase.cluster import Cluster
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
@@ -99,43 +99,16 @@ class CouchbaseServer:
         if not self.wait_for_cluster_healthy(timeout=120):
             raise CblTestError("CBS cluster did not become healthy")
 
-    @staticmethod
-    async def create(url: str, username: str, password: str) -> "CouchbaseServer":
-        """
-        Creates an instance and connects it to the cluster.
-
-        :param url: The URL of any node in the cluster
-        :param username: The administrator username to connect with
-        :param password: The administrator password to connect with
-        """
-        ret_val = CouchbaseServer(url, username, password)
-        await ret_val.connect()
-        return ret_val
-
     def __init__(self, url: str, username: str, password: str) -> None:
         self.__tracer = get_tracer(__name__, VERSION)
-        if "://" not in url:
-            url = f"couchbase://{url}"
-
-        # Parse URL to extract hostname and REST port
-        self._parse_connection_url(url)
-
-        self.__url = url
-        self.__username = username
-        self.__password = password
-        self.__cluster: Cluster | None = None
-
-        # Create a reusable HTTP session for REST API calls
-        self.__http_session = requests.Session()
-        self.__http_session.auth = (username, password)
-
-    async def connect(self) -> None:
-        """
-        Opens the SDK connection to the cluster.  Separate from the constructor because
-        the async SDK can only connect from inside a running event loop.
-        """
         with self.__tracer.start_as_current_span("connect_to_couchbase_server"):
-            auth = PasswordAuthenticator(self.__username, self.__password)
+            if "://" not in url:
+                url = f"couchbase://{url}"
+
+            # Parse URL to extract hostname and REST port
+            self._parse_connection_url(url)
+
+            auth = PasswordAuthenticator(username, password)
             opts = ClusterOptions(
                 auth,
                 timeout_options=ClusterTimeoutOptions(
@@ -143,34 +116,20 @@ class CouchbaseServer:
                     dns_srv_timeout=timedelta(seconds=10)
                 ),
             )
+            self.__username = username
+            self.__password = password
             try:
-                self.__cluster = await Cluster.connect(self.__url, opts)
+                self.__cluster = Cluster(url, opts)
             except CouchbaseException as e:
                 cbl_warning(
-                    f"Initial connection to Couchbase Server {self.__url} with "
-                    f"username={self.__username} password=<redacted> failed with: {e}"
+                    f"Initial connection to Couchbase Server {url} with {username=} password=<redacted> failed with: {e}"
                 )
                 raise
+            self.__cluster.wait_until_ready(timedelta(seconds=10))
 
-            await self.__cluster.wait_until_ready(timedelta(seconds=10))
-
-    @property
-    def _cluster(self) -> Cluster:
-        """
-        The connected SDK cluster.
-        """
-        assert self.__cluster is not None, f"{self} is not connected, call connect() first"
-        return self.__cluster
-
-    async def close(self) -> None:
-        """
-        Closes the SDK connection to the cluster, and the REST session.
-        """
-        if self.__cluster is not None:
-            await self.__cluster.close()
-            self.__cluster = None
-
-        self.__http_session.close()
+            # Create a reusable HTTP session for REST API calls
+            self.__http_session = requests.Session()
+            self.__http_session.auth = (username, password)
 
     def _parse_connection_url(self, url: str) -> None:
         """
@@ -200,18 +159,16 @@ class CouchbaseServer:
         reraise=True,
         retry=tenacity.retry_if_exception_type(CouchbaseException),
     )
-    async def get_bucket(self, name: str) -> Bucket:
+    def get_bucket(self, name: str) -> Bucket:
         """
         Opens a bucket on the cluster, retrying while it is not yet available
         (e.g. shortly after creation).
 
         :param name: The name of the bucket to open
         """
-        bucket = self._cluster.bucket(name)
-        await bucket.on_connect()
-        return bucket
+        return self.__cluster.bucket(name)
 
-    async def create_collections(self, bucket: str, scope: str, names: list[str]) -> None:
+    def create_collections(self, bucket: str, scope: str, names: list[str]) -> None:
         """
         A function that will create a specified set of collections in the specified scope
         which resides in the specified bucket
@@ -225,11 +182,11 @@ class CouchbaseServer:
             "Create Scope",
             attributes={"cbl.scope.name": scope, "cbl.bucket.name": bucket},
         ):
-            bucket_obj = await self.get_bucket(bucket)
+            bucket_obj = self.get_bucket(bucket)
             c = bucket_obj.collections()
             try:
                 if scope != "_default":
-                    await c.create_scope(scope)
+                    c.create_scope(scope)
             except ScopeAlreadyExistsException:
                 pass
 
@@ -244,11 +201,11 @@ class CouchbaseServer:
                 ):
                     try:
                         if name != "_default":
-                            await c.create_collection(scope_name=scope, collection_name=name)
+                            c.create_collection(scope_name=scope, collection_name=name)
                     except CollectionAlreadyExistsException:
                         pass
 
-                await self._wait_for_collection_ready(bucket_obj, scope, name)
+                self._wait_for_collection_ready(bucket_obj, scope, name)
 
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),
@@ -256,7 +213,7 @@ class CouchbaseServer:
         reraise=True,
         retry=tenacity.retry_if_exception_type(CblTestError),
     )
-    async def _wait_for_collection_ready(self, bucket: Bucket, scope: str, name: str) -> None:
+    def _wait_for_collection_ready(self, bucket: Bucket, scope: str, name: str) -> None:
         """
         Probes a freshly created collection by reading a nonexistent document from it,
         retrying until the collection responds.
@@ -266,13 +223,13 @@ class CouchbaseServer:
         :param name: The name of the collection to probe
         """
         try:
-            await bucket.scope(scope).collection(name).get("_nonexistent")
+            bucket.scope(scope).collection(name).get("_nonexistent")
         except DocumentNotFoundException:
             pass
         except Exception as e:
             raise CblTestError(f"Unable to properly create {bucket.name}.{scope}.{name} in Couchbase Server") from e
 
-    async def create_bucket(
+    def create_bucket(
         self,
         name: str,
         num_replicas: int = 0,
@@ -289,7 +246,7 @@ class CouchbaseServer:
         :return: True if the bucket was created, False if it already existed
         """
         with self.__tracer.start_as_current_span("create_bucket", attributes={"cbl.bucket.name": name}):
-            mgr = self._cluster.buckets()
+            mgr = self.__cluster.buckets()
             settings = CreateBucketSettings(
                 name=name,
                 flush_enabled=True,
@@ -298,7 +255,7 @@ class CouchbaseServer:
             )
             newly_created = True
             try:
-                await mgr.create_bucket(settings)
+                mgr.create_bucket(settings)
             except BucketAlreadyExistsException:
                 newly_created = False
 
@@ -321,7 +278,7 @@ class CouchbaseServer:
         assert self.bucket_kv_responding(name), f"bucket '{name}' is not responding to KV stats requests"
         assert self.collections_ready(name), f"bucket '{name}' collection manifest is not available"
 
-    async def wait_for_indexes_removed(self, bucket: str) -> None:
+    def wait_for_indexes_removed(self, bucket: str) -> None:
         """
         CBL-4977: A bucket recreated with the same name can have stale indexes that are
         still being deleted asynchronously.  Sync Gateway will then wrongly detect that
@@ -335,18 +292,17 @@ class CouchbaseServer:
 
         :param bucket: The bucket to wait on
         """
-
-        async def _check_all_indexes_removed() -> None:
-            count = await self.indexes_count(bucket)
-            assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
-
-        await async_retry_assert(
-            _check_all_indexes_removed,
+        retry_assert(
+            lambda: self._check_all_indexes_removed(bucket),
             tenacity.wait_fixed(2),
             tenacity.stop_after_attempt(10),
         )
 
-    async def drop_bucket(self, name: str) -> None:
+    def _check_all_indexes_removed(self, bucket: str) -> None:
+        count = self.indexes_count(bucket)
+        assert count == 0, f"{count} indexes remain in '{bucket}' bucket"
+
+    def drop_bucket(self, name: str) -> None:
         """
         Drops a bucket from the Couchbase cluster
 
@@ -354,8 +310,8 @@ class CouchbaseServer:
         """
         with self.__tracer.start_as_current_span("drop_bucket", attributes={"cbl.bucket.name": name}):
             try:
-                mgr = self._cluster.buckets()
-                await mgr.drop_bucket(name)
+                mgr = self.__cluster.buckets()
+                mgr.drop_bucket(name)
             except BucketDoesNotExistException:
                 pass
 
@@ -533,18 +489,18 @@ class CouchbaseServer:
                     ]
                 subprocess.run(restore_args, check=True)
 
-    async def indexes_count(self, bucket: str) -> int:
+    def indexes_count(self, bucket: str) -> int:
         """
         Returns the number of indexes that are in the specified bucket
 
         :param bucket: The bucket to check for indexes
         """
         with self.__tracer.start_as_current_span("indexes_count", attributes={"cbl.bucket.name": bucket}):
-            index_mgr = self._cluster.query_indexes()
-            indexes = await index_mgr.get_all_indexes(bucket)
+            index_mgr = self.__cluster.query_indexes()
+            indexes = list(index_mgr.get_all_indexes(bucket))
             return len(indexes)
 
-    async def run_query(
+    def run_query(
         self,
         query: str,
         bucket: str,
@@ -566,18 +522,18 @@ class CouchbaseServer:
         """
         actual_query = query.format(f"{bucket}.{scope}.{collection}")
         with self.__tracer.start_as_current_span("run_query", attributes={"cbl.query.name": actual_query}):
-            query_obj = self._cluster.query(actual_query)
+            query_obj = self.__cluster.query(actual_query)
             try:
-                await self._cluster.query_indexes().create_primary_index(
+                self.__cluster.query_indexes().create_primary_index(
                     bucket,
                     CreatePrimaryQueryIndexOptions(scope_name=scope, collection_name=collection),
                 )
             except QueryIndexAlreadyExistsException:
                 pass
 
-            return [dict(result) async for result in query_obj.rows()]
+            return [dict(result) for result in query_obj.execute()]
 
-    async def upsert_document(
+    def upsert_document(
         self,
         bucket: str,
         doc_id: str,
@@ -604,13 +560,13 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = await self.get_bucket(bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
-                await coll.upsert(doc_id, document)
+                coll.upsert(doc_id, document)
             except Exception as e:
                 raise CblTestError(f"Failed to insert document '{doc_id}' into {bucket}.{scope}.{collection}") from e
 
-    async def delete_document(
+    def delete_document(
         self,
         bucket: str,
         doc_id: str,
@@ -630,15 +586,15 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = await self.get_bucket(bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
-                await coll.remove(doc_id)
+                coll.remove(doc_id)
             except DocumentNotFoundException:
                 pass
             except Exception as e:
                 raise CblTestError(f"Failed to delete document '{doc_id}' from {bucket}.{scope}.{collection}") from e
 
-    async def get_document(
+    def get_document(
         self,
         bucket: str,
         doc_id: str,
@@ -664,16 +620,16 @@ class CouchbaseServer:
             },
         ):
             try:
-                bucket_obj = await self.get_bucket(bucket)
+                bucket_obj = self.get_bucket(bucket)
                 coll = bucket_obj.scope(scope).collection(collection)
-                result = await coll.get(doc_id)
+                result = coll.get(doc_id)
                 return result.content_as[dict] if result else None
             except DocumentNotFoundException:
                 return None
             except Exception as e:
                 raise CblTestError(f"Failed to get document '{doc_id}' from {bucket}.{scope}.{collection}") from e
 
-    async def upsert_document_xattr(
+    def upsert_document_xattr(
         self,
         bucket: str,
         doc_id: str,
@@ -703,8 +659,8 @@ class CouchbaseServer:
             },
         ):
             try:
-                col = (await self.get_bucket(bucket)).scope(scope).collection(collection)
-                await col.mutate_in(
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
+                col.mutate_in(
                     doc_id,
                     [upsert(xattr_key, xattr_value, xattr=True, create_parents=True)],
                 )
@@ -713,7 +669,7 @@ class CouchbaseServer:
                     f"Failed to upsert xattr '{xattr_key}' on document '{doc_id}' in {bucket}.{scope}.{collection}"
                 ) from e
 
-    async def delete_document_xattr(
+    def delete_document_xattr(
         self,
         bucket: str,
         doc_id: str,
@@ -743,8 +699,8 @@ class CouchbaseServer:
             try:
                 from couchbase.subdocument import remove
 
-                col = (await self.get_bucket(bucket)).scope(scope).collection(collection)
-                await col.mutate_in(
+                col = self.get_bucket(bucket).scope(scope).collection(collection)
+                col.mutate_in(
                     doc_id,
                     [remove(xattr_key, xattr=True)],
                 )

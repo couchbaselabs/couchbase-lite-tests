@@ -47,6 +47,7 @@ explicit = true
 [dependency-groups]
 lint = ["ty>=0.0.72", "ruff>=0.16.3", "types-netifaces==0.11.0.20241025"]
 dotnet-build = ["dotnetenv"]
+dev = ["pytest-randomly==5.0.0", "pytest-repeat==0.9.4"]
 
 [tool.uv.workspace]
 members = ["client"]
@@ -55,6 +56,9 @@ members = ["client"]
 root = [".", "client/src", "tests"]
 
 [tool.pytest.ini_options]
+# Shuffling the suites this config covers is opt-in via `-p randomly`: they are slow enough that a
+# random order is worth asking for. client/tests has its own config and runs shuffled.
+addopts = "-p no:randomly"
 asyncio_default_fixture_loop_scope = "session"
 # "tests" puts tests/shared on the path
 pythonpath = ["tests"]
