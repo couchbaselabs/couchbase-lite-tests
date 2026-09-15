@@ -46,7 +46,10 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
     server = make_server()
     calls = stub_sidecar(monkeypatch, server)
 
-    archive = await server.collect_logs(tmp_path)
+    try:
+        archive = await server.collect_logs(tmp_path)
+    finally:
+        await server.close()
 
     assert [(method, path) for method, path, _, _ in calls] == [("post", "/collect-logs")]
     (_, _, body, timeout) = calls[0]
@@ -74,6 +77,9 @@ async def test_collect_logs_surfaces_warnings_without_failing(tmp_path: Path, mo
     server = make_server()
     stub_sidecar(monkeypatch, server, response='{"warnings": "some component was unreachable"}')
 
-    archive = await server.collect_logs(tmp_path)
+    try:
+        archive = await server.collect_logs(tmp_path)
+    finally:
+        await server.close()
 
     assert archive.suffix == ".zip"
