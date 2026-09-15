@@ -171,7 +171,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
 
             self.mark_test_step("Get changes for user from previous checkpoint and bob should receive a revocation")
             changes_after_revoke = await bob._send_request(
-                "get", f"/{db_name}._default._default/_changes", params={"since": checkpoint}
+                "get",
+                f"/{db_name}._default._default/_changes",
+                params={"since": checkpoint, "revocations": "true"},
             )
             revoked_ids = {entry["id"] for entry in changes_after_revoke["results"] if entry.get("removed")}
             assert "doc1" in revoked_ids
@@ -181,7 +183,9 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
 
             self.mark_test_step("Get changes again from the old checkpoint, no revocation should be sent")
             changes_after_compact = await bob._send_request(
-                "get", f"/{db_name}._default._default/_changes", params={"since": checkpoint}
+                "get",
+                f"/{db_name}._default._default/_changes",
+                params={"since": checkpoint, "revocations": "true"},
             )
             revoked_ids_after_compact = {
                 entry["id"] for entry in changes_after_compact["results"] if entry.get("removed")
