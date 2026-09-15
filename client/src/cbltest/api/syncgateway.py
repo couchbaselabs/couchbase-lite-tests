@@ -17,7 +17,7 @@ import packaging.version
 import requests
 import tenacity
 from aiohttp import ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
-from aiohttp.client_exceptions import ClientConnectorError
+from aiohttp.client_exceptions import ClientConnectorError, ClientError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
@@ -2202,7 +2202,9 @@ class SyncGateway(_SyncGatewayBase):
         async def _wait_for_rest_api_poll() -> None:
             try:
                 await self._send_request("get", "/_ping")
-            except (CblSyncGatewayBadResponseError, ClientConnectorError) as exc:
+            # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
+            # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
+            except (CblSyncGatewayBadResponseError, ClientError, OSError) as exc:
                 raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
 
         await async_retry_assert(
