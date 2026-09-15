@@ -58,15 +58,7 @@ class TestXattrs(CBLTestClass):
                     )
                 )
 
-            batch_size = 500
-            for batch_start in range(0, num_docs, batch_size):
-                batch_end = min(batch_start + batch_size, num_docs)
-                await sg.update_documents(
-                    sg_db,
-                    sg_docs[batch_start:batch_end],
-                    scope="_default",
-                    collection="_default",
-                )
+            await sg.update_documents(sg_db, sg_docs, scope="_default", collection="_default")
 
             self.mark_test_step("Verify all SG docs were created successfully and store revisions, versions")
             sg_all_docs = await sg_user.get_all_documents(sg_db)
@@ -77,7 +69,7 @@ class TestXattrs(CBLTestClass):
             if supports_version_vectors:
                 original_vv = {row.id: row.cv for row in sg_all_docs.rows}
 
-        self.mark_test_step("Stop Sync Gateway")
+        self.mark_test_step("Delete the Sync Gateway database")
         await cluster.sync_gateway_cluster.delete_database(sg_db)
 
         self.mark_test_step("Update all SG docs via SDK")
@@ -104,17 +96,15 @@ class TestXattrs(CBLTestClass):
             }
             cbs.upsert_document(bucket_name, doc_id, doc_body, "_default", "_default")
 
-        self.mark_test_step("Restart Sync Gateway (recreate database endpoint)")
+        self.mark_test_step("Restart Sync Gateway database")
         await cluster.sync_gateway_cluster.create_database(sg_db, db_payload)
-        async with sg.create_user_client(sg_db, username, password, ["SG", "SDK"]) as sg_user:
+        async with sg.create_user_client(sg_db, username, password, ["SG", "SDK"]):
             self.mark_test_step("Verify revisions, versions and contents of all documents")
             sgw_docs_now, sdk_docs_now = 0, 0
             content_errors = []
             for doc_id in sg_doc_ids + sdk_doc_ids:
                 doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if doc is None:
-                    content_errors.append(f"SG doc {doc_id} not found")
-                elif doc.id.startswith("sg_"):
+                if doc.id.startswith("sg_"):
                     sgw_docs_now += 1
                     if doc.body.get("updated_by_sdk") is not True:
                         content_errors.append(f"SG doc {doc_id} missing 'updated_by_sdk' flag")
@@ -171,15 +161,7 @@ class TestXattrs(CBLTestClass):
                     )
                 )
 
-            batch_size = 500
-            for batch_start in range(0, num_docs, batch_size):
-                batch_end = min(batch_start + batch_size, num_docs)
-                await sg.update_documents(
-                    sg_db,
-                    sg_docs[batch_start:batch_end],
-                    scope="_default",
-                    collection="_default",
-                )
+            await sg.update_documents(sg_db, sg_docs, scope="_default", collection="_default")
 
             self.mark_test_step(f"Bulk create {num_docs} docs via SDK")
             sdk_doc_ids: list[str] = []
@@ -222,7 +204,7 @@ class TestXattrs(CBLTestClass):
 
             for doc_id in docs_to_delete:
                 sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if sg_doc is not None and sg_doc.revid is not None:
+                if sg_doc.revid is not None:
                     await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
             self.mark_test_step("Verify deleted docs visible in changes feed with new revision")
@@ -363,7 +345,7 @@ class TestXattrs(CBLTestClass):
                         cbs.upsert_document(bucket_name, doc_id, sdk_doc, "_default", "_default")
 
             self.mark_test_step("Verify SDK docs don't contain _sync metadata")
-            for doc_id in sdk_doc_ids[:5]:
+            for doc_id in sdk_doc_ids:
                 sdk_doc = cbs.get_document(bucket_name, doc_id, "_default", "_default")
                 if sdk_doc is not None:
                     assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
@@ -373,10 +355,9 @@ class TestXattrs(CBLTestClass):
                 sg_docs_to_update: list[DocumentUpdateEntry] = []
                 for doc_id in sg_doc_ids:
                     sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                    if sg_doc is not None:
-                        updated_body = sg_doc.body.copy()
-                        updated_body["content"]["updates"] += 1
-                        sg_docs_to_update.append(DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body))
+                    updated_body = sg_doc.body.copy()
+                    updated_body["content"]["updates"] += 1
+                    sg_docs_to_update.append(DocumentUpdateEntry(doc_id, sg_doc.revid, updated_body))
                 await sg.update_documents(sg_db, sg_docs_to_update, "_default", "_default")
 
             self.mark_test_step("Verify SDK sees all doc updates")
@@ -388,13 +369,12 @@ class TestXattrs(CBLTestClass):
                     )
 
             self.mark_test_step(f"Verify '{username}' sees all doc updates via _all_docs (public API)")
-            all_docs_updated = await sg_user.get_all_documents(sg_db)
+            all_docs_updated = await sg_user.get_all_documents(sg_db, include_docs=True)
             for row in all_docs_updated.rows:
-                sg_doc = await sg.get_document(sg_db, row.id, "_default", "_default")
-                if sg_doc is not None:
-                    assert sg_doc.body["content"]["updates"] == num_updates + 1, (
-                        f"SG doc {sg_doc.id} should have {num_updates + 1} updates, got {sg_doc.body['content']['updates']}"
-                    )
+                assert row.doc is not None, f"SG doc {row.id} should have a body in _all_docs"
+                assert row.doc["content"]["updates"] == num_updates + 1, (
+                    f"SG doc {row.id} should have {num_updates + 1} updates, got {row.doc['content']['updates']}"
+                )
 
             self.mark_test_step("Verify SDK docs still don't contain _sync after updates")
             for doc_id in sdk_doc_ids:
@@ -409,7 +389,7 @@ class TestXattrs(CBLTestClass):
             self.mark_test_step("Bulk delete sg docs via Sync Gateway")
             for doc_id in sg_doc_ids:
                 sg_doc = await sg.get_document(sg_db, doc_id, "_default", "_default")
-                if sg_doc is not None and sg_doc.revid is not None:
+                if sg_doc.revid is not None:
                     await sg.delete_document(doc_id, sg_doc.revid, sg_db, "_default", "_default")
 
             self.mark_test_step("Verify SDK sees all docs as deleted")
@@ -505,7 +485,7 @@ class TestXattrs(CBLTestClass):
                     doc_id = random.choice(docs_remaining)
                     try:
                         sg_doc = await sg.get_document(sg_db, doc_id)
-                        if sg_doc is None or sg_doc.body.get("sg_updates", 0) >= num_updates:
+                        if sg_doc.body.get("sg_updates", 0) >= num_updates:
                             docs_remaining.remove(doc_id)
                             continue
 
@@ -523,7 +503,7 @@ class TestXattrs(CBLTestClass):
                     await asyncio.sleep(0.01)  # Small delay to normalize rate
 
             def update_from_sdk() -> None:
-                """Update documents from SDK side with CAS"""
+                """Update documents from SDK side"""
                 docs_remaining = list(all_doc_ids)
                 while docs_remaining:
                     doc_id = random.choice(docs_remaining)
@@ -534,13 +514,9 @@ class TestXattrs(CBLTestClass):
 
                     # Ensure no _sync metadata in SDK docs
                     assert "_sync" not in sdk_doc, f"SDK doc {doc_id} contains _sync"
-                    try:
-                        sdk_doc["sdk_updates"] = sdk_doc.get("sdk_updates", 0) + 1
-                        sdk_doc["updates"] = sdk_doc.get("updates", 0) + 1
-                        cbs.upsert_document(bucket_name, doc_id, sdk_doc)
-                    except Exception:
-                        # CAS mismatch or other error, retry
-                        continue
+                    sdk_doc["sdk_updates"] = sdk_doc.get("sdk_updates", 0) + 1
+                    sdk_doc["updates"] = sdk_doc.get("updates", 0) + 1
+                    cbs.upsert_document(bucket_name, doc_id, sdk_doc)
 
             # Run concurrent updates
             await asyncio.gather(update_from_sg(), asyncio.to_thread(update_from_sdk))
@@ -579,10 +555,6 @@ class TestXattrs(CBLTestClass):
                     doc_id = random.choice(docs_to_delete)
                     try:
                         sg_doc = await sg.get_document(sg_db, doc_id)
-                        if sg_doc is None:
-                            docs_to_delete.remove(doc_id)
-                            continue
-
                         if sg_doc.revid is not None:
                             await sg.delete_document(doc_id, sg_doc.revid, sg_db)
                             deleted_count += 1
@@ -605,14 +577,9 @@ class TestXattrs(CBLTestClass):
                 docs_to_delete = list(all_doc_ids)
                 while docs_to_delete:
                     doc_id = random.choice(docs_to_delete)
-                    try:
-                        cbs.delete_document(bucket_name, doc_id)
-                        deleted_count += 1
-                        docs_to_delete.remove(doc_id)
-                    except Exception:
-                        # Document not found, must have been deleted by SG
-                        docs_to_delete.remove(doc_id)
-                        continue
+                    cbs.delete_document(bucket_name, doc_id)
+                    deleted_count += 1
+                    docs_to_delete.remove(doc_id)
                     await asyncio.sleep(0.01)
                 return deleted_count
 
@@ -720,7 +687,7 @@ class TestXattrs(CBLTestClass):
             self.mark_test_step(f"Concurrently update xattrs to '{sg_channel2}' while querying docs")
 
             async def update_xattrs_and_docs() -> None:
-                """Update xattrs to change channel assignment, then trigger import"""
+                """Update xattrs to move every doc into the second channel"""
                 for doc_id in sdk_doc_ids:
                     cbs.upsert_document_xattr(
                         bucket_name,
@@ -732,21 +699,25 @@ class TestXattrs(CBLTestClass):
                     )
 
             async def query_as_user2() -> None:
-                """Repeatedly query as user2 to trigger sync function processing"""
+                """Read the changes feed as user2 while the xattrs are being rewritten"""
                 for _ in range(20):
                     await sg_user2.get_changes(sg_db)
                     await asyncio.sleep(0.1)
 
-            await asyncio.gather(update_xattrs_and_docs(), query_as_user2())
+            # The xattr writes still run to completion before the queries start: the Couchbase SDK
+            # calls are synchronous, so these only truly interleave once that SDK is async.
+            async with asyncio.TaskGroup() as tg:
+                tg.create_task(update_xattrs_and_docs())
+                tg.create_task(query_as_user2())
 
             self.mark_test_step("Delete _sync xattrs to force complete re-processing")
             for doc_id in sdk_doc_ids:
                 cbs.delete_document_xattr(bucket_name, doc_id, "_sync", "_default", "_default")
 
-            self.mark_test_step("Restart Sync Gateway to force re-import with updated xattrs")
+            self.mark_test_step("Restart Sync Gateway database")
             await cblpytest.sync_gateway_cluster.update_database_config(sg_db, db_payload)
 
-            # Recreate users after database restart
+            # Re-issue the channel grants so each user's changes feed backfills the re-imported docs
             await sg.reset_user(sg_db, username1, password, [sg_channel1])
             await sg.reset_user(sg_db, username2, password, [sg_channel2])
 

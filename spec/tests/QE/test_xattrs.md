@@ -6,12 +6,12 @@ Test that documents written by Sync Gateway can be updated via SDK and successfu
 
 1. Configure Sync Gateway database endpoint
 2. Create user 'vipul' with access to SG and SDK channels
-3. Bulk create 1000 docs via Sync Gateway
+3. Bulk create 100 docs via Sync Gateway
 4. Verify all SG docs were created successfully and store revisions, versions
-5. Stop Sync Gateway
+5. Delete the Sync Gateway database
 6. Update all SG docs via SDK
-7. Write 1000 new docs via SDK
-8. Restart Sync Gateway (recreate database endpoint)
+7. Write 100 new docs via SDK
+8. Restart Sync Gateway database
 9. Verify revisions, versions and contents of all documents
 
 ## test_purge
@@ -20,8 +20,8 @@ Test purging functionality with XATTR-based documents created via both Sync Gate
 
 1. Configure Sync Gateway database endpoint
 2. Create user 'vipul' with access to channels
-3. Bulk create 1000 docs via Sync Gateway
-4. Bulk create 1000 docs via SDK
+3. Bulk create 100 docs via Sync Gateway
+4. Bulk create 100 docs via SDK
 5. Get all docs via Sync Gateway and save revisions
 6. Store original version vectors for SG docs (optional)
 7. Get all docs via SDK and verify count
@@ -82,6 +82,6 @@ Test concurrent xattr updates and xattr-based channel assignment.
 5. Verify user 'vipul' can see all docs in channel 'abc'
 6. Concurrently update xattrs to 'xyz' while querying docs
 7. Delete _sync xattrs to force complete re-processing
-8. Restart Sync Gateway to force re-import with updated xattrs
+8. Restart Sync Gateway database
 9. Verify user 'lupiv' can now see all docs
 10. Verify user 'vipul' can no longer see any docs
