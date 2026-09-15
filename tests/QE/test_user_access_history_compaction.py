@@ -175,7 +175,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
                 f"/{db_name}._default._default/_changes",
                 params={"since": checkpoint, "revocations": "true"},
             )
-            revoked_ids = {entry["id"] for entry in changes_after_revoke["results"] if entry.get("removed")}
+            revoked_ids = {entry["id"] for entry in changes_after_revoke["results"] if entry.get("revoked")}
             assert "doc1" in revoked_ids
 
             self.mark_test_step("Compact access history")
@@ -188,7 +188,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
                 params={"since": checkpoint, "revocations": "true"},
             )
             revoked_ids_after_compact = {
-                entry["id"] for entry in changes_after_compact["results"] if entry.get("removed")
+                entry["id"] for entry in changes_after_compact["results"] if entry.get("revoked")
             }
             assert not revoked_ids_after_compact
 
