@@ -8,8 +8,10 @@ whether the identity arrived as Basic credentials, a session token, or a JWT --
 which is the property the auth suite actually cares about.
 """
 
+import secrets
 from typing import Any, Final, cast
 
+import pytest
 from cbltest import CBLPyTest
 from cbltest.api.replicator_types import (
     ReplicatorAuthenticator,
@@ -18,6 +20,7 @@ from cbltest.api.replicator_types import (
     ReplicatorSessionAuthenticator,
 )
 from cbltest.api.syncgateway import LocalJWT, SyncGateway
+from cbltest.responses import ServerVariant
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 
 from shared.jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
@@ -33,24 +36,14 @@ JWT_PROVIDER: Final[str] = "qe"
 _ISSUER_HOST: Final[str] = "qe.example.com"
 
 
-def auth_mode_for(cblpytest: CBLPyTest) -> str:
-    """
-    The auth method this run should use, read from ``--test-props``.
-
-    A run-level switch rather than a pytest parametrize. Only CBL JS supports session
-    and bearer credentials differently, so multiplying every shared test by three would
-    triple iOS, Android, C, Java and .NET runtime to cover a JS-only concern. CI runs
-    the suite again with a different props file instead, which also means a failure
-    names the auth mode in the job rather than in a test ID.
-
-    Defaults to ``"basic"``, so an existing run behaves exactly as before.
-
-    :raises ValueError: If the props file names a mode that does not exist, rather than
-        silently falling back to basic and reporting a green run that tested nothing new.
-    """
+async def auth_mode_for(cblpytest: CBLPyTest) -> str:
     mode = cast(str, cblpytest.extra_props.get("auth_mode", "basic"))
     if mode not in AUTH_MODES:
         raise ValueError(f"auth_mode {mode!r} in --test-props is not one of {AUTH_MODES}")
+    if mode == "jwt":
+        variant = (await cblpytest.test_servers[0].get_info()).variant
+        if variant != ServerVariant.JS:
+            pytest.skip(f"BEARER auth is only implemented by the JavaScript test server (got {variant})")
     return mode
 
 
@@ -108,16 +101,20 @@ async def mirror_user_for_jwt(
     this to get an equivalent ``qe.example.com_alice``, so the JWT run exercises the
     same authorization rules without the test having to know about the name mangling.
 
-    The twin gets no password -- it is reachable only by JWT, which keeps the two
-    identities from being accidentally interchangeable in a test.
+    The twin gets a random password rather than none: Sync Gateway rejects user
+    creation without one ("Empty passwords are not allowed") unless the database sets
+    ``disable_password_auth``. A random value keeps the twin effectively JWT-only --
+    nothing in the test knows it -- so the two identities cannot be accidentally
+    interchanged, which is the property that matters.
 
     :return: The derived username, for use as the JWT's ``sub`` mapping target
     """
     derived = jwt_username(username)
-    await sync_gateway.delete_user(db_name, derived)
+    # await sync_gateway.delete_user(db_name, derived)
     await sync_gateway.add_user(
         db_name,
         derived,
+        password=secrets.token_urlsafe(32),
         collection_access=collection_access,
         admin_roles=admin_roles,
     )

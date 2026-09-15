@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import FunctionType
 
 import pytest
 from cbltest import CBLPyTest
@@ -8,21 +9,62 @@ from cbltest.api.database import Database, SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
-    ReplicatorBasicAuthenticator,
+    ReplicatorAuthenticator,
     ReplicatorDocumentFlags,
     WaitForDocumentEventEntry,
 )
+from shared.auth_helpers import (
+    auth_mode_for,
+    configure_jwt_provider,
+    describe_auth,
+    make_authenticator,
+)
+
+# The grants the `todo` dataset gives each user. Channel access is empty -- visibility is
+# driven by the sync function and by roles -- but the collections must still be listed so a
+# JWT twin is created against the same keyspaces.
+_TODO_ACCESS = {
+    "_default": {
+        "lists": {"admin_channels": []},
+        "tasks": {"admin_channels": []},
+        "users": {"admin_channels": []},
+    }
+}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestFest(CBLTestClass):
+    """
+    The TestFest suite, run under whichever auth method the run selects.
+
+    These tests are about channel and role driven visibility -- who can see a shared list --
+    so running them under session and bearer credentials checks that authorization does not
+    depend on the authentication mechanism.
+
+    Note that `setup_test_fest_repls` issues credentials for **two** users. On a bearer run
+    the local_jwt provider is configured once, before either is issued, and both tokens are
+    signed by that one key. Configuring it per credential would re-key the provider and
+    invalidate the token issued moments earlier.
+    """
+
+    def setup_method(self, method: FunctionType) -> None:
+        super().setup_method(method)
+        #: Roles assigned per user by setup_test_fest_cluster, so the JWT twins created in
+        #: setup_test_fest_repls can mirror them. Reset per test via setup_method rather
+        #: than a class attribute, so one test's roles cannot leak into another's twins.
+        #: Note this cannot be an __init__ -- pytest refuses to collect a test class that
+        #: defines one.
+        self._fest_roles: dict[str, list[str]] = {}
+
     async def setup_test_fest_cluster(
         self, cluster: CouchbaseCluster, dataset_path: Path, roles: dict[str, list[str]]
     ) -> CouchbaseCluster:
         sync_gateway = cluster.sync_gateways[0]
         self.mark_test_step("Reset SG and load todo dataset")
         await cluster.configure_dataset(dataset_path, "todo")
+
+        self._fest_roles = roles
 
         for user, user_roles in roles.items():
             self.mark_test_step(f"Assign roles '{', '.join(user_roles)}' to the user '{user}'")
@@ -48,11 +90,37 @@ class TestFest(CBLTestClass):
 
     async def setup_test_fest_repls(
         self,
+        cblpytest: CBLPyTest,
         cluster: CouchbaseCluster,
         dbs: tuple[Database, Database],
         users: tuple[str, str] = ("user1", "user1"),
     ) -> tuple[Replicator, Replicator]:
         sync_gateway = cluster.sync_gateways[0]
+
+        auth_mode = await auth_mode_for(cblpytest)
+        # Configure the provider once, before either credential is issued -- see the class
+        # docstring. Inert for basic and session runs.
+        jwt_key = await configure_jwt_provider(sync_gateway, "todo") if auth_mode == "jwt" else None
+
+        async def credential(username: str) -> ReplicatorAuthenticator:
+            return await make_authenticator(
+                sync_gateway,
+                "todo",
+                username,
+                "pass",
+                auth_mode,
+                collection_access=_TODO_ACCESS,
+                admin_roles=self._fest_roles.get(username, []),
+                jwt_key=jwt_key,
+            )
+
+        self.mark_test_step(
+            f"Authenticating {dbs[0].name} as {describe_auth(auth_mode, users[0])} "
+            f"and {dbs[1].name} as {describe_auth(auth_mode, users[1])}"
+        )
+        auth1 = await credential(users[0])
+        auth2 = await credential(users[1])
+
         self.mark_test_step(f"""
                 Create a replicator
                     * endpoint: /todo
@@ -69,7 +137,7 @@ class TestFest(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             collections=[ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
-            authenticator=ReplicatorBasicAuthenticator(users[0], "pass"),
+            authenticator=auth1,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -90,7 +158,7 @@ class TestFest(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             collections=[ReplicatorCollectionEntry(["_default.lists", "_default.tasks", "_default.users"])],
-            authenticator=ReplicatorBasicAuthenticator(users[1], "pass"),
+            authenticator=auth2,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -111,7 +179,7 @@ class TestFest(CBLTestClass):
             },
         )
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2))
 
         self.mark_test_step("Snapshot db1")
         snap1 = await db1.create_snapshot(
@@ -244,7 +312,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cblpytest.clusters[0], (db1, db2))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cblpytest.clusters[0], (db1, db2))
 
         self.mark_test_step("Snapshot db2")
         snap2 = await db2.create_snapshot(
@@ -388,7 +456,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2))
 
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
@@ -498,7 +566,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2))
 
         self.mark_test_step("Create a list and two tasks in db1")
         async with db1.batch_updater() as b:
@@ -657,7 +725,7 @@ class TestFest(CBLTestClass):
             },
         )
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Create a list and a task in db1")
         async with db1.batch_updater() as b:
@@ -770,7 +838,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap = await db2.create_snapshot(
@@ -910,7 +978,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot(
@@ -1099,7 +1167,7 @@ class TestFest(CBLTestClass):
         cloud = cblpytest.clusters[0]
         await self.setup_test_fest_cluster(cloud, dataset_path, {"user1": ["lists.user1.db1-list1.contributor"]})
         db1, db2 = await self.setup_test_fest_dbs(cblpytest)
-        repl1, repl2 = await self.setup_test_fest_repls(cloud, (db1, db2), ("user1", "user2"))
+        repl1, repl2 = await self.setup_test_fest_repls(cblpytest, cloud, (db1, db2), ("user1", "user2"))
 
         self.mark_test_step("Snapshot documents in db2")
         snap2 = await db2.create_snapshot(

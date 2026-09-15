@@ -36,7 +36,7 @@ from tqdm import tqdm
 
 from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
 from environment.aws.common.output import header
-from environment.aws.common.x509_certificate import create_cert
+from environment.aws.common.x509_certificate import CertKeyPair, create_cert
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -208,7 +208,33 @@ def remote_exec_bg(ssh: paramiko.SSHClient, command: str, desc: str) -> None:
     click.echo()
 
 
-def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadInfo) -> None:
+def create_shared_ca() -> tuple[CertKeyPair, CertKeyPair]:
+    """
+    Create the CA and client certificate shared by every Edge Server in the topology.
+
+    Previously both were minted inside setup_server, so each host ended up with its own
+    CA. That is fine while every mTLS connection originates from the test runner, but it
+    makes Edge-Server-to-Edge-Server mTLS impossible: a client certificate issued on one
+    host is signed by a CA the other has never heard of.
+
+    Creating them once here gives all hosts a common trust root, so any Edge Server can
+    present its client certificate to any other.
+
+    Returns:
+        (ca, client) -- the CA pair and the shared client certificate pair.
+    """
+    ca = create_cert("EdgeTestCA", is_ca=True)
+    client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
+    return ca, client
+
+
+def setup_server(
+    hostname: str,
+    pkey: paramiko.Ed25519Key,
+    es_info: EsDownloadInfo,
+    ca: CertKeyPair,
+    client: CertKeyPair,
+) -> None:
     """
     Set up an Edge Server on an EC2 instance.
 
@@ -250,9 +276,9 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
         )
 
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    ca = create_cert("EdgeTestCA", is_ca=True)
+    # The server certificate is still per-host (its CN is the hostname), but the CA and
+    # client certificate are shared across the topology -- see create_shared_ca.
     cert = create_cert(hostname, ca, usages=[ExtendedKeyUsageOID.SERVER_AUTH])
-    client = create_cert("test-client", ca, usages=[ExtendedKeyUsageOID.CLIENT_AUTH])
     ca_cert = ca.pem_bytes()
     cert_pem = cert.pem_bytes()
     key_pem = cert.private_pem_bytes()
@@ -287,6 +313,11 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     sftp_progress_bar(sftp, Path("/tmp/es_cert.pem"), "/home/ec2-user/cert/es_cert.pem")
     sftp_progress_bar(sftp, Path("/tmp/es_key.pem"), "/home/ec2-user/cert/es_key.pem")
     sftp_progress_bar(sftp, Path("/tmp/ca_cert.pem"), "/home/ec2-user/cert/ca_cert.pem")
+    # Also place the shared client certificate on the host, so an Edge Server can act as
+    # an mTLS *client* when replicating from another Edge Server. Without these, only the
+    # test runner can open an mTLS connection.
+    sftp_progress_bar(sftp, client_cert_path, "/home/ec2-user/cert/client_cert.pem")
+    sftp_progress_bar(sftp, client_key_path, "/home/ec2-user/cert/client_key.pem")
     sftp_progress_bar(
         sftp,
         SCRIPT_DIR / "config" / "config.json",
@@ -356,7 +387,9 @@ def main(topology: TopologyConfig) -> None:
     if len(topology.edge_servers) == 0:
         return
 
+    ca, client = create_shared_ca()
+
     for es in topology.edge_servers:
         es_info = EsDownloadInfo(es.version)
         download_es_package(es_info)
-        setup_server(es.hostname, topology.ssh_key, es_info)
+        setup_server(es.hostname, topology.ssh_key, es_info, ca, client)

@@ -11,17 +11,31 @@ from cbltest.api.database import Database
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
 from cbltest.jsonhelper import json_equivalent
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
+
+# The grants the `travel` dataset gives user1, from dataset/sg/travel-sg-config.json.
+_TRAVEL_ACCESS = {
+    "travel": {coll: {"admin_channels": ["*"]} for coll in ("airlines", "routes", "airports", "landmarks", "hotels")}
+}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestQueryConsistency(CBLTestClass):
+    """
+    Query results compared between Couchbase Lite and Couchbase Server.
+
+    Authentication is incidental here -- it only gets the data into the local database
+    once, in the shared fixture below. Running under session or bearer credentials is
+    still worth it as a cheap check that the seeding replication works under them, but a
+    failure in these tests almost certainly means a query difference, not an auth problem.
+    """
+
     __database: Database | None = None
 
     @pytest_asyncio.fixture(autouse=True)
@@ -36,6 +50,13 @@ class TestQueryConsistency(CBLTestClass):
         await cloud.configure_dataset(dataset_path, "travel")
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Seeding the local database, authenticating with {describe_auth(auth_mode, 'user1')}")
+
         replicator = Replicator(
             dbs[0],
             sync_gateway.replication_url("travel"),
@@ -51,7 +72,7 @@ class TestQueryConsistency(CBLTestClass):
                 )
             ],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()

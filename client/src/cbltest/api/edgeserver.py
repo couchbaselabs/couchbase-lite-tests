@@ -108,11 +108,6 @@ class EdgeServerSession:
         return self.__session_id
 
     @property
-    def cookie_name(self) -> str:
-        """The cookie the token should be presented in"""
-        return self.__cookie_name
-
-    @property
     def expires(self) -> str | None:
         """When the session expires, if the server said"""
         return self.__expires
@@ -125,12 +120,10 @@ class EdgeServerSession:
     def __init__(
         self,
         session_id: str,
-        cookie_name: str = "SyncGatewaySession",
         expires: str | None = None,
         one_time: bool = False,
     ) -> None:
         self.__session_id = session_id
-        self.__cookie_name = cookie_name
         self.__expires = expires
         self.__one_time = one_time
 
@@ -145,7 +138,6 @@ class EdgeServerSession:
 
         return cls(
             session_id=cast(str, session_id),
-            cookie_name=cast(str, body.get("cookie_name", "SyncGatewaySession")),
             expires=cast("str | None", body.get("expires")),
             one_time=one_time,
         )
@@ -1109,26 +1101,23 @@ class EdgeServer:
             assert isinstance(resp, dict), f"Unexpected _session response: {resp}"
             return EdgeServerSession.parse_response(cast(dict, resp), one_time=one_time)
 
-    async def get_session(self, db_name: str, session: "EdgeServerSession") -> dict:
+    async def delete_session(self, db_name: str, username: str, password: str) -> None:
         """
-        Returns the session's own details via ``GET /{db}/_session``.
-        """
-        with self.__tracer.start_as_current_span("es_get_session", attributes={"cbl.database.name": db_name}):
-            client = self._create_session(self.scheme, self.__hostname, self.__port, None)
-            client.headers["Cookie"] = f"{session.cookie_name}={session.session_id}"
-            resp = await self._send_request("get", f"/{db_name}/_session", session=client)
-            assert isinstance(resp, dict)
-            return cast(dict, resp)
+        Revokes the caller's session via ``DELETE /{db}/_session``.
 
-    async def delete_session(self, db_name: str, session: "EdgeServerSession") -> None:
-        """
-        Revokes a session via ``DELETE /{db}/_session``.
+        Per the Edge Server session design, this endpoint identifies the caller by Basic
+        auth and revokes *their* session -- the token itself is not a credential outside
+        the `_blipsync` upgrade, so presenting it here returns 401.
         """
         with self.__tracer.start_as_current_span("es_delete_session", attributes={"cbl.database.name": db_name}):
-            try:
-                client = self._create_session(self.scheme, self.__hostname, self.__port, None)
-                client.headers["Cookie"] = f"{session.cookie_name}={session.session_id}"
-                await self._send_request("delete", f"/{db_name}/_session", session=client)
-            except CblEdgeServerBadResponseError as e:
-                if e.code != 404:
-                    raise e
+            async with self._create_session(
+                self.scheme,
+                self.__hostname,
+                self.__port,
+                encode_basic_auth(username, password, "ascii"),
+            ) as user_session:
+                try:
+                    await self._send_request("delete", f"/{db_name}/_session", session=user_session)
+                except CblEdgeServerBadResponseError as e:
+                    if e.code != 404:
+                        raise

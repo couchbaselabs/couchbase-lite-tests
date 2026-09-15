@@ -9,18 +9,30 @@ from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
     ReplicatorType,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
+
+# The grants the `names` dataset gives user1, from dataset/sg/names-sg-config.json.
+_NAMES_ACCESS = {"_default": {"_default": {"admin_channels": ["*"]}}}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestCustomConflict(CBLTestClass):
+    """
+    Custom conflict resolution, run under whichever auth method the run selects.
+
+    Each test builds its authenticator once and shares it across every replicator it
+    starts -- several of these tests start three or four. Issuing a second credential on a
+    bearer run would reconfigure the database's local_jwt provider with a fresh keypair
+    and invalidate the token the earlier replicators are still using.
+    """
+
     async def do_custom_conflict_test(
         self,
         cblpytest: CBLPyTest,
@@ -37,20 +49,25 @@ class TestCustomConflict(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: pull
                 * continuous: false
-                * credentials: user1/pass
         """)
         replicator = Replicator(
             db,
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -94,7 +111,6 @@ class TestCustomConflict(CBLTestClass):
                 * collections : `_default._default`
                 * type: pull
                 * continuous: false
-                * credentials: user1/pass
                 * conflictResolver: '{conflict_resolver.name}'{resolver_params}
         """)
         replicator = Replicator(
@@ -102,7 +118,7 @@ class TestCustomConflict(CBLTestClass):
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"], conflict_resolver=conflict_resolver)],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -128,20 +144,26 @@ class TestCustomConflict(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator for all four replicators in this test -- see the class docstring.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: pull
                 * continuous: false
-                * credentials: user1/pass
         """)
         replicator = Replicator(
             db,
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -198,7 +220,6 @@ class TestCustomConflict(CBLTestClass):
                 * collections : `_default._default`
                 * type: pull
                 * continuous: false
-                * credentials: user1/pass
                 * conflictResolver: 'local-wins'
         """)
         replicator = Replicator(
@@ -211,7 +232,7 @@ class TestCustomConflict(CBLTestClass):
                     conflict_resolver=ReplicatorConflictResolver("local-wins"),
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -232,7 +253,6 @@ class TestCustomConflict(CBLTestClass):
                 * collections : `_default._default`
                 * type: push
                 * continuous: false
-                * credentials: user1/pass
                 * conflictResolver: 'local-wins'
         """)
         replicator = Replicator(
@@ -245,7 +265,7 @@ class TestCustomConflict(CBLTestClass):
                     conflict_resolver=ReplicatorConflictResolver("local-wins"),
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -285,7 +305,6 @@ class TestCustomConflict(CBLTestClass):
                 * collections : `_default._default`
                 * type: push/pull
                 * continuous: false
-                * credentials: user1/pass
                 * conflictResolver: 'local-wins'
                 * reset: true
         """)
@@ -300,7 +319,7 @@ class TestCustomConflict(CBLTestClass):
                     conflict_resolver=ReplicatorConflictResolver("local-wins"),
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()

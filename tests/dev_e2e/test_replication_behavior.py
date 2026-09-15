@@ -9,16 +9,28 @@ from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
 from cbltest.utils import assert_not_null, retry_assert
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
+
+# The grants the `names` dataset gives user1, from dataset/sg/names-sg-config.json.
+_NAMES_ACCESS = {"_default": {"_default": {"admin_channels": ["*"]}}}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationBehavior(CBLTestClass):
+    """
+    Replication edge cases -- active-only pulls and resurrected documents -- under the
+    run's auth method.
+
+    Each test builds one authenticator and shares it across every replicator it starts, so
+    that a bearer run configures its local_jwt provider once rather than re-keying it
+    between credentials.
+    """
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_empty_database_active_only(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
@@ -38,6 +50,12 @@ class TestReplicationBehavior(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/names`
@@ -52,7 +70,7 @@ class TestReplicationBehavior(CBLTestClass):
             sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -86,6 +104,12 @@ class TestReplicationBehavior(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/names`
@@ -100,7 +124,7 @@ class TestReplicationBehavior(CBLTestClass):
             sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -175,7 +199,7 @@ class TestReplicationBehavior(CBLTestClass):
             sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )

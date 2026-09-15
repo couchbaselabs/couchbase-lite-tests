@@ -91,7 +91,7 @@
                 document.cookie = `autostart=${autostartBox.checked}`;
 
                 Server = new TestServer(deviceID);
-                await Server.logToConsole();
+                await Server.logToConsole("debug");
                 Server.delegate = new TDKImpl();
 
                 Server.onStateChange = (state) => {

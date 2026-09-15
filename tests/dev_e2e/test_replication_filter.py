@@ -8,7 +8,6 @@ from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorDocumentEntry,
     ReplicatorFilter,
@@ -16,12 +15,30 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.utils import assert_not_null
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
 from test_replication_filter_data import uk_and_france_doc_ids
+
+# Grants copied from the dataset configs. user2 in `names` deliberately has *no* channel
+# access -- test_replicate_public_channel depends on it seeing only the public `!` channel,
+# so its JWT twin must be granted nothing either.
+_TRAVEL_ACCESS = {
+    "travel": {coll: {"admin_channels": ["*"]} for coll in ("airlines", "routes", "airports", "landmarks", "hotels")}
+}
+_NAMES_ACCESS = {"_default": {"_default": {"admin_channels": ["*"]}}}
+_NAMES_NO_ACCESS: dict = {}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationFilter(CBLTestClass):
+    """
+    Document ID, channel and custom filters, under the run's auth method.
+
+    Each test builds one authenticator and shares it across every replicator it starts.
+    Issuing a second credential on a bearer run would re-key the local_jwt provider and
+    invalidate the token already in use.
+    """
+
     def validate_replicated_doc_ids(self, expected: set[str], actual: list[ReplicatorDocumentEntry]) -> None:
         for update in actual:
             assert update.document_id in expected, f"Unexpected document update not in filter: {update.document_id}"
@@ -39,6 +56,12 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Reset local database, and load `travel` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
+
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
 
         self.mark_test_step(
             """
@@ -65,7 +88,7 @@ class TestReplicationFilter(CBLTestClass):
                 ),
                 ReplicatorCollectionEntry(["travel.routes"], document_ids=["route_10", "route_20"]),
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -121,6 +144,12 @@ class TestReplicationFilter(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step(
             """
             Start a replicator: 
@@ -146,7 +175,7 @@ class TestReplicationFilter(CBLTestClass):
                 ),
                 ReplicatorCollectionEntry(["travel.landmarks"], document_ids=["landmark_10", "landmark_20"]),
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -211,6 +240,12 @@ class TestReplicationFilter(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step(
             """
             Start a replicator: 
@@ -233,7 +268,7 @@ class TestReplicationFilter(CBLTestClass):
                 ReplicatorCollectionEntry(["travel.airports"], channels=["United Kingdom", "France"]),
                 ReplicatorCollectionEntry(["travel.landmarks"], channels=["France"]),
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -331,6 +366,14 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Reset local database, and load `empty` dataset.")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
+
+        auth_mode = await auth_mode_for(cblpytest)
+        # user2 is granted nothing: this test checks that only the public `!`
+        # channel is visible, so the bearer twin must be equally unprivileged.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user2", "pass", auth_mode, collection_access=_NAMES_NO_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user2')}")
         snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "test_public")])
         snapshot_updater = SnapshotUpdater(snapshot_id)
 
@@ -365,7 +408,7 @@ class TestReplicationFilter(CBLTestClass):
             db,
             sync_gateway.replication_url("names"),
             ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         replicator.add_default_collection()
@@ -408,7 +451,7 @@ class TestReplicationFilter(CBLTestClass):
             db,
             sync_gateway.replication_url("names"),
             ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user2", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         replicator.add_default_collection()
@@ -437,6 +480,12 @@ class TestReplicationFilter(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step(
             """
             Start a replicator: 
@@ -461,7 +510,7 @@ class TestReplicationFilter(CBLTestClass):
                     push_filter=ReplicatorFilter("deletedDocumentsOnly"),
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -517,6 +566,12 @@ class TestReplicationFilter(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step(
             """
         Start a replicator:
@@ -541,7 +596,7 @@ class TestReplicationFilter(CBLTestClass):
                     pull_filter=ReplicatorFilter("deletedDocumentsOnly"),
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )

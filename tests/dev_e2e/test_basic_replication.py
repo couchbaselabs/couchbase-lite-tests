@@ -12,19 +12,36 @@ from cbltest.api.replicator import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.replicator_types import (
-    ReplicatorBasicAuthenticator,
-    ReplicatorDocumentFlags,
-)
+from cbltest.api.replicator_types import ReplicatorDocumentFlags
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
+
+# The grants each dataset gives user1, copied from dataset/sg/<name>-sg-config.json.
+# make_authenticator needs these so a bearer run's JWT twin sees the same channels; they
+# are inert for basic and session runs.
+_NAMES_ACCESS = {"_default": {"_default": {"admin_channels": ["*"]}}}
+_TRAVEL_ACCESS = {
+    "travel": {coll: {"admin_channels": ["*"]} for coll in ("airlines", "routes", "airports", "landmarks", "hotels")}
+}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestBasicReplication(CBLTestClass):
+    """
+    The core replication matrix, run under whichever auth method the run selects.
+
+    Authentication is incidental to what most of these tests assert -- they are about
+    push, pull, continuous mode and checkpoints. Running them under session and bearer
+    credentials is still worth it here, because this is the suite the JavaScript pipeline
+    executes: it is the broadest existing check that a non-Basic credential survives real
+    replication work, including the long-lived continuous replicators and the
+    reset-checkpoint flows that start a replicator twice.
+    """
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_non_existing_sg_collections(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `names` dataset")
@@ -35,6 +52,15 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Reset local database, and load `travel` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
+
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
 
         self.mark_test_step("""
             Start a replicator
@@ -49,7 +75,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[ReplicatorCollectionEntry(["travel.airlines"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -80,6 +106,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -93,7 +128,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PUSH,
             collections=[ReplicatorCollectionEntry(["travel.airlines", "travel.airports", "travel.hotels"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -126,6 +161,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -139,7 +183,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["travel.routes", "travel.landmarks", "travel.hotels"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -172,6 +216,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -195,7 +248,7 @@ class TestBasicReplication(CBLTestClass):
                     ]
                 )
             ],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -234,6 +287,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -250,7 +312,7 @@ class TestBasicReplication(CBLTestClass):
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             enable_document_listener=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -359,6 +421,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -375,7 +446,7 @@ class TestBasicReplication(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_document_listener=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -538,6 +609,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/travel`
@@ -564,7 +644,7 @@ class TestBasicReplication(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             continuous=True,
             enable_document_listener=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -902,6 +982,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator: 
                 * endpoint: `/names`
@@ -914,7 +1003,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -947,6 +1036,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/names`
@@ -959,7 +1057,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -992,6 +1090,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/names`
@@ -1004,7 +1111,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("names"),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -1037,6 +1144,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/travel`
@@ -1050,7 +1166,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.airlines"])],
             replicator_type=ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -1096,7 +1212,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.airlines"])],
             replicator_type=ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             reset=True,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
@@ -1131,6 +1247,15 @@ class TestBasicReplication(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        # One authenticator per test, reused by every replicator in it. Issuing a
+        # second one on a bearer run would reconfigure the local_jwt provider with a
+        # fresh keypair and invalidate the token already in use.
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("""
             Start a replicator:
                 * endpoint: `/travel`
@@ -1144,7 +1269,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.airports"])],
             replicator_type=ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -1191,7 +1316,7 @@ class TestBasicReplication(CBLTestClass):
             sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.airports"])],
             replicator_type=ReplicatorType.PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             reset=True,
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),

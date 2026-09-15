@@ -1,4 +1,6 @@
 from pathlib import Path
+from types import FunctionType
+from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
@@ -8,19 +10,71 @@ from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
-    ReplicatorBasicAuthenticator,
+    ReplicatorAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorDocumentFlags,
     ReplicatorFilter,
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
+from shared.auth_helpers import auth_mode_for, configure_jwt_provider, make_authenticator
+
+# The grants the `posts` dataset gives user1, from dataset/sg/posts-sg-config.json.
+_POSTS_ACCESS = {"_default": {"posts": {"admin_channels": ["group1", "group2"]}}}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationAutoPurge(CBLTestClass):
+    """
+    Auto-purge behaviour when channel access changes, under the run's auth method.
+
+    These tests repeatedly rewrite `user1` with `add_user` to grant and revoke channels,
+    which is what makes them worth running under session and bearer credentials: rewriting
+    a principal invalidates any session or JWT identity issued for it, so a client must
+    re-authenticate before its next connect. Basic credentials are re-sent on every connect
+    and never notice. Each `add_user` below is therefore followed by a fresh credential --
+    the same thing a real application would have to do.
+    """
+
+    def setup_method(self, method: FunctionType) -> None:
+        super().setup_method(method)
+        # Resolved lazily on first use and cached for the test, so that a bearer run
+        # configures its local_jwt provider exactly once. Re-configuring it would re-key
+        # the provider and invalidate tokens already handed to running replicators.
+        self._auth_mode: str | None = None
+        self._jwt_key: Any = None
+
+    async def _credential(
+        self,
+        cblpytest: CBLPyTest,
+        sync_gateway: SyncGateway,
+        collection_access: dict | None = None,
+        admin_roles: list[str] | None = None,
+    ) -> ReplicatorAuthenticator:
+        """
+        Issues a credential for user1 reflecting their current grants.
+
+        Safe to call repeatedly within a test: the JWT provider is configured once on the
+        first call and reused, so a credential issued later never invalidates an earlier one.
+        """
+        if self._auth_mode is None:
+            self._auth_mode = await auth_mode_for(cblpytest)
+            if self._auth_mode == "jwt":
+                self._jwt_key = await configure_jwt_provider(sync_gateway, "posts")
+
+        return await make_authenticator(
+            sync_gateway,
+            "posts",
+            "user1",
+            "pass",
+            self._auth_mode,
+            collection_access=collection_access if collection_access is not None else _POSTS_ACCESS,
+            admin_roles=admin_roles,
+            jwt_key=self._jwt_key,
+        )
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_remove_docs_from_channel_with_auto_purge_enabled(
         self, cblpytest: CBLPyTest, dataset_path: Path
@@ -51,7 +105,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -160,7 +214,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -186,6 +240,12 @@ class TestReplicationAutoPurge(CBLTestClass):
             {"_default.posts": ["group1"]}
         )
         await sync_gateway.add_user("posts", "user1", "pass", collection_access_dict)
+
+        # Rewriting the principal invalidates any session or bearer identity issued for it,
+        # so re-authenticate before reconnecting. A no-op for basic credentials.
+        replicator.authenticator = await self._credential(
+            cblpytest, sync_gateway, collection_access={"_default": {"posts": {"admin_channels": ["group1"]}}}
+        )
 
         self.mark_test_step("Start another replicator with the same config as above")
         replicator.enable_document_listener = True
@@ -230,6 +290,12 @@ class TestReplicationAutoPurge(CBLTestClass):
             {"_default.posts": ["group1", "group2"]}
         )
         await sync_gateway.add_user("posts", "user1", "pass", collection_access_dict)
+
+        # Rewriting the principal invalidates any session or bearer identity issued for it,
+        # so re-authenticate before reconnecting. A no-op for basic credentials.
+        replicator.authenticator = await self._credential(
+            cblpytest, sync_gateway, collection_access={"_default": {"posts": {"admin_channels": ["group1", "group2"]}}}
+        )
 
         self.mark_test_step("Start another replicator with the same config as above")
         replicator.clear_document_updates()
@@ -298,7 +364,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=False,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
@@ -352,7 +418,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_auto_purge=False,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -442,7 +508,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=False,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
@@ -486,7 +552,11 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_auto_purge=False,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            # The reduced grants matter here: on a bearer run the JWT maps to its own
+            # principal, so it must lose group2 alongside user1 or nothing is revoked.
+            authenticator=await self._credential(
+                cblpytest, sync_gateway, collection_access={"_default": {"posts": {"admin_channels": ["group1"]}}}
+            ),
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -554,7 +624,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl1.start()
@@ -620,7 +690,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             enable_document_listener=True,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
@@ -693,7 +763,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=auto_purge_enabled,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -718,6 +788,12 @@ class TestReplicationAutoPurge(CBLTestClass):
             "user1",
             "pass",
             {"_default": {"posts": {"admin_channels": ["group1"]}}},
+        )
+
+        # Rewriting the principal invalidates any session or bearer identity issued for it,
+        # so re-authenticate before reconnecting. A no-op for basic credentials.
+        replicator.authenticator = await self._credential(
+            cblpytest, sync_gateway, collection_access={"_default": {"posts": {"admin_channels": ["group1"]}}}
         )
 
         self.mark_test_step("Start another replicator with the same config as above")
@@ -833,7 +909,9 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=auto_purge_enabled,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            # post_6 is only visible through role1, so the identity must carry that role --
+            # otherwise a bearer run's twin sees five documents instead of six.
+            authenticator=await self._credential(cblpytest, sync_gateway, admin_roles=["role1"]),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -926,7 +1004,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
@@ -964,7 +1042,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=True,
             enable_document_listener=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
@@ -1052,7 +1130,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
@@ -1090,7 +1168,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
             enable_document_listener=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
@@ -1167,7 +1245,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             replicator_type=ReplicatorType.PULL,
             continuous=False,
             enable_auto_purge=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=await self._credential(cblpytest, sync_gateway),
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await repl.start()
@@ -1213,6 +1291,11 @@ class TestReplicationAutoPurge(CBLTestClass):
             "user1",
             "pass",
             collection_access={"_default": {"posts": {"admin_channels": ["group2"]}}},
+        )
+
+        # As above: the principal was rewritten, so re-authenticate before reconnecting.
+        repl.authenticator = await self._credential(
+            cblpytest, sync_gateway, collection_access={"_default": {"posts": {"admin_channels": ["group2"]}}}
         )
 
         self.mark_test_step("Snapshot the local db for post_1")

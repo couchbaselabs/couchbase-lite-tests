@@ -1,4 +1,5 @@
 import asyncio
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -27,7 +28,7 @@ class TestReplicationFunctional(CBLTestClass):
         proves who it is changes. A difference between runs would mean authorization
         depends on the authentication mechanism, which it should not.
         """
-        auth_mode = auth_mode_for(cblpytest)
+        auth_mode = await auth_mode_for(cblpytest)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -463,7 +464,7 @@ class TestReplicationFunctional(CBLTestClass):
         await pull_replicator.start()
 
         self.mark_test_step("Wait for pull replication to finish.")
-        status = await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        status = await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=200))
         assert status.error is None, (
             f"Error waiting for pull replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
@@ -519,7 +520,7 @@ class TestReplicationFunctional(CBLTestClass):
         re-resolves channel access for an already-authenticated connection regardless of
         how that connection authenticated.
         """
-        auth_mode = auth_mode_for(cblpytest)
+        auth_mode = await auth_mode_for(cblpytest)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

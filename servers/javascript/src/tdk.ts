@@ -409,7 +409,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         let colls: Record<string,cbl.CollectionConfig> = {};
         if (collections) {
             for (const coll of collections)
-                colls[coll] = {};
+                colls[normalizeCollectionID(coll)] = {};
         }
         this.#logger.info `Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
         const db = await cbl.Database.open({name: name, version: 1, collections: colls});

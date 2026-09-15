@@ -16,6 +16,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
+from shared.auth_helpers import auth_mode_for, configure_jwt_provider, describe_auth, make_authenticator
 
 
 async def update_cbl(cbl_db: Database, doc_id: str, data: list[dict[str, Any]]) -> None:
@@ -24,11 +25,30 @@ async def update_cbl(cbl_db: Database, doc_id: str, data: list[dict[str, Any]]) 
 
 
 @pytest.mark.cbl
-@pytest.mark.min_test_servers(3)
+@pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestNoConflicts(CBLTestClass):
+    """
+    Conflict behaviour when Sync Gateway and Couchbase Lite update the same document.
+
+    ``min_test_servers`` sits at 1 on the class so the single-CBL test can run on a
+    one-server topology; the two multi-CBL tests declare 3 for themselves. Previously the
+    class-level 3 meant all three skipped whenever fewer were configured, including the
+    one that did not need them.
+    """
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_sg_cbl_updates_concurrently_with_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        """
+        Concurrent SGW and CBL updates to one document, under the run's auth mode.
+
+        Conflict resolution should not depend on how the replicator authenticated. Running
+        the same flow under basic, session and bearer credentials checks that -- and in
+        particular that a long-lived continuous replicator keeps working on a session or
+        token for the duration, which a one-shot test would not reveal.
+        """
+        auth_mode = await auth_mode_for(cblpytest)
+
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -37,21 +57,28 @@ class TestNoConflicts(CBLTestClass):
         self.mark_test_step("Reset local database and load `posts` dataset")
         db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts"))[0]
 
-        self.mark_test_step("""
+        self.mark_test_step(f"""
             Start a replicator:
                 * endpoint: `/posts`
                 * collections: `_default.posts`
                 * type: pull
                 * continuous: true
-                * credentials: user1/pass
+                * credentials: {describe_auth(auth_mode, "user1")}
         """)
+        # Matches the grants the `posts` dataset gives user1, so the JWT twin created for
+        # a bearer run sees the same channels.
+        posts_access = {"_default": {"posts": {"admin_channels": ["group1", "group2"]}}}
+        jwt_key = await configure_jwt_provider(sync_gateway, "posts") if auth_mode == "jwt" else None
+        pull_auth = await make_authenticator(
+            sync_gateway, "posts", "user1", "pass", auth_mode, collection_access=posts_access, jwt_key=jwt_key
+        )
         replicator = Replicator(
             db,
             sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PULL,
             continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=pull_auth,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -100,14 +127,21 @@ class TestNoConflicts(CBLTestClass):
                 * collections: `_default.posts`
                 * type: push
                 * continuous: true
-                * credentials: user1/pass""")
+                * credentials: as above, independently issued""")
+        # A separate credential rather than the same object: two sessions or two tokens,
+        # so a token cached at the transport layer would show up as one replicator
+        # interfering with the other. That failure mode is specific to CBL JS, where the
+        # browser has a single cookie jar per origin.
+        push_auth = await make_authenticator(
+            sync_gateway, "posts", "user1", "pass", auth_mode, collection_access=posts_access
+        )
         replicator2 = Replicator(
             db,
             sync_gateway.replication_url("posts"),
             collections=[ReplicatorCollectionEntry(["_default.posts"])],
             replicator_type=ReplicatorType.PUSH,
             continuous=True,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=push_auth,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator2.start()
@@ -164,6 +198,7 @@ class TestNoConflicts(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
+    @pytest.mark.min_test_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -306,6 +341,7 @@ class TestNoConflicts(CBLTestClass):
         await cblpytest.test_servers[1].cleanup()
         await cblpytest.test_servers[2].cleanup()
 
+    @pytest.mark.min_test_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_multiple_cbls_updates_concurrently_with_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")

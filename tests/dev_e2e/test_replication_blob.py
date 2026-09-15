@@ -12,16 +12,31 @@ from cbltest.api.replicator import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
 from cbltest.utils import assert_not_null
+from shared.auth_helpers import auth_mode_for, describe_auth, make_authenticator
+
+# Grants copied from the dataset configs.
+_TRAVEL_ACCESS = {
+    "travel": {coll: {"admin_channels": ["*"]} for coll in ("airlines", "routes", "airports", "landmarks", "hotels")}
+}
+_NAMES_ACCESS = {"_default": {"_default": {"admin_channels": ["*"]}}}
 
 
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationBlob(CBLTestClass):
+    """
+    Blob replication, under the run's auth method.
+
+    Note that test_pull_non_blob_changes_with_delta_sync_and_compact excludes CBL JS, and
+    the bearer mode is only implemented by the JavaScript test server -- so that test and a
+    `jwt` run never coincide. It still converts cleanly, and runs under session credentials
+    on the native platforms.
+    """
+
     @pytest.mark.cbse(14861)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(
@@ -38,6 +53,12 @@ class TestReplicationBlob(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "travel", "user1", "pass", auth_mode, collection_access=_TRAVEL_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step(
             """
             Start a replicator:
@@ -53,7 +74,7 @@ class TestReplicationBlob(CBLTestClass):
             sync_gateway.replication_url("travel"),
             collections=[ReplicatorCollectionEntry(["travel.hotels"])],
             replicator_type=ReplicatorType.PUSH_AND_PULL,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
@@ -201,6 +222,12 @@ class TestReplicationBlob(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
+        auth_mode = await auth_mode_for(cblpytest)
+        authenticator = await make_authenticator(
+            sync_gateway, "names", "user1", "pass", auth_mode, collection_access=_NAMES_ACCESS
+        )
+        self.mark_test_step(f"Authenticating with {describe_auth(auth_mode, 'user1')}")
+
         self.mark_test_step("Create a document with a blob on the property `watermelon` with the contents of s10.jpg")
         async with db.batch_updater() as b:
             b.upsert_document("_default._default", "fruits", new_blobs={"watermelon": "s10.jpg"})
@@ -218,7 +245,7 @@ class TestReplicationBlob(CBLTestClass):
             sync_gateway.replication_url("names"),
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             replicator_type=ReplicatorType.PUSH,
-            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
