@@ -150,7 +150,10 @@ class TestSyncGatewayResync(CBLTestClass):
         try:
             await resync_node.wait_for_resync_running(db_name)
         except TimeoutError:
-            pytest.skip(f"Resync on '{db_name}' finished before it was seen running, so there is nothing to stop")
+            status = await resync_node.get_resync_status(db_name)
+            if status.status.value == "completed":
+                pytest.skip(f"Resync on '{db_name}' finished before it was seen running, so there is nothing to stop")
+            raise
 
         self.mark_test_step(f"Stop the resync operation on database '{db_name}'.")
         await resync_node.stop_resync(db_name)
