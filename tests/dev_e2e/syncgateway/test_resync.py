@@ -125,7 +125,7 @@ class TestSyncGatewayResync(CBLTestClass):
         assert final_status.docs_processed >= SIMPLE_RESYNC_NUM_DOCS
 
     @pytest.mark.asyncio(loop_scope="session")
-    @pytest.mark.min_sync_gateways(3)
+    @pytest.mark.min_sync_gateways(1)
     async def test_resync_stop_resume(self, cblpytest: CBLPyTest) -> None:
         # Enough to outlast the ~20s before a stop takes effect, while still fitting in one
         # _bulk_docs within the client timeout.

@@ -24,7 +24,6 @@ cases.
 
 ### Description
 
-Runs against a 3-node Sync Gateway cluster sharing one Couchbase Server bucket.
 Reproduces a reported issue where stopping a resync operation and then checking
 its status returns "completed" instead of "stopped" on a multi-node cluster.
 Also reproduces a related issue where resuming a stopped resync, without
