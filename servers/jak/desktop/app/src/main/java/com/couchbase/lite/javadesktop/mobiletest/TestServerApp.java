@@ -19,6 +19,7 @@ import com.couchbase.lite.mobiletest.Server;
 import com.couchbase.lite.mobiletest.TestApp;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.services.Log;
+import com.couchbase.lite.mobiletest.util.CliUtils;
 import com.couchbase.lite.mobiletest.util.NetUtils;
 
 
@@ -36,12 +37,13 @@ public class TestServerApp implements Daemon {
 
     /**
      * Main method runs as non-service mode for debugging use
+     * Pass "--port &lt;port&gt;" to listen on a port other than 8080.
      *
      * @param args cli args
      */
     @SuppressWarnings({"PMD.SystemPrintln", "RegexpSinglelineJava"})
     public static void main(String[] args) {
-        startApp();
+        startApp(CliUtils.getPort(args));
 
         if ((args.length > 0) && ("server".equals(args[0]))) {
             Runtime.getRuntime().addShutdownHook(new Thread(TestServerApp::stopApp));
@@ -59,6 +61,8 @@ public class TestServerApp implements Daemon {
     /**
      * Static methods called by prunsrv to start/stop the Windows service.
      * Pass the argument "start" to start the service and any other argument to stop it.
+     * A port other than 8080 is requested with "start --port &lt;port&gt;": the first argument
+     * still decides between start and stop, so "--port" cannot lead.
      *
      * @param args Arguments from prunsrv command line
      **/
@@ -67,7 +71,7 @@ public class TestServerApp implements Daemon {
         switch (args[0].trim().toLowerCase(Locale.getDefault())) {
             case "":
             case "start":
-                startApp();
+                startApp(CliUtils.getPort(args));
                 waitForStop();
                 break;
 
@@ -76,8 +80,8 @@ public class TestServerApp implements Daemon {
         }
     }
 
-    private static void startApp() {
-        final TestServerApp app = new TestServerApp();
+    private static void startApp(int port) {
+        final TestServerApp app = new TestServerApp(port);
         if (!APP.compareAndSet(null, app)) { throw new ServerError("Attempt to restart app"); }
 
         app.initApp();
@@ -100,13 +104,19 @@ public class TestServerApp implements Daemon {
     }
 
 
+    private final int port;
+
+    public TestServerApp() { this(NetUtils.DEFAULT_PORT); }
+
+    public TestServerApp(int port) { this.port = port; }
+
     @Override
     public void init(DaemonContext context) { initApp(); }
 
     @SuppressFBWarnings("DM_DEFAULT_ENCODING")
     @Override
     public void start() {
-        final Server server = new Server();
+        final Server server = new Server(port);
         if (!SERVER.compareAndSet(null, server)) { throw new ServerError("Attempt to restart server"); }
 
         final String addr = NetUtils.getLocalAddress();

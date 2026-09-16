@@ -47,6 +47,8 @@ import com.couchbase.lite.mobiletest.services.Log;
 public final class NetUtils {
     private NetUtils() { }
 
+    public static final int DEFAULT_PORT = 8080;
+
     private static final String TAG = "NET_UTIL";
 
     private static final String GITHUB_BASE_URL  = "https://media.githubusercontent.com/media/";
@@ -84,7 +86,7 @@ public final class NetUtils {
     public static URI makeUri(@Nullable String scheme, @Nullable String addr, int port, @Nullable String path) {
         if (scheme == null) { scheme = "http"; }
         if (addr == null) { addr = "0.0.0.0"; }
-        if (port < 0) { port = 8080; }
+        if (port < 0) { port = DEFAULT_PORT; }
         try { return new URI(scheme, null, addr, port, path, null, null); }
         catch (URISyntaxException e) {
             Log.err(TAG, "Cannot parse URI: " + scheme + "//:" + addr + ":" + port + "/" + path);
