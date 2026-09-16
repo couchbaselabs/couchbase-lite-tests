@@ -428,7 +428,7 @@ class TestXattrs(CBLTestClass):
                     f"SDK doc {doc_id} should have {num_updates + 1} updates, got {sdk_doc['content']['updates']}"
                 )
 
-            self.mark_test_step(f"Verify '{username}' sees all doc updates via _changes (public API)")
+            self.mark_test_step(f"Verify '{username}' sees all doc updates via the document API")
             await wait_for_update_count(sg_user, sg_db, all_doc_ids, num_updates + 1)
 
             self.mark_test_step("Verify SDK docs still don't contain _sync after updates")
