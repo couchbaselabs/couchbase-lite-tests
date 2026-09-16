@@ -48,7 +48,7 @@ def _record_node_calls(monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]
     for name in (
         "_put_database",
         "_update_database_config",
-        "_refresh_database_config",
+        "_wait_for_database_config",
         "_wait_for_db_state_online",
     ):
         monkeypatch.setattr(SyncGateway, name, recorder(name))
@@ -65,13 +65,11 @@ async def test_create_database_brings_every_node_online(monkeypatch: pytest.Monk
         await cluster.create_database("db1", DatabaseConfig(bucket="b1"))
 
     assert calls[0][0] == "_put_database"
-    writer = calls[0][1]
-    others = [i for i in range(3) if i != writer]
 
-    # The writing node already has the config, so only the others re-read it, but every
-    # node comes online in the background and so has to be waited on.
-    assert sorted(calls[1:3]) == [("_refresh_database_config", i) for i in others]
-    assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(3)]
+    # Every node has to pick the config up on its own, and comes online in the background
+    # afterwards, so both waits cover the whole cluster.
+    assert sorted(calls[1:4]) == [("_wait_for_database_config", i) for i in range(3)]
+    assert sorted(calls[4:]) == [("_wait_for_db_state_online", i) for i in range(3)]
 
 
 @pytest.mark.asyncio
@@ -83,7 +81,6 @@ async def test_update_database_config_brings_every_node_online(monkeypatch: pyte
         await cluster.update_database_config("db1", DatabaseConfig(bucket="b1"))
 
     assert calls[0][0] == "_update_database_config"
-    writer = calls[0][1]
 
-    assert calls[1] == ("_refresh_database_config", 1 - writer)
-    assert sorted(calls[2:]) == [("_wait_for_db_state_online", i) for i in range(2)]
+    assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
+    assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(2)]

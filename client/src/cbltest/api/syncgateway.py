@@ -188,6 +188,39 @@ class DatabaseConfig(BaseModel):
         return dumps(self.to_json(), indent=2)
 
 
+def _config_mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
+    """
+    Report where a database config Sync Gateway is running differs from the config a
+    caller asked for.  Only the settings the caller set are compared, because a running
+    config carries a value for every setting Sync Gateway has a default for.
+
+    :param expected: The config the caller asked for, as JSON.
+    :param actual: The config Sync Gateway reports, as JSON.
+    :param path: The dotted key path reached so far, for the messages.
+    """
+    # Sync Gateway stamps these into a database config from its bootstrap config and
+    # redacts them in the response, so they never match what a caller asked for.
+    uncomparable_keys = frozenset({"username", "password", "cacertpath", "certpath", "keypath"})
+
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return [f"{path or 'config'}: expected an object, got {actual!r}"]
+
+        mismatches: list[str] = []
+        for key, value in expected.items():
+            if not path and key in uncomparable_keys:
+                continue
+            child = f"{path}.{key}" if path else key
+            if key not in actual:
+                mismatches.append(f"{child}: missing")
+            else:
+                mismatches.extend(_config_mismatches(value, actual[key], child))
+
+        return mismatches
+
+    return [] if expected == actual else [f"{path or 'config'}: expected {expected!r}, got {actual!r}"]
+
+
 class ISGRPayload(JSONSerializable):
     """
     A class containing configuration options for Inter-Sync Gateway Replication (ISGR)
@@ -1818,6 +1851,58 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span("get_database_config", attributes={"cbl.database.name": db_name}):
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
+
+    async def _get_database_runtime_config(self, db_name: str) -> dict:
+        """
+        Gets the config this node is running for a database, rather than the config that
+        is stored in the bucket, with a value filled in for every setting the config it
+        was given left out.
+
+        :param db_name: The name of the database to get the running configuration for
+        :return: The configuration this node is running, as JSON
+        """
+        _assert_not_null(db_name, "db_name")
+        with self._tracer.start_as_current_span(
+            "get_database_runtime_config", attributes={"cbl.database.name": db_name}
+        ):
+            resp = await self._send_request("GET", f"/{db_name}/_config", params={"include_runtime": "true"})
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def _wait_for_database_config(
+        self,
+        db_name: str,
+        config: DatabaseConfig,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node runs the database with every setting the given config asks
+        for.  A node picks up a config another node wrote on its next config poll, ten
+        seconds apart by default, and loads the database if it did not serve it before.
+
+        :param db_name: The database whose config to wait for.
+        :param config: The config that was written, as it was passed to Sync Gateway.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        :raises TimeoutError: if the node is not running the config once the polls run out
+        """
+        expected = config.to_json()
+
+        async def _poll() -> None:
+            try:
+                actual = await self._get_database_runtime_config(db_name)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code not in (403, 404, 503):
+                    raise
+                raise AssertionError(f"{self} does not serve database {db_name} yet ({e.code})") from e
+
+            mismatches = _config_mismatches(expected, actual)
+            assert not mismatches, f"{self} is not running the config for {db_name}: {'; '.join(mismatches)}"
+
+        with self._tracer.start_as_current_span("wait_for_database_config", attributes={"cbl.database.name": db_name}):
+            await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
     async def _refresh_database_config(self, db_name: str) -> None:
         """
