@@ -48,7 +48,7 @@ Test Sync Gateway and SDK interoperability with unique documents and multiple up
 8. Verify SDK docs don't contain _sync metadata
 9. Bulk update sg docs 10 times via Sync Gateway
 10. Verify SDK sees all doc updates
-11. Verify 'vipul' sees all doc updates via _changes (public API)
+11. Verify 'vipul' sees all doc updates via the document API
 12. Verify SDK docs still don't contain _sync after updates
 13. Bulk delete sdk docs via SDK
 14. Bulk delete sg docs via Sync Gateway
