@@ -61,9 +61,7 @@ pipeline {
             }
             post {
                 always {
-                    // Publish pytest's JUnit XML so per-test failures (messages and
-                    // tracebacks) are surfaced in Jenkins even if teardown fails.
-                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+                    junit testResults: 'tests/junit_result.xml', allowEmptyResults: true
 
                     echo "=== Teardown SGW Tests"
                     timeout(time: 5, unit: 'MINUTES') {
