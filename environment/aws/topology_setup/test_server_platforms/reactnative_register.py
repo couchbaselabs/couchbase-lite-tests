@@ -374,7 +374,7 @@ class _ReactNativeTestServerBase(TestServer):
         with open(pkg_path) as f:
             pkg = json.load(f)
         pkg["dependencies"]["cbl-reactnative"] = (
-            f"npm:couchbase-lite-react-native@{self.version}"
+            f"npm:@couchbase/couchbase-lite-react-native@{self.version}"
         )
         with open(pkg_path, "w") as f:
             json.dump(pkg, f, indent=2)
