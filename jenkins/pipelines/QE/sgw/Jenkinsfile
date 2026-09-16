@@ -61,11 +61,6 @@ pipeline {
             }
             post {
                 always {
-                    // Publish pytest's JUnit XML so per-test failures (messages and
-                    // tracebacks) are surfaced in Jenkins even if teardown fails. Exact
-                    // path, not a "**" glob -- the workspace persists across builds, and
-                    // a glob also matches the previous build's archived copy still
-                    // sitting at tests/sgw/junit_result.xml, double-counting every test.
                     junit testResults: 'tests/junit_result.xml', allowEmptyResults: true
 
                     echo "=== Teardown SGW Tests"
