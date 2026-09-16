@@ -758,11 +758,14 @@ class TestXattrs(CBLTestClass):
                 tg.create_task(query_as_user2())
 
             self.mark_test_step("Delete _sync xattrs to force complete re-processing")
+            # The docs are already on user2's feed from the xattr update, so anchor the wait
+            # below to a sequence taken before the deletion.
+            since = (await sg_user2.get_changes(sg_db)).last_seq
             for doc_id in sdk_doc_ids:
                 cbs.delete_document_xattr(bucket_name, doc_id, "_sync", "_default", "_default")
 
             self.mark_test_step(f"Verify user '{username2}' can now see all docs")
-            await sg_user2.wait_for_documents(sg_db, sdk_doc_ids)
+            await sg_user2.wait_for_documents(sg_db, sdk_doc_ids, since=since)
 
             self.mark_test_step(f"Verify user '{username1}' can no longer see any docs")
             user1_changes_after = await sg_user1.get_changes(sg_db)

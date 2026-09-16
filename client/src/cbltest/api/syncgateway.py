@@ -1203,6 +1203,7 @@ class _SyncGatewayBase:
         collection: str = "_default",
         deleted: bool = False,
         version_type: str = "rev",
+        since: int | str | None = None,
     ) -> dict[str, ChangesResponseEntry]:
         """
         Retry the changes feed until every doc in doc_ids has appeared in the wanted state,
@@ -1220,7 +1221,8 @@ class _SyncGatewayBase:
         That resumption is also the one sharp edge: a document is matched once and never
         looked at again, so a write that changes its state later in the same wait leaves the
         entry returned for it stale.  Wait on a batch of writes that has already been made,
-        not on one still in flight.
+        not on one still in flight.  When the documents are already on the feed in another
+        state, pass `since` so that those earlier entries cannot satisfy the wait.
 
         :param db_name: The name of the Sync Gateway database to query
         :param doc_ids: The documents to wait for
@@ -1229,11 +1231,13 @@ class _SyncGatewayBase:
         :param deleted: If True, wait for each document to appear as a tombstone instead of alive
         :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version
                              vectors in SGW 4.0+)
+        :param since: Start the wait from this sequence instead of the beginning of the feed.
+                      Pass a sequence captured before the writes being waited on so that an
+                      earlier state of the same documents cannot satisfy the wait
         """
         wanted = set(doc_ids)
         found: dict[str, ChangesResponseEntry] = {}
         state = "tombstoned" if deleted else "present"
-        since: int | str | None = None
 
         async def _wait_for_documents_poll() -> dict[str, ChangesResponseEntry]:
             nonlocal since
