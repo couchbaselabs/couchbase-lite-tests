@@ -53,11 +53,9 @@ pipeline {
             steps {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
-                echo "=== Run SGW Tests"
                 timeout(time: 180, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --dataset-version '${env.TS_DATASET_VERSION}' --test-filter '${env.TS_TEST_FILTER}'"
                 }
-                echo "=== SGW Tests Complete"
             }
             post {
                 always {
@@ -65,7 +63,6 @@ pipeline {
                     // tracebacks) are surfaced in Jenkins even if teardown fails.
                     junit testResults: '**/junit_result.xml', allowEmptyResults: true
 
-                    echo "=== Teardown SGW Tests"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/sgw/teardown.sh"
                     }
@@ -73,7 +70,6 @@ pipeline {
                     // is what populates tests/sgw/ (the whole tests/ tree runs
                     // in one session, so artifacts live at the tests/ root).
                     archiveArtifacts artifacts: 'tests/sgw/**/*', fingerprint: true, allowEmptyArchive: true
-                    echo "=== SGW Test Teardown Complete"
                 }
             }
         }
