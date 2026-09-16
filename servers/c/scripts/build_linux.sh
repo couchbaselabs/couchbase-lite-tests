@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
 function usage() {
-  echo "Usage: $0 <cbl-version> <cbl-build-num>"
+  echo "Usage: $0 <edition> <cbl-version> <cbl-build-num>"
   exit 1
 }
 
@@ -21,9 +21,10 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
+ASSETS_DIR="${SCRIPT_DIR}/../assets"
 
 # Download CBL:
-"${SCRIPT_DIR}"/download_cbl.sh linux "enterprise" ${VERSION} ${BLD_NUM}
+"${SCRIPT_DIR}"/download_cbl.sh linux "${EDITION}" ${VERSION} ${BLD_NUM}
 
 # Build
 rm -rf "${BUILD_DIR}"
@@ -35,6 +36,7 @@ make -j8 install
 # Copy libcblite to
 cp ${LIB_DIR}/libcblite/lib/**/libcblite.so* out/bin/
 
-# Copy assets folder
-cp -R assets out/bin
+# Copy assets folder. The server looks for it next to its own directory, as <executable>/../assets.
+mkdir -p out/assets
+cp -R "${ASSETS_DIR}/." out/assets/
 popd >/dev/null
