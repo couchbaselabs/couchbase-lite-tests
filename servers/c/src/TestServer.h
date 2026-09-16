@@ -16,6 +16,9 @@ namespace ts {
         static constexpr const char *CBL_PLATFORM_NAME = "couchbase-lite-c";
         static constexpr unsigned short API_VERSION = 1;
         static constexpr unsigned short DEFAULT_PORT = 8080;
+        /* Subdirectory of the platform location files::filesDir picks, used when no files
+           directory is given: /tmp on Linux and macOS, the working directory on Windows */
+        static constexpr const char *DEFAULT_FILES_SUBDIR = "CBL-C-TestServer";
 
         struct Context {
             std::string filesDir;
@@ -24,7 +27,10 @@ namespace ts {
 
         static void init();
 
-        explicit TestServer(unsigned short port = DEFAULT_PORT);
+        /* filesDir is where databases and sessions are kept. Leave it empty for the platform's
+           default location; give each server its own to run more than one on a host, since a
+           server deletes the whole sessions directory it finds when it starts. */
+        explicit TestServer(unsigned short port = DEFAULT_PORT, const std::string &filesDir = {});
 
         ~TestServer();
 

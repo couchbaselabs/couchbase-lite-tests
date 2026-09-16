@@ -66,6 +66,11 @@ namespace ts::support {
         return dir;
     }
 
+    string files::ensureDir(const string &dir) {
+        filesystem::create_directories(dir);
+        return dir;
+    }
+
     string files::assetsDir() {
 #ifdef __ANDROID__
         return androidContext()->assetsDir;
