@@ -545,7 +545,13 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
 
         # The Xcode "Bundle React Native code and images" phase expects a
         # pre-built ios/main.jsbundle. Generate it now before xcodebuild runs.
+        # The generated src/datasetBundle.ts is a single multi-MB module (all
+        # datasets plus base64 blobs inlined), so Metro's jest-worker blows the
+        # default ~2 GB V8 old-space transforming it. Raise the heap for the
+        # bundle run; NODE_OPTIONS propagates to Metro's worker children.
         rn_cli = working / "node_modules" / ".bin" / "react-native"
+        bundle_env = os.environ.copy()
+        bundle_env["NODE_OPTIONS"] = "--max-old-space-size=8192"
         subprocess.run(
             [
                 node_binary, str(rn_cli),
@@ -558,6 +564,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
             ],
             check=True,
             cwd=working,
+            env=bundle_env,
         )
 
         xcode_env = os.environ.copy()
