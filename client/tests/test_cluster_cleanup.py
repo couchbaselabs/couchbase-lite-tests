@@ -11,39 +11,71 @@ from conftest import fake_sync_gateways
 DeleteDatabase = Callable[[str], Coroutine[Any, Any, None]]
 
 
-def _stub_node(
+def _stub_cluster(
     monkeypatch: pytest.MonkeyPatch,
-    sg: SyncGateway,
-    db_names: list[str],
+    sync_gateways: list[SyncGateway],
+    served: list[list[str]],
     delete_database: DeleteDatabase,
 ) -> None:
-    """Have sg report db_names and delete them via delete_database, skipping Rosmar buckets."""
+    """
+    Have each node report its own list of databases and delete them via delete_database.
 
-    async def get_all_databases_verbose() -> dict[str, Any]:
-        return dict.fromkeys(db_names, object())
+    A delete removes the database from every node, the way deleting the config from the
+    bucket makes the other nodes drop it on their next config re-read.  Rosmar is off, so
+    no bucket dropping runs.
+    """
+    reported = [list(names) for names in served]
 
-    monkeypatch.setattr(sg, "get_all_databases_verbose", get_all_databases_verbose)
-    monkeypatch.setattr(sg, "_delete_database", delete_database)
-    # requests.get is patched out, so using_rosmar defaults to a truthy mock.
-    monkeypatch.setattr(sg, "using_rosmar", False)
+    for index, sg in enumerate(sync_gateways):
+
+        async def get_all_databases_verbose(index: int = index) -> dict[str, Any]:
+            return dict.fromkeys(reported[index], object())
+
+        async def delete_and_forget(db_name: str) -> None:
+            await delete_database(db_name)
+            for names in reported:
+                if db_name in names:
+                    names.remove(db_name)
+
+        monkeypatch.setattr(sg, "get_all_databases_verbose", get_all_databases_verbose)
+        monkeypatch.setattr(sg, "_delete_database", delete_and_forget)
+        # requests.get is patched out, so using_rosmar defaults to a truthy mock.
+        monkeypatch.setattr(sg, "using_rosmar", False)
+
+
+@pytest.mark.asyncio
+async def test_delete_all_databases_deletes_each_database_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Sync Gateway keeps one registry document per bucket, so deleting the same database
+    from every node at once makes those writes collide on it.
+    """
+    with fake_sync_gateways(3) as sync_gateways:
+        deleted: list[str] = []
+
+        async def delete_database(db_name: str) -> None:
+            deleted.append(db_name)
+
+        _stub_cluster(monkeypatch, list(sync_gateways), [["db1", "db2"]] * 3, delete_database)
+
+        await delete_all_databases(SyncGatewayCluster(sync_gateways))
+
+        assert sorted(deleted) == ["db1", "db2"]
 
 
 @pytest.mark.asyncio
 async def test_delete_all_databases_covers_every_node(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A node that never learned about a database is not covered by deleting it elsewhere."""
-    with fake_sync_gateways(2) as sync_gateways:
-        deleted: list[tuple[int, str]] = []
+    """A database that only one node learned about still has to be deleted."""
+    with fake_sync_gateways(3) as sync_gateways:
+        deleted: list[str] = []
 
-        for index, sg in enumerate(sync_gateways):
+        async def delete_database(db_name: str) -> None:
+            deleted.append(db_name)
 
-            async def delete_database(db_name: str, index: int = index) -> None:
-                deleted.append((index, db_name))
-
-            _stub_node(monkeypatch, sg, ["db1", "db2"], delete_database)
+        _stub_cluster(monkeypatch, list(sync_gateways), [["db1"], [], ["db1", "db3"]], delete_database)
 
         await delete_all_databases(SyncGatewayCluster(sync_gateways))
 
-        assert sorted(deleted) == [(0, "db1"), (0, "db2"), (1, "db1"), (1, "db2")]
+        assert sorted(deleted) == ["db1", "db3"]
 
 
 @pytest.mark.asyncio
@@ -52,22 +84,19 @@ async def test_delete_all_databases_fails_fast_and_unwinds_siblings(monkeypatch:
     The sibling must be cancelled and unwound before returning, or it runs on into the next
     test on the session-scoped loop.
     """
-    with fake_sync_gateways(2) as sync_gateways:
-        failing, slow = sync_gateways
+    with fake_sync_gateways(1) as sync_gateways:
         cancelled = asyncio.Event()
 
-        async def delete_and_fail(db_name: str) -> None:
-            raise RuntimeError("SGW returned 500")
-
-        async def delete_slowly(db_name: str) -> None:
+        async def delete_database(db_name: str) -> None:
+            if db_name == "db_fails":
+                raise RuntimeError("SGW returned 500")
             try:
                 await asyncio.sleep(30)
             except asyncio.CancelledError:
                 cancelled.set()
                 raise
 
-        _stub_node(monkeypatch, failing, ["db"], delete_and_fail)
-        _stub_node(monkeypatch, slow, ["db"], delete_slowly)
+        _stub_cluster(monkeypatch, list(sync_gateways), [["db_fails", "db_slow"]], delete_database)
 
         with pytest.raises(BaseExceptionGroup) as raised:
             await delete_all_databases(SyncGatewayCluster(sync_gateways))
@@ -81,12 +110,11 @@ async def test_delete_all_databases_fails_fast_and_unwinds_siblings(monkeypatch:
 async def test_delete_all_databases_reports_every_simultaneous_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     """Failures that land together are all reported, not just the first one seen."""
     with fake_sync_gateways(3) as sync_gateways:
-        for index, sg in enumerate(sync_gateways):
 
-            async def delete_and_fail(db_name: str, index: int = index) -> None:
-                raise RuntimeError(f"SGW {index} returned 500")
+        async def delete_database(db_name: str) -> None:
+            raise RuntimeError(f"SGW returned 500 for {db_name}")
 
-            _stub_node(monkeypatch, sg, ["db"], delete_and_fail)
+        _stub_cluster(monkeypatch, list(sync_gateways), [["db1", "db2", "db3"], [], []], delete_database)
 
         with pytest.raises(BaseExceptionGroup) as raised:
             await delete_all_databases(SyncGatewayCluster(sync_gateways))
@@ -99,10 +127,10 @@ async def test_delete_all_databases_lets_outer_cancellation_through(monkeypatch:
     """Cancellation of the caller is control flow, not a cleanup failure."""
     with fake_sync_gateways(1) as sync_gateways:
 
-        async def delete_slowly(db_name: str) -> None:
+        async def delete_database(db_name: str) -> None:
             await asyncio.sleep(30)
 
-        _stub_node(monkeypatch, sync_gateways[0], ["db"], delete_slowly)
+        _stub_cluster(monkeypatch, list(sync_gateways), [["db"]], delete_database)
 
         task = asyncio.ensure_future(delete_all_databases(SyncGatewayCluster(sync_gateways)))
         await asyncio.sleep(0)

@@ -4,6 +4,7 @@ from typing import Final, cast
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
+from cbltest.api.couchbaseserver import BucketCleanupMode
 from cbltest.configparser import ParsedConfig, _parse_config
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -26,6 +27,7 @@ async def cblpytest(request: pytest.FixtureRequest) -> AsyncGenerator[CBLPyTest]
     test_props = request.config.getoption("--test-props")
     otel_endpoint = request.config.getoption("--otel-endpoint")
     dataset_version = request.config.getoption("--dataset-version", "4.0")
+    bucket_cleanup = BucketCleanupMode(request.config.getoption("--bucketpool"))
     if otel_endpoint is not None:
         # This section is all about setting up the OpenTelemetry report
         # and can be ignored if not using OpenTelemetry.
@@ -36,7 +38,13 @@ async def cblpytest(request: pytest.FixtureRequest) -> AsyncGenerator[CBLPyTest]
         provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
 
-    cblpytest = await CBLPyTest.create(config, log_level, test_props, dataset_version=dataset_version)
+    cblpytest = await CBLPyTest.create(
+        config,
+        log_level,
+        test_props,
+        dataset_version=dataset_version,
+        bucket_cleanup=bucket_cleanup,
+    )
     yield cblpytest
     await cblpytest.close()
 
@@ -75,6 +83,16 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         metavar="VERSION",
         help="The default dataset version to use for test servers",
         default="4.0",
+    )
+    group.addoption(
+        "--bucketpool",
+        metavar="MODE",
+        choices=[mode.value for mode in BucketCleanupMode],
+        help=(
+            "How to empty a Couchbase Server bucket between tests: 'delete' drops it, "
+            "'purge' empties it in place and keeps its collections and indexes"
+        ),
+        default=BucketCleanupMode.PURGE.value,
     )
 
 
