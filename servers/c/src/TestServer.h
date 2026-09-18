@@ -15,7 +15,7 @@ namespace ts {
     public:
         static constexpr const char *CBL_PLATFORM_NAME = "couchbase-lite-c";
         static constexpr unsigned short API_VERSION = 1;
-        static constexpr unsigned short PORT = 8080;
+        static constexpr unsigned short DEFAULT_PORT = 8080;
 
         struct Context {
             std::string filesDir;
@@ -24,7 +24,7 @@ namespace ts {
 
         static void init();
 
-        explicit TestServer();
+        explicit TestServer(unsigned short port = DEFAULT_PORT);
 
         ~TestServer();
 
@@ -35,6 +35,8 @@ namespace ts {
         [[nodiscard]] const Context &context() const { return _context; }
 
         [[nodiscard]] std::string serverUUID() const { return _uuid; }
+
+        [[nodiscard]] unsigned short port() const { return _port; }
 
         SessionManager *sessionManager() const { return _sessionManager.get(); }
 
@@ -51,6 +53,7 @@ namespace ts {
         std::unique_ptr<ts::SessionManager> _sessionManager;
 
         mg_context *_server{nullptr};
+        unsigned short _port;
         std::string _uuid;
     };
 }

@@ -33,7 +33,7 @@ namespace ts {
         sTestServerInitialized = true;
     }
 
-    TestServer::TestServer() {
+    TestServer::TestServer(unsigned short port) : _port(port) {
         if (!sTestServerInitialized) {
             throw runtime_error("TestServer::init() hasn't been called");
         }
@@ -57,7 +57,7 @@ namespace ts {
 
         _uuid = generateUUID();
 
-        string port_str = to_string(PORT);
+        string port_str = to_string(_port);
         const char *options[3] = {"listening_ports", port_str.c_str(), nullptr};
         _server = mg_start(nullptr, nullptr, options);
         if (!_server) { throw runtime_error("Cannot start server"); }

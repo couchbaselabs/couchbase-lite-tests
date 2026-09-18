@@ -19,13 +19,12 @@ import com.couchbase.lite.mobiletest.errors.TestError;
 import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.services.Log;
+import com.couchbase.lite.mobiletest.util.NetUtils;
 import com.couchbase.lite.mobiletest.util.StringUtils;
 
 
 public class Server extends NanoHTTPD {
     private static final String TAG = "SERVER";
-
-    private static final int PORT = 8080;
 
     private static class SafeResponse extends Response {
         private final Status status;
@@ -53,8 +52,10 @@ public class Server extends NanoHTTPD {
     private final GetDispatcher getDispatcher;
     private final PostDispatcher postDispatcher;
 
-    public Server() {
-        super(PORT);
+    public Server() { this(NetUtils.DEFAULT_PORT); }
+
+    public Server(int port) {
+        super(port);
         final TestApp app = TestApp.getApp();
         appId = app.getAppId();
         getDispatcher = new GetDispatcher(app);
