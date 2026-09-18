@@ -35,14 +35,24 @@ def test_random_node_returns_a_cluster_member() -> None:
             assert cluster.random_node in sync_gateways
 
 
-def _record_node_calls(monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]) -> list[tuple[str, int]]:
-    """Record the per-node calls the cluster helpers make, as (method name, node index)."""
+# What the faked writes return, so that the waits can be checked against it.
+_SENTINEL = "config-sentinel"
+
+
+def _record_node_calls(
+    monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]
+) -> tuple[list[tuple[str, int]], list[object]]:
+    """Record the per-node calls the cluster helpers make, as (method name, node index),
+    along with the sentinel every _wait_for_database_config call was handed."""
     calls: list[tuple[str, int]] = []
+    awaited_sentinels: list[object] = []
 
     def recorder(name: str) -> Callable[..., Awaitable[str]]:
         async def fake(node: SyncGateway, db_name: str, *args: object, **kwargs: object) -> str:
             calls.append((name, next(i for i, n in enumerate(nodes) if n is node)))
-            return "sentinel"
+            if name == "_wait_for_database_config":
+                awaited_sentinels.append(args[0] if args else kwargs.get("sentinel"))
+            return _SENTINEL
 
         return fake
 
@@ -54,14 +64,14 @@ def _record_node_calls(monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]
     ):
         monkeypatch.setattr(SyncGateway, name, recorder(name))
 
-    return calls
+    return calls, awaited_sentinels
 
 
 @pytest.mark.asyncio
 async def test_create_database_brings_every_node_online(monkeypatch: pytest.MonkeyPatch) -> None:
     with fake_sync_gateways(3) as sync_gateways:
         cluster = SyncGatewayCluster(sync_gateways)
-        calls = _record_node_calls(monkeypatch, sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
 
         await cluster.create_database("db1", DatabaseConfig(bucket="b1"))
 
@@ -72,12 +82,15 @@ async def test_create_database_brings_every_node_online(monkeypatch: pytest.Monk
     assert sorted(calls[1:4]) == [("_wait_for_database_config", i) for i in range(3)]
     assert sorted(calls[4:]) == [("_wait_for_db_state_online", i) for i in range(3)]
 
+    # Every node waits for the config the write returned, not just for any config.
+    assert awaited_sentinels == [_SENTINEL] * 3
+
 
 @pytest.mark.asyncio
 async def test_update_database_config_brings_every_node_online(monkeypatch: pytest.MonkeyPatch) -> None:
     with fake_sync_gateways(2) as sync_gateways:
         cluster = SyncGatewayCluster(sync_gateways)
-        calls = _record_node_calls(monkeypatch, sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
 
         await cluster.update_database_config("db1", DatabaseConfig(bucket="b1"))
 
@@ -85,3 +98,5 @@ async def test_update_database_config_brings_every_node_online(monkeypatch: pyte
 
     assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
     assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(2)]
+
+    assert awaited_sentinels == [_SENTINEL] * 2

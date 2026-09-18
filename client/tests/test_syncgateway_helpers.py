@@ -273,24 +273,22 @@ class TestWaitForDbUp:
 
         await sg._wait_for_db_online("db1", max_retries=1, retry_delay=0)
 
-        # Wait for the node to serve the database at all, reload its config, then wait
-        # for the database to come online under that config.
+        # Wait for the node to serve the database at all, then for it to be online there.
         assert [entry[_URL_KEY] for entry in received] == [
             "/_all_dbs?verbose=true",
-            "/db1/_config?refresh_config=true",
             "/_all_dbs?verbose=true",
         ]
 
     @pytest.mark.asyncio
-    async def test_raises_when_refresh_fails(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_raises_when_polling_fails(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [
             {"status": 200, "json": [{"bucket": "b1", "db_name": "db1", "state": "Online"}]},
             {"status": 403, "json": {"error": "Forbidden", "reason": ""}},
         ]
 
-        # The node answers a reload in every state it serves the database in, so a failure
-        # here means the database is gone.  That surfaces rather than retrying to a timeout.
+        # Only a failed assertion is retried, so an HTTP error from the poll itself
+        # surfaces rather than retrying to a timeout.
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
             await sg._wait_for_db_online("db1", max_retries=2, retry_delay=0)
 

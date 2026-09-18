@@ -2284,17 +2284,12 @@ class SyncGateway(_SyncGatewayBase):
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until the SGW node serves the database, force one config re-read so that
-        the caller does not go on to use a config version the node cached earlier, then
-        wait until the node reports the database as Online again, because the re-read
-        re-opens the database on the node.
+        Wait until the SGW node serves the database, then wait until it reports that
+        database as Online.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each of the two waits.
         :param retry_delay: Seconds between polls.
-        :raises CblSyncGatewayBadResponseError: if the config is gone by the time the node
-            is asked to re-read it.  A database it still serves re-reads in any state,
-            Offline and Resyncing included, so there is no transient failure to retry.
         """
         await self._wait_for_db_present(db_name, max_retries=max_retries, retry_delay=retry_delay)
         await self._wait_for_db_state_online(db_name, max_retries=max_retries, retry_delay=retry_delay)

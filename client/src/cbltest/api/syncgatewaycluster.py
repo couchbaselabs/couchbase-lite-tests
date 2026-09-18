@@ -44,11 +44,10 @@ class SyncGatewayCluster:
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until every node in the cluster serves the database, re-reads its config and
-        reports it Online, polling all nodes concurrently.  Only for waits on something
-        outside our control, such as a restored bucket or a node that is still starting:
-        after a config write, :func:`_wait_for_database_config` covers the same ground
-        against the config that was written.
+        Wait until every node in the cluster serves the database and reports it Online,
+        polling all nodes concurrently.  Only for waits on something outside our control,
+        such as a restored bucket or a node that is still starting: after a config write,
+        :func:`_wait_for_database_config` waits on the config that was written instead.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each wait a node makes.
@@ -76,8 +75,8 @@ class SyncGatewayCluster:
 
     async def _wait_for_db_state_online(self, db_name: str) -> None:
         """
-        Wait until every node reports the database Online, without asking any of them to
-        re-read the config first.
+        Wait until every node reports the database Online, whatever config each of them
+        is running.
 
         :param db_name: Database name to poll.
         """
