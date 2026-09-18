@@ -11,6 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
 from urllib.parse import urlencode, urljoin
+from uuid import uuid4
 
 import aiofiles
 import packaging.version
@@ -186,39 +187,6 @@ class DatabaseConfig(BaseModel):
 
     def serialize(self) -> str:
         return dumps(self.to_json(), indent=2)
-
-
-def _config_mismatches(expected: Any, actual: Any, path: str = "") -> list[str]:
-    """
-    Report where a database config Sync Gateway is running differs from the config a
-    caller asked for.  Only the settings the caller set are compared, because a running
-    config carries a value for every setting Sync Gateway has a default for.
-
-    :param expected: The config the caller asked for, as JSON.
-    :param actual: The config Sync Gateway reports, as JSON.
-    :param path: The dotted key path reached so far, for the messages.
-    """
-    # Sync Gateway stamps these into a database config from its bootstrap config and
-    # redacts them in the response, so they never match what a caller asked for.
-    uncomparable_keys = frozenset({"username", "password", "cacertpath", "certpath", "keypath"})
-
-    if isinstance(expected, dict):
-        if not isinstance(actual, dict):
-            return [f"{path or 'config'}: expected an object, got {actual!r}"]
-
-        mismatches: list[str] = []
-        for key, value in expected.items():
-            if not path and key in uncomparable_keys:
-                continue
-            child = f"{path}.{key}" if path else key
-            if key not in actual:
-                mismatches.append(f"{child}: missing")
-            else:
-                mismatches.extend(_config_mismatches(value, actual[key], child))
-
-        return mismatches
-
-    return [] if expected == actual else [f"{path or 'config'}: expected {expected!r}, got {actual!r}"]
 
 
 class ISGRPayload(JSONSerializable):
@@ -961,7 +929,7 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Upsert a database configuration on the Sync Gateway instance
 
@@ -971,11 +939,17 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("update_database_config", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("post", f"/{db_name}/_config", payload)
+            return payload.feed_type
 
-    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Attempts to create a database on the Sync Gateway instance
 
@@ -984,9 +958,15 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("put_database", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("put", f"/{db_name}/", payload)
+            return payload.feed_type
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -1872,23 +1852,23 @@ class _SyncGatewayBase:
     async def _wait_for_database_config(
         self,
         db_name: str,
-        config: DatabaseConfig,
+        sentinel: str,
         *,
         max_retries: int = 70,
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until this node runs the database with every setting the given config asks
-        for.  A node picks up a config another node wrote on its next config poll, ten
-        seconds apart by default, and loads the database if it did not serve it before.
+        Wait until this node runs the revision of the config the given sentinel
+        identifies.  A node picks up a config another node wrote on its next config poll,
+        and loads the database if it did not serve it before.
 
         :param db_name: The database whose config to wait for.
-        :param config: The config that was written, as it was passed to Sync Gateway.
+        :param sentinel: The sentinel value :func:`_put_database` or
+            :func:`_update_database_config` returned.
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
         :raises TimeoutError: if the node is not running the config once the polls run out
         """
-        expected = config.to_json()
 
         async def _poll() -> None:
             try:
@@ -1898,8 +1878,10 @@ class _SyncGatewayBase:
                     raise
                 raise AssertionError(f"{self} does not serve database {db_name} yet ({e.code})") from e
 
-            mismatches = _config_mismatches(expected, actual)
-            assert not mismatches, f"{self} is not running the config for {db_name}: {'; '.join(mismatches)}"
+            running = actual.get("feed_type")
+            assert running == sentinel, (
+                f"{self} is not running config {sentinel} for {db_name}, it is running {running!r}"
+            )
 
         with self._tracer.start_as_current_span("wait_for_database_config", attributes={"cbl.database.name": db_name}):
             await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))

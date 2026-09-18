@@ -39,9 +39,10 @@ def _record_node_calls(monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]
     """Record the per-node calls the cluster helpers make, as (method name, node index)."""
     calls: list[tuple[str, int]] = []
 
-    def recorder(name: str) -> Callable[..., Awaitable[None]]:
-        async def fake(node: SyncGateway, db_name: str, *args: object, **kwargs: object) -> None:
+    def recorder(name: str) -> Callable[..., Awaitable[str]]:
+        async def fake(node: SyncGateway, db_name: str, *args: object, **kwargs: object) -> str:
             calls.append((name, next(i for i, n in enumerate(nodes) if n is node)))
+            return "sentinel"
 
         return fake
 

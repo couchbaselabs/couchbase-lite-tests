@@ -61,18 +61,18 @@ class SyncGatewayCluster:
             )
         )
 
-    async def _wait_for_database_config(self, db_name: str, config: DatabaseConfig) -> None:
+    async def _wait_for_database_config(self, db_name: str, sentinel: str) -> None:
         """
-        Wait until every node runs the database with the settings the given config asks
-        for, polling all nodes concurrently.  A node that did not serve the database
-        before loads it as it picks the config up, and comes online in the background, so
-        pair this with :func:`_wait_for_db_state_online`.
+        Wait until every node runs the config the given sentinel marks, polling all nodes
+        concurrently.  A node that did not serve the database before loads it as it picks
+        the config up, and comes online in the background, so pair this with
+        :func:`_wait_for_db_state_online`.
 
         :param db_name: The database whose config the nodes must pick up.
-        :param config: The config that was written, as it was passed to Sync Gateway.
+        :param sentinel: The value the write to one node returned.
         :raises TimeoutError: if a node is not running the config once the polls run out
         """
-        await asyncio.gather(*(sg._wait_for_database_config(db_name, config) for sg in self.__sync_gateways))
+        await asyncio.gather(*(sg._wait_for_database_config(db_name, sentinel) for sg in self.__sync_gateways))
 
     async def _wait_for_db_state_online(self, db_name: str) -> None:
         """
@@ -91,8 +91,8 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        await self.random_node._put_database(db_name, config)
-        await self._wait_for_database_config(db_name, config)
+        sentinel = await self.random_node._put_database(db_name, config)
+        await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
 
     async def wait_for_no_database(self, db_name: str) -> None:
@@ -127,6 +127,6 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to update
         :param config: The configuration to apply
         """
-        await self.random_node._update_database_config(db_name, config)
-        await self._wait_for_database_config(db_name, config)
+        sentinel = await self.random_node._update_database_config(db_name, config)
+        await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)

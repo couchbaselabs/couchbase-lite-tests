@@ -24,7 +24,6 @@ from cbltest.api.syncgateway import (
     ChangesResponse,
     DatabaseConfig,
     DatabaseState,
-    DeltaSyncConfig,
     DocumentUpdateEntry,
     ScopeConfig,
     SyncGateway,
@@ -38,6 +37,9 @@ SyncGatewayFixture = tuple[SyncGateway, list[dict], list[dict[str, str]]]
 
 # Key under which each `received` entry carries the request target (path plus query string).
 _URL_KEY = "__url__"
+
+# Key under which each `received` entry carries the request body, as text.
+_BODY_KEY = "__body__"
 
 
 class _FakeConfigResponse:
@@ -59,8 +61,8 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     server responds with: while it holds more than one entry, each request pops
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online). `received` accumulates the headers of
-    every request the server saw (plus its target under `_URL_KEY`), so tests can assert on
-    what went out on the wire."""
+    every request the server saw (plus its target under `_URL_KEY` and its body under
+    `_BODY_KEY`), so tests can assert on what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
@@ -71,7 +73,7 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     received: list[dict[str, str]] = []
 
     async def handle(request: web.Request) -> web.Response:
-        received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url)})
+        received.append(dict(request.headers) | {_URL_KEY: str(request.rel_url), _BODY_KEY: await request.text()})
         spec = specs.pop(0) if len(specs) > 1 else specs[0]
         if "text" in spec:
             return web.Response(
@@ -383,88 +385,77 @@ class TestWaitForDbUp:
         assert received == []
 
 
-class TestWaitForDatabaseConfig:
-    """The wait polls the config a node is running, and passes once that config carries
-    every setting the caller wrote."""
+class TestDatabaseConfigSentinel:
+    """A write stamps a sentinel into a setting Sync Gateway stores but does not act on,
+    and the wait passes once a node reports that sentinel back."""
 
     @pytest.mark.asyncio
-    async def test_succeeds_when_the_node_runs_the_written_settings(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_put_database_stamps_the_sentinel_it_returns(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, received = sync_gateway
-        specs[:] = [
-            {
-                "status": 200,
-                "json": {
-                    "bucket": "b1",
-                    "name": "db1",
-                    "password": "xxxxx",
-                    "revs_limit": 1000,
-                    "delta_sync": {"enabled": True, "rev_max_age_seconds": 86400},
-                },
-            }
-        ]
+        specs[:] = [{"status": 201, "json": {}}]
 
-        # Sync Gateway fills in a value for every setting the write left out, and redacts
-        # the credentials it stamps in, so neither counts as a mismatch.
-        await sg._wait_for_database_config(
-            "db1",
-            DatabaseConfig(bucket="b1", password="hunter2", delta_sync=DeltaSyncConfig(enabled=True)),
-            max_retries=1,
-            retry_delay=0,
-        )
+        sentinel = await sg._put_database("db1", DatabaseConfig(bucket="b1"))
+
+        assert loads(received[0][_BODY_KEY]) == {"bucket": "b1", "feed_type": sentinel}
+
+    @pytest.mark.asyncio
+    async def test_update_database_config_stamps_a_new_sentinel(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 201, "json": {}}]
+        config = DatabaseConfig(bucket="b1")
+
+        first = await sg._update_database_config("db1", config)
+        second = await sg._update_database_config("db1", config)
+
+        assert first != second
+        assert loads(received[1][_BODY_KEY])["feed_type"] == second
+        # The write stamps the sentinel into the config it was handed.
+        assert config.feed_type == second
+
+    @pytest.mark.asyncio
+    async def test_wait_succeeds_when_the_node_reports_the_sentinel(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {"bucket": "b1", "name": "db1", "feed_type": "abc123"}}]
+
+        await sg._wait_for_database_config("db1", "abc123", max_retries=1, retry_delay=0)
 
         assert [entry[_URL_KEY] for entry in received] == ["/db1/_config?include_runtime=true"]
 
     @pytest.mark.asyncio
-    async def test_polls_until_the_node_loads_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_wait_polls_until_the_node_loads_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, received = sync_gateway
         specs[:] = [
             {"status": 403, "json": {"error": "Forbidden", "reason": ""}},
-            {"status": 200, "json": {"bucket": "b1", "name": "db1"}},
+            {"status": 200, "json": {"bucket": "b1", "name": "db1", "feed_type": "abc123"}},
         ]
 
         # A node picks up a database another node created on its next config poll, and
         # rejects requests for it until then.
-        await sg._wait_for_database_config("db1", DatabaseConfig(bucket="b1"), max_retries=2, retry_delay=0)
+        await sg._wait_for_database_config("db1", "abc123", max_retries=2, retry_delay=0)
 
         assert len(received) == 2
 
     @pytest.mark.asyncio
-    async def test_timeout_reports_the_settings_that_did_not_land(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_wait_times_out_while_the_node_runs_an_older_config(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, specs, _ = sync_gateway
-        specs[:] = [
-            {
-                "status": 200,
-                "json": {
-                    "bucket": "b1",
-                    "name": "db1",
-                    "scopes": {"_default": {"collections": {"_default": {"sync": "function(doc){channel('a');}"}}}},
-                },
-            }
-        ]
+        specs[:] = [{"status": 200, "json": {"bucket": "b1", "name": "db1", "feed_type": "older"}}]
 
         with pytest.raises(TimeoutError) as exc_info:
-            await sg._wait_for_database_config(
-                "db1",
-                DatabaseConfig(
-                    bucket="b1",
-                    revs_limit=20,
-                    scopes={"_default": ScopeConfig(collections={"_default": {"sync": "function(doc){}"}})},
-                ),
-                max_retries=2,
-                retry_delay=0,
-            )
+            await sg._wait_for_database_config("db1", "abc123", max_retries=2, retry_delay=0)
 
         message = str(exc_info.value)
-        assert "revs_limit: missing" in message
-        assert "scopes._default.collections._default.sync: expected 'function(doc){}'" in message
+        assert "is not running config abc123 for db1" in message
+        assert "it is running 'older'" in message
 
     @pytest.mark.asyncio
-    async def test_reports_a_failure_that_is_not_about_the_database(self, sync_gateway: SyncGatewayFixture) -> None:
+    async def test_wait_reports_a_failure_that_is_not_about_the_database(
+        self, sync_gateway: SyncGatewayFixture
+    ) -> None:
         sg, specs, _ = sync_gateway
         specs[:] = [{"status": 500, "json": {"error": "Internal Server Error", "reason": "boom"}}]
 
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
-            await sg._wait_for_database_config("db1", DatabaseConfig(bucket="b1"), max_retries=2, retry_delay=0)
+            await sg._wait_for_database_config("db1", "abc123", max_retries=2, retry_delay=0)
 
         assert exc_info.value.code == 500
 
