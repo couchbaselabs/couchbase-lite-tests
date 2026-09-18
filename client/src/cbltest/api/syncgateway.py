@@ -1886,21 +1886,6 @@ class _SyncGatewayBase:
         with self._tracer.start_as_current_span("wait_for_database_config", attributes={"cbl.database.name": db_name}):
             await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
-    async def _refresh_database_config(self, db_name: str) -> None:
-        """
-        Make this node apply the database config from the bucket now, rather than at its
-        next config poll, so that a config written on another node takes effect here
-        straight away.  A node that has not loaded the database at all loads it here.
-
-        :param db_name: The name of the database to reload the config for
-        :raises CblSyncGatewayBadResponseError: if the node cannot re-read the config: 404
-            when it serves the database but the config is gone from the bucket, 403 when it
-            does not serve the database at all
-        """
-        _assert_not_null(db_name, "db_name")
-        with self._tracer.start_as_current_span("refresh_database_config", attributes={"cbl.database.name": db_name}):
-            await self._send_request("GET", f"/{db_name}/_config", params={"refresh_config": "true"})
-
     @property
     def caddy(self) -> caddy.Caddy:
         """Gets the Caddy file server running alongside this Sync Gateway"""
@@ -2312,7 +2297,6 @@ class SyncGateway(_SyncGatewayBase):
             Offline and Resyncing included, so there is no transient failure to retry.
         """
         await self._wait_for_db_present(db_name, max_retries=max_retries, retry_delay=retry_delay)
-        await self._refresh_database_config(db_name)
         await self._wait_for_db_state_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
 
     async def _wait_for_db_present(
