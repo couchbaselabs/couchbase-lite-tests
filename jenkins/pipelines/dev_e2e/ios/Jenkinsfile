@@ -39,7 +39,7 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-iphone-01' }
+            agent { label 'mob-e2e-iphone-03' }
             environment {
                 KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
             }
@@ -47,7 +47,7 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run iOS Test"
-                lock("mob-e2e-iphone-01") {
+                lock("mob-e2e-iphone-03") {
                     timeout(time: 60, unit: 'MINUTES') {
                         sh "jenkins/pipelines/dev_e2e/ios/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                     }
