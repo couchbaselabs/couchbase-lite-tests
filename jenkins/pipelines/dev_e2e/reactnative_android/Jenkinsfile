@@ -37,9 +37,9 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mob-e2e-mac-01' }
+            agent { label 'qe-mac-india' }
             options {
-                lock("mob-e2e-android-01")
+                lock("56141JEBF18456")
             }
             steps {
                 echo "Run React Native Android Tests"
