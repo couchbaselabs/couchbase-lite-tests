@@ -1,7 +1,6 @@
 from pathlib import Path
 
 import pytest
-import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import SnapshotUpdater
@@ -13,7 +12,6 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.utils import async_retry_assert
 
 
 @pytest.mark.min_test_servers(1)
@@ -26,12 +24,14 @@ class TestReplicationBehavior(CBLTestClass):
         sync_gateway = cloud.sync_gateways[0]
         await cloud.configure_dataset(dataset_path, "names")
 
-        self.mark_test_step("Delete name_101 through name_150 on sync gateway")
+        self.mark_test_step("Delete name_001 through name_150 on sync gateway")
         all_docs = await sync_gateway.get_all_documents("names")
+        # _all_docs is sorted by ID, so name_150 is the last delete, and the `request_plus` feed it
+        # waits on has already caught up to every sequence allocated before it.
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
-                await sync_gateway.delete_document(row.id, row.revid, "names")
+                await sync_gateway.delete_document(row.id, row.revid, "names", wait_for_caching_feed=name_number == 150)
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
@@ -149,15 +149,17 @@ class TestReplicationBehavior(CBLTestClass):
         }
         cloud.couchbase_servers[0].upsert_document("names", loc_deleted, resurrected_body)
 
-        self.mark_test_step(f"Wait until Sync Gateway has imported the resurrected `{loc_deleted}`")
+        self.mark_test_step(
+            f"Read `{loc_deleted}` on Sync Gateway, which imports the resurrected document on demand, "
+            "and wait for that import to reach the changes feed"
+        )
 
-        async def _confirm_resurrected_on_sg() -> None:
-            remote_doc = await sync_gateway.get_document("names", loc_deleted)
-            assert remote_doc.body.get("name") == resurrected_body["name"], (
-                f"{loc_deleted} on Sync Gateway does not reflect the resurrected content yet"
-            )
-
-        await async_retry_assert(_confirm_resurrected_on_sg, tenacity.wait_fixed(1), tenacity.stop_after_attempt(15))
+        # The admin read performs the on-demand import itself, so the resurrected body comes back
+        # from this call; wait_for_caching_feed then holds until a replicator would see it too.
+        remote_doc = await sync_gateway.get_document("names", loc_deleted, wait_for_caching_feed=True)
+        assert remote_doc.body.get("name") == resurrected_body["name"], (
+            f"{loc_deleted} on Sync Gateway does not reflect the resurrected content: {remote_doc.body}"
+        )
 
         self.mark_test_step("""
             Start a replicator:
