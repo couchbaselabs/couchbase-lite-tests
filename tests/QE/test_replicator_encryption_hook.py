@@ -248,13 +248,14 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
 
         self.mark_test_step("Update existing document in SGW with encryption")
-        await sync_gateway.upsert_documents(
+        await sync_gateway.update_documents(
             "travel",
             [
                 DocumentUpdateEntry(
                     "hotel_400",
                     original_doc.revid,
-                    {
+                    original_doc.body
+                    | {
                         "name": "SGW",
                         "encrypted_field": EncryptedValue("secret_password"),
                     },

@@ -14,7 +14,6 @@ from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_ids, compare_local_and_remote
 from cbltest.responses import ServerVariant
-from cbltest.utils import assert_not_null
 
 
 @pytest.mark.min_test_servers(1)
@@ -157,11 +156,10 @@ class TestReplicationXdcr(CBLTestClass):
                     )
                 )
             elif doc.id == "name_102":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await (
                     cblpytest.clusters[1]
                     .sync_gateways[0]
-                    .delete_document(doc.id, revid, "names", "_default", "_default")
+                    .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -298,11 +296,10 @@ class TestReplicationXdcr(CBLTestClass):
                     )
                 )
             elif doc.id == "name_102":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await (
                     cblpytest.clusters[1]
                     .sync_gateways[0]
-                    .delete_document(doc.id, revid, "names", "_default", "_default")
+                    .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
         self.mark_test_step(

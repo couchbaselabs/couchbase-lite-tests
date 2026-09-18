@@ -500,13 +500,13 @@ class TestDeltaSync(CBLTestClass):
             Update docs in SGW:
                 * Modify the `name` field of the doc (small change).
         """)
-        await sync_gateway.upsert_documents(
+        await sync_gateway.update_documents(
             "posts",
             [
                 DocumentUpdateEntry(
                     "post_1",
                     original_doc.revid,
-                    {"channels": ["group1"], "name": "SGW"},
+                    original_doc.body | {"channels": ["group1"], "name": "SGW"},
                 )
             ],
             collection="posts",
@@ -634,13 +634,13 @@ class TestDeltaSync(CBLTestClass):
                 Update docs in SGW:
                     * Modify content in document "doc1": `"name": "SGW"` (small change)
             """)
-            await sync_gateway.upsert_documents(
+            await sync_gateway.update_documents(
                 "short_expiry",
                 [
                     DocumentUpdateEntry(
                         "doc1",
                         old_revision,
-                        {"name": "SGW"},
+                        sgw_doc_before_update.body | {"name": "SGW"},
                     )
                 ],
             )

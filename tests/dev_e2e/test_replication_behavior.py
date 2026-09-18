@@ -12,7 +12,6 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.utils import assert_not_null
 
 
 @pytest.mark.min_test_servers(1)
@@ -32,8 +31,7 @@ class TestReplicationBehavior(CBLTestClass):
         for row in all_docs.rows:
             name_number = int(row.id[-3:])
             if name_number <= 150:
-                revid = assert_not_null(row.revid, f"Missing revid on {row.id}")
-                await sync_gateway.delete_document(row.id, revid, "names", wait_for_caching_feed=name_number == 150)
+                await sync_gateway.delete_document(row.id, row.revid, "names", wait_for_caching_feed=name_number == 150)
 
         self.mark_test_step("Reset local database, and load `empty` dataset")
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
