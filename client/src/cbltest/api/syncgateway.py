@@ -375,12 +375,22 @@ class ChangesResponseEntry:
         """Gets whether this document was deleted"""
         return self.__deleted
 
+    @property
+    def removed(self) -> list[str]:
+        """
+        Gets the channels this document was removed from, empty unless the entry is a removal
+        notice.  Sync Gateway sends one to a user that has lost access, so an entry carrying
+        this reports that the document went away, not that the user can still see it.
+        """
+        return self.__removed
+
     def __init__(self, entry: dict) -> None:
         seq = entry.get("seq")
         assert isinstance(seq, int | str), f"Unusable sequence in changes feed entry: {seq!r}"
         self.__seq = seq
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
+        self.__removed = cast(list[str], entry.get("removed", []))
         changes_list = cast(list[dict], entry.get("changes", []))
         self.__changes = [cast(str, c.get("rev") or c.get("cv")) for c in changes_list]
 
@@ -1191,22 +1201,63 @@ class _SyncGatewayBase:
         doc_ids: Collection[str],
         scope: str = "_default",
         collection: str = "_default",
-    ) -> ChangesResponse:
+        deleted: bool = False,
+        version_type: str = "rev",
+        since: int | str | None = None,
+    ) -> dict[str, ChangesResponseEntry]:
         """
-        Retry the _doc_ids filtered changes feed until every doc in doc_ids is
-        present and not a tombstone, then return the response.  Raises TimeoutError
-        if they have not all arrived within 60s.
+        Retry the changes feed until every doc in doc_ids has appeared in the wanted state,
+        then return the entry that matched for each.  Raises TimeoutError if they have not
+        all arrived within 60s.
 
         Use this rather than wait_for_document_count when the collection also holds
-        unrelated documents.
+        unrelated documents, or when the documents being waited on are tombstones.
+
+        The feed is read unfiltered and matched here rather than through `_doc_ids`, which
+        `DocIDChangesFeed` serves out of the bucket and so reports documents a replicator
+        still cannot see.  Each poll resumes from the last one's `last_seq`, so a wait that
+        spans several polls re-reads only what has arrived since.
+
+        That resumption is also the one sharp edge: a document is matched once and never
+        looked at again, so a write that changes its state later in the same wait leaves the
+        entry returned for it stale.  Wait on a batch of writes that has already been made,
+        not on one still in flight.  When the documents are already on the feed in another
+        state, pass `since` so that those earlier entries cannot satisfy the wait.
+
+        :param db_name: The name of the Sync Gateway database to query
+        :param doc_ids: The documents to wait for
+        :param scope: The scope to use when querying Sync Gateway
+        :param collection: The collection to use when querying Sync Gateway
+        :param deleted: If True, wait for each document to appear as a tombstone instead of alive
+        :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version
+                             vectors in SGW 4.0+)
+        :param since: Start the wait from this sequence instead of the beginning of the feed.
+                      Pass a sequence captured before the writes being waited on so that an
+                      earlier state of the same documents cannot satisfy the wait
         """
         wanted = set(doc_ids)
+        found: dict[str, ChangesResponseEntry] = {}
+        state = "tombstoned" if deleted else "present"
 
-        async def _wait_for_documents_poll() -> ChangesResponse:
-            changes = await self.get_changes(db_name, scope, collection, doc_ids=sorted(wanted))
-            missing = wanted - {entry.id for entry in changes.results if not entry.deleted}
-            assert not missing, f"Documents missing from {db_name}.{scope}.{collection}: {sorted(missing)}"
-            return changes
+        async def _wait_for_documents_poll() -> dict[str, ChangesResponseEntry]:
+            nonlocal since
+            changes = await self.get_changes(db_name, scope, collection, version_type=version_type, since=since)
+            since = changes.last_seq
+            for entry in changes.results:
+                if entry.id not in wanted or entry.deleted != deleted:
+                    continue
+
+                # A removal notice says the reader lost access, so it answers a wait for the
+                # document going away but never one for the document arriving.  A tombstone on
+                # a user's feed carries both, since a deleted document grants no channels.
+                if entry.removed and not deleted:
+                    continue
+
+                found[entry.id] = entry
+
+            missing = wanted - found.keys()
+            assert not missing, f"Documents not {state} in {db_name}.{scope}.{collection}: {sorted(missing)}"
+            return dict(found)
 
         # Import lands on SGW's polling cadence, not sub-second.
         return await async_retry_assert(
@@ -1442,7 +1493,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Deletes a document from Sync Gateway
@@ -1456,9 +1506,6 @@ class _SyncGatewayBase:
                                       A delete reaches the changes feed on the same asynchronous
                                       cadence as a write, so without this a caller that goes on to
                                       read a feed can still see the document alive
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
         :return: The tombstone.  Its `body` is Sync Gateway's delete acknowledgement rather than
                  document content, and its `seq` is only populated when waiting for the caching feed
         """
@@ -1475,6 +1522,8 @@ class _SyncGatewayBase:
                 new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
             else:
                 new_rev_id = revid
+
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
 
             response = await self._send_request(
                 "delete",
@@ -1589,6 +1638,22 @@ class _SyncGatewayBase:
                 cast(dict, response), db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
             )
 
+    async def get_last_sequence(self, db_name: str) -> int:
+        """
+        Gets the sequence Sync Gateway has most recently allocated in the database.
+
+        Read this before a write to bound the feed read that waits for it: the write lands at a
+        higher sequence, so the wait does not have to re-read the feed from the start.
+
+        :param db_name: The name of the Sync Gateway database to query
+        """
+        with self._tracer.start_as_current_span("get_last_sequence", attributes={"cbl.database.name": db_name}):
+            response = await self._send_request("get", f"/{db_name}/", log_response=False)
+            assert isinstance(response, dict), f"Unusable response from GET /{db_name}/: {response!r}"
+            update_seq = response.get("update_seq")
+            assert isinstance(update_seq, int), f"Unusable update_seq for database {db_name}: {update_seq!r}"
+            return update_seq
+
     async def _document_with_sequence(
         self,
         body: dict,
@@ -1598,7 +1663,7 @@ class _SyncGatewayBase:
         scope: str,
         collection: str,
         tombstone: bool = False,
-        since: int | str | None = None,
+        since: int | None = None,
     ) -> RemoteDocument:
         """Wait for the write `body` describes to reach the caching feed, and return it with its sequence."""
         assert "_rev" in body or "_cv" in body, (
@@ -1613,7 +1678,7 @@ class _SyncGatewayBase:
         # which reads each document straight from the bucket and never waits for the cache.
         #
         # Without a `since` this reads the collection's whole feed, which is quadratic over a loop
-        # of writes.  Callers writing in a loop pass the previous write's sequence to bound it.
+        # of writes, so the caller reads the database's sequence before the write and passes it.
         changes = await self.get_changes(
             db_name,
             scope,
@@ -1649,7 +1714,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Creates a document in Sync Gateway
@@ -1664,9 +1728,6 @@ class _SyncGatewayBase:
                                       document is readable by ID but not yet in the changes feed,
                                       so a caller that reads a feed -- or waits on something
                                       replicating out of this Sync Gateway -- races the write
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
         :return: The created document.  Never None; every failure raises
         :raises CblSyncGatewayBadResponseError: if the write is rejected, or the response is not a
                                                 document
@@ -1680,6 +1741,7 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
             body = dict(document)
             body["_id"] = doc_id  # Ensure document has _id before sending
             response = await self._send_request(
@@ -1725,7 +1787,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
@@ -1741,9 +1802,6 @@ class _SyncGatewayBase:
                                       this update's own sequence rather than a stale pre-write one.
                                       Raises if a concurrent write superseded this one first, since
                                       the feed then reports only that later sequence
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
         :return: The updated document as a RemoteDocument object
         :raises AssertionError: if `wait_for_caching_feed` is set and the response carries no revision,
             or the feed never reported the revision written
@@ -1757,6 +1815,7 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
             body = dict(document)
             body["_id"] = doc_id
             body["_rev"] = rev
@@ -2099,7 +2158,7 @@ class SyncGateway(_SyncGatewayBase):
         :param password: The password for the user that will be added
         :param collection_access: The collections that the user will have access to.  This needs to
             be formatted in the way Sync Gateway expects it, so if you are unsure use
-            :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
+            :func:`create_collection_access_dict()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
         """
         with self._tracer.start_as_current_span("add_user", attributes={"cbl.user.name": name}):
