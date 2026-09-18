@@ -68,11 +68,7 @@ class TestSessionCookieBase(CBLTestClass):
         self.mark_test_step("Creating SGW database.")
         payload = DatabaseConfig(
             bucket=BUCKET_NAME,
-            scopes={
-                "travel": ScopeConfig(
-                    collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}}
-                )
-            },
+            scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
         )
         await cblpytest.sync_gateway_cluster.create_database(SG_DB_NAME, payload)
@@ -109,9 +105,7 @@ class TestSessionCookieBase(CBLTestClass):
         # documents are in SGW's feed.
         # =====================================================================
         self.mark_test_step("Waiting for SGW to import documents from CBS.")
-        await sync_gateway.wait_for_documents(
-            SG_DB_NAME, doc_ids, scope="travel", collection="airlines"
-        )
+        await sync_gateway.wait_for_documents(SG_DB_NAME, doc_ids, scope="travel", collection="airlines")
 
         # =====================================================================
         # Mint the session. This is the credential under test.
@@ -143,9 +137,7 @@ class TestSessionCookieBase(CBLTestClass):
             f"Session cookie rejected by SGW before Edge Server was involved: {status_code} {resp_text}"
         )
 
-    async def _start_edge_server(
-        self, cblpytest: CBLPyTest, tmp_path: Path, session_cookie: str
-    ) -> EdgeServer:
+    async def _start_edge_server(self, cblpytest: CBLPyTest, tmp_path: Path, session_cookie: str) -> EdgeServer:
         """Write an ES config using `session_cookie` auth and start the server on it."""
         sync_gateway = cblpytest.sync_gateways[0]
 
@@ -160,9 +152,7 @@ class TestSessionCookieBase(CBLTestClass):
         es_manager = cblpytest.edge_servers[0]
         return await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
-    async def _assert_replication_works(
-        self, edge_server: EdgeServer, expected_doc_ids: set[str]
-    ) -> None:
+    async def _assert_replication_works(self, edge_server: EdgeServer, expected_doc_ids: set[str]) -> None:
         """
         Assert the replicator started, reached idle, and pulled the freshly seeded
         documents.
@@ -215,9 +205,7 @@ class TestSessionCookieBase(CBLTestClass):
 @pytest.mark.min_edge_servers(1)
 class TestSessionCookie(TestSessionCookieBase):
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_session_cookie_replication(
-        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
-    ) -> None:
+    async def test_session_cookie_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         """
         ES replicates with SGW using a bare session id.
 
@@ -227,9 +215,7 @@ class TestSessionCookie(TestSessionCookieBase):
         doc_prefix = "session_cookie_airline"
         session_id = await self._setup_sgw(cblpytest, doc_prefix)
         seeded_doc_ids = self._seeded_doc_ids(doc_prefix)
-        await self._verify_session_against_sgw(
-            cblpytest, f"SyncGatewaySession={session_id}"
-        )
+        await self._verify_session_against_sgw(cblpytest, f"SyncGatewaySession={session_id}")
 
         # Bare session id — Edge Server adds the prefix.
         edge_server = await self._start_edge_server(cblpytest, tmp_path, session_id)
@@ -239,9 +225,7 @@ class TestSessionCookie(TestSessionCookieBase):
         response = await edge_server.get_all_documents("travel", collection=COLLECTION)
         assert len(response.rows) > 0, "No documents found on Edge Server."
         first_doc_id = response.rows[0].id
-        edge_doc = await edge_server.get_document(
-            "travel", collection=COLLECTION, doc_id=first_doc_id
-        )
+        edge_doc = await edge_server.get_document("travel", collection=COLLECTION, doc_id=first_doc_id)
         assert edge_doc is not None, f"Document {first_doc_id} not retrievable from Edge Server."
         assert "name" in edge_doc.body, f"Document missing 'name' field: {edge_doc.body}"
 
