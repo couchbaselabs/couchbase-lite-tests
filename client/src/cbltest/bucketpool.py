@@ -19,6 +19,10 @@ from cbltest.logging import cbl_trace
 _TOOL_NAME = "bucketpool"
 _PASSWORD_ENV_VAR = "BUCKETPOOL_PASSWORD"
 
+#: Seconds a purge is given before it is treated as hung.  A bucket holding hundreds of
+#: thousands of documents takes minutes, so this is generous on purpose.
+DEFAULT_TIMEOUT = 900.0
+
 
 def tool_path() -> Path:
     """
@@ -49,7 +53,7 @@ async def purge_bucket(
     username: str,
     password: str,
     bucket: str,
-    timeout: float = 120.0,
+    timeout: float = DEFAULT_TIMEOUT,
 ) -> str:
     """
     Removes every document, and every xattr, from all collections of a bucket.  The bucket,

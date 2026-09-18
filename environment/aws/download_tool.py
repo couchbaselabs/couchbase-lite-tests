@@ -37,7 +37,7 @@ _MACOS: Final[str] = "macos"
 _LINUX: Final[str] = "linux"
 
 # The bucketpool release that empties Couchbase Server buckets between tests.
-BUCKETPOOL_VERSION: Final[str] = "0.1.0"
+BUCKETPOOL_VERSION: Final[str] = "0.1.1"
 
 TMP_LOCATION: Final[Path] = SCRIPT_DIR / ".tmp"
 TOOLS_LOCATION: Final[Path] = SCRIPT_DIR.parents[1] / "tests" / ".tools"

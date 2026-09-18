@@ -9,6 +9,7 @@ from unittest.mock import patch
 import pytest
 from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.couchbaseserver import MAX_BUCKETS, BucketCleanupMode, BucketPool, CouchbaseServer
+from cbltest.bucketpool import DEFAULT_TIMEOUT
 from cbltest.plugins.cluster_cleanup import clean_all_buckets
 
 ALL_MODES = [BucketCleanupMode.DELETE, BucketCleanupMode.PURGE]
@@ -49,7 +50,7 @@ class Recorder:
         if name in self.buckets:
             self.buckets.remove(name)
 
-    async def _purge_bucket(self, name: str, timeout: float = 120.0) -> str:
+    async def _purge_bucket(self, name: str, timeout: float = DEFAULT_TIMEOUT) -> str:
         self.purged.append(name)
         return f"purged {name}"
 

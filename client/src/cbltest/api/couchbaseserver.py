@@ -489,7 +489,7 @@ class CouchbaseServer:
         self.delete_bucket(name)
         await self.wait_for_bucket_deleted(name)
 
-    async def purge_bucket(self, name: str, timeout: float = 120.0) -> str:
+    async def purge_bucket(self, name: str, timeout: float = bucketpool.DEFAULT_TIMEOUT) -> str:
         """
         Removes every document, and every xattr, from all collections of a bucket.  The
         bucket, its scopes, its collections and its indexes stay as they are.
