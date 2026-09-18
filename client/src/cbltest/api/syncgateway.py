@@ -673,6 +673,39 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
+class ResyncAction(str, Enum):
+    """The action to perform via POST /{db}/_resync"""
+
+    START = "start"
+    STOP = "stop"
+
+
+class ResyncState(str, Enum):
+    """The state of a Sync Gateway resync process, as reported by /{db}/_resync"""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+class ResyncStatusResponse(BaseModel):
+    """
+    Output of GET /{db}/_resync (and POST /{db}/_resync) endpoints of Sync Gateway
+    """
+
+    status: ResyncState
+    start_time: str = ""
+    last_error: str = ""
+    resync_id: str = ""
+    collections_processing: dict[str, list[str]] | None = None
+    docs_changed: int = 0
+    docs_processed: int = 0
+    docs_errored: int = 0
+    docs_targeted: int = 0
+
+
 class SGCollectRedactLevel(str, Enum):
     """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
 
@@ -2269,6 +2302,35 @@ class SyncGateway(_SyncGatewayBase):
 
         await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
+    async def _wait_for_db_state(
+        self,
+        db_name: str,
+        target_state: DatabaseState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> None:
+        """
+        Wait until this node reports the database in the given state.  Sync Gateway applies
+        a state change in the background, so every config write and every config re-read
+        leaves the database in a transitional state for a while, and a request to a database
+        that is not Online gets a 503.
+
+        :param db_name: Database name to poll.
+        :param target_state: The state to wait for.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        state_name = target_state.value.lower()
+
+        async def _poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            entry = dbs.get(db_name)
+            assert entry is not None, f"{self} stopped serving database {db_name} while it was going {state_name}"
+            assert entry.state == target_state, f"Database {db_name} is not {state_name}: {entry}"
+
+        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
+
     async def _wait_for_db_state_online(
         self,
         db_name: str,
@@ -2277,22 +2339,202 @@ class SyncGateway(_SyncGatewayBase):
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until this node reports the database Online.  Sync Gateway brings a database
-        online in the background, so every config write and every config re-read leaves it
-        Starting for a while, and a request to a database that is not Online gets a 503.
+        Wait until this node reports the database Online.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
         """
+        await self._wait_for_db_state(db_name, DatabaseState.ONLINE, max_retries=max_retries, retry_delay=retry_delay)
 
-        async def _poll() -> None:
-            dbs = await self.get_all_databases_verbose()
-            entry = dbs.get(db_name)
-            assert entry is not None, f"{self} stopped serving database {db_name} while it was coming online"
-            assert entry.state == DatabaseState.ONLINE, f"Database {db_name} is not online: {entry}"
+    async def _wait_for_db_state_offline(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node reports the database Offline.
 
-        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        await self._wait_for_db_state(db_name, DatabaseState.OFFLINE, max_retries=max_retries, retry_delay=retry_delay)
+
+    async def _set_database_offline(
+        self,
+        db_name: str,
+        *,
+        sync_function: str | None = None,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Takes a database offline by POSTing {"offline": true} to its /_config endpoint,
+        replacing a collection's sync function in the same write when one is given.
+
+        Private: use `SyncGatewayCluster.take_database_offline` instead of calling this
+        directly, so that every node in the cluster is offline when the caller returns.
+
+        :param db_name: Database name to take offline.
+        :param sync_function: A new sync function for the collection.  Defaults to leaving
+            the sync function as it is.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection the sync function belongs to (default '_default').
+        """
+        with self._tracer.start_as_current_span("set_database_offline", attributes={"sg.database.name": db_name}):
+            scopes = (
+                {scope: ScopeConfig(collections={collection: {"sync": sync_function}})}
+                if sync_function is not None
+                else None
+            )
+            await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
+
+    async def _put_resync(
+        self,
+        db_name: str,
+        *,
+        action: ResyncAction,
+        reset: bool = False,
+    ) -> ResyncStatusResponse:
+        """
+        Starts or stops a resync operation via POST /{db}/_resync. The database
+        must be offline (see `SyncGatewayCluster.take_database_offline`) before
+        starting a resync.
+
+        :param db_name: The name of the database to resync.
+        :param action: Whether to start or stop the resync operation.
+        :param reset: Whether to discard previous resync progress before starting.
+            Only meaningful when ``action`` is :attr:`ResyncAction.START`.
+        """
+        with self._tracer.start_as_current_span(
+            "put_resync",
+            attributes={"sg.database.name": db_name, "sg.resync.action": action.value},
+        ):
+            params = {"action": action.value, "reset": "true" if reset else "false"}
+            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def start_resync(self, db_name: str, *, reset: bool = False) -> ResyncStatusResponse:
+        """
+        Starts a resync operation via POST /{db}/_resync. The database must be
+        offline (see `SyncGatewayCluster.take_database_offline`) before starting
+        a resync.
+
+        :param db_name: The name of the database to resync.
+        :param reset: Whether to discard previous resync progress before starting.
+        """
+        return await self._put_resync(db_name, action=ResyncAction.START, reset=reset)
+
+    async def stop_resync(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Stops a running resync operation via POST /{db}/_resync.
+
+        :param db_name: The name of the database whose resync operation to stop.
+        """
+        return await self._put_resync(db_name, action=ResyncAction.STOP)
+
+    async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Gets the current resync status via GET /{db}/_resync.
+
+        :param db_name: The name of the database to query.
+        """
+        with self._tracer.start_as_current_span("get_resync_status", attributes={"sg.database.name": db_name}):
+            resp = await self._send_request("get", f"/{db_name}/_resync")
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def _wait_for_resync_state(
+        self,
+        db_name: str,
+        target_state: ResyncState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> ResyncStatusResponse:
+        async def _wait_for_resync_state_poll() -> ResyncStatusResponse:
+            status = await self.get_resync_status(db_name)
+            # A terminal state never becomes the target, so polling it out just wastes the budget.
+            if status.status is ResyncState.ERROR and target_state is not ResyncState.ERROR:
+                raise CblTestError(f"Resync on database {db_name} failed: {status.last_error}")
+            assert status.status == target_state, f"Resync on database {db_name} is {status.status}, not {target_state}"
+            return status
+
+        return await async_retry_assert(
+            _wait_for_resync_state_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
+
+    async def wait_for_resync_running(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 1,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Running, then
+        return its status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.RUNNING,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+    async def wait_for_resync_completed(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 300,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Completed, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.COMPLETED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+    async def wait_for_resync_stopped(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Stopped, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.STOPPED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
 
     async def get_import_count(self, db_name: str) -> int:
         """
