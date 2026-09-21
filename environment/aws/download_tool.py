@@ -29,20 +29,25 @@ from environment.aws.common.output import header
 
 class ToolName(Enum):
     BackupManager = "cbbackupmgr"
+    BucketPool = "bucketpool"
 
 
 _WINDOWS: Final[str] = "windows"
 _MACOS: Final[str] = "macos"
 _LINUX: Final[str] = "linux"
 
+# The bucketpool release that empties Couchbase Server buckets between tests.
+BUCKETPOOL_VERSION: Final[str] = "0.1.1"
+
 TMP_LOCATION: Final[Path] = SCRIPT_DIR / ".tmp"
+TOOLS_LOCATION: Final[Path] = SCRIPT_DIR.parents[1] / "tests" / ".tools"
 
 
 # CLI entry point
 @click.command()
 @click.argument("name", type=click.Choice([a.value for a in ToolName]), required=True)
-@click.argument("version", type=str, required=True)
-def main(name: str, version: str) -> None:
+@click.argument("version", type=str, required=False)
+def main(name: str, version: str | None) -> None:
     download_tool(ToolName(name), version)
 
 
@@ -72,6 +77,18 @@ def _get_arch(os: str) -> str:
     raise RuntimeError(f"Unsupported architecture: {machine}")
 
 
+def _get_go_arch() -> str:
+    """The architecture name a Go release archive is published under."""
+    machine = platform.machine().lower()
+    if machine in ("x86_64", "amd64"):
+        return "amd64"
+
+    if machine in ("aarch64", "arm64"):
+        return "arm64"
+
+    raise RuntimeError(f"Unsupported architecture: {machine}")
+
+
 def _get_ext(os: str) -> str:
     return "tar.gz" if os == _LINUX else "zip"
 
@@ -83,63 +100,73 @@ def _extract(location: Path) -> None:
         untar_directory(location, location.parent)
 
 
+def tool_path(name: ToolName) -> Path:
+    """The path the given tool is downloaded to, whether or not it exists yet."""
+    binary = f"{name.value}.exe" if _get_os() == _WINDOWS else name.value
+    return TOOLS_LOCATION / name.value / binary
+
+
 # Entry for other scripts to call
-def download_tool(name: ToolName, version: str) -> None:
-    header(f"Downloading {name.value} v{version}")
-    TMP_LOCATION.mkdir(parents=True, exist_ok=True)
+def download_tool(name: ToolName, version: str | None = None) -> None:
     if name == ToolName.BackupManager:
-        download_cbbackupmgr(version)
+        if version is None:
+            raise RuntimeError(f"{name.value} needs an explicit version")
+
+        os = _get_os()
+        ext = _get_ext(os)
+        url = (
+            f"https://packages.couchbase.com/releases/{version}/"
+            f"couchbase-server-dev-tools-{version}-{os}_{_get_arch(os)}.{ext}"
+        )
+    elif name == ToolName.BucketPool:
+        version = version or BUCKETPOOL_VERSION
+        os = _get_os()
+        # The release archives use the Go platform names, so macos is darwin here.
+        go_os = "darwin" if os == _MACOS else os
+        ext = "zip" if os == _WINDOWS else "tar.gz"
+        url = (
+            f"https://github.com/couchbaselabs/bucketpool/releases/download/v{version}/"
+            f"{name.value}_{version}_{go_os}_{_get_go_arch()}.{ext}"
+        )
     else:
         raise RuntimeError(f"Unsupported tool: {name.value}")
 
+    header(f"Downloading {name.value} v{version}")
+    _install(name, version, url, ext)
 
-def download_cbbackupmgr(version: str) -> None:
-    os = _get_os()
-    arch = _get_arch(os)
-    ext = _get_ext(os)
 
-    dest_dir = SCRIPT_DIR.parent.parent / "tests" / ".tools" / ToolName.BackupManager.value
-    dest_name = f"{ToolName.BackupManager.value}.exe" if os == _WINDOWS else ToolName.BackupManager.value
-    dest_version_name = ".version"
-    version_location = dest_dir / dest_version_name
-    if version_location.exists():
-        existing_version = version_location.read_text().strip()
-        if existing_version == version and (dest_dir / dest_name).exists():
-            click.secho("\t...already downloaded", fg="green")
-            return
+def _install(name: ToolName, version: str, url: str, ext: str) -> None:
+    """Downloads an archive, finds the tool inside it, and puts it in `tests/.tools`."""
+    location = tool_path(name)
+    version_location = location.parent / ".version"
+    if version_location.exists() and location.exists() and version_location.read_text().strip() == version:
+        click.secho("\t...already downloaded", fg="green")
+        return
 
-    location = dest_dir / dest_name
     version_location.unlink(missing_ok=True)
     location.unlink(missing_ok=True)
+    location.parent.mkdir(parents=True, exist_ok=True)
 
-    dest_dir.mkdir(parents=True, exist_ok=True)
-    url = f"https://packages.couchbase.com/releases/{version}/couchbase-server-dev-tools-{version}-{os}_{arch}.{ext}"
+    TMP_LOCATION.mkdir(parents=True, exist_ok=True)
     download = requests.get(url, stream=True)
     download.raise_for_status()
     tmp_file = TMP_LOCATION / f"download.{ext}"
     download_progress_bar(download, tmp_file)
     _extract(tmp_file)
     tmp_file.unlink()
+
+    matches = [match for match in TMP_LOCATION.rglob(location.name) if match.is_file()]
+    if not matches:
+        raise RuntimeError(f"Could not find {location.name} in the archive downloaded from {url}")
+
+    shutil.copy2(matches[0], location)
+    shutil.rmtree(TMP_LOCATION)
     version_location.write_text(version)
 
-    # Find the cbbackupmgr binary in the extracted contents under TMP_LOCATION
-    target_in_archive = "cbbackupmgr.exe" if os == _WINDOWS else "cbbackupmgr"
-    matches = list(TMP_LOCATION.rglob(target_in_archive))
-    if not matches:
-        raise RuntimeError(f"Could not find {target_in_archive} in extracted archive {tmp_file}")
+    if _get_os() != _WINDOWS:
+        mode = location.stat().st_mode
+        location.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
-    # Choose the first match
-    src_path = next(match for match in matches if match.is_file())
-    shutil.copy2(src_path, location)
-    shutil.rmtree(TMP_LOCATION)
-
-    # Ensure executable on non-Windows
-    if os != _WINDOWS:
-        try:
-            mode = location.stat().st_mode
-            location.chmod(mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
-        except Exception:
-            pass
     click.secho("\t...done", fg="green")
 
 

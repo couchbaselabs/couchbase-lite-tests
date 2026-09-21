@@ -137,6 +137,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 2. **`conftest.py` `dataset_path` fixtures** — three near-identical copies in `tests/dev_e2e/`, `tests/QE/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
 3. **Server build scripts** — the `download_cbl.sh` → `build_*.sh` → package chain applies to the `c` and `ios` platforms; `dotnet` only has `build_cli.sh`/`.ps1`, `jak` builds via Gradle, and `javascript` via `npm`.
 4. **AWS setup scripts** — every `environment/aws/*_setup/setup_*.py` follows: SSH via `paramiko` → SFTP upload → `remote_exec` → start service (Docker / systemd).
+5. **Bucket cleanup mode** — `--bucketpool` picks how `cluster_cleanup` empties a Couchbase Server bucket between tests, through `CouchbaseServer.clean_bucket()`. `purge` (the default) empties the bucket in place with `purge_bucket()`, which runs the downloaded [`bucketpool`](https://github.com/couchbaselabs/bucketpool) tool, and keeps its collections and indexes, so `BucketPool` (`client/src/cbltest/api/couchbaseserver.py`) caps the cluster at 10 buckets and evicts the least recently used one. `delete` drops the bucket instead. There is no pool in `delete` mode, because nothing survives to reuse.
 
 ## CI/CD
 

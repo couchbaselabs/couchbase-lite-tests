@@ -999,14 +999,17 @@ class _SyncGatewayBase:
     async def _wait_for_database_gone(
         self,
         db_name: str,
-        timeout: float = 30.0,
+        timeout: float = 150.0,
         retry_delay: float = 1.0,
     ) -> None:
         """
         Wait until this node stops reporting db_name.
 
         :param db_name: Database the node should stop serving.
-        :param timeout: Seconds to wait, against a default config poll interval of 10s.
+        :param timeout: Seconds to wait.  A node drops a database deleted elsewhere on its
+                        config poll, every 10s by default, but that poll re-reads the config
+                        and skips the removal whenever the read fails transiently, so the
+                        budget has to cover several missed polls.
         :param retry_delay: Seconds between polls.
         :raises TimeoutError: if the node is still serving the database after timeout
         """
@@ -1031,7 +1034,7 @@ class _SyncGatewayBase:
 
         .. warning:: This will not delete the data from the Couchbase Server bucket.
             To delete the data see the
-            :func:`drop_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.drop_bucket>` function
+            :func:`purge_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.purge_bucket>` function
 
         :param db_name: The name of the Database to delete
         :param retry_count: Retries already spent on this delete

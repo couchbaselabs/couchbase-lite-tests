@@ -201,6 +201,7 @@ def setup_test(
             json.dump(topology, fout, indent=4)
 
     download_tool(ToolName.BackupManager, couchbase_server_version)
+    download_tool(ToolName.BucketPool)
 
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(

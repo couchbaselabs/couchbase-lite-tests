@@ -8,7 +8,7 @@ You own everything under `tests/`:
 - `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
 - `tests/QE/` — QA suite, including an edge-server sub-suite
 - `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
-- `tests/.tools/` — binary tools used during tests (e.g. `cbbackupmgr`)
+- `tests/.tools/` — binary tools used during tests (`cbbackupmgr`, `bucketpool`)
 
 You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you understand how they wire into your tests.
 
@@ -77,7 +77,8 @@ tests/
 │   └── upgrade_test_helpers.py
 │
 └── .tools/
-    └── cbbackupmgr/                    # Couchbase Backup Manager binary
+    ├── cbbackupmgr/                    # Couchbase Backup Manager binary
+    └── bucketpool/                     # Bucket purge helper binary
 ```
 
 ## Test Pattern (use this exact shape)
