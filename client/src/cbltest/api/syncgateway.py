@@ -11,6 +11,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
 from urllib.parse import urlencode, urljoin
+from uuid import uuid4
 
 import aiofiles
 import packaging.version
@@ -939,7 +940,7 @@ class _SyncGatewayBase:
         delta = db_section.get("delta_sync")
         return delta if isinstance(delta, dict) else {}
 
-    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Upsert a database configuration on the Sync Gateway instance
 
@@ -949,11 +950,17 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("update_database_config", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("post", f"/{db_name}/_config", payload)
+            return payload.feed_type
 
-    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Attempts to create a database on the Sync Gateway instance
 
@@ -962,9 +969,15 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("put_database", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("put", f"/{db_name}/", payload)
+            return payload.feed_type
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -1724,20 +1737,59 @@ class _SyncGatewayBase:
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
 
-    async def _refresh_database_config(self, db_name: str) -> None:
+    async def _get_database_runtime_config(self, db_name: str) -> dict:
         """
-        Make this node apply the database config from the bucket now, rather than at its
-        next config poll, so that a config written on another node takes effect here
-        straight away.  A node that has not loaded the database at all loads it here.
+        Gets the config this node is running for a database, rather than the config that
+        is stored in the bucket, with a value filled in for every setting the config it
+        was given left out.
 
-        :param db_name: The name of the database to reload the config for
-        :raises CblSyncGatewayBadResponseError: if the node cannot re-read the config: 404
-            when it serves the database but the config is gone from the bucket, 403 when it
-            does not serve the database at all
+        :param db_name: The name of the database to get the running configuration for
+        :return: The configuration this node is running, as JSON
         """
         _assert_not_null(db_name, "db_name")
-        with self._tracer.start_as_current_span("refresh_database_config", attributes={"cbl.database.name": db_name}):
-            await self._send_request("GET", f"/{db_name}/_config", params={"refresh_config": "true"})
+        with self._tracer.start_as_current_span(
+            "get_database_runtime_config", attributes={"cbl.database.name": db_name}
+        ):
+            resp = await self._send_request("GET", f"/{db_name}/_config", params={"include_runtime": "true"})
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def _wait_for_database_config(
+        self,
+        db_name: str,
+        sentinel: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node runs the revision of the config the given sentinel
+        identifies.  A node picks up a config another node wrote on its next config poll,
+        and loads the database if it did not serve it before.
+
+        :param db_name: The database whose config to wait for.
+        :param sentinel: The sentinel value :func:`_put_database` or
+            :func:`_update_database_config` returned.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        :raises TimeoutError: if the node is not running the config once the polls run out
+        """
+
+        async def _poll() -> None:
+            try:
+                actual = await self._get_database_runtime_config(db_name)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code not in (403, 404, 503):
+                    raise
+                raise AssertionError(f"{self} does not serve database {db_name} yet ({e.code})") from e
+
+            running = actual.get("feed_type")
+            assert running == sentinel, (
+                f"{self} is not running config {sentinel} for {db_name}, it is running {running!r}"
+            )
+
+        with self._tracer.start_as_current_span("wait_for_database_config", attributes={"cbl.database.name": db_name}):
+            await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
     @property
     def caddy(self) -> caddy.Caddy:
@@ -2137,20 +2189,14 @@ class SyncGateway(_SyncGatewayBase):
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until the SGW node serves the database, force one config re-read so that
-        the caller does not go on to use a config version the node cached earlier, then
-        wait until the node reports the database as Online again, because the re-read
-        re-opens the database on the node.
+        Wait until the SGW node serves the database, then wait until it reports that
+        database as Online.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each of the two waits.
         :param retry_delay: Seconds between polls.
-        :raises CblSyncGatewayBadResponseError: if the config is gone by the time the node
-            is asked to re-read it.  A database it still serves re-reads in any state,
-            Offline and Resyncing included, so there is no transient failure to retry.
         """
         await self._wait_for_db_present(db_name, max_retries=max_retries, retry_delay=retry_delay)
-        await self._refresh_database_config(db_name)
         await self._wait_for_db_state_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
 
     async def _wait_for_db_present(
