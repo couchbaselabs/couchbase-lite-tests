@@ -20,6 +20,7 @@ Test basic multipeer mesh replication sanity with a small number of documents.
    * Verify no replicator errors
 6. Check that all device databases have the same content:
    * All databases should have identical documents
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 7. Stop multipeer replicator on all devices.
 
 ## test_large_mesh_consistency
@@ -41,6 +42,7 @@ Test multipeer mesh replication consistency with documents added on all devices.
    * Verify no replicator errors
 6. Check that all device databases have the same content:
    * All databases should have identical documents from all devices
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 7. Stop multipeer replicator on all devices.
 
 ## test_scalable_conflict_resolution
@@ -118,6 +120,7 @@ Test network partition scenarios with peer groups in multipeer mesh replication.
 15. Verify all devices have all documents:
     * All devices should have 300 documents total (100 from each group)
     * All databases should have identical content
+    * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 16. Stop all multipeer replicators.
 
 ## test_dynamic_peer_addition_removal
@@ -159,6 +162,7 @@ Test dynamic peer addition and removal during active replication in multipeer me
 13. Verify remaining devices achieve full data consistency:
     * All remaining devices should have the same document count
     * All databases should have identical content
+    * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 14. Stop all remaining multipeer replicators.
 
 ## test_large_document_replication
@@ -180,4 +184,5 @@ Test multipeer mesh replication with large documents containing blobs.
 6. Check that all device databases have the same content:
    * Each device should have exactly 10 documents
    * All databases should have identical content including blobs
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 7. Stop multipeer replicator on all devices.

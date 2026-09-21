@@ -106,9 +106,8 @@ class TestReplicationXdcr(CBLTestClass):
         # via XDCR use version vectors, so their revids are not comparable.
         local_docs = await db.get_all_documents("_default._default")
         remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        assert compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows).success, (
-            "Local database and SG2 should have the same docs"
-        )
+        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
+        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
 
         self.mark_test_step("""
             Update documents in the local database.
@@ -247,9 +246,8 @@ class TestReplicationXdcr(CBLTestClass):
         # via XDCR use version vectors, so their revids are not comparable.
         local_docs = await db.get_all_documents("_default._default")
         remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        assert compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows).success, (
-            "Local database and SG2 should have the same docs"
-        )
+        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
+        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
 
         self.mark_test_step("""
             Update documents in the local database.

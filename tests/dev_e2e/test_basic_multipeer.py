@@ -59,10 +59,9 @@ class TestMultipeer(CBLTestClass):
         )
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])
 
@@ -115,9 +114,8 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Check that all device databases have the same content")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         await asyncio.gather(*[multipeer.stop() for multipeer in multipeer_replicators])

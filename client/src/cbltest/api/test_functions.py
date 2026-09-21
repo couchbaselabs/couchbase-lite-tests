@@ -54,11 +54,17 @@ class DocsCompareResult:
         self.__success = success
         self.__message = message
 
+    def __bool__(self) -> bool:
+        return self.__success
+
+    def __str__(self) -> str:
+        return "documents match" if self.__success else (self.__message or "documents do not match")
+
 
 _test_function_tracer = get_tracer("test_functions", VERSION)
 
 
-def compare_doc_results(
+def _compare_doc_results(
     local: list[AllDocumentsEntry],
     remote: list[AllDocumentsResponseRow],
     mode: ReplicatorType,
@@ -116,7 +122,7 @@ def compare_doc_results(
         return DocsCompareResult(True)
 
 
-def compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]) -> DocsCompareResult:
+def _compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]) -> DocsCompareResult:
     local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
     remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
 
@@ -133,7 +139,7 @@ def compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocu
     return DocsCompareResult(True)
 
 
-def compare_doc_ids(
+def _compare_doc_ids(
     local: list[AllDocumentsEntry],
     remote: list[AllDocumentsResponseRow],
 ) -> DocsCompareResult:
@@ -153,6 +159,54 @@ def compare_doc_ids(
     return DocsCompareResult(True)
 
 
+def compare_doc_results(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsResponseRow],
+    mode: ReplicatorType,
+) -> None:
+    """
+    Asserts that a list of local documents and a list of remote documents are consistent,
+    as described in :func:`_compare_doc_results()<cbltest.api.test_functions._compare_doc_results>`
+
+    :param local: The list of documents from the local side (Couchbase Lite)
+    :param remote: The list of documents from the remote side (Sync Gateway)
+    :param mode: The mode of replication that was run
+    :raises AssertionError: If the documents are not consistent
+    """
+    result = _compare_doc_results(local, remote, mode)
+    assert result.success, str(result)
+
+
+def compare_doc_results_p2p(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsEntry],
+) -> None:
+    """
+    Asserts that two peers hold the same documents at the same revisions
+
+    :param local: The list of documents from the local peer
+    :param remote: The list of documents from the remote peer
+    :raises AssertionError: If a document is missing from either peer or has a different revision
+    """
+    result = _compare_doc_results_p2p(local, remote)
+    assert result.success, str(result)
+
+
+def compare_doc_ids(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsResponseRow],
+) -> None:
+    """
+    Asserts that the local and remote sides hold the same document IDs, ignoring revisions
+
+    :param local: The list of documents from the local side (Couchbase Lite)
+    :param remote: The list of documents from the remote side (Sync Gateway)
+    :raises AssertionError: If a document ID is missing from either side
+    """
+    result = _compare_doc_ids(local, remote)
+    assert result.success, str(result)
+
+
 async def compare_local_and_remote(
     local: Database,
     remote: SyncGateway,
@@ -163,8 +217,10 @@ async def compare_local_and_remote(
 ) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
-    :func:`compare_doc_results()<cbltest.api.test_functions.compare_doc_results>` function
+    :func:`_compare_doc_results()<cbltest.api.test_functions._compare_doc_results>` function
     for each collection
+
+    :raises AssertionError: If the documents in any collection are not consistent
     """
     with _test_function_tracer.start_as_current_span("compare_local_and_remote"):
         lite_all_docs = await local.get_all_documents(*collections)
@@ -181,5 +237,5 @@ async def compare_local_and_remote(
                 lite_docs = [entry for entry in lite_docs if entry.id in doc_ids]
                 sg_docs = [entry for entry in sg_docs if entry.id in doc_ids]
 
-            compare_result = compare_doc_results(lite_docs, sg_docs, mode)
+            compare_result = _compare_doc_results(lite_docs, sg_docs, mode)
             assert compare_result.success, f"{compare_result.message} ({collection})"

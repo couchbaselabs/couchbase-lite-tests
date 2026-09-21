@@ -24,6 +24,7 @@ two SG clusters.
 9. Wait 5 secs to ensure that the docs are sync between two SGs.
 10. Check that all docs are replicated correctly at SG1.
 11. Check that all docs are replicated correctly at SG2.
+    * Verify that the local database and SG2 have the same document IDs.
 12. Update documents in the local database.
     * Add 1 docs in default collection.
     * Update 1 docs in default collection.
@@ -61,6 +62,7 @@ data sync continues when one SG node goes offline.
 9.	Wait 5 seconds to ensure docs are synced between SGs.
 10.	Check that all docs are replicated correctly at SG1.
 11.	Check that all docs are replicated correctly at SG2.
+	* Verify that the local database and SG2 have the same document IDs.
 12.	Update documents in the local database:
 	* Add 1 doc in default collection
 	* Update 1 doc in default collection

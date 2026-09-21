@@ -19,6 +19,7 @@ Test long-running multipeer replication with periodic CRUD and device restarts.
    * Randomly stop and restart a subset of devices (up to 50%).
 6. After each cycle, wait for all devices to reach idle without errors.
 7. Verify all devices have identical document content after each cycle.
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1.
 8. Stop all multipeer replicators.
 
 ## test_volume_with_blobs
@@ -36,6 +37,7 @@ Test large-scale multipeer replication with documents containing blobs.
    * collections: `_default._default`
 6. Wait for all devices to reach idle without errors (extended timeout).
 7. Verify all devices have identical document content.
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1.
 8. Stop all multipeer replicators.
 
 ## test_multipeer_end_to_end
@@ -57,5 +59,6 @@ Test end-to-end replication across Couchbase Server, Sync Gateway, and multipeer
    * Restart one multipeer device during operations
 7. Wait for all replicators to reach idle without errors.
 8. Verify all devices have identical document content.
+   * For each device other than device 1, verify that the device has the same document IDs and revisions as device 1.
 9. Verify documents are replicated correctly to SGW1 and SGW2.
 10. Stop all multipeer replicators and clean up test servers.

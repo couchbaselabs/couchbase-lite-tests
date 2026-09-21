@@ -100,11 +100,9 @@ class TestPeerToPeerTopology(CBLTestClass):
             self.mark_test_step(f"Check that all device databases have the replicated documents after phase {phase}")
             all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
             all_docs_results = await asyncio.gather(*all_docs_collection)
-            for all_docs in all_docs_results[1:]:
-                assert compare_doc_results_p2p(
-                    all_docs_results[0]["_default._default"],
-                    all_docs["_default._default"],
-                ), f"All databases should have the same content after phase {phase}"
+            for peer_idx, all_docs in enumerate(all_docs_results[1:], 2):
+                self.mark_test_step(f"Verify that peer {peer_idx} has the same document IDs and revisions as peer 1")
+                compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
             self.mark_test_step(f"Stop listeners after phase {phase}")
             for _, listener in listeners:
@@ -191,9 +189,10 @@ class TestPeerToPeerTopology(CBLTestClass):
             )
             source_docs = await source_db.get_all_documents("_default._default")
             target_docs = await all_dbs[target_peer_idx].get_all_documents("_default._default")
-            assert compare_doc_results_p2p(source_docs["_default._default"], target_docs["_default._default"]), (
-                f"Peer {phase} and peer {target_peer_idx + 1} should have the same content after phase {phase}"
+            self.mark_test_step(
+                f"Verify that peer {target_peer_idx + 1} has the same document IDs and revisions as peer {phase}"
             )
+            compare_doc_results_p2p(source_docs["_default._default"], target_docs["_default._default"])
 
             self.mark_test_step(f"Stop listener after phase {phase}")
             await listener.stop()
@@ -202,7 +201,6 @@ class TestPeerToPeerTopology(CBLTestClass):
         self.mark_test_step("Verify all device databases have converged to the same content after all phases")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content after all phases complete"
-            )
+        for peer_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that peer {peer_idx} has the same document IDs and revisions as peer 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])

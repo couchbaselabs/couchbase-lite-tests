@@ -18,9 +18,11 @@ Test peer-to-peer replication between a listener and a client, including concurr
    * continuous: `continuous`
 5. Wait for replication to complete (Target activity: IDLE if continuous, STOPPED if not).
 6. Check that all documents are replicated correctly and both databases have the same content.
+   * Verify that Device-2 has the same document IDs and revisions as Device-1.
 7. Perform concurrent updates to documents on both the listener (Device-1) and the client (Device-2).
 8. Wait for replication to complete after the updates.
 9. Check that all updated documents are replicated correctly and databases match.
+   * Verify that Device-2 has the same document IDs and revisions as Device-1.
 10. Stop the listener on Device-1.
 
 ## test_peer_to_peer_oneClient_toManyServers
@@ -34,6 +36,7 @@ Test a peer-to-peer topology where a single client device replicates concurrentl
 5. Setup and start Replicator 2 on Device-1 pointing to Device-3's listener endpoint.
 6. Wait for both Replicator 1 and Replicator 2 to complete replication.
 7. Check that all documents are replicated correctly across all three databases.
+   * For each device other than Device-1, verify that the device has the same document IDs and revisions as Device-1.
 8. Stop the listeners on Device-2 and Device-3.
 
 ## test_peer_to_peer_oneServer_toManyClients
@@ -47,6 +50,7 @@ Test a peer-to-peer topology where multiple client devices replicate concurrentl
 5. Setup and start a Replicator on Device-3 pointing to Device-1's listener endpoint.
 6. Wait for both replicators on Device-2 and Device-3 to complete.
 7. Check that all documents are replicated correctly across all three databases.
+   * For each device other than Device-1, verify that the device has the same document IDs and revisions as Device-1.
 8. Stop the listener on Device-1.
 
 ## test_peer_to_peer_oneServer_twoClients_on_single_db
@@ -59,6 +63,7 @@ Test peer-to-peer replication behavior when multiple distinct replication sessio
 4. Setup and start three separate replicator sessions on Device-2, all using Device-2's `db1` and pointing to Device-1's listener endpoint.
 5. Wait for replication to complete on all 3 sessions.
 6. Check that all documents are replicated correctly and both databases match.
+   * Verify that Device-2 has the same document IDs and revisions as Device-1.
 7. Stop the listener on Device-1.
 
 ## test_peer_to_peer_replication_with_multiple_dbs
@@ -74,6 +79,7 @@ Test concurrent peer-to-peer replication scaling across multiple databases (DB1,
 4. Setup and start 3 separate replicators on Device-1 corresponding to each database, pointing to their respective listener endpoints on Device-2.
 5. Wait for replication to complete on all 3 replicator sessions.
 6. Check that all documents are replicated correctly across all database pairs (Device-1 DBs match Device-2 DBs).
+   * Verify that `db2` and `db3` on Device-2 have the same document IDs and revisions as `db1` on Device-2.
 7. Stop all 3 listeners on Device-2.
 
 ## test_peer_to_peer_with_server_down
@@ -90,4 +96,5 @@ Test the resilience of peer-to-peer replication when the listener server goes of
    * Perform document updates on Device-2.
 6. Restart the replicator on Device-2 if necessary, and wait for replication to complete.
 7. Check that all updated documents are successfully replicated to Device-1 despite the listener restart.
+   * Verify that Device-2 has the same document IDs and revisions as Device-1.
 8. Stop the new listener on Device-1.
