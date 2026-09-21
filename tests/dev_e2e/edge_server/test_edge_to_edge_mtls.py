@@ -14,14 +14,7 @@ CERT_DIR = "/home/ec2-user/cert"
 
 @pytest.mark.min_edge_servers(2)
 class TestEdgeToEdgeMTLS(CBLTestClass):
-    """Edge-to-edge replication authenticated with a TLS client certificate (mTLS).
-
-    A source Edge Server replicates to a target Edge Server over mutual TLS: the
-    source presents a client certificate (auth.tls_client_cert /
-    tls_client_cert_key) while the target verifies incoming clients against a CA
-    (https.client_cert_path). The client cert/key are given as file paths in a
-    config-file replications block, matching the customer's setup.
-    """
+    """Edge-to-edge replication over mTLS. See spec/tests/dev_e2e/015-edge-to-edge-mtls.md."""
 
     async def _wait_for_status(self, es: EdgeServer, wanted: set[str], timeout: int = 90) -> dict:
         """Poll the replication task list until the first task's status is in `wanted`.
@@ -47,8 +40,8 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_mtls_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_edge_to_edge_mtls_replication")
-        source = cblpytest.edge_servers[0]  # replication client (presents the cert)
-        target = cblpytest.edge_servers[1]  # passive mTLS server (verifies the cert)
+        source = cblpytest.edge_servers[0]
+        target = cblpytest.edge_servers[1]
         target_host = str(target)
 
         self.mark_test_step("Generate CA, target server cert (SAN=target host), and client cert")
@@ -65,7 +58,7 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
             db_name="db", config_file=f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_target.json"
         )
 
-        self.mark_test_step("Push client cert/key (plain PEM) + CA to the source host")
+        self.mark_test_step("Push client cert/key + CA to the source host")
         await source.write_file(f"{CERT_DIR}/client.crt", cert_pem(client_cert))
         await source.write_file(f"{CERT_DIR}/client.key", key_pem(client_key))
         await source.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
