@@ -59,7 +59,7 @@ class TestSnapshotVerify:
                 [{"test": "value"}],
             )
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is True, f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
@@ -74,7 +74,7 @@ class TestSnapshotVerify:
         async with db.batch_updater() as b:
             self.delete_multiple([b, snapshot_updater], "_default._default", "name_1")
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is True, f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
@@ -91,7 +91,7 @@ class TestSnapshotVerify:
         snapshot_updater.delete_document("_default._default", "name_1")
 
         snapshot_updater.delete_document("_default._default", "name_2")
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
@@ -107,7 +107,7 @@ class TestSnapshotVerify:
         async with db.batch_updater() as b:
             self.purge_multiple([b, snapshot_updater], "_default._default", "name_1")
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is True, f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
@@ -124,7 +124,7 @@ class TestSnapshotVerify:
         snapshot_updater.purge_document("_default._default", "name_1")
 
         snapshot_updater.purge_document("_default._default", "name_2")
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
@@ -141,7 +141,7 @@ class TestSnapshotVerify:
             b.upsert_document("_default._default", "name_1", [{"name.first": "Value"}])
 
         snapshot_updater.upsert_document("_default._default", "name_1", [{"name.first": "bad_value"}])
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert verify_result.actual.exists and verify_result.actual.value == "Value", "Incorrect 'actual' in response"
@@ -160,7 +160,7 @@ class TestSnapshotVerify:
             b.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
 
         snapshot_updater.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@baz.com"}])
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com", (
@@ -181,7 +181,7 @@ class TestSnapshotVerify:
             b.upsert_document("_default._default", "name_1", [{"contact.email[0]": "foo@bar.com"}])
 
         snapshot_updater.upsert_document("_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}])
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert verify_result.actual.exists and verify_result.actual.value == "foo@bar.com", (
@@ -202,7 +202,7 @@ class TestSnapshotVerify:
             b.upsert_document("_default._default", "name_1", removed_properties=["contact.email"])
 
         snapshot_updater.upsert_document("_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}])
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists, "'actual' should be missing"
@@ -222,7 +222,7 @@ class TestSnapshotVerify:
             b.upsert_document("_default._default", "name_1", [{"contact.email[1]": "foo@bar.com"}])
 
         snapshot_updater.upsert_document("_default._default", "name_1", removed_properties=["contact.email"])
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert verify_result.actual.exists and verify_result.actual.value == [
@@ -240,7 +240,7 @@ class TestSnapshotVerify:
         snapshot_updater = SnapshotUpdater(snapshot_id)
         snapshot_updater.purge_document("_default._default", "name_2")
         with pytest.raises(CblTestServerBadResponseError, match="returned 400"):
-            await db.verify_documents(snapshot_updater)
+            await db._get_verify_document_result(snapshot_updater)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_wrongly_existing_doc(self, cblpytest: CBLPyTest) -> None:
@@ -251,7 +251,7 @@ class TestSnapshotVerify:
         async with db.batch_updater() as b:
             b.upsert_document("_default._default", "foo_1", [{"contact.email[1]": "foo@bar.com"}])
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, (
@@ -267,7 +267,7 @@ class TestSnapshotVerify:
         async with db.batch_updater() as b:
             b.delete_document("_default._default", "name_1")
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, (
@@ -284,7 +284,7 @@ class TestSnapshotVerify:
         async with db.batch_updater() as b:
             b.delete_document("_default._default", "name_1")
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.description is not None, "Response should contain a description"
         assert not verify_result.actual.exists and not verify_result.actual.exists and verify_result.document is None, (
@@ -305,7 +305,7 @@ class TestSnapshotVerify:
                 new_blobs={"picture": "s1.jpg"},
             )
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is True, f"The verification failed: {verify_result.description}"
         assert not verify_result.actual.exists, "Response should not contain 'actual'"
         assert not verify_result.expected.exists, "Response should not contain 'expected'"
@@ -322,6 +322,36 @@ class TestSnapshotVerify:
 
         snapshot_updater.upsert_document("_default._default", "name_1", new_blobs={"picture": "s2.jpg"})
 
-        verify_result = await db.verify_documents(snapshot_updater)
+        verify_result = await db._get_verify_document_result(snapshot_updater)
         assert verify_result.result is False, "The verification passed"
         assert verify_result.document is not None, "Response should contain 'document'"
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_verify_assert_passes(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
+        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "name_1")])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            self.upsert_multiple([b, snapshot_updater], "_default._default", "name_1", [{"test": "value"}])
+
+        await db.verify_documents(snapshot_updater)
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_verify_assert_fails(self, cblpytest: CBLPyTest) -> None:
+        db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
+        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "name_1")])
+
+        snapshot_updater = SnapshotUpdater(snapshot_id)
+        async with db.batch_updater() as b:
+            b.upsert_document("_default._default", "name_1", [{"name.first": "Value"}])
+
+        snapshot_updater.upsert_document("_default._default", "name_1", [{"name.first": "bad_value"}])
+        with pytest.raises(AssertionError) as e:
+            await db.verify_documents(snapshot_updater)
+
+        message = str(e.value)
+        assert "name.first" in message, f"Missing key path in '{message}'"
+        assert "expected: bad_value" in message, f"Missing expected value in '{message}'"
+        assert "actual: Value" in message, f"Missing actual value in '{message}'"
+        assert "document: " in message, f"Missing document body in '{message}'"
