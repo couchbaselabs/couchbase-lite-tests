@@ -121,10 +121,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
         self.mark_test_step("Perform concurrent updates to both listener and client")
         for i in range(3):
             await asyncio.gather(
@@ -143,10 +142,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener.stop()
@@ -225,10 +223,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -304,10 +301,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -395,10 +391,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -498,10 +493,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in server_db_list]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for db_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that db{db_idx} on Device-2 has the same document IDs and revisions as db1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
@@ -578,10 +572,9 @@ class TestPeerToPeer(CBLTestClass):
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stop listener")
         await listener1.stop()
