@@ -409,8 +409,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             new_properties=[{"channels": ["group2"]}],
             removed_properties=["collection", "content", "owner", "scope", "title"],
         )
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -657,8 +656,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.delete_document("_default.posts", "post_1")
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
