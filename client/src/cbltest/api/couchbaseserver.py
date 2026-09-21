@@ -55,7 +55,7 @@ class BucketCleanupMode(StrEnum):
 
 
 #: How many buckets may exist on the cluster at once when buckets are reused.
-MAX_BUCKETS = 10
+MAX_BUCKETS = 5
 
 
 class BucketPool:
