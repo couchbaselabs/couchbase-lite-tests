@@ -1,8 +1,9 @@
 # Test Cases
 
-## #1 test_nonconflict_case_1
+## #1 Non Conflict Cases
 
-### Description
+### #1.1 test_nonconflict_case_1 (push_pre_upgrade_cbl_mutation)
+#### Description
 
 Bidirectional replication where CBL has a pre-upgrade mutation that hasn’t been 
 replicated — a mutation made on CBL before the 4.x upgrade has not yet been pushed.
@@ -18,7 +19,7 @@ replicated — a mutation made on CBL before the 4.x upgrade has not yet been pu
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -33,9 +34,8 @@ replicated — a mutation made on CBL before the 4.x upgrade has not yet been pu
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #2 test_nonconflict_case_2
-
-### Description
+### #1.2 test_nonconflict_case_2 (pull_pre_upgrade_sgw_mutation)
+#### Description
 
 Bidirectional replication where SGW has a pre-upgrade mutation that hasn’t been 
 replicated — a mutation made on SGW before the 4.x upgrade has not yet been pulled.
@@ -51,7 +51,7 @@ replicated — a mutation made on SGW before the 4.x upgrade has not yet been pu
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -66,9 +66,8 @@ replicated — a mutation made on SGW before the 4.x upgrade has not yet been pu
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #3 test_nonconflict_case_3
-
-### Description
+### #1.3 test_nonconflict_case_3 (push_pull_pre_upgrade_cbl_mutation_already_on_sgw)
+#### Description
 
 Bidirectional replication where CBL has a pre-upgrade mutation that SGW
 already knows — a mutation made on CBL before the 4.x upgrade has not
@@ -85,7 +84,7 @@ been pushed, but was already pushed earlier by another peer.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -100,9 +99,8 @@ been pushed, but was already pushed earlier by another peer.
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #4test_nonconflict_case_4
-
-### Description
+### #1.4 test_nonconflict_case_4 (push_pull_post_upgrade_sgw_mutation_with_cbl_ancestor)
+#### Description
 
 Bidirectional replication where CBL has a pre-upgrade mutation that is already in
 SGW’s history and SGW includes post-upgrade mutations — a mutation made on CBL
@@ -120,7 +118,7 @@ another peer and already exists in SGW’s revision tree history.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -135,9 +133,8 @@ another peer and already exists in SGW’s revision tree history.
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #5 test_nonconflict_case_5
-
-### Description
+### #1.5 test_nonconflict_case_5 (pull_post_upgrade_sgw_mutation_with_cbl_ancestor)
+#### Description
 
 CBL pull of a post-upgrade mutation that shares a common ancestor with the
 CBL version — SGW has a new mutation with the CBL revTreeID as its ancestor,
@@ -154,7 +151,7 @@ and CBL should recognize it as non-conflicting and pull the new revision.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -169,9 +166,8 @@ and CBL should recognize it as non-conflicting and pull the new revision.
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #6 test_nonconflict_case_6
-
-### Description
+### #1.6 test_nonconflict_case_6 (push_post_upgrade_cbl_mutation_with_sgw_ancestor)
+#### Description
 
 CBL push of a post-upgrade mutation that shares a common ancestor with the
 SGW version — CBL has a post-upgrade mutation with the same revTreeID ancestor
@@ -189,7 +185,7 @@ the pushed revision.
 +------------------+------------------------+------------------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -204,9 +200,10 @@ the pushed revision.
 6. Check that the doc is replicated correctly.
 7. Validate revid and HLV of local and remote doc.
 
-## #7 test_conflict_case_1
+## #2 Conflict Cases
 
-### Description
+### #2.1 test_conflict_case_1 (push_pre_upgrade_conflict)
+#### Description
 
 Push replication with a conflict between pre-upgrade CBL and SGW mutations —
 both sides have conflicting legacy revisions created before the 4.x upgrade.
@@ -222,7 +219,7 @@ both sides have conflicting legacy revisions created before the 4.x upgrade.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -236,9 +233,8 @@ both sides have conflicting legacy revisions created before the 4.x upgrade.
  6. Wait until the replicator is stopped.  
  7. Validate revid and HLV of local and remote doc.
 
-## #8 test_conflict_case_2
-
-### Description
+### #2.2 test_conflict_case_2 (pull_pre_upgrade_conflict_remote_wins)
+#### Description
 
 Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
 resolved by the default conflict resolver where SGW wins — both SGW and CBL
@@ -256,7 +252,7 @@ with SGW chosen as the winner under the legacy default conflict resolution.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -281,9 +277,8 @@ with SGW chosen as the winner under the legacy default conflict resolution.
 10. Check that the doc is replicated correctly.
 11. Validate revid and HLV of local and remote doc.
 
-## #9 test_conflict_case_3
-
-### Description
+### #2.3 test_conflict_case_3 (pull_post_upgrade_sgw_conflict_remote_wins)
+#### Description
 
 Bidirectional replication conflict between a pre-upgrade CBL mutation and a post-upgrade
 SGW mutation, resolved by the default conflict resolver where SGW wins — SGW and CBL
@@ -301,7 +296,7 @@ under the default conflict resolution.
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -326,9 +321,8 @@ under the default conflict resolution.
 10. Check that the doc is replicated correctly.
 11. Validate revid and HLV of local and remote doc.
 
-## #10 test_conflict_case_4
-
-### Description
+### #2.4 test_conflict_case_4 (pull_pre_upgrade_conflict_local_wins)
+#### Description
 
 Bidirectional replication conflict between pre-upgrade CBL and SGW mutations,
 resolved by the default conflict resolver where CBL wins — SGW and CBL have
@@ -347,7 +341,7 @@ as a child of the remote revision and push it to SGW.
 +------------------+---------------+----------------------+---------------+----------------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -371,9 +365,8 @@ as a child of the remote revision and push it to SGW.
 9. Check that the doc is replicated correctly.
 10. Validate revid and HLV of local and remote doc.
 
-## #11 test_conflict_case_5
-
-### Description
+### #2.5 test_conflict_case_5 (pull_post_upgrade_sgw_conflict_local_wins)
+#### Description
 
 Bidirectional replication conflict between a pre-upgrade CBL mutation and
 a post-upgrade SGW mutation, resolved by the default conflict resolver
@@ -392,7 +385,7 @@ the local winning revision as a child of the remote revision and push it to SGW.
 +------------------+-------------+----------------------+-------------+----------------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -416,9 +409,8 @@ the local winning revision as a child of the remote revision and push it to SGW.
 9. Check that the doc is replicated correctly.
 10. Validate revid and HLV of local and remote doc.
 
-## #12 test_conflict_case_6
-
-### Description
+### #2.6 test_conflict_case_6 (pull_post_upgrade_cbl_conflict_local_wins)
+#### Description
 
 Bidirectional replication conflict between a post-upgrade CBL mutation and
 a pre-upgrade SGW mutation, resolved with local wins — SGW and CBL have
@@ -437,7 +429,7 @@ as a child of the remote revision and push it to SGW.
 +------------------+--------------+----------------------+--------------+----------------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -461,9 +453,8 @@ as a child of the remote revision and push it to SGW.
 9. Check that the doc is replicated correctly.
 10. Validate revid and HLV of local and remote doc.
 
-## #13 test_conflict_case_7
-
-### Description
+### #2.7 test_conflict_case_7 (pull_post_upgrade_cbl_conflict_remote_wins)
+#### Description
 
 Bidirectional replication conflict between a post-upgrade CBL mutation and
 a pre-upgrade SGW mutation, resolved with remote wins — SGW and CBL have
@@ -482,7 +473,7 @@ winning revision as a child of the remote revision and push it to SGW.
 +------------------+-------------+-------------+-------------+-------------+
 ```
 
-### Steps
+#### Steps
 
 1. Restore Couchbase Server Bucket using `upgrade` dataset.
 2. Wait for SG to bring the restored database online.
@@ -504,3 +495,15 @@ winning revision as a child of the remote revision and push it to SGW.
 	* continuous: False
 8. Wait until the replicator is stopped.
 9. Validate revid and HLV of local and remote doc.
+
+# Changes
+
+1.1.0 (09/22/2026)
+* Group the test cases into "Non Conflict Cases" and "Conflict Cases" sections.
+* Number the test cases as #<section>.<case> and add a descriptive name after each test name.
+
+1.0.1 (08/26/2026)
+* All test cases: remove the "Delete Sync Gateway database" step and the fixed 2s wait from the setup steps; wait for Sync Gateway to bring the restored database online instead (CBG-5723).
+
+1.0.0 (10/22/2025)
+* Initial version: 6 non-conflict and 7 conflict upgrade test cases.
