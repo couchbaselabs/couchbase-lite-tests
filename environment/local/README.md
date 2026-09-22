@@ -44,8 +44,8 @@ uv run pytest --config "$(cat ../../environment/local/topology_config)"
 - **`--connstr couchbase://<host>`** — use a Couchbase Server you already have running
   (locally, in Docker, on a VM, whatever). This is the only option if you don't have
   Docker/Go available locally.
-- **`--start-cbs`** — have `start_local.py` start (or reuse) a local single-node cluster for
-  you, via the Sync Gateway checkout's
+- **`--start-cbs`** — have `start_local.py` start (or reuse) a local cluster for you (one node
+  unless `--couchbase-servers` asks for more), via the Sync Gateway checkout's
   [`integration-test/start_cbs.py`](https://github.com/couchbase/sync_gateway/blob/main/integration-test/start_cbs.py),
   which drives [`cbdinocluster`](https://github.com/couchbaselabs/cbdinocluster) to deploy a
   Couchbase Server container. Requires Docker and Go on `PATH`; `cbdinocluster` itself is
@@ -66,6 +66,33 @@ previously started cluster if it's still up, tracked via
 manage it directly, use `cbdinocluster`
 (`go run github.com/couchbaselabs/cbdinocluster@latest rm <cluster-id>`) — `start_local.py` has
 no `--stop-cbs` equivalent to `--stop-sync-gateway`.
+
+## Multiple Couchbase Server nodes
+
+`--couchbase-servers N` puts N Couchbase Server nodes in the topology config, for tests marked
+`min_couchbase_servers(N)` — `tests/QE/test_multiple_servers.py` needs 2, since it fails over,
+rebalances and recovers the second node. The flag requires `--server cbs` and a source of nodes:
+
+```bash
+# Allocate a 2-node cbdinocluster cluster
+uv run environment/local/start_local.py --server cbs --start-cbs --couchbase-servers 2 --git-tag main
+
+# Or point at a 2-node cluster you already have
+uv run environment/local/start_local.py --server cbs --couchbase-servers 2 \
+  --connstr couchbase://10.0.0.1,10.0.0.2
+```
+
+With `--start-cbs` the count is passed to `start_cbs.py --nodes`, which allocates the nodes already
+joined into one cluster. Node memory quotas stay at that script's defaults (3 GB kv + 3 GB index per
+node); set `COUCHBASE_KV_MEMORY_MB`/`COUCHBASE_INDEX_MEMORY_MB` if that does not fit your Docker VM.
+
+With `--connstr` the connection string must name exactly `--couchbase-servers` nodes. A connstr
+naming fewer would skip the tests that need them, and one naming more would hand the tests a node
+the cluster does not have, so a mismatch is an error rather than a silent trim.
+
+Each node becomes its own `couchbase-servers` entry in the topology config, addressed on its own
+rather than through the whole connection string: the tests act on nodes individually, which a single
+entry naming every node cannot express.
 
 ## Multiple Sync Gateway instances
 
