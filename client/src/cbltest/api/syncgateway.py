@@ -262,6 +262,11 @@ class ISGRPayload(JSONSerializable):
         return body
 
 
+# The fields DocumentUpdateEntry derives from its own id/revision arguments, which it
+# refuses to take in a body.
+_UPDATE_ENTRY_METADATA = frozenset({"_id", "_rev", "_cv"})
+
+
 class AllDocumentsResponseRow:
     """
     A class representing a single entry in an all_docs response from Sync Gateway
@@ -291,6 +296,14 @@ class AllDocumentsResponseRow:
     def doc(self) -> dict | None:
         """Gets the document body (only available if include_docs=True was used)"""
         return self.__doc
+
+    @property
+    def body(self) -> dict | None:
+        """The document body without the metadata that DocumentUpdateEntry sets itself."""
+        if self.__doc is None:
+            return None
+
+        return {k: v for k, v in self.__doc.items() if k not in _UPDATE_ENTRY_METADATA}
 
     def __init__(
         self,
@@ -447,9 +460,8 @@ class DocumentUpdateEntry(JSONSerializable):
         return bool(self.__body.get("_deleted", False))
 
     def __init__(self, id: str, revision: str | None, body: dict) -> None:
-        assert "_id" not in body, "_id will be overwritten by DocumentUpdateEntry.id"
-        assert "_rev" not in body, "_rev will be overwritten by DocumentUpdateEntry.revision"
-        assert "_cv" not in body, "_cv will be overwritten by DocumentUpdateEntry.revision"
+        for field in _UPDATE_ENTRY_METADATA:
+            assert field not in body, f"{field} will be overwritten from the id/revision arguments"
         self.__body = body.copy()
         self.__body["_id"] = id
         if revision:

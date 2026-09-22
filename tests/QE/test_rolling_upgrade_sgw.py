@@ -149,14 +149,15 @@ class TestSgwRollingUpgrade(CBLTestClass):
         self.mark_test_step("Update all docs on SGW to progress revisions")
         updated_docs: list[DocumentUpdateEntry] = []
         for row in docs_before.rows:
-            if row is None or row.doc is None:
+            body = row.body
+            if body is None:
                 continue
             updated_docs.append(
                 DocumentUpdateEntry(
                     row.id,
                     revs_before[row.id],
                     body={
-                        **row.doc,
+                        **body,
                         "message": f"updated in {upgrade_phase}",
                     },
                 )
