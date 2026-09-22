@@ -123,7 +123,7 @@ class EdgeServerVersion(CouchbaseVersion):
         if not version:
             cbl_warning(f"Could not extract version from Edge Server version string: '{input}'")
             version = "unknown"
-        raw_build = input[first_lparen + 1: first_rparen].strip()
+        raw_build = input[first_lparen + 1 : first_rparen].strip()
         try:
             build = int(raw_build.split(";", 1)[0])
         except ValueError:
