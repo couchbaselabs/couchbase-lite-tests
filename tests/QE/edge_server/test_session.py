@@ -19,7 +19,6 @@ _ADMIN_PASSWORD = "password"
 
 @pytest.mark.min_edge_servers(1)
 class TestEdgeServerSession(CBLTestClass):
-
     @staticmethod
     def _manager(cblpytest: CBLPyTest) -> EdgeServerManager:
         """The manager, which owns user administration and restarts; the client only speaks REST."""
@@ -28,9 +27,7 @@ class TestEdgeServerSession(CBLTestClass):
     async def _configure(self, cblpytest: CBLPyTest) -> EdgeServer:
         return await self._manager(cblpytest).configure_dataset(db_name=_DB, config_file=_CONFIG)
 
-    async def _add_user(
-        self, cblpytest: CBLPyTest, name: str, password: str, role: str = "replicate"
-    ) -> EdgeServer:
+    async def _add_user(self, cblpytest: CBLPyTest, name: str, password: str, role: str = "replicate") -> EdgeServer:
         """Add a user and return a fresh client, since add_user restarts Edge Server."""
         manager = self._manager(cblpytest)
         await manager.add_user(name, password, role=role)
@@ -67,9 +64,7 @@ class TestEdgeServerSession(CBLTestClass):
         edge_server = await self._configure(cblpytest)
 
         self.mark_test_step("Create 3 sessions one after another")
-        sequential = [
-            await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False) for _ in range(3)
-        ]
+        sequential = [await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False) for _ in range(3)]
 
         self.mark_test_step("Create 10 more concurrently")
         concurrent = await asyncio.gather(
@@ -140,9 +135,7 @@ class TestEdgeServerSession(CBLTestClass):
             assert verb == "delete", f"{verb} succeeded against a database that does not exist"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_session_reports_authenticated_caller(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
+    async def test_get_session_reports_authenticated_caller(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Configure Edge Server with the `names` dataset")
         await self._configure(cblpytest)
 

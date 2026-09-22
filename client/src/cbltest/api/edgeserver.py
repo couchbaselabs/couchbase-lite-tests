@@ -123,9 +123,9 @@ class EdgeServerVersion(CouchbaseVersion):
         if not version:
             cbl_warning(f"Could not extract version from Edge Server version string: '{input}'")
             version = "unknown"
-
+        raw_build = input[first_lparen + 1: first_rparen].strip()
         try:
-            build = int(input[first_lparen + 1 : first_rparen].strip())
+            build = int(raw_build.split(";", 1)[0])
         except ValueError:
             cbl_warning(f"Could not parse build number from Edge Server version string: '{input}'")
             build = 0
@@ -819,11 +819,11 @@ class EdgeServer:
             return analyze_bulk_docs_response(resp, CblEdgeServerBadResponseError)
 
     async def create_session(
-            self,
-            db_name: str,
-            username: str,
-            password: str,
-            one_time: bool = True,
+        self,
+        db_name: str,
+        username: str,
+        password: str,
+        one_time: bool = True,
     ) -> str:
         """
         Create a session token via POST /{db}/_session.
@@ -836,16 +836,14 @@ class EdgeServer:
         :return: Session token string
         """
         with self.__tracer.start_as_current_span(
-                "create_session",
-                attributes={
-                    "cbl.database.name": db_name,
-                    "cbl.user.name": username,
-                    "cbl.one_time": one_time,
-                },
+            "create_session",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.user.name": username,
+                "cbl.one_time": one_time,
+            },
         ):
-            async with self._create_session(
-                    encode_basic_auth(username, password, "ascii")
-            ) as user_session:
+            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
                 qp = "?one_time=true" if one_time else "?one_time=false"
                 resp = await self._send_request(
                     "post",
@@ -857,10 +855,10 @@ class EdgeServer:
             return resp["one_time_session_id"] if one_time else resp["session_id"]
 
     async def get_session(
-            self,
-            db_name: str,
-            username: str,
-            password: str,
+        self,
+        db_name: str,
+        username: str,
+        password: str,
     ) -> dict:
         """
         Get current session info via GET /{db}/_session.
@@ -871,15 +869,13 @@ class EdgeServer:
         :return: Session info dict
         """
         with self.__tracer.start_as_current_span(
-                "get_session",
-                attributes={
-                    "cbl.database.name": db_name,
-                    "cbl.user.name": username,
-                },
+            "get_session",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.user.name": username,
+            },
         ):
-            async with self._create_session(
-                    encode_basic_auth(username, password, "ascii")
-            ) as user_session:
+            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
                 resp = await self._send_request(
                     "get",
                     f"/{db_name}/_session",
@@ -890,10 +886,10 @@ class EdgeServer:
             return resp
 
     async def delete_session(
-            self,
-            db_name: str,
-            username: str,
-            password: str,
+        self,
+        db_name: str,
+        username: str,
+        password: str,
     ) -> None:
         """
         Revoke a session via DELETE /{db}/_session (logout).
@@ -903,15 +899,13 @@ class EdgeServer:
         :param password: User's password
         """
         with self.__tracer.start_as_current_span(
-                "delete_session",
-                attributes={
-                    "cbl.database.name": db_name,
-                    "cbl.user.name": username,
-                },
+            "delete_session",
+            attributes={
+                "cbl.database.name": db_name,
+                "cbl.user.name": username,
+            },
         ):
-            async with self._create_session(
-                    encode_basic_auth(username, password, "ascii")
-            ) as user_session:
+            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
                 try:
                     await self._send_request(
                         "delete",
@@ -921,7 +915,6 @@ class EdgeServer:
                 except CblEdgeServerBadResponseError as e:
                     if e.code != 404:
                         raise
-
 
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
