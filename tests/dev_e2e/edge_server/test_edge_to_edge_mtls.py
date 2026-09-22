@@ -38,7 +38,9 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
         return task
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_edge_to_edge_mtls_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+    async def test_edge_to_edge_mtls_replication(
+        self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
+    ) -> None:
         self.mark_test_step("test_edge_to_edge_mtls_replication")
         source = cblpytest.edge_servers[0]
         target = cblpytest.edge_servers[1]
@@ -50,27 +52,45 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
         client_cert, client_key = generate_signed_cert(ca_cert, ca_key, "edge-client", client=True)
         ca_pem = cert_pem(ca_cert)
 
-        self.mark_test_step("Push server cert/key + CA to the target host and start it with mTLS")
-        await target.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
-        await target.write_file(f"{CERT_DIR}/server.crt", cert_pem(server_cert))
-        await target.write_file(f"{CERT_DIR}/server.key", key_pem(server_key))
-        await target.configure_dataset(
-            db_name="db", config_file=f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_target.json"
-        )
+        # Trust our generated CA locally so the framework can reach the mTLS target; restored in finally.
+        cert_dir = Path.home() / ".cbl_certs"
+        cert_dir.mkdir(mode=0o700, exist_ok=True)
+        cert_names = ("ca_cert.pem", "client_cert.pem", "client_key.pem")
+        provisioned = {n: (cert_dir / n).read_bytes() for n in cert_names if (cert_dir / n).exists()}
 
-        self.mark_test_step("Push client cert/key + CA to the source host")
-        await source.write_file(f"{CERT_DIR}/client.crt", cert_pem(client_cert))
-        await source.write_file(f"{CERT_DIR}/client.key", key_pem(client_key))
-        await source.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
+        try:
+            (cert_dir / "ca_cert.pem").write_bytes(ca_pem.encode())
+            (cert_dir / "client_cert.pem").write_bytes(cert_pem(client_cert).encode())
+            (cert_dir / "client_key.pem").write_bytes(key_pem(client_key).encode())
+            (cert_dir / "client_key.pem").chmod(0o600)
 
-        self.mark_test_step("Configure the source with a config-file mTLS replication to the target")
-        config_path = f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_source.json"
-        config = await read_json_file(config_path)
-        config["replications"][0]["target"] = f"wss://{target_host}:59840/db"
-        await write_json_file(config_path, config)
-        source_es = await source.configure_dataset(db_name="db", config_file=config_path)
+            self.mark_test_step("Push server cert/key + CA to the target host and start it with mTLS")
+            await target.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
+            await target.write_file(f"{CERT_DIR}/server.crt", cert_pem(server_cert))
+            await target.write_file(f"{CERT_DIR}/server.key", key_pem(server_key))
+            await target.configure_dataset(
+                db_name="db", config_file=f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_target.json"
+            )
 
-        self.mark_test_step("Verify the mTLS handshake succeeds and replication reaches Idle/Busy")
-        status = await self._wait_for_status(source_es, {"Idle", "Busy"})
-        assert status.get("status") in {"Idle", "Busy"}, f"edge-to-edge mTLS replication did not start: {status}"
-        assert not status.get("error"), f"replication reported an error: {status.get('error')}"
+            self.mark_test_step("Push client cert/key + CA to the source host")
+            await source.write_file(f"{CERT_DIR}/client.crt", cert_pem(client_cert))
+            await source.write_file(f"{CERT_DIR}/client.key", key_pem(client_key))
+            await source.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
+
+            self.mark_test_step("Configure the source with a config-file mTLS replication to the target")
+            config = await read_json_file(f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_source.json")
+            config["replications"][0]["target"] = f"wss://{target_host}:59840/db"
+            # Write the run-specific target into a temp file so the checked-in fixture stays clean.
+            config_path = str(tmp_path / "mtls_source_config.json")
+            await write_json_file(config_path, config)
+            source_es = await source.configure_dataset(db_name="db", config_file=config_path)
+
+            self.mark_test_step("Verify the mTLS handshake succeeds and replication reaches Idle/Busy")
+            status = await self._wait_for_status(source_es, {"Idle", "Busy"})
+            assert status.get("status") in {"Idle", "Busy"}, f"edge-to-edge mTLS replication did not start: {status}"
+            assert not status.get("error"), f"replication reported an error: {status.get('error')}"
+        finally:
+            for name, data in provisioned.items():
+                (cert_dir / name).write_bytes(data)
+            if (cert_dir / "client_key.pem").exists():
+                (cert_dir / "client_key.pem").chmod(0o600)
