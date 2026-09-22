@@ -4,7 +4,8 @@
         {
             "platform": "reactnative_android",
             "cbl_version": "{{version}}",
-            "location": "1BCACS00001MX3",
+            "location": "35101FDH20004D",
+            "ip_hint": "172.16.150.164",
             "download": true
         }
     ],
