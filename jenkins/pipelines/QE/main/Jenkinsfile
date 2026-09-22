@@ -68,6 +68,7 @@ pipeline {
             steps {
                 script {
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }
             }
         }
@@ -118,10 +119,6 @@ pipeline {
 
                     if (resolved.isEmpty()) { error "Could not resolve any platform version" }
 
-                    def summary = ALL_PLATFORMS.findAll { resolved.containsKey(it) }
-                        .collect { "${it}:${resolved[it].size()}" }.join(' ')
-                    currentBuild.displayName = "QE ${params.CBL_PLATFORM}  |  ${summary}  |  SGW ${params.SGW_VERSION}  (#${currentBuild.number})"
-
                     if (failed) {
                         currentBuild.result = 'UNSTABLE'
                         echo "WARNING: ${failed.size()} train(s) failed to resolve: ${failed}"
@@ -130,81 +127,75 @@ pipeline {
             }
         }
         stage('Trigger QE Tests') {
-            matrix {
-                when {
-                    anyOf {
-                        expression { params.CBL_PLATFORM == 'all' }
-                        expression { params.CBL_PLATFORM == env.CBL_PLATFORM }
-                    }
-                }
-                axes {
-                    axis {
-                        name 'CBL_PLATFORM'
-                        values 'c', 'android', 'java', 'ios', 'dotnet'
-                    }
-                }
-                stages {
-                    stage('Lookup Builds and Trigger Tests') {
-                        steps {
-                            script {
-                                def platform = env.CBL_PLATFORM
-                                def entries = resolved[platform]
-                                if (!entries) {
-                                    echo "SKIP: ${platform} (no version could be resolved)"
-                                    return
-                                }
-                                def sgwVersion = params.SGW_VERSION
-                                def force = params.FORCE_TRIGGER
-                                def jobName = "qe-${platform}-pipeline"
+            steps {
+                script {
+                    def selected = (params.CBL_PLATFORM == 'all') ? ALL_PLATFORMS : [params.CBL_PLATFORM]
+                    def force = params.FORCE_TRIGGER
+                    def sgwVersion = params.SGW_VERSION
 
-                                // Dedup per build: state is a { "<version>": "<build>" } map,
-                                // shared across all trains of this platform.
-                                def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/${platform}.json"
-                                echo "Build Info File: ${buildInfoFile}"
-                                def buildInfo = [:]
-                                if (!force && fileExists(buildInfoFile)) {
-                                    try {
-                                        buildInfo = readJSON file: buildInfoFile, returnPojo: true
-                                    } catch (Exception e) {
-                                        echo "WARN : Error when reading ${platform}.json : ${e}"
-                                    }
-                                }
+                    // platform -> list of "<version>-<build>" actually triggered this run.
+                    def triggeredByPlatform = [:]
 
-                                def triggered = []
-                                def skipped = []
-                                for (info in entries) {
-                                    def fullVersion = "${info.version}-${info.build}"
-                                    if (!force && buildInfo[info.version] == info.build) {
-                                        echo "SKIP: ${platform} v${fullVersion} (already triggered)"
-                                        skipped << fullVersion
-                                        continue
-                                    }
+                    for (platform in selected) {
+                        def entries = resolved[platform]
+                        if (!entries) {
+                            echo "SKIP: ${platform} (no version could be resolved)"
+                            continue
+                        }
+                        def jobName = "qe-${platform}-pipeline"
 
-                                    echo "Triggering '${jobName}' for ${platform} v${fullVersion} (dataset ${info.dataset})"
-                                    build job: jobName, parameters: [
-                                        string(name: "CBL_VERSION", value: fullVersion),
-                                        string(name: "SGW_VERSION", value: sgwVersion),
-                                        string(name: "TS_DATASET_VERSION", value: info.dataset)
-                                    ], wait: false
-
-                                    buildInfo[info.version] = info.build
-                                    triggered << fullVersion
-                                }
-
-                                // Persist dedup state once, after all trains are processed.
-                                if (triggered) {
-                                    try {
-                                        writeJSON file: buildInfoFile, json: buildInfo
-                                    } catch (Exception e) {
-                                        error "Cannot save ${platform}.json with error: ${e}"
-                                    }
-                                }
-
-                                echo "${platform} triggered: ${triggered}"
-                                echo "${platform} skipped:   ${skipped}"
+                        // Dedup per build: state is a { "<version>": "<build>" } map,
+                        // shared across all trains of this platform.
+                        def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/${platform}.json"
+                        echo "Build Info File: ${buildInfoFile}"
+                        def buildInfo = [:]
+                        if (!force && fileExists(buildInfoFile)) {
+                            try {
+                                buildInfo = readJSON file: buildInfoFile, returnPojo: true
+                            } catch (Exception e) {
+                                echo "WARN : Error when reading ${platform}.json : ${e}"
                             }
                         }
+
+                        def triggered = []
+                        def skipped = []
+                        for (info in entries) {
+                            def fullVersion = "${info.version}-${info.build}"
+                            if (!force && buildInfo[info.version] == info.build) {
+                                echo "SKIP: ${platform} v${fullVersion} (already triggered)"
+                                skipped << fullVersion
+                                continue
+                            }
+
+                            echo "Triggering '${jobName}' for ${platform} v${fullVersion} (dataset ${info.dataset})"
+                            build job: jobName, parameters: [
+                                string(name: "CBL_VERSION", value: fullVersion),
+                                string(name: "SGW_VERSION", value: sgwVersion),
+                                string(name: "TS_DATASET_VERSION", value: info.dataset)
+                            ], wait: false
+
+                            buildInfo[info.version] = info.build
+                            triggered << fullVersion
+                        }
+
+                        // Persist dedup state once, after all trains are processed.
+                        if (triggered) {
+                            try {
+                                writeJSON file: buildInfoFile, json: buildInfo
+                            } catch (Exception e) {
+                                error "Cannot save ${platform}.json with error: ${e}"
+                            }
+                            triggeredByPlatform[platform] = triggered
+                        }
+
+                        echo "${platform} triggered: ${triggered}"
+                        echo "${platform} skipped:   ${skipped}"
                     }
+
+                    def title = triggeredByPlatform ?
+                        triggeredByPlatform.collect { p, v -> "${p}: ${v.join(', ')}" }.join('  |  ') :
+                        'none'
+                    currentBuild.displayName = "QE ${params.CBL_PLATFORM}  |  ${title}  (#${currentBuild.number})"
                 }
             }
         }
