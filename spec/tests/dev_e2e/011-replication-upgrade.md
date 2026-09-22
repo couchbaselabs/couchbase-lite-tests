@@ -336,6 +336,7 @@ conflicting legacy revisions, with CBL chosen as the winner under the legacy
 default conflict resolution. CBL will rewrite the local winning revision
 as a child of the remote revision and push it to SGW.
 
+```
 +------------------+--------------------------------------+--------------------------------------+
 |                  |              CBL                     |                 SGW                  |
 |                  +---------------+----------------------+---------------+----------------------+
@@ -344,6 +345,7 @@ as a child of the remote revision and push it to SGW.
 | Initial State    |     3-def     |      none            |     3-abc     |      none            |
 | Expected Result  |      none     | [100@CBL1, 3abc@RTE] |     4-def     | [100@CBL1, 3abc@RTE] |
 +------------------+---------------+----------------------+---------------+----------------------+
+```
 
 ### Steps
 
