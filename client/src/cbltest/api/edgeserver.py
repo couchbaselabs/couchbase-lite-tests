@@ -114,8 +114,9 @@ class EdgeServerVersion(CouchbaseVersion):
 
     def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
+        first_rparen = input.find(")", first_lparen + 1)
+        if first_lparen == -1 or first_rparen == -1:
+            cbl_warning(f"Could not parse Edge Server version string: '{input}'")
             return ("unknown", 0)
 
         version = input[0:first_lparen].strip()
@@ -124,7 +125,7 @@ class EdgeServerVersion(CouchbaseVersion):
             version = "unknown"
 
         try:
-            build = int(input[first_lparen + 1 : first_semicol])
+            build = int(input[first_lparen + 1 : first_rparen].strip())
         except ValueError:
             cbl_warning(f"Could not parse build number from Edge Server version string: '{input}'")
             build = 0
@@ -264,13 +265,16 @@ class EdgeServer:
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
+        session: ClientSession | None = None,
     ) -> Any:
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
+            if session is None:
+                session = self.__session
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await self.__session.request(method, path, data=data, headers=headers)
+            resp = await session.request(method, path, data=data, headers=headers)
 
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
@@ -813,6 +817,111 @@ class EdgeServer:
                 )
 
             return analyze_bulk_docs_response(resp, CblEdgeServerBadResponseError)
+
+    async def create_session(
+            self,
+            db_name: str,
+            username: str,
+            password: str,
+            one_time: bool = True,
+    ) -> str:
+        """
+        Create a session token via POST /{db}/_session.
+
+        :param db_name: Database to create session for
+        :param username: User to authenticate as
+        :param password: User's password
+        :param one_time: If True (default), token is single-use (5 min TTL).
+                        If False, token is reusable (24 hour TTL).
+        :return: Session token string
+        """
+        with self.__tracer.start_as_current_span(
+                "create_session",
+                attributes={
+                    "cbl.database.name": db_name,
+                    "cbl.user.name": username,
+                    "cbl.one_time": one_time,
+                },
+        ):
+            async with self._create_session(
+                    encode_basic_auth(username, password, "ascii")
+            ) as user_session:
+                qp = "?one_time=true" if one_time else "?one_time=false"
+                resp = await self._send_request(
+                    "post",
+                    f"/{db_name}/_session{qp}",
+                    session=user_session,
+                )
+
+            assert isinstance(resp, dict)
+            return resp["one_time_session_id"] if one_time else resp["session_id"]
+
+    async def get_session(
+            self,
+            db_name: str,
+            username: str,
+            password: str,
+    ) -> dict:
+        """
+        Get current session info via GET /{db}/_session.
+
+        :param db_name: Database to query
+        :param username: User to authenticate as
+        :param password: User's password
+        :return: Session info dict
+        """
+        with self.__tracer.start_as_current_span(
+                "get_session",
+                attributes={
+                    "cbl.database.name": db_name,
+                    "cbl.user.name": username,
+                },
+        ):
+            async with self._create_session(
+                    encode_basic_auth(username, password, "ascii")
+            ) as user_session:
+                resp = await self._send_request(
+                    "get",
+                    f"/{db_name}/_session",
+                    session=user_session,
+                )
+
+            assert isinstance(resp, dict)
+            return resp
+
+    async def delete_session(
+            self,
+            db_name: str,
+            username: str,
+            password: str,
+    ) -> None:
+        """
+        Revoke a session via DELETE /{db}/_session (logout).
+
+        :param db_name: Database to logout from
+        :param username: User to authenticate as
+        :param password: User's password
+        """
+        with self.__tracer.start_as_current_span(
+                "delete_session",
+                attributes={
+                    "cbl.database.name": db_name,
+                    "cbl.user.name": username,
+                },
+        ):
+            async with self._create_session(
+                    encode_basic_auth(username, password, "ascii")
+            ) as user_session:
+                try:
+                    await self._send_request(
+                        "delete",
+                        f"/{db_name}/_session",
+                        session=user_session,
+                    )
+                except CblEdgeServerBadResponseError as e:
+                    if e.code != 404:
+                        raise
+
 
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
