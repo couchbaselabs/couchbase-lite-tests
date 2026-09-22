@@ -11,7 +11,6 @@ from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
     SyncGateway,
     SyncGatewayUserClient,
@@ -91,7 +90,6 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cluster.create_database(sg_db, db_payload)
@@ -195,7 +193,6 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -332,7 +329,6 @@ class TestXattrs(CBLTestClass):
         # Default sync function reads doc.channels from document body
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -474,7 +470,6 @@ class TestXattrs(CBLTestClass):
         self.mark_test_step("Configure Sync Gateway with default sync function")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -693,7 +688,6 @@ class TestXattrs(CBLTestClass):
             bucket=bucket_name,
             import_docs=True,
             user_xattr_key=user_custom_channel_xattr,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {"sync": sync_function}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)

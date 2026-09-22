@@ -15,7 +15,7 @@ class FakeServer:
     def get_bucket_names(self) -> list[str]:
         return list(self.buckets)
 
-    def _create_bucket(self, name: str, num_replicas: int, retries: int, interval: float) -> bool:
+    def _create_bucket(self, name: str, num_replicas: int | None, retries: int, interval: float) -> bool:
         if name in self.buckets:
             return False
         self.buckets.append(name)
