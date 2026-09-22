@@ -1,3 +1,15 @@
+# Changes
+
+1.1.0 (09/22/2026)
+* Group the test cases into "Non Conflict Cases" and "Conflict Cases" sections.
+* Number the test cases as #<section>.<case> and add a descriptive name after each test name.
+
+1.0.1 (08/26/2026)
+* All test cases: remove the "Delete Sync Gateway database" step and the fixed 2s wait from the setup steps; wait for Sync Gateway to bring the restored database online instead (CBG-5723).
+
+1.0.0 (10/22/2025)
+* Initial version: 6 non-conflict and 7 conflict upgrade test cases.
+
 # Test Cases
 
 ## #1 Non Conflict Cases
@@ -495,15 +507,3 @@ winning revision as a child of the remote revision and push it to SGW.
 	* continuous: False
 8. Wait until the replicator is stopped.
 9. Validate revid and HLV of local and remote doc.
-
-# Changes
-
-1.1.0 (09/22/2026)
-* Group the test cases into "Non Conflict Cases" and "Conflict Cases" sections.
-* Number the test cases as #<section>.<case> and add a descriptive name after each test name.
-
-1.0.1 (08/26/2026)
-* All test cases: remove the "Delete Sync Gateway database" step and the fixed 2s wait from the setup steps; wait for Sync Gateway to bring the restored database online instead (CBG-5723).
-
-1.0.0 (10/22/2025)
-* Initial version: 6 non-conflict and 7 conflict upgrade test cases.
