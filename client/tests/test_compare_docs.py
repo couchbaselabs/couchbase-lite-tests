@@ -35,23 +35,39 @@ class TestCompareDocs:
     def test_compare_doc_results_p2p_match(self) -> None:
         compare_doc_results_p2p([local("doc_1", "1-abc")], [local("doc_1", "1-abc")])
 
-    def test_compare_doc_results_p2p_mismatch(self) -> None:
-        with pytest.raises(AssertionError) as e:
-            compare_doc_results_p2p([local("doc_1", "1-abc")], [])
+    def test_compare_doc_results_p2p_local_source(self) -> None:
+        compare_doc_results_p2p([local("doc_1", "18084339b4320000@*")], [local("doc_1", "18084339b4320000@AbCdEf")])
 
-        assert str(e.value).startswith("Doc 'doc_1' present in"), str(e.value)
+    def test_compare_doc_results_p2p_mismatched_revision(self) -> None:
+        with pytest.raises(AssertionError) as e:
+            compare_doc_results_p2p([local("doc_1", "1-abc")], [local("doc_1", "2-def")])
+
+        assert "{'doc_1': '1-abc'} != {'doc_1': '2-def'}" in str(e.value), str(e.value)
+
+    def test_compare_doc_results_p2p_missing_remotely(self) -> None:
+        with pytest.raises(AssertionError) as e:
+            compare_doc_results_p2p([local("doc_1", "1-abc"), local("doc_2", "1-abc")], [local("doc_2", "1-abc")])
+
+        assert "Left contains 1 more item" in str(e.value), str(e.value)
+        assert "doc_2" not in str(e.value), str(e.value)
+
+    def test_compare_doc_results_p2p_missing_locally(self) -> None:
+        with pytest.raises(AssertionError) as e:
+            compare_doc_results_p2p([], [local("doc_1", "1-abc")])
+
+        assert "Right contains 1 more item" in str(e.value), str(e.value)
 
     def test_compare_doc_ids_match(self) -> None:
         compare_doc_ids([local("doc_1", "1-abc")], [remote("doc_1", "2-def")])
 
-    def test_compare_doc_ids_mismatch(self) -> None:
+    def test_compare_doc_ids_missing_remotely(self) -> None:
         with pytest.raises(AssertionError) as e:
             compare_doc_ids([local("doc_1", "1-abc")], [])
 
-        assert str(e.value).startswith("Doc 'doc_1' present locally but missing on remote"), str(e.value)
+        assert "Extra items in the left set" in str(e.value), str(e.value)
 
     def test_compare_doc_ids_missing_locally(self) -> None:
         with pytest.raises(AssertionError) as e:
             compare_doc_ids([], [remote("doc_1", "1-abc")])
 
-        assert str(e.value).startswith("Doc 'doc_1' present on remote but missing locally"), str(e.value)
+        assert "Extra items in the right set" in str(e.value), str(e.value)

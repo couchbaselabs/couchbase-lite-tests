@@ -122,41 +122,15 @@ def _compare_doc_results(
         return DocsCompareResult(True)
 
 
-def _compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]) -> DocsCompareResult:
-    local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
-    remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
+def _same_p2p_revision(rev: str, other: str) -> bool:
+    if rev == other:
+        return True
 
-    for id, rev in local_dict.items():
-        if id not in remote_dict:
-            return DocsCompareResult(False, f"Doc '{id}' present in {local_dict} but not {remote_dict}")
+    # A peer reports the source of its own changes as "*", other peers report its full source ID
+    if rev.endswith("@*") or other.endswith("@*"):
+        return rev.split("@")[0] == other.split("@")[0]
 
-        if not _compare_revisions(rev, [remote_dict[id], None]):
-            return DocsCompareResult(
-                False,
-                f"Doc '{id}' mismatched revid (local: {rev}, remote: {remote_dict[id]})",
-            )
-
-    return DocsCompareResult(True)
-
-
-def _compare_doc_ids(
-    local: list[AllDocumentsEntry],
-    remote: list[AllDocumentsResponseRow],
-) -> DocsCompareResult:
-    local_ids = {e.id for e in local}
-    remote_ids = {e.id for e in remote}
-
-    missing_on_remote = local_ids - remote_ids
-    if missing_on_remote:
-        missing_id = next(iter(missing_on_remote))
-        return DocsCompareResult(False, f"Doc '{missing_id}' present locally but missing on remote")
-
-    missing_on_local = remote_ids - local_ids
-    if missing_on_local:
-        missing_id = next(iter(missing_on_local))
-        return DocsCompareResult(False, f"Doc '{missing_id}' present on remote but missing locally")
-
-    return DocsCompareResult(True)
+    return False
 
 
 def compare_doc_results(
@@ -188,8 +162,16 @@ def compare_doc_results_p2p(
     :param remote: The list of documents from the remote peer
     :raises AssertionError: If a document is missing from either peer or has a different revision
     """
-    result = _compare_doc_results_p2p(local, remote)
-    assert result.success, str(result)
+    local_revs = {entry.id: entry.rev for entry in local}
+    remote_revs = {entry.id: entry.rev for entry in remote}
+    for id, rev in local_revs.items():
+        if id in remote_revs and _same_p2p_revision(rev, remote_revs[id]):
+            remote_revs[id] = rev
+
+    # Compare only the differing entries, so the pytest diff stays small when it is not truncated on CI
+    local_only = {id: rev for id, rev in local_revs.items() if remote_revs.get(id) != rev}
+    remote_only = {id: rev for id, rev in remote_revs.items() if local_revs.get(id) != rev}
+    assert local_only == remote_only
 
 
 def compare_doc_ids(
@@ -203,8 +185,11 @@ def compare_doc_ids(
     :param remote: The list of documents from the remote side (Sync Gateway)
     :raises AssertionError: If a document ID is missing from either side
     """
-    result = _compare_doc_ids(local, remote)
-    assert result.success, str(result)
+    local_ids = {entry.id for entry in local}
+    remote_ids = {entry.id for entry in remote}
+
+    # Compare only the differing IDs, so the pytest diff stays small when it is not truncated on CI
+    assert local_ids - remote_ids == remote_ids - local_ids
 
 
 async def compare_local_and_remote(
