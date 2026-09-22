@@ -34,6 +34,7 @@ Test legacy peer-to-peer functionality with mesh topology setup where each peer 
      * Target activity: IDLE if continuous, otherwise STOPPED
    - Check that all device databases have the replicated documents after phase 1:
      * All databases should have the same content
+     * For each peer other than peer 1, verify that the peer has the same document IDs and revisions as peer 1
    - Stop listeners after phase 1.
 4. **PHASE 2**: Peer 2 -> Peers [1, 3]
    - Add `num_of_docs` documents to the database on peer 2:
@@ -46,6 +47,7 @@ Test legacy peer-to-peer functionality with mesh topology setup where each peer 
    - Start replication from peer 2 to peers 1 and 3.
    - Wait for replication from peer 2 to complete.
    - Check that all device databases have the replicated documents after phase 2.
+     * For each peer other than peer 1, verify that the peer has the same document IDs and revisions as peer 1
    - Stop listeners after phase 2.
 5. **PHASE 3**: Peer 3 -> Peers [1, 2]
    - Add `num_of_docs` documents to the database on peer 3:
@@ -58,6 +60,7 @@ Test legacy peer-to-peer functionality with mesh topology setup where each peer 
    - Start replication from peer 3 to peers 1 and 2.
    - Wait for replication from peer 3 to complete.
    - Check that all device databases have the replicated documents after phase 3.
+     * For each peer other than peer 1, verify that the peer has the same document IDs and revisions as peer 1
    - Stop listeners after phase 3.
 
 ## test_peer_to_peer_topology_loop
@@ -92,6 +95,7 @@ Test legacy peer-to-peer functionality with loop topology setup where each peer 
      * Target activity: IDLE if continuous, otherwise STOPPED
    - Verify that peer 1 and peer 2 have the same content after phase 1:
      * Source and target databases should match
+     * Verify that peer 2 has the same document IDs and revisions as peer 1
    - Stop listener after phase 1.
 4. **PHASE 2**: Peer 2 -> Peer 3
    - Add `num_of_docs` documents to the database on peer 2:
@@ -104,6 +108,7 @@ Test legacy peer-to-peer functionality with loop topology setup where each peer 
    - Start replication from peer 2 to peer 3.
    - Wait for replication from peer 2 to peer 3 to complete.
    - Verify that peer 2 and peer 3 have the same content after phase 2.
+     * Verify that peer 3 has the same document IDs and revisions as peer 2
    - Stop listener after phase 2.
 5. **PHASE 3**: Peer 3 -> Peer 1
    - Add `num_of_docs` documents to the database on peer 3:
@@ -116,8 +121,10 @@ Test legacy peer-to-peer functionality with loop topology setup where each peer 
    - Start replication from peer 3 to peer 1.
    - Wait for replication from peer 3 to peer 1 to complete.
    - Verify that peer 3 and peer 1 have the same content after phase 3.
+     * Verify that peer 1 has the same document IDs and revisions as peer 3
    - Stop listener after phase 3.
 6. Verify all device databases have converged to the same content after all phases:
    * All three peers should have identical content
    * All documents from all phases should be present on all peers
+   * For each peer other than peer 1, verify that the peer has the same document IDs and revisions as peer 1
 
