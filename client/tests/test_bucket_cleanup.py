@@ -38,7 +38,9 @@ class Recorder:
         monkeypatch.setattr(server, "_block_until_bucket_deleted", lambda name, **kwargs: None)
         monkeypatch.setattr(server, "get_bucket_names", lambda: list(self.buckets))
 
-    def _create_bucket(self, name: str, num_replicas: int = 0, retries: int = 60, interval: float = 2.0) -> bool:
+    def _create_bucket(
+        self, name: str, num_replicas: int | None = None, retries: int = 60, interval: float = 2.0
+    ) -> bool:
         self.created.append(name)
         if name in self.buckets:
             return False

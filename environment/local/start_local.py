@@ -195,11 +195,11 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
 @click.option(
     "--start-cbs",
     is_flag=True,
-    help="Start a local single-node Couchbase Server cluster via cbdinocluster (using the "
-    "Sync Gateway checkout's integration-test/start_cbs.py) instead of pointing at an "
-    "existing one with --connstr. Only valid with --server cbs; requires Docker and Go. "
-    "Reuses a previously started cluster (tracked in environment/local/) if one is still "
-    "running.",
+    help="Start a local Couchbase Server cluster via cbdinocluster (using the Sync Gateway "
+    "checkout's integration-test/start_cbs.py) instead of pointing at an existing one with "
+    "--connstr. Only valid with --server cbs; requires Docker and Go. Reuses a previously "
+    "started cluster (tracked in environment/local/) if one is still running and has the "
+    "node count --couchbase-servers asks for.",
 )
 @click.option(
     "--build-testserver",
@@ -223,6 +223,15 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     show_default=True,
     help="Couchbase Server admin password. Only used with --connstr; ignored with --start-cbs, "
     "which always uses the default Administrator/password.",
+)
+@click.option(
+    "--couchbase-servers",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of Couchbase Server nodes to put in the topology config, for tests marked "
+    "min_couchbase_servers(N). Requires --server cbs, plus either --start-cbs (which allocates "
+    "a cluster of this many nodes) or a --connstr naming exactly this many nodes.",
 )
 @click.option(
     "--sync-gateways",
@@ -271,6 +280,7 @@ def main(
     git_tag: str | None,
     admin_user: str,
     admin_password: str,
+    couchbase_servers: int,
     sync_gateways: int,
     skip_testserver: bool,
     skip_sync_gateway_build: bool,
@@ -299,6 +309,12 @@ def main(
     if sync_gateways < 1:
         raise click.UsageError(f"--sync-gateways must be at least 1; got {sync_gateways}.")
 
+    if couchbase_servers < 1:
+        raise click.UsageError(f"--couchbase-servers must be at least 1; got {couchbase_servers}.")
+
+    if couchbase_servers > 1 and server != "cbs":
+        raise click.UsageError("--couchbase-servers > 1 requires --server cbs.")
+
     if sync_gateways > 1 and server != "cbs":
         raise click.UsageError(
             "--sync-gateways > 1 requires --server cbs. Each rosmar instance keeps its bucket in its "
@@ -323,8 +339,14 @@ def main(
         # --start-cbs always uses these credentials; --admin-user/--admin-password are ignored.
         admin_user, admin_password = "Administrator", "password"
 
+    if couchbase_servers > 1 and not (connstr or start_cbs):
+        raise click.UsageError(
+            "--couchbase-servers > 1 needs --start-cbs to allocate the nodes, or a --connstr "
+            "naming the nodes of a cluster you already have."
+        )
+
     if connstr:
-        _validate_single_node_connstr(connstr)
+        _validate_connstr_nodes(connstr, couchbase_servers)
 
     if (not skip_sync_gateway_build or start_cbs) and bool(repo_path) == bool(git_tag):
         raise click.UsageError(
@@ -347,13 +369,16 @@ def main(
             futures.append(executor.submit(build_sync_gateway, repo_dir))
         if start_cbs:
             assert repo_dir is not None
-            cbs_future = executor.submit(start_cbs_cluster, repo_dir)
+            cbs_future = executor.submit(start_cbs_cluster, repo_dir, couchbase_servers)
             futures.append(cbs_future)
         for future in futures:
             future.result()
 
     if cbs_future:
+        # Checked like a user-supplied --connstr: a cluster that came back with fewer nodes than
+        # were asked for would otherwise silently skip the tests that need them.
         connstr = cbs_future.result()
+        _validate_connstr_nodes(connstr, couchbase_servers, source="--start-cbs")
 
     if not skip_sync_gateway_start:
         instance_ports = start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
@@ -370,11 +395,19 @@ def _connstr_hosts(connstr: str) -> list[str]:
     return urlsplit(connstr).netloc.split(",")
 
 
-def _validate_single_node_connstr(connstr: str) -> None:
-    """Raise if connstr specifies more than one node — this tool only supports a single CBS node."""
+def _validate_connstr_nodes(connstr: str, expected: int, source: str = "--connstr") -> None:
+    """
+    Raise if connstr names a different number of nodes than --couchbase-servers asks for.
+
+    Every node named here becomes a `couchbase-servers` entry, so naming too few skips the tests
+    that need them, and naming too many hands them a node the cluster does not have.
+    """
     hosts = _connstr_hosts(connstr)
-    if len(hosts) > 1:
-        raise click.UsageError(f"--connstr must specify exactly one Couchbase Server node; got {len(hosts)}: {connstr}")
+    if len(hosts) != expected:
+        raise click.UsageError(
+            f"{source} must specify exactly {expected} Couchbase Server node(s), to match "
+            f"--couchbase-servers {expected}; got {len(hosts)}: {connstr}"
+        )
 
 
 def _test_server_port_answered() -> bool:
@@ -482,9 +515,9 @@ def build_sync_gateway(repo_dir: str) -> str:
     return str(SYNC_GATEWAY_BIN)
 
 
-def start_cbs_cluster(repo_dir: str) -> str:
+def start_cbs_cluster(repo_dir: str, nodes: int) -> str:
     """
-    Start (or reuse) a local single-node Couchbase Server cluster via the Sync Gateway
+    Start (or reuse) a local Couchbase Server cluster of `nodes` nodes via the Sync Gateway
     checkout's integration-test/start_cbs.py (which drives cbdinocluster), returning its
     connection string.
 
@@ -502,9 +535,12 @@ def start_cbs_cluster(repo_dir: str) -> str:
     env_var = "SG_TEST_COUCHBASE_SERVER_URL"
     with tempfile.NamedTemporaryFile(suffix=".env", delete=False) as env_file:
         env_file_path = pathlib.Path(env_file.name)
+    # A checkout old enough to predate --nodes still handles the single-node default, so only
+    # ask for the count when it differs from what that script would do anyway.
+    node_args = ["--nodes", str(nodes)] if nodes > 1 else []
     try:
         _run(
-            [sys.executable, script, "--env-file", str(env_file_path)],
+            [sys.executable, script, *node_args, "--env-file", str(env_file_path)],
             step="start_cbs.py",
             cwd=str(SCRIPT_DIR),
         )
@@ -875,8 +911,9 @@ def resolve_topology_config(
     """
     Resolve the cbltest topology config to use.
 
-    Patches in a CBS connstr override if given, and expands `sync-gateways` to one entry per running
-    instance so tests marked `min_sync_gateways(N)` can see them all.
+    Patches in a CBS connstr override if given, and expands `couchbase-servers` and `sync-gateways`
+    to one entry per node/running instance, so tests marked `min_couchbase_servers(N)` or
+    `min_sync_gateways(N)` can see them all.
 
     Any topology config generated by an earlier run is swept first, so that the one written here is
     this directory's only record of which instances it has and where they are.
@@ -892,10 +929,20 @@ def resolve_topology_config(
 
     def patch(c: dict[str, Any]) -> None:
         if override_cbs:
-            cbs = c["couchbase-servers"][0]
-            cbs["hostname"] = connstr
-            cbs["admin_user"] = admin_user
-            cbs["admin_password"] = admin_password
+            assert connstr is not None
+            # Each node gets its own entry rather than one naming them all, since the tests
+            # fail over and rebalance nodes individually.
+            scheme = urlsplit(connstr).scheme
+            cbs_template = c["couchbase-servers"][0]
+            c["couchbase-servers"] = [
+                {
+                    **cbs_template,
+                    "hostname": f"{scheme}://{host}",
+                    "admin_user": admin_user,
+                    "admin_password": admin_password,
+                }
+                for host in _connstr_hosts(connstr)
+            ]
 
         template = c["sync-gateways"][0]
         c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]

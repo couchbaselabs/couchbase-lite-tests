@@ -12,7 +12,6 @@ from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ISGRPayload,
     ScopeConfig,
     SyncGatewayUserClient,
@@ -61,10 +60,8 @@ async def _setup_database_and_user(
         sg_db,
         DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=1),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         ),
-        bucket_replicas=1,
     )
 
     sg = cluster.sync_gateways[0]

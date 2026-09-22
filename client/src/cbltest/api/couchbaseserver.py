@@ -23,6 +23,7 @@ from couchbase import subdocument
 from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
+from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
@@ -94,7 +95,7 @@ class BucketPool:
     def create_bucket(
         self,
         name: str,
-        num_replicas: int = 0,
+        num_replicas: int | None = None,
         retries: int = 60,
         interval: float = 2.0,
     ) -> bool:
@@ -104,7 +105,7 @@ class BucketPool:
         deleted first to make room.
 
         :param name: The name of the bucket
-        :param num_replicas: The number of replicas for the bucket (default 0)
+        :param num_replicas: The number of replicas, or None to suit the cluster (default None)
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
         :return: True if the bucket was created, False if it already existed
@@ -363,7 +364,7 @@ class CouchbaseServer:
     def create_bucket(
         self,
         name: str,
-        num_replicas: int = 0,
+        num_replicas: int | None = None,
         retries: int = 60,
         interval: float = 2.0,
     ) -> bool:
@@ -376,7 +377,7 @@ class CouchbaseServer:
         one to make room.
 
         :param name: The name of the bucket to create
-        :param num_replicas: The number of replicas for the bucket (default 0)
+        :param num_replicas: The number of replicas, or None to suit the cluster (default None)
         :param retries: Number of readiness checks to perform (default 60)
         :param interval: Seconds to wait between checks (default 2.0)
         :return: True if the bucket was created, False if it already existed
@@ -389,7 +390,7 @@ class CouchbaseServer:
     def _create_bucket(
         self,
         name: str,
-        num_replicas: int = 0,
+        num_replicas: int | None = None,
         retries: int = 60,
         interval: float = 2.0,
     ) -> bool:
@@ -405,7 +406,7 @@ class CouchbaseServer:
                 name=name,
                 flush_enabled=True,
                 ram_quota_mb=512,
-                num_replicas=num_replicas,
+                num_replicas=self.replica_count(ServiceType.KeyValue) if num_replicas is None else num_replicas,
             )
             newly_created = True
             try:
@@ -1312,6 +1313,42 @@ class CouchbaseServer:
         # All attempts failed - last_exception is guaranteed to be set
         assert last_exception is not None
         raise last_exception
+
+    def node_count(self, service: ServiceType) -> int:
+        """
+        The number of nodes in the cluster running a given service.
+
+        :param service: The service to count
+        """
+        # A node names its services differently from the SDK, and lists none for Management.
+        name = {
+            ServiceType.KeyValue: "kv",
+            ServiceType.Query: "n1ql",
+            ServiceType.Search: "fts",
+            ServiceType.Analytics: "cbas",
+            ServiceType.View: "views",
+        }.get(service)
+        if name is None:
+            raise CblTestError(f"{service} is not a service that a Couchbase Server node reports running")
+
+        # Only a node that is both in the cluster and up can hold a replica; one left behind by
+        # a failover is still listed.
+        return sum(
+            1
+            for node in self._get_cluster_info().get("nodes", [])
+            if name in node.get("services", [])
+            and node.get("clusterMembership") == "active"
+            and node.get("status") == "healthy"
+        )
+
+    def replica_count(self, service: ServiceType) -> int:
+        """
+        How many replicas to give a bucket or index: one, unless the service runs on a single
+        node and a replica has nowhere to live.
+
+        :param service: The service the replica belongs to
+        """
+        return 1 if self.node_count(service) > 1 else 0
 
     def _get_cluster_info(self) -> dict:
         """

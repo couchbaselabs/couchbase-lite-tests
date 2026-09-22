@@ -17,7 +17,6 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
     SyncGateway,
 )
@@ -54,7 +53,6 @@ _CHANNEL_SYNC_FUNCTION = "function(doc){channel(doc.channels);}"
 # A database with only the _default._default collection.
 _ACCESS_TRACKING_CONFIG = DatabaseConfig(
     bucket=_BUCKET,
-    index=IndexConfig(num_replicas=0),
     scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
 )
 
@@ -230,7 +228,6 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             db_name,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={
                     "_default": ScopeConfig(
                         collections={
@@ -290,7 +287,6 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             db_name,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={
                     "_default": ScopeConfig(
                         collections={
@@ -404,7 +400,6 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             db_name,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={
                     "_default": ScopeConfig(
                         collections={

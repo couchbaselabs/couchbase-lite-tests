@@ -6,7 +6,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
     SyncGatewayUserClient,
 )
@@ -39,7 +38,6 @@ class TestHighAvailability(CBLTestClass):
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
