@@ -72,25 +72,25 @@ echo "Python executable used by uv: $(uv run python -c 'import sys; print(sys.ex
 #     test_replication_auto_purge.py::TestReplicationAutoPurge::test_push_after_remove_access
 
 # Full suite (restore when finished debugging):
-# echo "Run the React Native Android tests"
-# uv run pytest \
-#     --maxfail=7 \
-#     -v \
-#     -W ignore::DeprecationWarning \
-#     --config config.json \
-#     --dataset-version $DATASET_VERSION \
-#     --ignore=test_multipeer.py \
-#     -k "not listener and not multipeer and not custom_conflict" \
-#     --tb=short \
-#     --timeout=300
+ echo "Run the React Native Android tests"
+ uv run pytest \
+     --maxfail=7 \
+     -v \
+     -W ignore::DeprecationWarning \
+     --config config.json \
+     --dataset-version $DATASET_VERSION \
+     --ignore=test_multipeer.py \
+     -k "not listener and not multipeer and not custom_conflict" \
+     --tb=short \
+     --timeout=300
 
-echo "Run the React Native Android tests (failed tests only)"
-uv run pytest \
-    -v \
-    -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version $DATASET_VERSION \
-    --tb=short \
-    --timeout=300 \
-    -k test_replicate_public_channel
+#echo "Run the React Native Android tests (failed tests only)"
+#uv run pytest \
+#    -v \
+#    -W ignore::DeprecationWarning \
+#    --config config.json \
+#    --dataset-version $DATASET_VERSION \
+#    --tb=short \
+#    --timeout=300 \
+#    -k test_replicate_public_channel
 popd > /dev/null
