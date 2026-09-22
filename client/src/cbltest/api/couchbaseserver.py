@@ -23,7 +23,6 @@ from couchbase import subdocument
 from couchbase.auth import PasswordAuthenticator
 from couchbase.bucket import Bucket
 from couchbase.cluster import Cluster
-from couchbase.diagnostics import ServiceType
 from couchbase.exceptions import (
     BucketAlreadyExistsException,
     BucketDoesNotExistException,
@@ -53,6 +52,13 @@ class BucketCleanupMode(StrEnum):
 
     #: Empty the bucket in place and keep its scopes, collections and indexes.
     PURGE = "purge"
+
+
+class ServiceType(StrEnum):
+    """A Couchbase Server service."""
+
+    KeyValue = "kv"
+    Index = "index"
 
 
 #: How many buckets may exist on the cluster at once when buckets are reused.
@@ -1320,23 +1326,12 @@ class CouchbaseServer:
 
         :param service: The service to count
         """
-        # A node names its services differently from the SDK, and lists none for Management.
-        name = {
-            ServiceType.KeyValue: "kv",
-            ServiceType.Query: "n1ql",
-            ServiceType.Search: "fts",
-            ServiceType.Analytics: "cbas",
-            ServiceType.View: "views",
-        }.get(service)
-        if name is None:
-            raise CblTestError(f"{service} is not a service that a Couchbase Server node reports running")
-
         # Only a node that is both in the cluster and up can hold a replica; one left behind by
         # a failover is still listed.
         return sum(
             1
             for node in self._get_cluster_info().get("nodes", [])
-            if name in node.get("services", [])
+            if service in node.get("services", [])
             and node.get("clusterMembership") == "active"
             and node.get("status") == "healthy"
         )

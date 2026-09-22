@@ -4,10 +4,9 @@ from pathlib import Path
 from typing import cast
 
 import aiofiles
-from couchbase.diagnostics import ServiceType
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.couchbaseserver import CouchbaseServer, ServiceType
 from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
@@ -171,7 +170,7 @@ class CouchbaseCluster:
             # deprecated num_index_replicas, so a config using the old field is left alone.
             if config.num_index_replicas is None and (config.index is None or config.index.num_replicas is None):
                 config = config.model_copy(
-                    update={"index": IndexConfig(num_replicas=cbs.replica_count(ServiceType.Query))}
+                    update={"index": IndexConfig(num_replicas=cbs.replica_count(ServiceType.Index))}
                 )
             bucket_created = cbs.create_bucket(bucket)
             self.create_collections(config)
