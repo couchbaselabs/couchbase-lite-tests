@@ -148,7 +148,8 @@ def compare_doc_results(
     :raises AssertionError: If the documents are not consistent
     """
     result = _compare_doc_results(local, remote, mode)
-    assert result.success, str(result)
+    if not result:
+        raise AssertionError(str(result))
 
 
 def compare_doc_results_p2p(
@@ -223,4 +224,5 @@ async def compare_local_and_remote(
                 sg_docs = [entry for entry in sg_docs if entry.id in doc_ids]
 
             compare_result = _compare_doc_results(lite_docs, sg_docs, mode)
-            assert compare_result.success, f"{compare_result.message} ({collection})"
+            if not compare_result:
+                raise AssertionError(f"{compare_result} ({collection})")
