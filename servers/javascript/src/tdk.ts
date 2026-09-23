@@ -217,15 +217,8 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             url:         rq.config.endpoint,
             collections: {},
         };
-        if (rq.config.authenticator) {
-            if (rq.config.authenticator.type !== 'BASIC')
-                throw new HTTPError(501, "Only Basic auth is supported");
-            const basicAuth = rq.config.authenticator as tdk.ReplicatorBasicAuthenticator;
-            config.credentials = {
-                username: basicAuth.username,
-                password: basicAuth.password
-            };
-        }
+        if (rq.config.authenticator)
+            config.credentials = credentialsFromAuthenticator(rq.config.authenticator);
         for (const colls of rq.config.collections) {
             const collCfg: cbl.ReplicatorCollectionConfig = { };
             if (rq.config.replicatorType !== 'pull') {
@@ -255,7 +248,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 
             if (rq.reset)
                 collCfg.resetCheckpoint = rq.reset;
-            
+
             for (const collName of colls.names)
                 config.collections[normalizeCollectionID(collName)] = collCfg;
         }
@@ -392,7 +385,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         let colls: Record<string,cbl.CollectionConfig> = {};
         if (collections) {
             for (const coll of collections)
-                colls[coll] = {};
+                colls[normalizeCollectionID(coll)] = {};
         }
         this.#logger.info `Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
         const db = await cbl.Database.open({name: name, version: 1, collections: colls});
@@ -528,4 +521,63 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
 /** Adds the default scope name, if necessary, to an outgoing collection ID. */
 function collectionIDWithScope(id: string): string {
     return id.includes('.') ? id : `_default.${id}`;
+}
+
+
+/** The SDK's credentials type, derived from ReplicatorConfig rather than imported by
+ *  name, so that this keeps compiling if CBL renames or re-exports the type. */
+type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig['credentials']>;
+/** The default Sync Gateway session cookie name. A SESSION authenticator naming any
+ *  other cookie cannot be served on this platform -- see below. */
+const kDefaultSessionCookie = 'SyncGatewaySession';
+/** Maps a TDK authenticator onto the SDK's credentials type.
+ *
+ *  This is the single seam between the TDK wire format and the SDK's auth API. The SDK
+ *  supports five modes; the TDK reaches all of them:
+ *
+ *  | TDK                                | SDK credentials                    | Flow |
+ *  |------------------------------------|------------------------------------|------|
+ *  | `BASIC`                            | `{username, password}`             | POSTs `_session?one_time=true` with `Authorization: Basic`, then puts the returned token on the handshake |
+ *  | `BASIC` with both fields empty     | `{username: '', password: ''}`     | Legacy cookie mode: no `Authorization` header, `credentials: 'include'` so the browser attaches an existing cookie |
+ *  | `BEARER`                           | `{type: Bearer, token}`            | Same as BASIC but `Authorization: Bearer`; needs an `oidc`/`local_jwt` provider on the remote |
+ *  | `SESSION`                          | `{type: Session, sessionID}`       | No `_session` call at all; the ID goes straight onto the handshake |
+ *  | absent                             | `undefined`                        | Anonymous / GUEST |
+ *
+ *  Note that unlike every other platform, none of these send a `Cookie` header on the
+ *  WebSocket upgrade -- a browser will not allow it. The credential always reaches Sync
+ *  Gateway as a session token on the handshake subprotocol, which is why `cookieName`
+ *  has no meaning here. */
+function credentialsFromAuthenticator(auth: tdk.ReplicatorAuthenticator): ReplicatorCredentials {
+    switch (auth.type) {
+        case 'BASIC': {
+            const basic = auth as tdk.ReplicatorBasicAuthenticator;
+            check(typeof basic.username === 'string' && typeof basic.password === 'string',
+                  "BASIC authenticator requires username and password");
+            // Both-empty is legacy cookie mode and is deliberately allowed through. A
+            // half-empty credential is not cookie mode -- the SDK would send a literal
+            // `Authorization: Basic` header with a blank half -- so reject it rather
+            // than let a test think it was exercising the cookie path.
+            check(!!basic.username === !!basic.password,
+                  "BASIC authenticator must have both username and password, or neither "
+                  + "(both empty selects legacy cookie mode)");
+            return {username: basic.username, password: basic.password};
+        }
+        case 'BEARER': {
+            const bearer = auth as tdk.ReplicatorBearerAuthenticator;
+            check(typeof bearer.token === 'string' && bearer.token.length > 0,
+                  "BEARER authenticator requires a non-empty token");
+            return {type: cbl.CredentialType.Bearer, token: bearer.token};
+        }
+        case 'SESSION': {
+            const session = auth as tdk.ReplicatorSessionAuthenticator;
+            if (session.cookieName !== undefined && session.cookieName !== kDefaultSessionCookie)
+                throw new HTTPError(501,
+                    `Custom session cookie names are not supported on this platform `
+                    + `(got "${session.cookieName}"): CBL JS presents the session ID on the `
+                    + `WebSocket handshake, not as a cookie.`);
+            return {type: cbl.CredentialType.Session, sessionID: session.sessionID};
+        }
+        default:
+            throw new HTTPError(501, `Unsupported authenticator type "${(auth as {type: string}).type}"`);
+    }
 }
