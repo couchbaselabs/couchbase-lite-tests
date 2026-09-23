@@ -46,6 +46,9 @@ info:
       ```
 
     Changes
+    2.0.4 (09/23/2026)
+    * Add ReplicatorBearerAuthenticator (type BEARER) to ReplicatorConfiguration.authenticator
+
     2.0.3 (04/17/2026)
     * Add identity property to [/startListener](#operation/startListener)
 
@@ -155,7 +158,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 2.0.3
+  version: 2.0.4
 tags:
   - name: API
     description: The API endpoints of the test server

@@ -258,8 +258,8 @@ export interface LogRequest extends TestRequest {
 //-------- Loading datasets:
 
 /** Base URL for our JSON datasets. */
-export const kDatasetBaseURL = "http://localhost:5173/datasets/";
-export const kBlobBaseURL    = "http://localhost:5173/blobs/";
+export const kDatasetBaseURL = "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
+export const kBlobBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/";
 /** Schema of `index.json` */
 export interface DatasetIndex {
     name        : string,
