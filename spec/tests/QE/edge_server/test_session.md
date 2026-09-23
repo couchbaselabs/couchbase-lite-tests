@@ -6,9 +6,7 @@ JavaScript SDK can authenticate a `_blipsync` WebSocket upgrade, where the token
 as the subprotocol entry `SyncGatewaySession_<token>`. Token *use* at that upgrade is covered
 by the CBL JS session tests, which require a browser; these tests cover what REST can observe.
 
-All tests use the `admin_user` / `password` credentials and the `test_session.json` config,
-which must declare users — otherwise the client sends no credentials and the authentication
-tests pass without testing anything.
+All tests start with the `admin_user` / `password` credentials and the `test_session.json` config; some tests add additional users through the Edge Server manager.
 
 ## test_create_session_both_modes
 
