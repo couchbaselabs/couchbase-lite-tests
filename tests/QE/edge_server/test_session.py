@@ -1,4 +1,6 @@
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -34,13 +36,27 @@ class TestEdgeServerSession(CBLTestClass):
         return manager.get_admin_client()
 
     @staticmethod
-    async def _call(edge_server: EdgeServer, verb: str, db: str, username: str, password: str) -> Any:
+    async def _call(client: EdgeServer, verb: str, db: str) -> Any:
         """Dispatch to one of the three session verbs, so a test can parametrize over them."""
         if verb == "create":
-            return await edge_server.create_session(db, username, password, one_time=False)
+            return await client.create_session(db, one_time=False)
         if verb == "get":
-            return await edge_server.get_session(db, username, password)
-        return await edge_server.delete_session(db, username, password)
+            return await client.get_session(db)
+        return await client.delete_session(db)
+
+    @asynccontextmanager
+    async def _client_for(self, cblpytest: CBLPyTest, credentials: str) -> AsyncIterator[EdgeServer]:
+        """A client for one credential case; anonymous means no Authorization header at all."""
+        manager = self._manager(cblpytest)
+        if credentials == "anonymous":
+            async with manager.get_anonymous_client() as client:
+                yield client
+        elif credentials == "wrong password":
+            async with manager.get_user_client(_ADMIN, "not-the-password") as client:
+                yield client
+        else:
+            async with manager.get_user_client("nosuchuser", "password") as client:
+                yield client
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_create_session_both_modes(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -48,15 +64,14 @@ class TestEdgeServerSession(CBLTestClass):
         edge_server = await self._configure(cblpytest)
 
         self.mark_test_step("Create a one-time session, then a reusable one")
-        one_time = await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=True)
-        reusable = await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False)
+        one_time = await edge_server.create_session(_DB, one_time=True)
+        reusable = await edge_server.create_session(_DB, one_time=False)
 
         self.mark_test_step("Check both tokens are usable strings and differ from each other")
         for label, token in (("one-time", one_time), ("reusable", reusable)):
             assert isinstance(token, str), f"{label}: expected a token string, got {type(token).__name__}"
             assert token and token.strip() == token, f"{label}: empty or padded token {token!r}"
-        assert one_time != reusable, "Both modes returned the same token; the one_time flag looks ignored"
-        await edge_server.delete_session(_DB, _ADMIN, _ADMIN_PASSWORD)
+        await edge_server.delete_session(_DB)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_tokens_are_unique(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -64,12 +79,10 @@ class TestEdgeServerSession(CBLTestClass):
         edge_server = await self._configure(cblpytest)
 
         self.mark_test_step("Create 3 sessions one after another")
-        sequential = [await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False) for _ in range(3)]
+        sequential = [await edge_server.create_session(_DB, one_time=False) for _ in range(3)]
 
         self.mark_test_step("Create 10 more concurrently")
-        concurrent = await asyncio.gather(
-            *(edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False) for _ in range(10))
-        )
+        concurrent = await asyncio.gather(*(edge_server.create_session(_DB, one_time=False) for _ in range(10)))
 
         self.mark_test_step("Check all 13 tokens are non-empty and distinct")
         tokens = sequential + list(concurrent)
@@ -80,29 +93,24 @@ class TestEdgeServerSession(CBLTestClass):
             f"{len(concurrent)} concurrent creations"
         )
 
-        await edge_server.delete_session(_DB, _ADMIN, _ADMIN_PASSWORD)
+        await edge_server.delete_session(_DB)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("verb", ["create", "get", "delete"])
-    @pytest.mark.parametrize(
-        ("label", "username", "password"),
-        [
-            ("wrong password", _ADMIN, "not-the-password"),
-            ("unknown user", "nosuchuser", "password"),
-            ("no credentials", "", ""),
-        ],
-    )
+    @pytest.mark.parametrize("credentials", ["wrong password", "unknown user", "anonymous"])
     async def test_session_endpoints_reject_bad_credentials(
-        self, cblpytest: CBLPyTest, dataset_path: Path, verb: str, label: str, username: str, password: str
+        self, cblpytest: CBLPyTest, dataset_path: Path, verb: str, credentials: str
     ) -> None:
         self.mark_test_step("Configure Edge Server with the `names` dataset")
-        edge_server = await self._configure(cblpytest)
+        await self._configure(cblpytest)
 
-        self.mark_test_step(f"Attempt to {verb} a session with {label}")
-        with pytest.raises(CblEdgeServerBadResponseError) as excinfo:
-            await self._call(edge_server, verb, _DB, username, password)
+        self.mark_test_step(f"Attempt to {verb} a session with {credentials}")
 
-        assert excinfo.value.code == 401, f"{verb} with {label}: expected 401, got {excinfo.value.code}"
+        async with self._client_for(cblpytest, credentials) as client:
+            with pytest.raises(CblEdgeServerBadResponseError) as excinfo:
+                await self._call(client, verb, _DB)
+
+        assert excinfo.value.code == 401, f"{verb} with {credentials}: expected 401, got {excinfo.value.code}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_non_admin_can_create_own_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -110,13 +118,13 @@ class TestEdgeServerSession(CBLTestClass):
         await self._configure(cblpytest)
 
         self.mark_test_step("Add a non-admin user")
-        edge_server = await self._add_user(cblpytest, "session_user", "session_pass")
+        await self._add_user(cblpytest, "session_user", "session_pass")
 
         self.mark_test_step("Create a session as that user")
-        token = await edge_server.create_session(_DB, "session_user", "session_pass", one_time=False)
-        assert token, "A non-admin user could not create a session for themselves"
-
-        await edge_server.delete_session(_DB, "session_user", "session_pass")
+        async with self._manager(cblpytest).get_user_client("session_user", "session_pass") as client:
+            token = await client.create_session(_DB, one_time=False)
+            assert token, "A non-admin user could not create a session for themselves"
+            await client.delete_session(_DB)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("verb", ["create", "get", "delete"])
@@ -127,12 +135,12 @@ class TestEdgeServerSession(CBLTestClass):
         edge_server = await self._configure(cblpytest)
 
         self.mark_test_step(f"Attempt to {verb} a session against `nosuchdb`")
-        try:
-            await self._call(edge_server, verb, "nosuchdb", _ADMIN, _ADMIN_PASSWORD)
-        except CblEdgeServerBadResponseError as e:
-            assert e.code in (401, 403, 404), f"Expected a client error for an unknown database, got {e.code}"
-        else:
-            assert verb == "delete", f"{verb} succeeded against a database that does not exist"
+        with pytest.raises(CblEdgeServerBadResponseError) as excinfo:
+            await self._call(edge_server, verb, "nosuchdb")
+
+        assert excinfo.value.code in (401, 403, 404), (
+            f"{verb}: expected a client error for an unknown database, got {excinfo.value.code}"
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_get_session_reports_authenticated_caller(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -141,19 +149,21 @@ class TestEdgeServerSession(CBLTestClass):
 
         self.mark_test_step("Add a second user, then give both users a session")
         edge_server = await self._add_user(cblpytest, "other_user", "other_pass")
-        await edge_server.create_session(_DB, _ADMIN, _ADMIN_PASSWORD, one_time=False)
-        await edge_server.create_session(_DB, "other_user", "other_pass", one_time=False)
+        await edge_server.create_session(_DB, one_time=False)
 
-        self.mark_test_step("Ask GET /_session as each user in turn")
-        admin_info = await edge_server.get_session(_DB, _ADMIN, _ADMIN_PASSWORD)
-        other_info = await edge_server.get_session(_DB, "other_user", "other_pass")
+        async with self._manager(cblpytest).get_user_client("other_user", "other_pass") as other:
+            await other.create_session(_DB, one_time=False)
 
-        self.mark_test_step(f"Responses: admin={admin_info}, other={other_info}")
-        for expected_user, info in ((_ADMIN, admin_info), ("other_user", other_info)):
-            assert info.get("ok") is True, f"{expected_user}: GET /_session did not report ok, got {info}"
-            assert info.get("userCtx", {}).get("name") == expected_user, (
-                f"GET /_session as `{expected_user}` reported {info.get('userCtx')}"
-            )
+            self.mark_test_step("Ask GET /_session as each user in turn")
+            admin_info = await edge_server.get_session(_DB)
+            other_info = await other.get_session(_DB)
 
-        await edge_server.delete_session(_DB, _ADMIN, _ADMIN_PASSWORD)
-        await edge_server.delete_session(_DB, "other_user", "other_pass")
+            self.mark_test_step(f"Responses: admin={admin_info}, other={other_info}")
+            for expected_user, info in ((_ADMIN, admin_info), ("other_user", other_info)):
+                assert info.get("ok") is True, f"{expected_user}: GET /_session did not report ok, got {info}"
+                assert info.get("userCtx", {}).get("name") == expected_user, (
+                    f"GET /_session as `{expected_user}` reported {info.get('userCtx')}"
+                )
+
+            await other.delete_session(_DB)
+        await edge_server.delete_session(_DB)

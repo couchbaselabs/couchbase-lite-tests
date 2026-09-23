@@ -265,17 +265,13 @@ class EdgeServer:
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
-        session: ClientSession | None = None,
     ) -> Any:
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
-            if session is None:
-                session = self.__session
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await session.request(method, path, data=data, headers=headers)
-
+            resp = await self.__session.request(method, path, data=data, headers=headers)
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -818,103 +814,50 @@ class EdgeServer:
 
             return analyze_bulk_docs_response(resp, CblEdgeServerBadResponseError)
 
-    async def create_session(
-        self,
-        db_name: str,
-        username: str,
-        password: str,
-        one_time: bool = True,
-    ) -> str:
+    async def create_session(self, db_name: str, one_time: bool = True) -> str:
         """
-        Create a session token via POST /{db}/_session.
+        Create a session token via POST /{db}/_session, as the user this client authenticates as.
 
-        :param db_name: Database to create session for
-        :param username: User to authenticate as
-        :param password: User's password
-        :param one_time: If True (default), token is single-use (5 min TTL).
-                        If False, token is reusable (24 hour TTL).
+        :param db_name: Database to create the session for
+        :param one_time: If True (default), the token is single-use (5 min TTL).
+                         If False, it is reusable (24 hour TTL).
         :return: Session token string
         """
         with self.__tracer.start_as_current_span(
             "create_session",
-            attributes={
-                "es.database.name": db_name,
-                "es.user.name": username,
-                "es.one_time": one_time,
-            },
+            attributes={"es.database.name": db_name, "es.one_time": one_time},
         ):
-            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
-                qp = "?one_time=true" if one_time else "?one_time=false"
-                resp = await self._send_request(
-                    "post",
-                    f"/{db_name}/_session{qp}",
-                    session=user_session,
-                )
-
+            qp = "?one_time=true" if one_time else "?one_time=false"
+            resp = await self._send_request("post", f"/{db_name}/_session{qp}")
             assert isinstance(resp, dict)
             return resp["one_time_session_id"] if one_time else resp["session_id"]
 
-    async def get_session(
-        self,
-        db_name: str,
-        username: str,
-        password: str,
-    ) -> dict:
+    async def get_session(self, db_name: str) -> dict:
         """
-        Get current session info via GET /{db}/_session.
+        Get session info via GET /{db}/_session, for the user this client authenticates as.
 
         :param db_name: Database to query
-        :param username: User to authenticate as
-        :param password: User's password
         :return: Session info dict
         """
         with self.__tracer.start_as_current_span(
             "get_session",
-            attributes={
-                "es.database.name": db_name,
-                "es.user.name": username,
-            },
+            attributes={"es.database.name": db_name},
         ):
-            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
-                resp = await self._send_request(
-                    "get",
-                    f"/{db_name}/_session",
-                    session=user_session,
-                )
-
+            resp = await self._send_request("get", f"/{db_name}/_session")
             assert isinstance(resp, dict)
             return resp
 
-    async def delete_session(
-        self,
-        db_name: str,
-        username: str,
-        password: str,
-    ) -> None:
+    async def delete_session(self, db_name: str) -> None:
         """
-        Revoke a session via DELETE /{db}/_session (logout).
+        Revoke the session of the user this client authenticates as, via DELETE /{db}/_session.
 
-        :param db_name: Database to logout from
-        :param username: User to authenticate as
-        :param password: User's password
+        :param db_name: Database to log out of
         """
         with self.__tracer.start_as_current_span(
             "delete_session",
-            attributes={
-                "es.database.name": db_name,
-                "es.user.name": username,
-            },
+            attributes={"es.database.name": db_name},
         ):
-            async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
-                try:
-                    await self._send_request(
-                        "delete",
-                        f"/{db_name}/_session",
-                        session=user_session,
-                    )
-                except CblEdgeServerBadResponseError as e:
-                    if e.code != 404:
-                        raise
+            await self._send_request("delete", f"/{db_name}/_session")
 
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
