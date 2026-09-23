@@ -901,8 +901,8 @@ class EdgeServer:
         with self.__tracer.start_as_current_span(
             "delete_session",
             attributes={
-                "cbl.database.name": db_name,
-                "cbl.user.name": username,
+                "es.database.name": db_name,
+                "es.user.name": username,
             },
         ):
             async with self._create_session(encode_basic_auth(username, password, "ascii")) as user_session:
