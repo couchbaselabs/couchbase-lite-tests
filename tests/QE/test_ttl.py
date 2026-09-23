@@ -9,7 +9,6 @@ from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
 )
 
@@ -31,7 +30,6 @@ class TestTTL(CBLTestClass):
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -106,7 +104,6 @@ class TestTTL(CBLTestClass):
         self.mark_test_step("Configure Sync Gateway database endpoint")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)

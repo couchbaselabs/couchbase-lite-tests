@@ -15,7 +15,7 @@ from cbltest.api.replicator_types import (
     ReplicatorDocumentFlags,
     ReplicatorType,
 )
-from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, RemoteDocument, ScopeConfig, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, RemoteDocument, ScopeConfig, SyncGateway
 
 _CHANNEL_SYNC_FUNCTION = (
     "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
@@ -25,7 +25,6 @@ _BUCKET = "data-bucket"
 
 _CHANNEL_TRACKING_CONFIG = DatabaseConfig(
     bucket=_BUCKET,
-    index=IndexConfig(num_replicas=0),
     scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
 )
 
@@ -374,7 +373,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
                 enable_shared_bucket_access=True,
             ),
@@ -493,7 +491,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={
                     "_default": ScopeConfig(
                         collections={
@@ -659,7 +656,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
                 import_docs=False,
                 enable_shared_bucket_access=True,
