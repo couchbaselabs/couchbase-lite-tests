@@ -204,10 +204,6 @@ class ReplicatorBearerAuthenticator(ReplicatorAuthenticator):
     """
     A class holding a bearer token -- an OIDC ``id_token`` or other JWT that the remote
     is configured to trust.
-
-    The token is obtained outside the TDK: either from a real identity provider, or minted
-    locally with ``tests/shared/jwt_helper.py`` against a Sync Gateway ``local_jwt``
-    provider.  CBL does not perform the OIDC login flow itself.
     """
 
     @property
