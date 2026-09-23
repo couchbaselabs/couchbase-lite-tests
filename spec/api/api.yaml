@@ -1154,6 +1154,20 @@ components:
         cookieName:
           type: string
           example: 'sessionID'
+    ReplicatorBearerAuthenticator:
+      description: >
+        Authenticates with a bearer token -- an OIDC id_token or other JWT that the remote is configured to trust. The token is obtained outside the TDK (from an identity provider, or minted locally for tests) and passed through as-is; CBL does not perform the OIDC login flow itself.
+
+      type: object
+      required: ['type', 'token']
+      properties:
+        'type':
+          type: string
+          enum: ['BEARER']
+        token:
+          description: The bearer token, without the 'Bearer ' prefix.
+          type: string
+          example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...'
     ReplicatorConfiguration:
       type: object
       required: ['database', 'collections', 'endpoint']
@@ -1184,6 +1198,7 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ReplicatorBasicAuthenticator'
             - $ref: '#/components/schemas/ReplicatorSessionAuthenticator'
+            - $ref: '#/components/schemas/ReplicatorBearerAuthenticator'
         enableDocumentListener:
           description: 'When enable the document listener, the ReplicatorStatus will include the documents containing a list of DocumentReplication. The default is false.'
           type: boolean
