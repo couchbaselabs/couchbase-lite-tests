@@ -72,6 +72,8 @@ echo ""
 echo "Installing git hooks..."
 pre-commit install || fail "pre-commit install failed."
 info "Git hooks installed (pre-commit)"
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+info "git blame skips the commits in .git-blame-ignore-revs"
 
 # --- Regenerate secrets baseline if missing ---
 if [ ! -f "$REPO_ROOT/.secrets.baseline" ]; then
