@@ -127,7 +127,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 `.pre-commit-config.yaml` enforces on every commit:
 - **Syntax / style**: ruff (lint + import sort), ruff-format, pyupgrade, ty
-- **TypeScript** (`servers/javascript/` only): `npm run precommit` installs dependencies, then runs `tsc` and `eslint`.
+- **TypeScript** (`servers/javascript/` only): `npm run precommit` installs dependencies, formats with Biome, then runs `tsc` and `eslint`.
 - **Merge safety**: check-merge-conflict, check-executables-have-shebangs, check-shebang-scripts-are-executable
 
 `scripts/setup-hooks.sh` additionally installs `detect-secrets` and generates `.secrets.baseline` for **manual** scans. It is not wired into pre-commit — run `detect-secrets scan --baseline .secrets.baseline` manually before pushing changes that touch credentials, hostnames, or generated configs.

@@ -25,10 +25,10 @@ repos:
         entry: uv run python scripts/check_topology_markers.py
         files: ^tests/(dev_e2e|QE)/.*test_.*\.py$
       - id: javascript
-        name: tsc + eslint (servers/javascript)
+        name: biome + tsc + eslint (servers/javascript)
         language: unsupported
         entry: npm --prefix servers/javascript run precommit
-        files: ^servers/javascript/(src/.*\.ts|tsconfig\.json|eslint\.config\.mjs|package(-lock)?\.json)$
+        files: ^servers/javascript/(src/.*\.ts|[^/]+\.(js|mjs|json))$
         pass_filenames: false
   - repo: https://github.com/asottile/pyupgrade
     rev: v3.21.2
