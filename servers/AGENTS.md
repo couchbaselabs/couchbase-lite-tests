@@ -130,7 +130,8 @@ javascript/
 ├── package.json                # @couchbase/test-server
 ├── tsconfig.json
 ├── vite.config.js
-├── eslint.config.mjs
+├── eslint.config.mjs           # Lint rules
+├── biome.json                  # Formatter
 └── src/
     ├── testServer.ts           # Main server (WebSocket)
     ├── tdk.ts
