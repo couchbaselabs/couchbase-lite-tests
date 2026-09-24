@@ -6,10 +6,11 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Collection, Mapping
 from contextlib import asynccontextmanager
 from enum import Enum
+from http.cookies import SimpleCookie
 from json import dumps, loads
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self, cast
+from typing import Any, Final, Self, cast
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
@@ -19,6 +20,7 @@ import requests
 import tenacity
 from aiohttp import ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError, ClientError
+from multidict import CIMultiDictProxy
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
@@ -67,6 +69,8 @@ h7vaHwdE3b6S8WxeGR5HPOZeUVwrRHmTh8lkJPUQlfKDu+z/WP+Q4+engTSpRdRn
 fvJMZ8kpMTvrHDXO1G4EHiI48bzvQIJCKD6e2ZElimn25ZUJXSKL5ICsRij4
 -----END CERTIFICATE-----
 """
+
+_SESSION_COOKIE: Final[str] = "SyncGatewaySession"
 
 
 class ScopeConfig(BaseModel):
@@ -712,14 +716,15 @@ class _SyncGatewayBase:
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
+        username: str | None,
+        password: str | None,
         port: int,
         secure: bool = False,
         public_port: int | None = None,
         headers: Mapping[str, str] | None = None,
     ) -> None:
         """
+        :param username: The user to authenticate as, or None to send no credentials.
         :param port: The port this client sends its own requests to.
         :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
             correct for a client that already talks to the public API; an admin client must pass it,
@@ -737,13 +742,8 @@ class _SyncGatewayBase:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__session: ClientSession = self._create_session(
-            secure,
-            scheme,
-            url,
-            port,
-            {"Authorization": encode_basic_auth(username, password, "ascii")} | dict(headers or {}),
-        )
+        auth = {} if username is None else {"Authorization": encode_basic_auth(username, password or "", "ascii")}
+        self.__session: ClientSession = self._create_session(secure, scheme, url, port, auth | dict(headers or {}))
 
     def __str__(self) -> str:
         return f"{type(self).__name__} {self.hostname}:{self.port}"
@@ -819,8 +819,26 @@ class _SyncGatewayBase:
                              call whose body is large and uninteresting, such as a changes feed read
                              only to find one document; the request and status are still logged.
         """
+        ret_val, _ = await self._send_request_with_headers(method, path, payload, params, log_response=log_response)
+        return ret_val
+
+    async def _send_request_with_headers(
+        self,
+        method: str,
+        path: str,
+        payload: JSONSerializable | DatabaseConfig | None = None,
+        params: dict[str, str] | None = None,
+        headers: Mapping[str, str] | None = None,
+        log_response: bool = True,
+    ) -> tuple[Any, CIMultiDictProxy[str]]:
+        """
+        Like :func:`_send_request`, but also sends `headers` and returns the response headers
+        alongside the body, for a call whose result is in a header, such as a session cookie.
+        """
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
-            headers = {"Content-Type": "application/json"} if payload is not None else None
+            headers = dict(headers or {})
+            if payload is not None:
+                headers["Content-Type"] = "application/json"
             data = "" if payload is None else payload.serialize()
             # Log the query string too, otherwise the log cannot show which variant of an
             # endpoint was called (e.g. whether a _changes call was request_plus or filtered)
@@ -845,7 +863,7 @@ class _SyncGatewayBase:
                     body=data,
                 )
 
-            return ret_val
+            return ret_val, resp.headers
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -2318,6 +2336,15 @@ class SyncGateway(_SyncGatewayBase):
             await client.close()
 
     @asynccontextmanager
+    async def get_anonymous_client(self) -> AsyncIterator["SyncGatewayUserClient"]:
+        """Yields a public-API client that sends no credentials, closing its session on exit."""
+        client = SyncGatewayUserClient(self.hostname, None, None, port=self.public_port, secure=self.secure)
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @asynccontextmanager
     async def create_user_client(
         self,
         db_name: str,
@@ -2561,8 +2588,8 @@ class SyncGatewayUserClient(_SyncGatewayBase):
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
+        username: str | None,
+        password: str | None,
         port: int = 4984,
         secure: bool = False,
         headers: Mapping[str, str] | None = None,
@@ -2571,13 +2598,72 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         Initialize a SyncGatewayUserClient for public API access.
 
         :param url: The hostname/URL of the Sync Gateway instance
-        :param username: Username for authentication
+        :param username: Username for authentication, or None for an anonymous client
         :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
         :param headers: Headers to send with every request, e.g. Authorization.
         """
         super().__init__(url, username, password, port, secure, headers=headers)
+        self.__session_ids: dict[str, str] = {}
+
+    async def create_session(self, db_name: str, one_time: bool = True) -> str:
+        """
+        Create a session via the public API (POST /{db}/_session), as the user this client
+        authenticates as.  The id of a reusable session is the `SyncGatewaySession` cookie,
+        which this client keeps and sends on :func:`delete_session`.
+
+        :param db_name: Database to create the session for
+        :param one_time: If True (default), the session is single-use.  If False, it is reusable.
+        :return: The session id
+        """
+        with self._tracer.start_as_current_span(
+            "create_session",
+            attributes={"sg.database.name": db_name, "sg.one_time": one_time},
+        ):
+            # With no JSON body, SGW answers 400 rather than 401 to a client without credentials
+            resp, headers = await self._send_request_with_headers(
+                "post",
+                f"/{db_name}/_session",
+                JSONDictionary({}),
+                params={"one_time": "true" if one_time else "false"},
+            )
+            assert isinstance(resp, dict)
+            if one_time:
+                return cast(str, resp["one_time_session_id"])
+
+            cookies: SimpleCookie = SimpleCookie()
+            for header in headers.getall("Set-Cookie", []):
+                cookies.load(header)
+            session_id = cookies[_SESSION_COOKIE].value
+            self.__session_ids[db_name] = session_id
+            return session_id
+
+    async def get_session(self, db_name: str) -> dict:
+        """
+        Get session info via the public API (GET /{db}/_session), for the user this client
+        authenticates as.
+
+        :param db_name: Database to query
+        :return: Session info dict
+        """
+        with self._tracer.start_as_current_span("get_session", attributes={"sg.database.name": db_name}):
+            resp = await self._send_request("get", f"/{db_name}/_session")
+            assert isinstance(resp, dict)
+            return resp
+
+    async def delete_session(self, db_name: str) -> None:
+        """
+        Log out via the public API (DELETE /{db}/_session), sending the cookie of the last
+        reusable session :func:`create_session` made against `db_name`, even if that session
+        is already deleted.  SGW logs out that session only, and answers 404 when there is none.
+
+        :param db_name: Database to log out of
+        """
+        with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
+            session_id = self.__session_ids.get(db_name)
+            headers = {"Cookie": f"{_SESSION_COOKIE}={session_id}"} if session_id is not None else None
+            await self._send_request_with_headers("delete", f"/{db_name}/_session", headers=headers)
 
     async def __aenter__(self) -> Self:
         return self
