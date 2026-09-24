@@ -1,0 +1,29 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": false,
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "enable_client_sync": true
+        }
+    },
+    "users": "/home/ec2-user/user/users.json",
+    "cors": {
+        "origin": ["http://localhost:5173"],
+        "headers": ["Authorization", "Content-Type", "If-Match"],
+        "max_age": 600
+    },
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}

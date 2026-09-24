@@ -19,7 +19,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
-from jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
+from shared.jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE_PATH = "/home/ec2-user/cert/jwt.txt"
