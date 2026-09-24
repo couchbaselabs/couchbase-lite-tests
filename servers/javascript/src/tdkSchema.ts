@@ -236,7 +236,7 @@ export interface RunQueryRequest extends TestRequest {
 }
 
 export interface RunQueryResponse {
-    results     : cbl.JSONArray,
+    results     : cbl.CBLDictionary[],
 }
 
 
