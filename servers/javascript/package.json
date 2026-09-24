@@ -17,7 +17,7 @@
     "format:check": "biome format",
     "lint": "eslint src",
     "lint:fix": "eslint --fix src",
-    "precommit": "npm install --no-audit --no-fund --loglevel=error && npm run format && npm run typecheck && npm run lint"
+    "precommit": "npm ci --no-audit --no-fund --loglevel=error && npm run format && npm run typecheck && npm run lint"
   },
   "dependencies": {
     "@couchbase/lite-js": "^1.0.2"
