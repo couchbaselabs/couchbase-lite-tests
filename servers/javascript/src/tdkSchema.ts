@@ -128,7 +128,7 @@ export interface Filter {
 }
 
 export interface ReplicatorAuthenticator {
-    type        : 'BASIC' | 'SESSION',
+    type        : 'BASIC' | 'SESSION' | 'BEARER',
 }
 
 export interface ReplicatorBasicAuthenticator extends ReplicatorAuthenticator {
@@ -140,7 +140,14 @@ export interface ReplicatorBasicAuthenticator extends ReplicatorAuthenticator {
 export interface ReplicatorSessionAuthenticator extends ReplicatorAuthenticator {
     type        : 'SESSION',
     sessionID   : string,
-    cookieName  : string,
+    /** Unsupported on this platform -- see credentialsFromAuthenticator in tdk.ts.
+     *  Optional here because CBL JS cannot honour a non-default value. */
+    cookieName? : string,
+}
+
+export interface ReplicatorBearerAuthenticator extends ReplicatorAuthenticator {
+    type        : 'BEARER',
+    token       : string,
 }
 
 export interface StartReplicatorResponse {
@@ -253,7 +260,6 @@ export interface LogRequest extends TestRequest {
 /** Base URL for our JSON datasets. */
 export const kDatasetBaseURL = "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
 export const kBlobBaseURL = "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/";
-
 /** Schema of `index.json` */
 export interface DatasetIndex {
     name        : string,
