@@ -24,16 +24,14 @@ export class KeyPath {
         }
 
         let str = path.trim();
-        if (str.startsWith('$'))
-            str = str.substring(1);
-        else if (!str.startsWith('['))
-            str = "." + str;
+        if (str.startsWith("$")) str = str.substring(1);
+        else if (!str.startsWith("[")) str = "." + str;
 
         let i = 0;
         while (i < str.length) {
             const m = str.substring(i).match(/\.([^.[]*)|\[(-?\d+)\]/);
             check(m !== null);
-            if (m[0].startsWith('.')) {
+            if (m[0].startsWith(".")) {
                 const key = m[1];
                 check(key.length > 0);
                 this.components.push(key);
@@ -57,21 +55,17 @@ export class KeyPath {
         if (path.length === 0) {
             return ".";
         } else {
-            return path.flatMap( item => (typeof item === 'string') ? [".", item] : `[${item}]`)
-                .join("");
+            return path.flatMap((item) => (typeof item === "string" ? [".", item] : `[${item}]`)).join("");
         }
     }
 
     /** Returns the value at this path in `root`, else `undefined`. */
     read(root: CBLValue): CBLValue | undefined {
-        let cur : CBLValue | undefined = root;
+        let cur: CBLValue | undefined = root;
         for (const c of this.components) {
-            if (typeof c === 'string')
-                cur = isDict(cur) ? cur[c] : undefined;
-            else
-                cur = Array.isArray(cur) ? cur[c] : undefined;
-            if (cur === undefined)
-                break;
+            if (typeof c === "string") cur = isDict(cur) ? cur[c] : undefined;
+            else cur = Array.isArray(cur) ? cur[c] : undefined;
+            if (cur === undefined) break;
         }
         return cur;
     }
@@ -86,40 +80,31 @@ export class KeyPath {
      *    component is a scalar, or the component is a key but the value is an array, or vice
      *    versa, the traversal stops and the method returns false. */
     write(root: CBLValue, value: CBLValue | undefined): boolean {
-        const makeCollection = (i: number) =>
-            (typeof this.components[i] === 'string') ? {} : [];
+        const makeCollection = (i: number) => (typeof this.components[i] === "string" ? {} : []);
 
-        let cur : CBLValue = root;
+        let cur: CBLValue = root;
         const last = this.components.length - 1;
         for (let i = 0; i <= last; ++i) {
             const c = this.components[i];
-            if (typeof c === 'string') {
-                if (!isDict(cur))
-                    return false; // type mismatch
+            if (typeof c === "string") {
+                if (!isDict(cur)) return false; // type mismatch
                 if (i === last) {
-                    if (value !== undefined)
-                        cur[c] = value;
-                    else
-                        delete cur[c];
+                    if (value !== undefined) cur[c] = value;
+                    else delete cur[c];
                 } else if (c in cur) {
                     cur = cur[c];
                 } else {
                     cur = cur[c] = makeCollection(i + 1);
                 }
-
             } else {
-                if (!Array.isArray(cur))
-                    return false; // type mismatch
+                if (!Array.isArray(cur)) return false; // type mismatch
                 if (i < last && cur.length >= c) {
                     cur = cur[c];
                 } else {
-                    while (cur.length < c)
-                        cur.push(null); // pad the array if necessary
+                    while (cur.length < c) cur.push(null); // pad the array if necessary
                     if (i === last) {
-                        if (value !== undefined)
-                            cur[c] = value;
-                        else
-                            cur.splice(c, 1);
+                        if (value !== undefined) cur[c] = value;
+                        else cur.splice(c, 1);
                     } else {
                         cur = cur[c] = makeCollection(i + 1);
                     }
@@ -137,9 +122,10 @@ export class KeyPath {
         return new KeyPath(path).write(root, value);
     }
 
-    toString() {return this.str;}
+    toString() {
+        return this.str;
+    }
 }
-
 
 /** A simple cache of precompiled KeyPaths. */
 export class KeyPathCache {
@@ -154,12 +140,11 @@ export class KeyPathCache {
     }
 
     static path(str: string): KeyPath {
-        if (!this.#sharedInstance)
-            this.#sharedInstance = new KeyPathCache();
+        if (!this.#sharedInstance) this.#sharedInstance = new KeyPathCache();
         return this.#sharedInstance.path(str);
     }
 
-    #paths = new Map<string,KeyPath>();
+    #paths = new Map<string, KeyPath>();
 
     static #sharedInstance?: KeyPathCache;
 }

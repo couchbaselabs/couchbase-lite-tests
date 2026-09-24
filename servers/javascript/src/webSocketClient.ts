@@ -12,46 +12,54 @@
 
 import { check } from "./utils";
 
-
 /** States of WebSocketClient. (Same as the all-caps constants in `WebSocket`.) */
 export enum WebSocketState {
     Connecting = 0,
     Open,
     Closing,
-    Closed
+    Closed,
 }
-
 
 export const WebSocketStateNames = ["connecting", "connected", "closing", "closed"];
 
-
 /** Simple WebSocket client class, used by TestServer and LogSender. */
 export abstract class WebSocketClient implements Disposable {
-    constructor(private subProtocol?: string) { }
+    constructor(private subProtocol?: string) {}
 
     /** A callback that notifies about state changes. */
-    onStateChange? : (state: WebSocketState)=>void;
-
+    onStateChange?: (state: WebSocketState) => void;
 
     /** Connects to the server, asynchronously. */
     connect(url: string) {
         this.#ws = new WebSocket(url, this.subProtocol);
-        this.#ws.onopen     = ()      => {this.handleWSOpen();};
-        this.#ws.onmessage  = (event) => {this.handleWSMessage(event);};
-        this.#ws.onclose    = (event) => {this.handleWSClose(event);};
-        this.#ws.onerror    = (event) => {this.handleWSError(event);};
+        this.#ws.onopen = () => {
+            this.handleWSOpen();
+        };
+        this.#ws.onmessage = (event) => {
+            this.handleWSMessage(event);
+        };
+        this.#ws.onclose = (event) => {
+            this.handleWSClose(event);
+        };
+        this.#ws.onerror = (event) => {
+            this.handleWSError(event);
+        };
         this.onStateChange?.(this.state);
     }
 
-
     /** The WebSocket's current state. */
-    get state() : WebSocketState { return this.#ws?.readyState ?? WebSocketState.Closed; }
+    get state(): WebSocketState {
+        return this.#ws?.readyState ?? WebSocketState.Closed;
+    }
 
-    get isOpen() : boolean {return this.state === WebSocketState.Open;}
+    get isOpen(): boolean {
+        return this.state === WebSocketState.Open;
+    }
 
     /** The connection error, if any. */
-    get error() : string | undefined {return this.#errorMessage;}
-
+    get error(): string | undefined {
+        return this.#errorMessage;
+    }
 
     /** Closes the connection, asynchronously.. */
     close(code = 1000, reason = "") {
@@ -62,26 +70,24 @@ export abstract class WebSocketClient implements Disposable {
         }
     }
 
-    [Symbol.dispose]() {this.close();}
-
+    [Symbol.dispose]() {
+        this.close();
+    }
 
     //-------- For subclasses:
 
-
-    protected onOpen() { }
+    protected onOpen() {}
 
     protected send(message: string) {
         check(this.#ws !== undefined, "WebSocket is closed");
         this.#ws.send(message);
     }
 
-    protected onTextMessage(_message: string) { }
+    protected onTextMessage(_message: string) {}
 
-    protected onClose() { }
-
+    protected onClose() {}
 
     //------- Internal:
-
 
     private handleWSOpen() {
         check(this.#ws !== undefined, "WebSocket is closed");
@@ -98,30 +104,24 @@ export abstract class WebSocketClient implements Disposable {
         this.onStateChange?.(this.state);
     }
 
-
     private handleWSMessage(event: MessageEvent) {
-        if (typeof event.data === 'string')
-            this.onTextMessage(event.data);
+        if (typeof event.data === "string") this.onTextMessage(event.data);
     }
-
 
     private handleWSClose(event: CloseEvent) {
         if (event.code !== 1000 || !event.wasClean) {
             let message = `WebSocket closed unexpectedly with code ${event.code}`;
-            if (event.reason)
-                message += `: ${event.reason}`;
+            if (event.reason) message += `: ${event.reason}`;
             this.#errorMessage = message;
         }
         this.closed();
     }
-
 
     private handleWSError(_event: Event) {
         // In a browser there is, unfortunately, no useful information in the ErrorEvent.
         this.#errorMessage = this.#open ? "WebSocket disconnected" : "WebSocket connection failed";
         this.closed();
     }
-
 
     private closed() {
         this.#open = false;
@@ -130,8 +130,7 @@ export abstract class WebSocketClient implements Disposable {
         this.onStateChange?.(this.state);
     }
 
-
-    #ws?            : WebSocket;
-    #errorMessage?  : string;
-    #open           = false;
+    #ws?: WebSocket;
+    #errorMessage?: string;
+    #open = false;
 }
