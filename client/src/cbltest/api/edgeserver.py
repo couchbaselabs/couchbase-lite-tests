@@ -28,6 +28,7 @@ from cbltest.api.syncgateway import (
     RemoteDocument,
 )
 from cbltest.assertions import _assert_not_null
+from cbltest.httpclient import get_client_session
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
@@ -252,12 +253,12 @@ class EdgeServer:
                     keyfile=str(CERT_DIR / "client_key.pem"),
                 )
 
-            return ClientSession(
+            return get_client_session(
                 f"{self.scheme}{self.__hostname}:{self.__port}",
                 headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
-        return ClientSession(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
+        return get_client_session(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
 
     async def _send_request(
         self,

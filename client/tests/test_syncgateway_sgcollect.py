@@ -42,7 +42,7 @@ class FakeSyncGateway(SyncGateway):
 
     def __init__(self, hostname: str = "sg.example.com") -> None:
         with (
-            patch("cbltest.api.syncgateway.ClientSession", autospec=True),
+            patch("cbltest.httpclient.ClientSession", autospec=True),
             patch("cbltest.api.caddy.ClientSession", autospec=True),
             patch("cbltest.api.syncgateway.requests.get", autospec=True),
         ):

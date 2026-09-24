@@ -33,7 +33,7 @@ class CblTestServerBadResponseError(Exception):
         return self.__message
 
 
-class CblTimeoutError(Exception):
+class CblTimeoutError(TimeoutError):
     """A timeout occurred while waiting for an event"""
 
     def __init__(self, *args: Any) -> None:

@@ -19,8 +19,9 @@ from aiohttp import ClientError, ClientSession, ClientTimeout
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.error import CblTestError, CblTimeoutError
+from cbltest.httpclient import describe_transfer
 from cbltest.logging import cbl_info
-from cbltest.utils import describe_transfer, is_sidecar_reachable
+from cbltest.utils import is_sidecar_reachable
 from cbltest.version import VERSION
 
 _tracer = get_tracer(__name__, VERSION)

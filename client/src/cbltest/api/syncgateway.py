@@ -28,6 +28,7 @@ from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
+from cbltest.httpclient import get_client_session
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
@@ -810,13 +811,9 @@ class _SyncGatewayBase:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            return ClientSession(
-                f"{scheme}{url}:{port}",
-                headers=headers,
-                connector=TCPConnector(ssl=ssl_context),
-            )
+            return get_client_session(f"{scheme}{url}:{port}", headers=headers, connector=TCPConnector(ssl=ssl_context))
         else:
-            return ClientSession(f"{scheme}{url}:{port}", headers=headers)
+            return get_client_session(f"{scheme}{url}:{port}", headers=headers)
 
     async def _send_request(
         self,
