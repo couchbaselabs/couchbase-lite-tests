@@ -47,6 +47,8 @@ TOPOLOGY_ATTRS: dict[str, dict[str, str]] = {
     },
     "CouchbaseCluster": {
         "sync_gateways": "min_sync_gateways",
+        # A cluster-wide view over the same nodes, so it needs the same marker.
+        "sync_gateway_cluster": "min_sync_gateways",
         "couchbase_servers": "min_couchbase_servers",
     },
 }
