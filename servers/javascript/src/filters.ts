@@ -1,14 +1,14 @@
 import * as cbl from "@couchbase/lite-js";
 
 import type * as tdk from "./tdkSchema";
-import {check, isObject} from "./utils";
+import { check, isObject } from "./utils";
 
 // https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/spec/api/replication-filters.md
 
 type ReplicatorFilter = (doc: cbl.CBLDocument, flags: cbl.DocumentFlags) => boolean;
 type FilterMaker = (spec: tdk.Filter) => ReplicatorFilter;
 
-export const TDKReplicationFilters: Record<string,FilterMaker> = {
+export const TDKReplicationFilters: Record<string, FilterMaker> = {
     documentIDs: (spec) => {
         return (doc, _) => {
             const documentIDs = spec.params?.documentIDs;
@@ -29,7 +29,7 @@ export const TDKReplicationFilters: Record<string,FilterMaker> = {
 
     deletedDocumentsOnly: (_spec) => {
         return (_, flags) => (flags & cbl.DocumentFlags.deleted) !== 0;
-    }
+    },
 };
 
 export function CreateFilter(filterSpec: tdk.Filter | undefined): ReplicatorFilter | undefined {

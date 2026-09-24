@@ -1,5 +1,5 @@
 interface ViteTypeOptions {
-    strictImportMetaEnv: unknown
+    strictImportMetaEnv: unknown;
 }
 
 interface ImportMetaEnv {
