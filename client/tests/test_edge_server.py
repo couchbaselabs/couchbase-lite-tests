@@ -19,7 +19,7 @@ AUDIT_LOG = "/home/ec2-user/audit/EdgeServerAuditLog.txt"
 def no_network() -> Iterator[None]:
     """Keep the sessions an Edge Server client opens off the network."""
     with (
-        patch("cbltest.api.edgeserver.ClientSession", autospec=True),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
         patch("cbltest.api.caddy.ClientSession", autospec=True),
     ):
         yield

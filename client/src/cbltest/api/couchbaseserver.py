@@ -11,8 +11,6 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypeVar, cast
 
-import aiohttp
-
 T = TypeVar("T")
 import json
 from urllib.parse import quote_plus, urlparse
@@ -39,6 +37,7 @@ from opentelemetry.trace import get_tracer
 
 from cbltest import bucketpool
 from cbltest.api.error import CblTestError
+from cbltest.httpclient import get_client_session
 from cbltest.logging import cbl_info, cbl_warning
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
@@ -1502,7 +1501,7 @@ class CouchbaseServer:
         Stop the Couchbase Server service via shell2http.
         """
         async with (
-            aiohttp.ClientSession() as session,
+            get_client_session() as session,
             session.get(f"http://{self.hostname}:20001/stop-cbs") as resp,
         ):
             if resp.status != 200:
@@ -1516,7 +1515,7 @@ class CouchbaseServer:
         :param port: REST API port to wait for readiness (default 8091)
         """
         async with (
-            aiohttp.ClientSession() as session,
+            get_client_session() as session,
             session.post(
                 f"http://{self.hostname}:20001/start-cbs",
                 data=json.dumps({"port": port}),
@@ -1537,7 +1536,10 @@ class CouchbaseServer:
         # Use CBS REST API directly - returns clean PEM certificate
         url = f"http://{self.__hostname}:8091/pools/default/certificate"
 
-        async with aiohttp.ClientSession() as session, session.get(url) as resp:
+        async with (
+            get_client_session() as session,
+            session.get(url) as resp,
+        ):
             body = await resp.text()
             if resp.status != 200:
                 raise CblTestError(f"Failed to get CBS root CA: {resp.status} - {body}")
