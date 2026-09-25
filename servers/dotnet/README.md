@@ -23,8 +23,12 @@ Build with the standard .NET toolchain, either from an IDE (open
 
 ```
 dotnet build testserver.sln
-dotnet run --project testserver.cli
+dotnet run --project testserver.cli                    # listens on 8080
+dotnet run --project testserver.cli -- --port 8081     # or wherever you ask
 ```
+
+The CLI server takes `--port <port>` (default 8080) and `--silent`. A bare port with no flag name
+is still accepted, which is the form the orchestrator uses.
 
 The MAUI app (`testserver`) is built and deployed to a device, simulator, or Mac
 Catalyst from your IDE in the usual way. Running .NET apps locally is assumed

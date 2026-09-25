@@ -11,12 +11,28 @@ using TestServer.Utilities;
 using Couchbase.Lite.Logging;
 
 var silent = false;
-ushort port = 0;
-foreach (var arg in args) {
+var port = CBLTestServer.DEFAULT_PORT;
+for (var i = 0; i < args.Length; i++) {
+    var arg = args[i];
     if (arg == "--silent") {
         silent = true;
+    } else if (arg == "--port") {
+        if (i + 1 >= args.Length) {
+            Console.Error.WriteLine("Error: Missing value for --port");
+            PrintUsage();
+            return 1;
+        }
+
+        if (!TryParsePort(args[++i], out port)) {
+            return 1;
+        }
+    } else if (UInt16.TryParse(arg, out var positionalPort) && positionalPort != 0) {
+        // A bare port, the form this server has always accepted.
+        port = positionalPort;
     } else {
-        port = UInt16.Parse(arg);
+        Console.Error.WriteLine($"Error: Unrecognized argument: {arg}");
+        PrintUsage();
+        return 1;
     }
 }
 
@@ -67,7 +83,7 @@ Log(ipAddresses);
 await Task.Delay(Timeout.Infinite);
 
 server.Stop();
-return;
+return 0;
 
 void Log(string message)
 {
@@ -77,6 +93,21 @@ void Log(string message)
 
     Console.WriteLine(message);
 }
+
+static bool TryParsePort(string value, out ushort port)
+{
+    if (!UInt16.TryParse(value, out port) || port == 0) {
+        Console.Error.WriteLine($"Error: Invalid --port value: \"{value}\" (expected an integer in 1..65535)");
+        PrintUsage();
+        return false;
+    }
+
+    return true;
+}
+
+// Argument errors are printed even under --silent: they happen before the logger exists, and a
+// server that never bound the port it was asked for must not look like a successful start.
+static void PrintUsage() => Console.Error.WriteLine("Usage: testserver.cli [--silent] [--port <port>]");
 
 static bool IsInterfaceValid(NetworkInterface ni)
 {

@@ -30,6 +30,7 @@ import com.couchbase.lite.mobiletest.errors.TestError;
 import com.couchbase.lite.mobiletest.json.ErrorBuilder;
 import com.couchbase.lite.mobiletest.json.ReplyBuilder;
 import com.couchbase.lite.mobiletest.services.Log;
+import com.couchbase.lite.mobiletest.util.CliUtils;
 import com.couchbase.lite.mobiletest.util.NetUtils;
 
 
@@ -42,9 +43,20 @@ public class TestServerApp extends HttpServlet {
     // Servlets are serializable...
     private static final long serialVersionUID = 42L;
 
+    // Resolved by main, read again by init when Jetty brings the servlet up, so that the
+    // listening port and the URL written to server.url cannot drift apart.
+    private static int serverPort = NetUtils.DEFAULT_PORT;
+
+    /**
+     * Pass "--port &lt;port&gt;" to listen on a port other than 8080.
+     *
+     * @param args cli args
+     */
     public static void main(String[] args) {
+        serverPort = CliUtils.getPort(args);
+
         // Create a basic Jetty server instance
-        final Server server = new Server(8080);
+        final Server server = new Server(serverPort);
 
         // Set up a servlet context and map servlets
         final ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
@@ -77,7 +89,7 @@ public class TestServerApp extends HttpServlet {
         final String addr = NetUtils.getLocalAddress();
         if (addr == null) { throw new ServerError("Cannot get server address"); }
 
-        final URI serverUri = NetUtils.makeUri("http", addr, 8080, "");
+        final URI serverUri = NetUtils.makeUri("http", addr, serverPort, "");
         if (serverUri == null) { throw new ServerError("Cannot get server URI"); }
 
         try (PrintWriter writer = new PrintWriter(new FileWriter("server.url"))) {
