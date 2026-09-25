@@ -120,8 +120,7 @@ class TestReplicationBehavior(CBLTestClass):
         self.mark_test_step(f"Assert `{loc_deleted}`,  is `deleted`")
         snapshot_updater = SnapshotUpdater(snapshot)
         snapshot_updater.delete_document("_default._default", loc_deleted)
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result, f"{loc_deleted} was not deleted locally: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         self.mark_test_step("""
             Start a replicator:

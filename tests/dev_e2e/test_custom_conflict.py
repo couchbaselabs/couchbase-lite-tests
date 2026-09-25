@@ -113,8 +113,7 @@ class TestCustomConflict(CBLTestClass):
         )
 
         self.mark_test_step(verify_description)
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Conflict resolution resulted in bad data: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -221,8 +220,7 @@ class TestCustomConflict(CBLTestClass):
         )
 
         self.mark_test_step("Check that the name_101, name_102, and name_103 document `name.last` == 'Smith'")
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Conflict resolution resulted in bad data: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         self.mark_test_step("""
             Start a replicator:

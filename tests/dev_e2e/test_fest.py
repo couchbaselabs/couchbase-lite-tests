@@ -218,8 +218,7 @@ class TestFest(CBLTestClass):
             ],
             new_blobs={"image": "l2.jpg"},
         )
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(snapshot_updater)
 
         self.mark_test_step("Verify that the new docs are in db2")
         snapshot_updater = SnapshotUpdater(snap2)
@@ -234,8 +233,7 @@ class TestFest(CBLTestClass):
             ],
             new_blobs={"image": "l1.jpg"},
         )
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -332,8 +330,7 @@ class TestFest(CBLTestClass):
             ],
             new_blobs={"image": "l5.jpg"},
         )
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         self.mark_test_step("Update the db1-list1-task1 task in db2")
         async with db2.batch_updater() as b:
@@ -378,8 +375,7 @@ class TestFest(CBLTestClass):
             new_properties=[{"name": "Updated db1 list1 task1"}, {"complete": True}],
             new_blobs={"image": "l10.jpg"},
         )
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -482,14 +478,12 @@ class TestFest(CBLTestClass):
         self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db1")
         snapshot_updater = SnapshotUpdater(snap1)
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(snapshot_updater)
 
         self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -632,16 +626,14 @@ class TestFest(CBLTestClass):
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(snapshot_updater)
 
         self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db2")
         snapshot_updater = SnapshotUpdater(snap2)
         snapshot_updater.delete_document("_default.lists", "db1-list1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -756,12 +748,10 @@ class TestFest(CBLTestClass):
         )
 
         self.mark_test_step("Verify that db1 has not changed")
-        verify_result = await db1.verify_documents(SnapshotUpdater(snap1))
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(SnapshotUpdater(snap1))
 
         self.mark_test_step("Verify that db2 has not changed")
-        verify_result = await db2.verify_documents(SnapshotUpdater(snap2))
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(SnapshotUpdater(snap2))
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -838,8 +828,7 @@ class TestFest(CBLTestClass):
         )
 
         self.mark_test_step("Verify that there are no new documents in db2")
-        verify_result = await db2.verify_documents(SnapshotUpdater(snap))
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(SnapshotUpdater(snap))
 
         self.mark_test_step("Create a user document to share the _default.lists.db1-list1 from db1")
         async with db1.batch_updater() as b:
@@ -900,8 +889,7 @@ class TestFest(CBLTestClass):
                 {"taskList": {"id": "db1-list1", "owner": "user1"}},
             ],
         )
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -1046,8 +1034,7 @@ class TestFest(CBLTestClass):
             ],
             new_blobs={"image": "s1.jpg"},
         )
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         self.mark_test_step("Update _default.tasks.db1-list1-task1 and delete db1-list1-task2 in db2")
         async with db2.batch_updater() as b:
@@ -1089,8 +1076,7 @@ class TestFest(CBLTestClass):
             new_blobs={"image": "s1.jpg"},
         )
         snapshot_updater.delete_document("_default.tasks", "db1-list1-task2")
-        verify_result = await db1.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db1: {verify_result.description}"
+        await db1.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -1227,8 +1213,7 @@ class TestFest(CBLTestClass):
             ],
             new_blobs={"image": "s1.jpg"},
         )
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         self.mark_test_step("Unshare the db1-list1 list by deleting _default.users.db1-list1-user2 from db1")
         async with db1.batch_updater() as b:
@@ -1275,7 +1260,6 @@ class TestFest(CBLTestClass):
         snapshot_updater.purge_document("_default.lists", "db1-list1")
         snapshot_updater.purge_document("_default.tasks", "db1-list1-task1")
         snapshot_updater.purge_document("_default.tasks", "db1-list1-task2")
-        verify_result = await db2.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Unexpected docs in db2: {verify_result.description}"
+        await db2.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()

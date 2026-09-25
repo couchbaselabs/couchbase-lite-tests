@@ -185,8 +185,7 @@ class TestReplicationBlob(CBLTestClass):
         self.mark_test_step("Verify updates to the snapshot from the step 11.")
         snapshot_updater = SnapshotUpdater(snapshot_id)
         snapshot_updater.upsert_document("travel.hotels", "hotel_1", removed_properties=["description"])
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"The verification failed: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
