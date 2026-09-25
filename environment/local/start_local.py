@@ -22,7 +22,7 @@ import sys
 import tempfile
 from collections.abc import Callable
 from typing import Any, NamedTuple
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlunsplit
 
 import click
 import psutil
@@ -932,12 +932,12 @@ def resolve_topology_config(
             assert connstr is not None
             # Each node gets its own entry rather than one naming them all, since the tests
             # fail over and rebalance nodes individually.
-            scheme = urlsplit(connstr).scheme
+            parsed = urlsplit(connstr)
             cbs_template = c["couchbase-servers"][0]
             c["couchbase-servers"] = [
                 {
                     **cbs_template,
-                    "hostname": f"{scheme}://{host}",
+                    "hostname": urlunsplit(parsed._replace(netloc=host)),
                     "admin_user": admin_user,
                     "admin_password": admin_password,
                 }
