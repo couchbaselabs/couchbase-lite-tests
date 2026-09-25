@@ -23,90 +23,79 @@ import * as logtape from "@logtape/logtape";
 import { TDKConflictResolvers } from "./conflictResolvers";
 import { CreateFilter } from "./filters";
 
-
 interface ReplicatorInfo {
-    replicator  : cbl.Replicator,
-    documents?  : tdk.DocumentReplication[],
-    finished    : boolean,
-    error?      : Error,
+    replicator: cbl.Replicator;
+    documents?: tdk.DocumentReplication[];
+    finished: boolean;
+    error?: Error;
 }
-
 
 /** Parameter type of Collection.updateMultiple.
  *  TODO: Replace with `cbl.MultipleUpdates` once that's exported from CBL. */
 interface CollectionUpdates {
-    save?       : cbl.CBLDocument[],
-    delete?     : cbl.CBLDocument[],
-    bestEffort? : boolean,
-    onConflict? : cbl.ConflictHandler,
+    save?: cbl.CBLDocument[];
+    delete?: cbl.CBLDocument[];
+    bestEffort?: boolean;
+    onConflict?: cbl.ConflictHandler;
 }
-
 
 export const APIVersion = 1;
 
-
 /** Implementation of the TDK API, as a delegate object for TestServer. */
 export class TDKImpl implements tdk.TDK, AsyncDisposable {
-
     async [Symbol.asyncDispose]() {
         await this.#closeDatabases();
         this.#logSender?.close();
         this.#logSender = undefined;
     }
 
-
     async #closeDatabases() {
         for (const [id, repl] of this.#replicators) {
             if (!repl.finished) {
-                this.#logger.info `Reset: Stopping replicator ${id}`;
+                this.#logger.info`Reset: Stopping replicator ${id}`;
                 repl.replicator.stop();
             }
         }
         this.#replicators.clear();
 
         for (const db of this.#databases.values()) {
-            this.#logger.info `Reset: Closing database ${db.name}`;
+            this.#logger.info`Reset: Closing database ${db.name}`;
             await db.closeAndDelete();
         }
         this.#databases.clear();
     }
 
-
     //////// NEW SESSION
-    async [tdk.NewSessionCommand] (rq: tdk.NewSessionRequest): Promise<void> {
+    async [tdk.NewSessionCommand](rq: tdk.NewSessionRequest): Promise<void> {
         check(this.#sessionID === undefined, "Can't start a second session");
         this.#sessionID = rq.id;
         if (rq.logging) {
-            this.#logger.info `Connecting to LogSlurp at ${rq.logging.url} with id=${rq.id}, tag=${rq.logging.tag}`;
+            this.#logger.info`Connecting to LogSlurp at ${rq.logging.url} with id=${rq.id}, tag=${rq.logging.tag}`;
             this.#logSender = new LogSlurpSender(rq.logging.url, rq.id, rq.logging.tag);
             await this.#logSender.waitForConnected(5000);
         }
     }
 
-
     //////// GET INFO
-    async [tdk.GetInfoCommand] (_rq: TestRequest): Promise<tdk.GetInfoResponse> {
+    async [tdk.GetInfoCommand](_rq: TestRequest): Promise<tdk.GetInfoResponse> {
         return {
             version: cbl.Version,
             apiVersion: APIVersion,
             cbl: "couchbase-lite-js",
             device: {
-                "User-Agent": navigator.userAgent
+                "User-Agent": navigator.userAgent,
             },
         };
     }
 
-
     //////// RESET
-    async [tdk.ResetCommand] (rq: tdk.ResetRequest): Promise<void> {
+    async [tdk.ResetCommand](rq: tdk.ResetRequest): Promise<void> {
         await this.#closeDatabases();
         if (rq.databases) {
             for (const name of Object.getOwnPropertyNames(rq.databases)) {
                 const what = rq.databases[name];
-                if ('dataset' in what)
-                    await this.#loadDataset(name, what.dataset);
-                else
-                    await this.#createDatabase(name, what.collections);
+                if ("dataset" in what) await this.#loadDataset(name, what.dataset);
+                else await this.#createDatabase(name, what.collections);
             }
         }
         if (rq.test) {
@@ -114,20 +103,19 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         }
     }
 
-
     //////// GET ALL DOCUMENTS
-    async [tdk.GetAllDocumentsCommand] (rq: tdk.GetAllDocumentsRequest): Promise<tdk.GetAllDocumentsResponse> {
+    async [tdk.GetAllDocumentsCommand](rq: tdk.GetAllDocumentsRequest): Promise<tdk.GetAllDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const response: tdk.GetAllDocumentsResponse = {};
         for (const inputColl of rq.collections) {
             const collName = normalizeCollectionID(inputColl);
             if (collName in db.collections) {
                 const coll = db.getCollection(collName);
-                const docs = new Array<{id:cbl.DocID, rev:cbl.RevID}>();
+                const docs = new Array<{ id: cbl.DocID; rev: cbl.RevID }>();
                 response[inputColl] = docs;
-                await coll.eachDocument( doc => {
+                await coll.eachDocument((doc) => {
                     const m = cbl.meta(doc);
-                    docs.push({id: m.id, rev: m.revisionID!});
+                    docs.push({ id: m.id, rev: m.revisionID! });
                     return true;
                 });
             }
@@ -135,21 +123,18 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return response;
     }
 
-
     //////// GET DOCUMENT
-    async [tdk.GetDocumentCommand] (rq: tdk.GetDocumentRequest): Promise<tdk.GetDocumentResponse> {
-        const coll = this.#getDatabase(rq.database)
-            .getCollection(normalizeCollectionID(rq.document.collection));
+    async [tdk.GetDocumentCommand](rq: tdk.GetDocumentRequest): Promise<tdk.GetDocumentResponse> {
+        const coll = this.#getDatabase(rq.database).getCollection(normalizeCollectionID(rq.document.collection));
         const doc = await coll.getDocument(rq.document.id);
         if (!doc) throw new HTTPError(404, `No document "${rq.document.id}"`);
         const m = cbl.meta(doc);
         const jsonBody = docToJSON(doc);
-        return {_id: rq.document.id, _revs: m.revisionID!, ...jsonBody};
+        return { _id: rq.document.id, _revs: m.revisionID!, ...jsonBody };
     }
 
-
     //////// UPDATE DATABASE:
-    async [tdk.UpdateDatabaseCommand] (rq: tdk.UpdateDatabaseRequest): Promise<void> {
+    async [tdk.UpdateDatabaseCommand](rq: tdk.UpdateDatabaseRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);
         const dbUpdates = new Map<cbl.Collection, CollectionUpdates>();
 
@@ -160,12 +145,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             const coll = db.getCollection(normalizeCollectionID(update.collection));
             let collUpdates = dbUpdates.get(coll);
             if (!collUpdates) {
-                collUpdates = {save: [], delete: []};
+                collUpdates = { save: [], delete: [] };
                 dbUpdates.set(coll, collUpdates);
             }
 
-            const doc = (await coll.getDocument(update.documentID)) ??
-                        coll.createDocument(update.documentID);
+            const doc = (await coll.getDocument(update.documentID)) ?? coll.createDocument(update.documentID);
 
             function updatePath(pathStr: string, value: cbl.CBLValue | undefined): void {
                 if (!KeyPathCache.path(pathStr).write(doc, value))
@@ -173,7 +157,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             }
 
             switch (update.type) {
-                case 'UPDATE': {
+                case "UPDATE": {
                     if (update.updatedProperties) {
                         for (const props of update.updatedProperties) {
                             for (const pathStr of Object.getOwnPropertyNames(props))
@@ -194,53 +178,50 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     collUpdates.save!.push(doc);
                     break;
                 }
-                case 'DELETE':
+                case "DELETE":
                     collUpdates.delete!.push(doc);
                     break;
-                case 'PURGE':
-                    await coll.purge(doc);  // Collection.updateMultiple doesn't do purges
+                case "PURGE":
+                    await coll.purge(doc); // Collection.updateMultiple doesn't do purges
                     break;
             }
         }
 
         // Now update the database:
-        for (const collection of dbUpdates.keys())
-            await collection.updateMultiple(dbUpdates.get(collection)!);
+        for (const collection of dbUpdates.keys()) await collection.updateMultiple(dbUpdates.get(collection)!);
     }
 
-
     //////// START REPLICATOR:
-    async [tdk.StartReplicatorCommand] (rq: tdk.StartReplicatorRequest): Promise<tdk.StartReplicatorResponse> {
+    async [tdk.StartReplicatorCommand](rq: tdk.StartReplicatorRequest): Promise<tdk.StartReplicatorResponse> {
         const db = this.#getDatabase(rq.config.database);
         const config: cbl.ReplicatorConfig = {
-            database:    db,
-            url:         rq.config.endpoint,
+            database: db,
+            url: rq.config.endpoint,
             collections: {},
         };
         if (rq.config.authenticator) {
-            if (rq.config.authenticator.type !== 'BASIC')
-                throw new HTTPError(501, "Only Basic auth is supported");
+            if (rq.config.authenticator.type !== "BASIC") throw new HTTPError(501, "Only Basic auth is supported");
             const basicAuth = rq.config.authenticator as tdk.ReplicatorBasicAuthenticator;
             config.credentials = {
                 username: basicAuth.username,
-                password: basicAuth.password
+                password: basicAuth.password,
             };
         }
         for (const colls of rq.config.collections) {
-            const collCfg: cbl.ReplicatorCollectionConfig = { };
-            if (rq.config.replicatorType !== 'pull') {
+            const collCfg: cbl.ReplicatorCollectionConfig = {};
+            if (rq.config.replicatorType !== "pull") {
                 collCfg.push = {
                     continuous: rq.config.continuous,
-                    filter:     CreateFilter(colls.pushFilter),
+                    filter: CreateFilter(colls.pushFilter),
                 };
             }
 
-            if (rq.config.replicatorType !== 'push') {
+            if (rq.config.replicatorType !== "push") {
                 collCfg.pull = {
                     continuous: rq.config.continuous,
                     enableAutoPurge: rq.config.enableAutoPurge,
-                    channels:   colls.channels,
-                    filter:     CreateFilter(colls.pullFilter),
+                    channels: colls.channels,
+                    filter: CreateFilter(colls.pullFilter),
                 };
                 if (colls.conflictResolver) {
                     const name = colls.conflictResolver.name;
@@ -250,34 +231,30 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 }
             }
 
-            if (colls.documentIDs)
-                collCfg.documentIDs = colls.documentIDs;
+            if (colls.documentIDs) collCfg.documentIDs = colls.documentIDs;
 
-            if (rq.reset)
-                collCfg.resetCheckpoint = rq.reset;
-            
-            for (const collName of colls.names)
-                config.collections[normalizeCollectionID(collName)] = collCfg;
+            if (rq.reset) collCfg.resetCheckpoint = rq.reset;
+
+            for (const collName of colls.names) config.collections[normalizeCollectionID(collName)] = collCfg;
         }
 
         const repl = new cbl.Replicator(config);
-        const info: ReplicatorInfo = {replicator: repl, documents: [], finished: false};
+        const info: ReplicatorInfo = { replicator: repl, documents: [], finished: false };
 
         if (rq.config.enableDocumentListener) {
             repl.onDocuments = (collection, direction, documents) => {
-                if (info.documents === undefined)
-                    info.documents = [];
+                if (info.documents === undefined) info.documents = [];
                 for (const doc of documents) {
-                    const flags: ('deleted' | 'accessRemoved')[] = [];
-                    doc.deleted && flags.push('deleted');
-                    doc.lostAccess && flags.push('accessRemoved');
+                    const flags: ("deleted" | "accessRemoved")[] = [];
+                    doc.deleted && flags.push("deleted");
+                    doc.lostAccess && flags.push("accessRemoved");
 
                     info.documents.push({
                         collection: collectionIDWithScope(collection.name),
                         documentID: doc.docID,
-                        isPush:     (direction === 'push'),
-                        flags:      flags,
-                        error:      this.#mkErrorInfo(doc.error),
+                        isPush: direction === "push",
+                        flags: flags,
+                        error: this.#mkErrorInfo(doc.error),
                     });
                 }
             };
@@ -286,89 +263,83 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const id = `repl-${++this.#idCounter}`;
         this.#replicators.set(id, info);
         repl.run().then(
-            _ok   => {info.finished = true;},
-            error => {info.finished = true; info.error = error as Error;}
+            (_ok) => {
+                info.finished = true;
+            },
+            (error) => {
+                info.finished = true;
+                info.error = error as Error;
+            },
         );
-        return {id};
+        return { id };
     }
 
-
     //////// STOP REPLICATOR:
-    async [tdk.StopReplicatorCommand] (rq: tdk.StopReplicatorRequest): Promise<void> {
+    async [tdk.StopReplicatorCommand](rq: tdk.StopReplicatorRequest): Promise<void> {
         const info = this.#replicators.get(rq.id);
-        if (!info)
-            throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
         info.replicator.stop();
     }
 
-
     //////// REPLICATOR STATUS:
-    async [tdk.GetReplicatorStatusCommand] (rq: tdk.GetReplicatorStatusRequest): Promise<tdk.GetReplicatorStatusResponse> {
+    async [tdk.GetReplicatorStatusCommand](
+        rq: tdk.GetReplicatorStatusRequest,
+    ): Promise<tdk.GetReplicatorStatusResponse> {
         const info = this.#replicators.get(rq.id);
-        if (!info)
-            throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
         const status = info.replicator.status;
         const documents = info.documents;
         info.documents = undefined;
 
         return {
-            activity:   status.status?.toUpperCase() ?? "CONNECTING",
-            progress:   { completed: (status.status === 'stopped') },
-            documents:  documents,
-            error:      this.#mkErrorInfo(info.error),
+            activity: status.status?.toUpperCase() ?? "CONNECTING",
+            progress: { completed: status.status === "stopped" },
+            documents: documents,
+            error: this.#mkErrorInfo(info.error),
         };
     }
 
-
     //////// RUN QUERY:
-    async [tdk.RunQueryCommand] (rq: tdk.RunQueryRequest): Promise<tdk.RunQueryResponse> {
+    async [tdk.RunQueryCommand](rq: tdk.RunQueryRequest): Promise<tdk.RunQueryResponse> {
         const db = this.#getDatabase(rq.database);
         const rows = await db.createQuery(rq.query).execute();
         return {
-            results: rows
+            results: rows,
         };
     }
 
-
     //////// PERFORM MAINTENANCE:
-    async [tdk.PerformMaintenanceCommand] (rq: tdk.PerformMaintenanceRequest): Promise<void> {
+    async [tdk.PerformMaintenanceCommand](rq: tdk.PerformMaintenanceRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);
         switch (rq.maintenanceType) {
-            case 'compact':
-                await db.performMaintenance('compact');
+            case "compact":
+                await db.performMaintenance("compact");
                 break;
             default:
                 throw new HTTPError(501, "Unimplemented maintenance type");
         }
     }
 
-
     //////// SNAPSHOT DOCUMENTS:
-    async [tdk.SnapshotDocumentsCommand] (rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
+    async [tdk.SnapshotDocumentsCommand](rq: tdk.SnapshotDocumentsRequest): Promise<tdk.SnapshotDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const snap = new Snapshot(db);
-        for (const d of rq.documents)
-            await snap.record(d.collection, d.id);
+        for (const d of rq.documents) await snap.record(d.collection, d.id);
         const snapID = `snap-${++this.#snapshotCounter}`;
         this.#snapshots.set(snapID, snap);
-        return {id: snapID};
+        return { id: snapID };
     }
 
-
     //////// VERIFY DOCUMENTS:
-    async [tdk.VerifyDocumentsCommand] (rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
+    async [tdk.VerifyDocumentsCommand](rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const snap = this.#snapshots.get(rq.snapshot);
-        if (snap === undefined)
-            throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
-        if (snap.db !== db)
-            throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
+        if (snap === undefined) throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+        if (snap.db !== db) throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
         return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
 
-
     //-------- Internals:
-
 
     #mkErrorInfo(error: Error | undefined): tdk.ErrorInfo | undefined {
         let code = -1;
@@ -376,9 +347,8 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             code = error.code ?? -1;
         }
 
-        return error ? {domain: "CBL-JS", code: code, message: error.message} : undefined;
+        return error ? { domain: "CBL-JS", code: code, message: error.message } : undefined;
     }
-
 
     #getDatabase(name: string): cbl.Database {
         const db = this.#databases.get(name);
@@ -386,18 +356,16 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return db;
     }
 
-
     async #createDatabase(name: string, collections: readonly string[] | undefined): Promise<cbl.Database> {
         check(!this.#databases.has(name), `There is already an open database named ${name}`);
-        let colls: Record<string,cbl.CollectionConfig> = {};
+        let colls: Record<string, cbl.CollectionConfig> = {};
         if (collections) {
-            for (const coll of collections)
-                colls[coll] = {};
+            for (const coll of collections) colls[coll] = {};
         }
-        this.#logger.info `Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
-        const db = await cbl.Database.open({name: name, version: 1, collections: colls});
-        if (import.meta.env.VITE_ENCRYPTED_DBS === 'true') {
-            this.#logger.info `- VITE_ENCRYPTED_DBS set, adding encryption to ${name}`;
+        this.#logger.info`Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
+        const db = await cbl.Database.open({ name: name, version: 1, collections: colls });
+        if (import.meta.env.VITE_ENCRYPTED_DBS === "true") {
+            this.#logger.info`- VITE_ENCRYPTED_DBS set, adding encryption to ${name}`;
             await db.changeEncryptionKey("password");
         }
 
@@ -405,36 +373,39 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return db;
     }
 
-
     async #loadDataset(dbName: string, datasetName: string) {
         const url = tdk.kDatasetBaseURL + datasetName + "/";
 
         const fetchRelative = async (suffix: string): Promise<string> => {
             const response = await fetch(url + suffix);
             if (response.status !== 200)
-                throw new HTTPError(502, `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`);
+                throw new HTTPError(
+                    502,
+                    `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
+                );
             return await response.text();
         };
 
-        this.#logger.info `Loading database ${dbName} from dataset ${datasetName} at ${url} ...`;
+        this.#logger.info`Loading database ${dbName} from dataset ${datasetName} at ${url} ...`;
         const config = JSON.parse(await fetchRelative("index.json")) as tdk.DatasetIndex;
-        if (typeof config.name !== 'string' || !Array.isArray(config.collections))
+        if (typeof config.name !== "string" || !Array.isArray(config.collections))
             throw new HTTPError(400, `Not a valid dataset index at <${url}index.json>`);
 
         const db = await this.#createDatabase(dbName, config.collections);
 
-        let totalDocs = 0, totalBlobs = 0;
+        let totalDocs = 0,
+            totalBlobs = 0;
         for (const collID of config.collections) {
-            this.#logger.debug `- Loading docs in collection ${collID}...`;
+            this.#logger.debug`- Loading docs in collection ${collID}...`;
             const collection = db.getCollection(normalizeCollectionID(collID));
             const docs: cbl.CBLDocument[] = [];
             const jsonl = await fetchRelative(`${collID}.jsonl`);
-            for (const line of jsonl.trim().split('\n')) {
+            for (const line of jsonl.trim().split("\n")) {
                 if (line.trim().length > 0) {
                     const doc = JSON.parse(line) as tdk.DatasetDoc;
                     const id = cbl.DocID(doc._id);
                     const body: cbl.JSONObject = doc;
-                    delete body['_id'];
+                    delete body["_id"];
 
                     // Search for blobs and download the data:
                     totalBlobs += await this.#installBlobs(body, url);
@@ -442,35 +413,32 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                     docs.push(collection.createDocument(id, body));
                 }
             }
-            await collection.updateMultiple({save: docs});
-            this.#logger.info `- Added ${docs.length} docs to collection ${collID}...`;
+            await collection.updateMultiple({ save: docs });
+            this.#logger.info`- Added ${docs.length} docs to collection ${collID}...`;
             totalDocs += docs.length;
         }
-        this.#logger.info `Finished creating database ${dbName} with ${totalDocs} docs and ${totalBlobs} blobs.`;
+        this.#logger.info`Finished creating database ${dbName} with ${totalDocs} docs and ${totalBlobs} blobs.`;
     }
-
 
     async #installBlobs(doc: cbl.JSONObject, datasetURL: string): Promise<number> {
         let totalBlobs = 0;
-        const _installBlobs = async (obj: cbl.CBLValue) : Promise<cbl.NewBlob | undefined> =>{
+        const _installBlobs = async (obj: cbl.CBLValue): Promise<cbl.NewBlob | undefined> => {
             if (Array.isArray(obj)) {
                 let i = 0;
                 for (const v of obj) {
-                    const blob = await _installBlobs(v);  // recurse
-                    if (blob)
-                        obj[i] = blob;
+                    const blob = await _installBlobs(v); // recurse
+                    if (blob) obj[i] = blob;
                     ++i;
                 }
-            } else if (typeof obj === 'object' && obj !== null) {
+            } else if (typeof obj === "object" && obj !== null) {
                 obj = obj as cbl.CBLDictionary;
                 if (obj["@type"] === "blob" && typeof obj.digest === "string") {
                     ++totalBlobs;
                     return await this.#downloadDataSetBlob(obj as unknown as cbl.Bloblike, datasetURL);
                 }
                 for (const key of Object.getOwnPropertyNames(obj)) {
-                    const blob = await _installBlobs(obj[key]);  // recurse
-                    if (blob)
-                        obj[key] = blob;
+                    const blob = await _installBlobs(obj[key]); // recurse
+                    if (blob) obj[key] = blob;
                 }
             }
             return undefined;
@@ -479,25 +447,21 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return totalBlobs;
     }
 
-
     async #downloadDataSetBlob(blobMeta: cbl.Bloblike, datasetURL: string): Promise<cbl.NewBlob> {
         check(blobMeta.digest.startsWith("sha1-"), "Unexpected prefix in blob digest");
-        const digest = blobMeta.digest.substring(5).replaceAll('/', '_');
+        const digest = blobMeta.digest.substring(5).replaceAll("/", "_");
         const blobURL = `${datasetURL}Attachments/${digest}.blob`;
-        this.#logger.info `  - downloading blob ${blobMeta.digest}`;
+        this.#logger.info`  - downloading blob ${blobMeta.digest}`;
         const contents = await this.#downloadBlobContents(blobURL);
         return new cbl.NewBlob(contents, blobMeta.content_type);
     }
 
-
     async #downloadBlob(blobURL: string): Promise<cbl.NewBlob> {
-        if (blobURL.endsWith(".zip"))
-            throw new HTTPError(501, "Unzipping blobs is not supported");
+        if (blobURL.endsWith(".zip")) throw new HTTPError(501, "Unzipping blobs is not supported");
         const contents = await this.#downloadBlobContents(blobURL);
         const type = blobURL.endsWith(".jpg") ? "image/jpeg" : "application/octet-stream";
         return new cbl.NewBlob(contents, type);
     }
-
 
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
         const absURL = new URL(blobURL, tdk.kBlobBaseURL);
@@ -508,24 +472,26 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                 status = 400;
             }
 
-            throw new HTTPError(status, `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`);
+            throw new HTTPError(
+                status,
+                `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
+            );
         }
         const data = await response.arrayBuffer();
         return new Uint8Array(data);
     }
 
-
-    readonly #databases     = new Map<string,cbl.Database>();
-    readonly #replicators   = new Map<string,ReplicatorInfo>();
-    readonly #snapshots     = new Map<string,Snapshot>();
-    readonly #logger        = logtape.getLogger("TDK");
-    #idCounter              = 0;
-    #snapshotCounter        = 0;
-    #sessionID?             : string;
-    #logSender?             : LogSlurpSender;
+    readonly #databases = new Map<string, cbl.Database>();
+    readonly #replicators = new Map<string, ReplicatorInfo>();
+    readonly #snapshots = new Map<string, Snapshot>();
+    readonly #logger = logtape.getLogger("TDK");
+    #idCounter = 0;
+    #snapshotCounter = 0;
+    #sessionID?: string;
+    #logSender?: LogSlurpSender;
 }
 
 /** Adds the default scope name, if necessary, to an outgoing collection ID. */
 function collectionIDWithScope(id: string): string {
-    return id.includes('.') ? id : `_default.${id}`;
+    return id.includes(".") ? id : `_default.${id}`;
 }

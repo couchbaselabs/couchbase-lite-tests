@@ -1,18 +1,17 @@
 import js from "@eslint/js";
 import globals from "globals";
 import tseslint from "typescript-eslint";
-import stylistic from "@stylistic/eslint-plugin";
 
 const SourceFiles = ["src/**/*.ts", "src/**/*.test.ts"];
 
 export default tseslint.config(
     {
         extends: [js.configs.recommended],
-        files: SourceFiles
+        files: SourceFiles,
     },
     {
         extends: [tseslint.configs.recommendedTypeChecked],
-        files: SourceFiles
+        files: SourceFiles,
     },
     {
         files: SourceFiles,
@@ -23,9 +22,6 @@ export default tseslint.config(
                 tsconfigRootDir: import.meta.dirname,
             },
         },
-        plugins: {
-            "@stylistic": stylistic
-        },
         rules: {
             "@typescript-eslint/no-non-null-assertion": 0,
             "@typescript-eslint/restrict-template-expressions": 0,
@@ -33,7 +29,7 @@ export default tseslint.config(
             "@typescript-eslint/consistent-type-imports": "error",
             "@typescript-eslint/no-import-type-side-effects": "error",
 
-            "@typescript-eslint/no-unused-expressions": 0,   // it keeps flagging logtape log calls
+            "@typescript-eslint/no-unused-expressions": 0, // it keeps flagging logtape log calls
 
             "no-unused-private-class-members": "warn",
 
@@ -54,28 +50,6 @@ export default tseslint.config(
                 },
             ],
 
-            "@stylistic/indent": [
-                "warn",
-                4,
-                {
-                    ArrayExpression: "first",
-
-                    CallExpression: {
-                        arguments: "first",
-                    },
-
-                    FunctionDeclaration: {
-                        parameters: "first",
-                    },
-
-                    FunctionExpression: {
-                        parameters: "first",
-                    },
-                    SwitchCase: 1
-                },
-            ],
-          //  "@stylistic/quotes": ["warn", "double"],
-
             "no-eval": "error",
             "no-implied-eval": "error",
             "no-invalid-this": "error",
@@ -83,10 +57,7 @@ export default tseslint.config(
             "no-shadow": 0,
             "@typescript-eslint/promise-function-async": "error",
             "prefer-promise-reject-errors": "error",
-            "require-atomic-updates": 0,    // wayyy too many false positives
-            "@/semi": ["error"],
-            "@/space-infix-ops": ["error"],
-            "@/space-before-blocks": "error",
+            "require-atomic-updates": 0, // wayyy too many false positives
             "no-template-curly-in-string": "error",
             "no-unmodified-loop-condition": "error",
             "no-useless-assignment": "warn",

@@ -33,6 +33,7 @@ own logs go to the browser JavaScript console.
 bun run test         # Vitest (run once)
 bun run test:browser # Vitest in a real browser (Playwright)
 bun run test:watch   # Vitest in watch mode
+bun run format       # Biome formatter
 bun run lint         # ESLint
 bun run lint:fix     # ESLint with autofix
 ```

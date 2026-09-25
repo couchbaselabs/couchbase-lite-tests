@@ -7,12 +7,14 @@ export default defineConfig({
         // https://vitest.dev/config/
         include: ["src/**/*.test.ts"],
         browser: {
-            instances: [{
-                name: "chromium",
-                browser: "chromium",
-                headless: true,
-            }],
-            provider: "playwright"
-        }
+            instances: [
+                {
+                    name: "chromium",
+                    browser: "chromium",
+                    headless: true,
+                },
+            ],
+            provider: "playwright",
+        },
     },
 });
