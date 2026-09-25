@@ -114,17 +114,18 @@ class EdgeServerVersion(CouchbaseVersion):
 
     def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
+        first_rparen = input.find(")", first_lparen + 1)
+        if first_lparen == -1 or first_rparen == -1:
+            cbl_warning(f"Could not parse Edge Server version string: '{input}'")
             return ("unknown", 0)
 
         version = input[0:first_lparen].strip()
         if not version:
             cbl_warning(f"Could not extract version from Edge Server version string: '{input}'")
             version = "unknown"
-
+        raw_build = input[first_lparen + 1 : first_rparen].strip()
         try:
-            build = int(input[first_lparen + 1 : first_semicol])
+            build = int(raw_build.split(";", 1)[0])
         except ValueError:
             cbl_warning(f"Could not parse build number from Edge Server version string: '{input}'")
             build = 0
@@ -271,7 +272,6 @@ class EdgeServer:
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
             resp = await self.__session.request(method, path, data=data, headers=headers)
-
             if resp.content_type.startswith("application/json"):
                 ret_val = await resp.json()
                 data = dumps(ret_val, indent=2)
@@ -813,6 +813,51 @@ class EdgeServer:
                 )
 
             return analyze_bulk_docs_response(resp, CblEdgeServerBadResponseError)
+
+    async def create_session(self, db_name: str, one_time: bool = True) -> str:
+        """
+        Create a session token via POST /{db}/_session, as the user this client authenticates as.
+
+        :param db_name: Database to create the session for
+        :param one_time: If True (default), the token is single-use (5 min TTL).
+                         If False, it is reusable (24 hour TTL).
+        :return: Session token string
+        """
+        with self.__tracer.start_as_current_span(
+            "create_session",
+            attributes={"es.database.name": db_name, "es.one_time": one_time},
+        ):
+            qp = "?one_time=true" if one_time else "?one_time=false"
+            resp = await self._send_request("post", f"/{db_name}/_session{qp}")
+            assert isinstance(resp, dict)
+            return resp["one_time_session_id"] if one_time else resp["session_id"]
+
+    async def get_session(self, db_name: str) -> dict:
+        """
+        Get session info via GET /{db}/_session, for the user this client authenticates as.
+
+        :param db_name: Database to query
+        :return: Session info dict
+        """
+        with self.__tracer.start_as_current_span(
+            "get_session",
+            attributes={"es.database.name": db_name},
+        ):
+            resp = await self._send_request("get", f"/{db_name}/_session")
+            assert isinstance(resp, dict)
+            return resp
+
+    async def delete_session(self, db_name: str) -> None:
+        """
+        Revoke the session of the user this client authenticates as, via DELETE /{db}/_session.
+
+        :param db_name: Database to log out of
+        """
+        with self.__tracer.start_as_current_span(
+            "delete_session",
+            attributes={"es.database.name": db_name},
+        ):
+            await self._send_request("delete", f"/{db_name}/_session")
 
     async def download_log_file(self, log_file: str, local_path: str | Path) -> Path:
         """
