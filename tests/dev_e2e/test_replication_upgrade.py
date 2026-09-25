@@ -539,8 +539,8 @@ class TestReplicationUpgrade(CBLTestClass):
         |                  +---------------+---------------+---------------+---------------+
         |                  |   Rev Tree    |      HLV      |   Rev Tree    |      HLV      |
         +------------------+---------------+---------------+---------------+---------------+
-        | Initial State    |     2-abc     |      none     |     2-abc     |      none     |
-        | After first pull |     2-abc     |      none     |     2-abc     |      none     |
+        | Initial State    |  2-abc,1-xyz  |      none     |  2-abc,1-xyz  |      none     |  <- 3.x record (RevTree in `extra`)
+        | After first pull |     2-abc     |      none     |  2-abc,1-xyz  |      none     |  <- 4.x `extra`; 1-xyz dropped
         | After SGW update |     2-abc     |      none     |  3-ghi 2-abc  |   [100@SGW1]  |
         | Expected Result  |     none      |   [100@SGW1]  |  3-ghi 2-abc  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
