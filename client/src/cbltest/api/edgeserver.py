@@ -10,7 +10,7 @@ from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5
-from aiohttp import ClientSession, TCPConnector, encode_basic_auth
+from aiohttp import TCPConnector, encode_basic_auth
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, ConfigDict
 
@@ -28,7 +28,7 @@ from cbltest.api.syncgateway import (
     RemoteDocument,
 )
 from cbltest.assertions import _assert_not_null
-from cbltest.httpclient import get_client_session
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
@@ -213,8 +213,7 @@ class EdgeServer:
 
     async def close(self) -> None:
         """Close the session this client requests on, and its Caddy's."""
-        if not self.__session.closed:
-            await self.__session.close()
+        await self.__session.close()
         await self._caddy.close()
 
     @property
@@ -239,7 +238,7 @@ class EdgeServer:
 
         return audit_log
 
-    def _create_session(self, auth_header: str | None) -> ClientSession:
+    def _create_session(self, auth_header: str | None) -> AsyncHTTPClient:
         """Create a session, where `auth_header` is an `Authorization` header value
         from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
         headers = {"Authorization": auth_header} if auth_header is not None else None
@@ -253,12 +252,12 @@ class EdgeServer:
                     keyfile=str(CERT_DIR / "client_key.pem"),
                 )
 
-            return get_client_session(
+            return AsyncHTTPClient(
                 f"{self.scheme}{self.__hostname}:{self.__port}",
                 headers=headers,
                 connector=TCPConnector(ssl=ssl_context),
             )
-        return get_client_session(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
+        return AsyncHTTPClient(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
 
     async def _send_request(
         self,

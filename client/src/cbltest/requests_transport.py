@@ -4,11 +4,12 @@ from typing import cast
 from urllib.parse import urljoin
 from uuid import uuid4
 
-from aiohttp import ClientResponse, ClientSession
+from aiohttp import ClientResponse
 
 from cbltest.api.error import CblTestError, CblTestServerBadResponseError
 from cbltest.configparser import TransportType
 from cbltest.globals import CBLPyTestGlobal
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.request_types import GetRootRequest, TestServerRequest, TestServerResponse
 from cbltest.responses import _response_registry
@@ -22,7 +23,7 @@ class RequestTransport(ABC):
 
 
 class _RequestHttpTransport(RequestTransport):
-    def __init__(self, url: str, session: ClientSession) -> None:
+    def __init__(self, url: str, session: AsyncHTTPClient) -> None:
         self.__url = url
         self.__session = session
 
@@ -163,12 +164,12 @@ class RequestTransportFactory:
         transport_type: TransportType,
         url: str,
         *,
-        session: ClientSession | None,
+        session: AsyncHTTPClient | None,
         ws_router: WebSocketRouter | None,
     ) -> RequestTransport:
         if transport_type == TransportType.HTTP:
             if session is None:
-                raise ValueError("ClientSession is required for HTTP transport")
+                raise ValueError("AsyncHTTPClient is required for HTTP transport")
 
             return _RequestHttpTransport(url, session)
         elif transport_type == TransportType.WS:

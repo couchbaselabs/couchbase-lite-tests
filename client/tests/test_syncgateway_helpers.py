@@ -14,6 +14,7 @@ import inspect
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
@@ -30,6 +31,7 @@ from cbltest.api.syncgateway import (
     SyncGateway,
     SyncGatewayUserClient,
 )
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import _HttpLogWriter
 from cbltest.utils import async_retry_assert
 from pydantic import ValidationError
@@ -121,14 +123,13 @@ class TestSessionAuth:
         _create_session has to leave the Authorization header off when handed no credentials."""
         sg, _, _ = sync_gateway
 
-        async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None) as session:
-            assert "Authorization" not in session.headers
+        with patch("cbltest.api.syncgateway.AsyncHTTPClient", wraps=AsyncHTTPClient) as client_class:
+            async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None):
+                assert "Authorization" not in (client_class.call_args.kwargs["headers"] or {})
 
-        auth_header = encode_basic_auth("alice", "s3cret", "ascii")
-        async with sg._create_session(
-            sg.secure, sg.scheme, sg.hostname, sg.port, {"Authorization": auth_header}
-        ) as session:
-            assert session.headers["Authorization"] == auth_header
+            auth_header = encode_basic_auth("alice", "s3cret", "ascii")
+            async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, {"Authorization": auth_header}):
+                assert client_class.call_args.kwargs["headers"]["Authorization"] == auth_header
 
     @pytest.mark.asyncio
     async def test_user_client_get_document_revision_authenticates_as_given_user(

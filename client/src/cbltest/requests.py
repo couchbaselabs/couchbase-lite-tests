@@ -12,7 +12,7 @@ from uuid import UUID, uuid4
 from .api.error import CblTestServerBadResponseError
 from .api.jsonserializable import JSONSerializable
 from .configparser import ParsedConfig, TransportType
-from .httpclient import get_client_session
+from .httpclient import AsyncHTTPClient
 from .httplog import get_next_writer
 from .logging import cbl_error, cbl_info
 from .request_types import GetRootRequest, TestServerRequest
@@ -100,7 +100,7 @@ class RequestFactory:
 
         self.__uuid = uuid4()
         self.__server_infos: list[tuple[str, TransportType]] = []
-        self.__session = get_client_session()
+        self.__session = AsyncHTTPClient()
         ws_urls: list[str] = []
         for ts in config.test_servers:
             transport = cast(str, ts.get("transport", TransportType.HTTP.value)).lower()
@@ -205,5 +205,4 @@ class RequestFactory:
 
     async def close(self) -> None:
         await self.__ws_router.stop()
-        if not self.__session.closed:
-            await self.__session.close()
+        await self.__session.close()

@@ -108,7 +108,7 @@ class TestSyncGatewayCaCertificate:
                 sync_gateway = SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True)
 
             session = sync_gateway._create_session(True, "https://", "127.0.0.1", port, None)
-            async with session, session.get("/") as response:
+            async with session, await session.get("/") as response:
                 assert response.status == 200
 
 
