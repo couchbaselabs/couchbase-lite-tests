@@ -21,7 +21,7 @@ from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.configparser import EdgeServerInfo
-from cbltest.httpclient import get_client_session
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT
@@ -41,7 +41,7 @@ class EdgeServerManager:
         # What the host was provisioned with, which reset_to_initial_state() goes back to.
         self.__info = info
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__shell2http_session = get_client_session(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
+        self.__shell2http_session = AsyncHTTPClient(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
 

@@ -17,7 +17,7 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError, ClientError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
@@ -28,7 +28,7 @@ from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
-from cbltest.httpclient import get_client_session
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
@@ -750,7 +750,7 @@ class _SyncGatewayBase:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__session: ClientSession = self._create_session(
+        self.__session: AsyncHTTPClient = self._create_session(
             secure,
             scheme,
             url,
@@ -803,7 +803,7 @@ class _SyncGatewayBase:
         url: str,
         port: int,
         headers: Mapping[str, str] | None = None,
-    ) -> ClientSession:
+    ) -> AsyncHTTPClient:
         """Create a session that sends `headers` with every request, e.g. the
         `Authorization` header from `aiohttp.encode_basic_auth`.  None for a session that
         sends none, such as an anonymous one."""
@@ -811,9 +811,13 @@ class _SyncGatewayBase:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            return get_client_session(f"{scheme}{url}:{port}", headers=headers, connector=TCPConnector(ssl=ssl_context))
+            return AsyncHTTPClient(
+                f"{scheme}{url}:{port}",
+                headers=headers,
+                connector=TCPConnector(ssl=ssl_context),
+            )
         else:
-            return get_client_session(f"{scheme}{url}:{port}", headers=headers)
+            return AsyncHTTPClient(f"{scheme}{url}:{port}", headers=headers)
 
     async def _send_request(
         self,
@@ -1733,8 +1737,7 @@ class _SyncGatewayBase:
         """
         Closes this Sync Gateway's aiohttp session, and its Caddy's
         """
-        if not self.__session.closed:
-            await self.__session.close()
+        await self.__session.close()
         await self._caddy.close()
 
     async def get_database_config(self, db_name: str) -> DatabaseConfig:
@@ -2187,7 +2190,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             async with (
                 self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
-                session.get("/", timeout=ClientTimeout(total=5)) as resp,
+                await session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 return resp.status == 200
         except (ClientConnectorError, TimeoutError):
