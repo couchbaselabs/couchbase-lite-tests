@@ -33,11 +33,12 @@ class CblTestServerBadResponseError(Exception):
         return self.__message
 
 
-class CblTimeoutError(Exception):
+class CblTimeoutError(TimeoutError):
     """A timeout occurred while waiting for an event"""
 
-    def __init__(self, *args: Any) -> None:
-        super().__init__(*args)
+    # One message only, since OSError reads two arguments as (errno, strerror).
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
 class CblRemoteBadResponseError(Exception):

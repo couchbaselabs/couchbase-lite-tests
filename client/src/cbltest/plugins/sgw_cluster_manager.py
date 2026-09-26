@@ -12,11 +12,12 @@ from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
 from typing import Any
 
 import pytest_asyncio
-from aiohttp import ClientSession, ClientTimeout
+from aiohttp import ClientTimeout
 from cbltest import CBLPyTest
 from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import SHELL2HTTP_PORT, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_info
 from cbltest.version import VERSION
 from opentelemetry.trace import get_tracer
@@ -58,7 +59,7 @@ class SyncGatewayManager:
         _check_token(token, type(self).__name__)
         self.__node = node
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__session = ClientSession(f"http://{node.hostname}:{SHELL2HTTP_PORT}")
+        self.__session = AsyncHTTPClient(f"http://{node.hostname}:{SHELL2HTTP_PORT}")
 
     def __str__(self) -> str:
         return str(self.__node)
@@ -87,7 +88,7 @@ class SyncGatewayManager:
         :param timeout: Total timeout in seconds
         """
         headers = {"Content-Type": "text/plain"} if data is not None else None
-        async with self.__session.request(
+        async with await self.__session.request(
             method,
             path,
             data=data,

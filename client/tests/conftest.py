@@ -2,16 +2,21 @@ import json
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import create_autospec, patch
 
 from cbltest.api import edgeserver, syncgateway
+from cbltest.httpclient import AsyncHTTPClient
 
 
 @contextmanager
 def fake_sync_gateways(count: int) -> Iterator[list[syncgateway.SyncGateway]]:
     with (
-        patch("cbltest.api.syncgateway.ClientSession", autospec=True),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
+        # Only Sync Gateway's own sessions, so a manager built on these nodes keeps real ones.
+        patch(
+            "cbltest.api.syncgateway.AsyncHTTPClient",
+            side_effect=lambda *args, **kwargs: create_autospec(AsyncHTTPClient, instance=True),
+        ),
+        patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.syncgateway.requests.get", autospec=True),
     ):
         # A bare host, as the config supplies: SyncGateway builds its own URLs from this,
@@ -33,7 +38,6 @@ def fake_edge_server(tmp_path: Path) -> Iterator[edgeserver.EdgeServer]:
     config = tmp_path / "edge_server_config.json"
     config.write_text(json.dumps({"interface": "0.0.0.0:59840", "databases": {"db": {"path": "db.cblite2"}}}))
     with (
-        patch("cbltest.api.edgeserver.ClientSession", autospec=True),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
     ):
         yield edgeserver.EdgeServer(url="es.example.com", config_file=str(config))

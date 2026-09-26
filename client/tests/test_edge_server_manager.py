@@ -25,9 +25,7 @@ SidecarCall = tuple[str, str, Any]
 def no_network() -> Iterator[None]:
     """Keep every session an Edge Server or a manager opens off the network."""
     with (
-        patch("cbltest.api.edgeserver.ClientSession", autospec=True),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
@@ -234,9 +232,8 @@ class FakeSession:
 def fake_sessions() -> Iterator[None]:
     """Serve every Edge Server request from a FakeSession, so its headers are readable."""
     with (
-        patch("cbltest.api.edgeserver.ClientSession", FakeSession),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.api.edgeserver.AsyncHTTPClient", FakeSession),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),

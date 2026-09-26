@@ -14,13 +14,14 @@ from pathlib import Path
 
 import aiofiles
 import tenacity
-from aiohttp import ClientConnectorError, ClientSession
+from aiohttp import ClientConnectorError
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.edgeserver import EdgeServer
-from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError, CblTimeoutError
+from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.configparser import EdgeServerInfo
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT
@@ -40,7 +41,7 @@ class EdgeServerManager:
         # What the host was provisioned with, which reset_to_initial_state() goes back to.
         self.__info = info
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__shell2http_session = ClientSession(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
+        self.__shell2http_session = AsyncHTTPClient(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
 
@@ -71,20 +72,10 @@ class EdgeServerManager:
         headers = {"Content-Type": "application/json"} if payload is not None else None
         writer = get_next_writer()
         writer.write_begin(f"Edge Server host [{self.__info.hostname}] -> {method.upper()} {path}", data)
-        try:
-            resp = await self.__shell2http_session.request(method, path, data=data, headers=headers)
-            # A sidecar echoes raw files back -- start-edgeserver cats the Edge Server's log
-            # on a failed start -- so one odd byte must not fail the whole call.
-            body = await resp.text(errors="replace")
-        # A total timeout raises a bare TimeoutError that stringifies to "", so say what
-        # expired and against which budget, or the caller reports an empty message.
-        except TimeoutError as e:
-            detail = f": {e}" if str(e) else ""
-            budgets = self.__shell2http_session.timeout
-            raise CblTimeoutError(
-                f"{method.upper()} {path} timed out on Edge Server host [{self.__info.hostname}] "
-                f"(connect {budgets.sock_connect}s, total {budgets.total}s){detail}"
-            ) from e
+        resp = await self.__shell2http_session.request(method, path, data=data, headers=headers)
+        # A sidecar echoes raw files back -- start-edgeserver cats the Edge Server's log
+        # on a failed start -- so one odd byte must not fail the whole call.
+        body = await resp.text(errors="replace")
         writer.write_end(
             f"Edge Server host [{self.__info.hostname}] <- {method.upper()} {path} {resp.status}",
             body,

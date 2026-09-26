@@ -35,6 +35,7 @@ client/
     │
     ├── bucketpool.py             # Runs the downloaded bucketpool tool, the DCP bucket-emptying helper
     ├── logging.py                # cbl_info / cbl_error / cbl_warning / cbl_log_init, LogLevel
+    ├── httpclient.py             # AsyncHTTPClient: wraps ClientSession so timeouts name the request; stream_download()
     ├── httplog.py                # HTTP request/response logging (get_next_writer)
     ├── greenboarduploader.py     # Upload test results to Greenboard
     ├── websocket_router.py       # WebSocket routing (used by JS server)
