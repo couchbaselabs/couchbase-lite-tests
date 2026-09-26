@@ -87,6 +87,8 @@ class AsyncHTTPClient:
             budgets = self.__session.timeout
         elif isinstance(timeout := kwargs["timeout"], ClientTimeout):
             budgets = timeout
+        elif isinstance(timeout, int | float):
+            budgets = ClientTimeout(total=timeout)
         else:
             budgets = ClientTimeout()
 

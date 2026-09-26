@@ -89,6 +89,13 @@ async def test_timeout_names_the_per_request_budget(slow_server: str) -> None:
             await session.get("/slow", timeout=ClientTimeout(total=0.2))
 
 
+@pytest.mark.asyncio
+async def test_timeout_names_a_numeric_per_request_budget(slow_server: str) -> None:
+    async with AsyncHTTPClient(slow_server) as session:
+        with pytest.raises(TimeoutError, match=r"\(total 0\.2s\)$"):
+            await session.get("/slow", timeout=0.2)  # ty: ignore[invalid-argument-type]
+
+
 class _HangingResolver(AbstractResolver):
     """Never resolves, so a total timeout fires while connecting."""
 
