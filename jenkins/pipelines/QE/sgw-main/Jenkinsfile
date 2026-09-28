@@ -40,7 +40,7 @@ pipeline {
     }
     parameters {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or train (e.g. 4.2.0 or 4.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL iOS client version (e.g. 4.2.0). Leave blank to auto-resolve the latest prerelease via ProGet. The build number is resolved automatically.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0). Leave blank to auto-resolve the latest prerelease via ProGet. The build number is resolved automatically.')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the SGW test job even if this SGW version+build already ran')
     }
     options {
