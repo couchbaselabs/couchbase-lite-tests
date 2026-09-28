@@ -1381,50 +1381,31 @@ export class TDKImpl implements tdk.TDK {
     scopeName: string,
     collectionName: string,
     docId: string,
-    retries = 3,
-    retryDelayMs = 1000,
   ): Promise<JSONObject | null> {
-    // After a replication event (e.g. re-pull after auto-purge restore), the document
-    // may not be committed to the local store immediately. Retry a few times to handle
-    // the race between the replicator event and the actual local write.
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const result = await this.engine.collection_GetDocument({
-          docId,
-          databaseUniqueName: dbName,
-          scopeName,
-          collectionName,
-        });
-        // Bridge resolves with { _id, _sequence, _data } when found, {} when not found.
-        // result.document is never populated by this bridge — use _id as the existence check.
-        const r = result as any;
-        if (!r || !r._id) {
-          if (attempt < retries) {
-            await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-            continue;
-          }
-          return null;
-        }
-        const data = r._data;
-        if (!data) {
-          return null;
-        }
-        if (typeof data === 'string') {
-          return JSON.parse(data) as JSONObject;
-        }
-        if (typeof data === 'object') {
-          return data as JSONObject;
-        }
-        return null;
-      } catch (_e) {
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, retryDelayMs));
-          continue;
-        }
-        return null;
-      }
+    // Look the document up once. When the replicator reports a document as
+    // replicated (or goes IDLE/STOPPED), it is already saved locally, so there
+    // is no race to retry around. Lookup errors propagate to the caller.
+    const result = await this.engine.collection_GetDocument({
+      docId,
+      databaseUniqueName: dbName,
+      scopeName,
+      collectionName,
+    });
+    // Bridge resolves with { _id, _sequence, _data } when found, {} when not found.
+    // result.document is never populated by this bridge — use _id as the existence check.
+    const r = result as any;
+    if (!r || !r._id) {
+      return null;
     }
-    return null;
+    const data = r._data;
+    if (typeof data === 'string') {
+      return data.length > 0 ? (JSON.parse(data) as JSONObject) : {};
+    }
+    if (data && typeof data === 'object') {
+      return data as JSONObject;
+    }
+    // Document exists but has no body.
+    return {};
   }
 
   private parseCollectionName(fullName: string): {
