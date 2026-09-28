@@ -105,6 +105,18 @@ class CertKeyPair:
         """
         return self.private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
 
+    def der_bytes(self) -> bytes:
+        """
+        Returns the certificate in DER (binary) format.
+        """
+        return self.certificate.public_bytes(encoding=Encoding.DER)
+
+    def key_der_bytes(self) -> bytes:
+        """
+        Returns the private key as an unencrypted PKCS#8 DER.
+        """
+        return self.private_key.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
+
 
 def create_ca_certificate(CN: str) -> CertKeyPair:
     private_key = rsa.generate_private_key(

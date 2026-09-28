@@ -6,6 +6,7 @@ from the config it was built with, so take a fresh client after every restart.  
 closes every client it hands out.
 """
 
+import base64
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -214,16 +215,25 @@ class EdgeServerManager:
             await self.add_user(username, password, role)
             yield client
 
-    async def write_file(self, path: str, content: str) -> None:
+    async def write_file(self, path: str, content: str | bytes) -> None:
         """
         Write a file on the Edge Server host, for the certificates and tokens a config
         names by path.
 
         :param path: Absolute path on the host
-        :param content: File content
+        :param content: File content.  Bytes are written exactly, so binary files such as
+            DER certificates survive; they travel base64-encoded, since the sidecar reads
+            its request as JSON text.
         """
         with self.__tracer.start_as_current_span("write file on edge server host"):
-            await self._call_sidecar("post", "/write-file", JSONDictionary({"path": path, "content": content}))
+            payload: dict[str, str] = {"path": path}
+            if isinstance(content, bytes):
+                payload["content"] = base64.b64encode(content).decode("ascii")
+                payload["encoding"] = "base64"
+            else:
+                payload["content"] = content
+
+            await self._call_sidecar("post", "/write-file", JSONDictionary(payload))
 
     async def collect_logs(self, output_dir: Path) -> Path:
         """
