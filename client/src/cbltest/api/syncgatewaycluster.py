@@ -129,3 +129,28 @@ class SyncGatewayCluster:
         sentinel = await self.random_node._update_database_config(db_name, config)
         await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
+
+    async def take_database_offline(
+        self,
+        db_name: str,
+        *,
+        sync_function: str | None = None,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Take a database offline on one node of the cluster, and make every node apply the
+        config that was just written, so that every node reports the database Offline
+        before returning.  A resync needs the database offline on every node.
+
+        :param db_name: Database name to take offline.
+        :param sync_function: A new sync function for the collection, written in the same
+            config write that takes the database offline.  Defaults to leaving the sync
+            function as it is.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection the sync function belongs to (default '_default').
+        """
+        node = self.random_node
+        await node._set_database_offline(db_name, sync_function=sync_function, scope=scope, collection=collection)
+        await self._refresh_database_config(db_name, skip=node)
+        await asyncio.gather(*(sg._wait_for_db_state_offline(db_name) for sg in self.__sync_gateways))
