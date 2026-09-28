@@ -2,22 +2,20 @@
 """Re-launch the React Native iOS test server on the simulator."""
 
 import subprocess
-import sys
 
-SIM = "793881A3-248F-4AB1-A26B-6D581917BF0E"
 BUNDLE = "com.cbltestserver"
 WS_URL = "ws://127.0.0.1:8765"
 
 
 def main() -> None:
-    print(f"[relaunch_ios] simulator={SIM} wsURL={WS_URL}", flush=True)
-    subprocess.run(["xcrun", "simctl", "terminate", SIM, BUNDLE], check=False)
+    print(f"[relaunch_ios] simulator=booted wsURL={WS_URL}", flush=True)
+    subprocess.run(["xcrun", "simctl", "terminate", "booted", BUNDLE], check=False)
     subprocess.run(
         [
             "xcrun",
             "simctl",
             "launch",
-            SIM,
+            "booted",
             BUNDLE,
             "-deviceID",
             "ws0",

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Re-launch the React Native Android test server on the emulator."""
 
+import os
 import subprocess
-import sys
+from pathlib import Path
 
-ADB = "adb"
+_sdk = os.environ.get("ANDROID_HOME") or os.environ.get("ANDROID_SDK_ROOT")
+ADB = str(Path(_sdk) / "platform-tools" / "adb") if _sdk else "adb"
 SERIAL = "emulator-5554"
 PACKAGE = "com.cbltestserver"
 ACTIVITY = "com.cbltestserver/.MainActivity"
