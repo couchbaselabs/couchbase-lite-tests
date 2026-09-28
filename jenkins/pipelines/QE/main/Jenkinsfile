@@ -32,7 +32,9 @@ def latestReleased(String product, String train) {
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
 // build is looked up via ProGet get_version. When the newest (prerelease-inclusive)
 // version has no published build yet (e.g. an in-flight release like 3.2.7), fall
-// back to the newest built release in the same train (e.g. 3.2.6).
+// back to the newest built release in the same train (e.g. 3.2.6). Returns null
+// when the train has no published build at all yet (a normal new-train state, not
+// an error) so the caller can skip it quietly; genuine failures still throw.
 def resolveVersionBuild(proget, String product, String param, String label) {
     def version = proget.resolveProgetVersion(product, param, label)
     def buildNo
@@ -52,7 +54,7 @@ def resolveVersionBuild(proget, String product, String param, String label) {
             }
         }
     }
-    if (!buildNo) { error "Could not resolve build number for ${product} ${version}" }
+    if (!buildNo) { return null }  // no published build for this train yet
     def major = version.tokenize('.')[0].toInteger()
     return [version: version, build: buildNo, dataset: (major >= 4) ? "4.0" : "3.2"]
 }
@@ -134,6 +136,11 @@ pipeline {
                         for (train in trains) {
                             try {
                                 def info = resolveVersionBuild(proget, product, train, "CBL_VERSION")
+                                if (info == null) {
+                                    // No published build yet (new train) — normal, not a failure.
+                                    echo "SKIP: ${p} train ${train} — no published build yet"
+                                    continue
+                                }
                                 entries << info
                                 echo "${p}: CBL ${info.version}-${info.build} (dataset ${info.dataset})"
                             } catch (Exception e) {
