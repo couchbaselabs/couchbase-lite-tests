@@ -2107,7 +2107,7 @@ class SyncGateway(_SyncGatewayBase):
                 else:
                     raise
 
-    async def create_session(self, db_name: str, name: str) -> str:
+    async def create_session(self, db_name: str, name: str, ttl: int | None = None) -> str:
         """
         Creates a login session for an existing user via the admin API
         (POST /{db}/_session) and returns its session id.
@@ -2120,10 +2120,15 @@ class SyncGateway(_SyncGatewayBase):
 
         :param db_name: The name of the database to create the session against
         :param name: The user to create the session for
+        :param ttl: Seconds until the session expires, or None for Sync Gateway's default (24 hours)
         :return: The id of the created session
         """
         with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({"name": name}))
+            body: dict[str, Any] = {"name": name}
+            if ttl is not None:
+                body["ttl"] = ttl
+
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
             assert isinstance(resp, dict)
             session_id = resp["session_id"]
             assert isinstance(session_id, str)

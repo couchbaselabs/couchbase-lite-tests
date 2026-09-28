@@ -870,7 +870,11 @@ class EdgeServer:
         while not is_idle and retry > 0:
             status = await self.all_replication_status()
             if len(status) != 0:
-                assert "error" not in status[replicator_key], f"Replication setup failure: {status}"
+                if "error" in status[replicator_key]:
+                    raise CblEdgeServerBadResponseError(
+                        code=status[replicator_key]["error"]["x-litecore-code"],
+                        body=status[replicator_key]["error"]["error"],
+                    )
                 if status[replicator_key]["status"] == "Idle":
                     is_idle = True
                 else:
