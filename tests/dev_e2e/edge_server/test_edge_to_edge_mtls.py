@@ -5,8 +5,8 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import EdgeServer
+from cbltest.api.x509_certificate import create_ca_certificate, create_leaf_certificate
 from cbltest.asyncfile import read_json_file, write_json_file
-from cert_helper import cert_pem, generate_ca, generate_signed_cert, key_pem
 
 SCRIPT_DIR = str(Path(__file__).parent)
 CERT_DIR = "/home/ec2-user/cert"
@@ -47,10 +47,14 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
         target_host = str(target)
 
         self.mark_test_step("Generate CA, target server cert (SAN=target host), and client cert")
-        ca_cert, ca_key = generate_ca()
-        server_cert, server_key = generate_signed_cert(ca_cert, ca_key, target_host, sans=[target_host], client=False)
-        client_cert, client_key = generate_signed_cert(ca_cert, ca_key, "edge-client", client=True)
-        ca_pem = cert_pem(ca_cert)
+        ca = create_ca_certificate("Edge Test CA")
+        server = create_leaf_certificate(target_host, issuer_data=ca, sans=[target_host])
+        client = create_leaf_certificate("edge-client", issuer_data=ca)
+        ca_pem = ca.pem_bytes().decode()
+        server_cert_pem = server.pem_bytes().decode()
+        server_key_pem = server.key_pem_bytes().decode()
+        client_cert_pem = client.pem_bytes().decode()
+        client_key_pem = client.key_pem_bytes().decode()
 
         # Trust our generated CA locally so the framework can reach the mTLS target; restored in finally.
         cert_dir = Path.home() / ".cbl_certs"
@@ -60,21 +64,21 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
 
         try:
             (cert_dir / "ca_cert.pem").write_bytes(ca_pem.encode())
-            (cert_dir / "client_cert.pem").write_bytes(cert_pem(client_cert).encode())
-            (cert_dir / "client_key.pem").write_bytes(key_pem(client_key).encode())
+            (cert_dir / "client_cert.pem").write_bytes(client_cert_pem.encode())
+            (cert_dir / "client_key.pem").write_bytes(client_key_pem.encode())
             (cert_dir / "client_key.pem").chmod(0o600)
 
             self.mark_test_step("Push server cert/key + CA to the target host and start it with mTLS")
             await target.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
-            await target.write_file(f"{CERT_DIR}/server.crt", cert_pem(server_cert))
-            await target.write_file(f"{CERT_DIR}/server.key", key_pem(server_key))
+            await target.write_file(f"{CERT_DIR}/server.crt", server_cert_pem)
+            await target.write_file(f"{CERT_DIR}/server.key", server_key_pem)
             await target.configure_dataset(
                 db_name="db", config_file=f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_target.json"
             )
 
             self.mark_test_step("Push client cert/key + CA to the source host")
-            await source.write_file(f"{CERT_DIR}/client.crt", cert_pem(client_cert))
-            await source.write_file(f"{CERT_DIR}/client.key", key_pem(client_key))
+            await source.write_file(f"{CERT_DIR}/client.crt", client_cert_pem)
+            await source.write_file(f"{CERT_DIR}/client.key", client_key_pem)
             await source.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
 
             self.mark_test_step("Configure the source with a config-file mTLS replication to the target")

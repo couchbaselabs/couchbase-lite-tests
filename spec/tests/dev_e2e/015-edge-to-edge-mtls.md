@@ -9,7 +9,9 @@ target verifies incoming clients against a CA (`https.client_cert_path`). The
 client certificate and key are supplied as **file paths** in a config-file
 `replications` block, matching the customer deployment that reported the issue.
 
-Each test generates its own X.509 material in-memory with `cert_helper.py`: a CA,
+Each test generates its own X.509 material in-memory with the shared
+`cbltest.api.x509_certificate` helpers (`create_ca_certificate` /
+`create_leaf_certificate`): a CA,
 a target **server** certificate whose SubjectAltName is the target host (so the
 source can verify it against `trusted_root_certs`), and a **client**
 certificate/key. The client key is a plain, unencrypted PKCS#8 PEM key.
