@@ -59,8 +59,10 @@ def _record_node_calls(
     for name in (
         "_put_database",
         "_update_database_config",
+        "_set_database_offline",
         "_wait_for_database_config",
         "_wait_for_db_state_online",
+        "_wait_for_db_state_offline",
     ):
         monkeypatch.setattr(SyncGateway, name, recorder(name))
 
@@ -98,5 +100,21 @@ async def test_update_database_config_brings_every_node_online(monkeypatch: pyte
 
     assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
     assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(2)]
+
+    assert awaited_sentinels == [_SENTINEL] * 2
+
+
+@pytest.mark.asyncio
+async def test_take_database_offline_takes_every_node_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    with fake_sync_gateways(2) as sync_gateways:
+        cluster = SyncGatewayCluster(sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
+
+        await cluster.take_database_offline("db1", sync_function="function(doc){}")
+
+    assert calls[0][0] == "_set_database_offline"
+
+    assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
+    assert sorted(calls[3:]) == [("_wait_for_db_state_offline", i) for i in range(2)]
 
     assert awaited_sentinels == [_SENTINEL] * 2

@@ -150,7 +150,8 @@ class SyncGatewayCluster:
         :param scope: The scope containing the collection (default '_default').
         :param collection: The collection the sync function belongs to (default '_default').
         """
-        node = self.random_node
-        await node._set_database_offline(db_name, sync_function=sync_function, scope=scope, collection=collection)
-        await self._refresh_database_config(db_name, skip=node)
+        sentinel = await self.random_node._set_database_offline(
+            db_name, sync_function=sync_function, scope=scope, collection=collection
+        )
+        await self._wait_for_database_config(db_name, sentinel)
         await asyncio.gather(*(sg._wait_for_db_state_offline(db_name) for sg in self.__sync_gateways))

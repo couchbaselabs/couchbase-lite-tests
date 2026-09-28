@@ -2336,7 +2336,7 @@ class SyncGateway(_SyncGatewayBase):
         sync_function: str | None = None,
         scope: str = "_default",
         collection: str = "_default",
-    ) -> None:
+    ) -> str:
         """
         Takes a database offline by POSTing {"offline": true} to its /_config endpoint,
         replacing a collection's sync function in the same write when one is given.
@@ -2349,6 +2349,8 @@ class SyncGateway(_SyncGatewayBase):
             the sync function as it is.
         :param scope: The scope containing the collection (default '_default').
         :param collection: The collection the sync function belongs to (default '_default').
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("set_database_offline", attributes={"sg.database.name": db_name}):
             scopes = (
@@ -2356,7 +2358,7 @@ class SyncGateway(_SyncGatewayBase):
                 if sync_function is not None
                 else None
             )
-            await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
+            return await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
 
     async def _put_resync(
         self,
