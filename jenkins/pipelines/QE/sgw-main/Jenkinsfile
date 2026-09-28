@@ -1,5 +1,5 @@
 def SGW_PRODUCT = "sync-gateway"          // dedup key: the thing under test
-def CBL_PRODUCT = "couchbase-lite-ios"    // iOS test-server client, passed through
+def CBL_PRODUCT = "couchbase-lite-c"      // c_macos test-server client, passed through
 
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
 // build is looked up via ProGet get_version.
