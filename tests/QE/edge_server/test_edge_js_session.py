@@ -22,8 +22,6 @@ from cbltest.responses import ServerVariant
 SCRIPT_DIR = str(Path(__file__).parent)
 
 _CONFIG = f"{SCRIPT_DIR}/config/test_cbl_js_session_auth.json"
-# Declares `travel` and `names`, so a token minted for one database can be presented to the
-# other. Everything else matches _CONFIG, CORS included.
 _CONFIG_TWO_DBS = f"{SCRIPT_DIR}/config/test_cbl_js_session_auth_two_dbs.json"
 
 _DB = "travel"
@@ -45,9 +43,6 @@ _ONE_TIME_TTL_SECONDS = 320
 def _fmt_error(error: object) -> str:
     """
     Renders an ErrorResponseBody usefully.
-
-    It has no __str__, so interpolating it directly yields a memory address -- which tells
-    you a replication failed but not why.
     """
     if error is None:
         return "None"
@@ -57,59 +52,7 @@ def _fmt_error(error: object) -> str:
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_edge_servers(1)
 class TestCblJsEdgeServerSessionAuth(CBLTestClass):
-    """
-    Session authentication between Couchbase Lite and Edge Server.
-
-    Two things about this suite are worth knowing before reading it.
-
-    First, this appears to be the **first** test in the repository that drives a CBL
-    replicator against Edge Server. Every other Edge Server test uses the REST API
-    directly, or exercises Edge-to-Edge and Edge-to-Sync-Gateway replication. So a failure
-    here may be the CBL-to-Edge path itself rather than anything to do with sessions --
-    which is why the suite starts with a Basic-auth control.
-
-    Second, the config is deliberately **not** TLS. Every other platform pins the Edge
-    Server certificate, but a browser cannot, and `pinnedServerCert` is declared in the
-    JavaScript test server's schema without ever being read. A `wss://` endpoint would
-    therefore need `EdgeTestCA` in the browser's own trust store, which is a topology
-    concern rather than something these tests should carry. Plain `ws://` keeps the
-    variable out.
-
-    The config does carry a `cors` block allowing `http://localhost:5173`. CBL JS runs the
-    replicator inside a page, so Edge Server must allow that origin or the `_session` fetch
-    fails before any authentication is attempted.
-
-    Per the Edge Server session design (CBL-8630), a session token authenticates the
-    `_blipsync` upgrade only -- CBL JS presents it as the subprotocol entry
-    `SyncGatewaySession_<token>`. It is not a cookie and not a REST credential, so these
-    tests never present it to a REST endpoint; verified against Edge Server 1.2.0, where
-    every such presentation returns 401. Revocation therefore goes through Basic auth, as
-    the identity of the client that calls it.
-
-    Sessions belong to whichever user a client authenticates as, so `create_session` and
-    `delete_session` take no credentials -- the admin client returned by `configure_dataset`
-    is already `admin_user`. `create_session` returns the token itself: a one-time session
-    is read from `one_time_session_id` and a reusable one from `session_id`, so a token
-    coming back at all is the assertion that Edge Server used the expected key.
-
-    The REST-only properties of `_session` are covered by test_session.py. What needs a
-    replicator, and lives here, is everything about presenting a token at the `_blipsync`
-    upgrade: that it works, that it is scoped, that it carries the right identity, and that
-    it fails cleanly when it should not work.
-    """
-
-    # ---------------------------------------------------------------- helpers
-
     async def _assert_auth_rejected(self, cblpytest: CBLPyTest, replicator: Replicator) -> ReplicatorStatus:
-        """
-        Asserts a replicator stopped because its credentials were rejected.
-
-        CBL JS cannot see an HTTP status for a refused WebSocket upgrade, so a SESSION
-        rejection surfaces as `WebSocketError` with code -1 rather than 401. Basic auth
-        does produce a readable 401, because it fails on the `_session` fetch first. Both
-        are accepted; what matters is that the replicator stopped with an error rather than
-        sitting in OFFLINE retrying a credential that will never work.
-        """
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is not None, "Replicator stopped without an error; expected a rejection"
 
@@ -149,17 +92,9 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
 
     @staticmethod
     async def _add_limited_user(cblpytest: CBLPyTest):
-        """
-        Add a replicate-role user and return a fresh admin client.
-
-        `add_user` restarts Edge Server, so anything created before this call is gone and the
-        previous client predates the restart.
-        """
         manager = cblpytest.edge_servers[0]
         await manager.add_user(_LIMITED_USER, _LIMITED_PASSWORD, role="replicate")
         return manager.get_admin_client()
-
-    # ---------------------------------------------------------------- the control
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_basic_auth_control(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -302,15 +237,6 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     ) -> None:
         """
         A session resolves to a user, so it grants exactly what that user's credentials grant.
-
-        Every other test here authenticates as `admin_user`, whose admin role bypasses
-        collection-level checks -- so none of them would notice if a session authenticated as
-        "someone, therefore everything". Compares a session-authenticated replication against
-        the same user's Basic-authenticated one: whatever the limited user can do with a
-        password, they must be able to do with a token, and no more.
-
-        This matters more with per-database access control (CBL-8556) in the picture: a
-        session that dropped permissions would be a way around it.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
@@ -353,16 +279,10 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    # ---------------------------------------------------------------- rejection
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_invalid_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         ESS-18: a session token that was never issued is rejected cleanly.
-
-        The important half is that the replicator reaches STOPPED. A replicator that sits
-        in OFFLINE retrying a token Edge Server will never accept is a worse outcome than
-        an outright failure, because nothing surfaces to the application.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
@@ -392,18 +312,12 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     async def test_replicate_with_revoked_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         ESS-10 + ESS-18: a revoked session is rejected for a subsequent replication.
-
-        Revokes before starting the replicator; mid-flight revocation is a separate question,
-        covered by test_revocation_during_replication.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
 
         self.mark_test_step("Create a reusable session, then revoke it")
         token = await edge_server.create_session(_DB, one_time=False)
-        # DELETE /{db}/_session revokes "the caller's session", and the caller is whoever this
-        # client authenticates as. With exactly one outstanding session that is unambiguous;
-        # see test_revoke_with_several_sessions_outstanding for the case where it is not.
         await edge_server.delete_session(_DB)
 
         self.mark_test_step("Reset local database with an empty `travel.airlines` collection")
@@ -424,15 +338,6 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     ) -> None:
         """
         Records which session DELETE revokes when a user holds more than one.
-
-        The design says the endpoint revokes "the caller's session", identified by Basic auth,
-        and does not say what that means with several outstanding. The plausible answers are
-        all of them, the most recent, or the oldest, and they differ for a user signed in on a
-        phone and a laptop: logging out of one should not log out the other.
-
-        Asserts nothing about which, only reports what happened -- this exists to produce
-        evidence for that design conversation. What it does assert is that revocation did
-        something: silently revoking nothing would be worse than any of the three.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
@@ -467,15 +372,6 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     async def test_revocation_during_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Records whether revoking a session stops a replication already running on it.
-
-        Sync Gateway does not re-validate a session for an established BLIP connection -- it
-        tracks the resolved user, not the session -- so a revoked session keeps syncing until
-        the connection drops. That is defensible, but it is an assumption about Edge Server
-        until measured, and "logging out does not stop the sync" is a question a security
-        review will eventually ask.
-
-        Asserts only the safe half: once the connection is torn down, the revoked token must
-        not get it back. Whether the in-flight connection survives is reported, not asserted.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
@@ -512,20 +408,10 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
 
         await cblpytest.test_servers[0].cleanup()
 
-    # ---------------------------------------------------------------- lifecycle
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_session_lost_on_edge_server_restart(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
-        ESS-11: Edge Server sessions do not survive a restart, and the client fails cleanly.
-
-        This is the empirical check on "in-memory sessions are sufficient". Sync Gateway
-        stores sessions as documents and they persist; Edge Server holds them in memory, so
-        a restart should invalidate them. What matters for a client is that it gets a clean
-        rejection it can act on, rather than hanging.
-
-        If this test *fails* because the session still works, that is worth knowing too --
-        it would mean Edge Server sessions are persisted after all.
+        Edge Server sessions do not survive a restart, and the client fails cleanly.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         manager = cblpytest.edge_servers[0]
@@ -535,8 +421,6 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
         token = await edge_server.create_session(_DB, one_time=False)
 
         self.mark_test_step("Restart Edge Server")
-        # Restarts are the manager's job, and a client is fixed to the config it was built
-        # with, so take a fresh one rather than reusing the pre-restart client.
         await manager.kill_server()
         edge_server = await manager.start_server()
 
@@ -567,14 +451,6 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     ) -> None:
         """
         A continuous replicator on a reusable token recovers when the network comes back.
-
-        This is the case a browser actually hits -- the laptop sleeps, the wifi changes -- and
-        it is the only test here that exercises a *reconnect* rather than a first connection.
-        A token that authenticates the initial upgrade but not the second would leave a client
-        permanently offline after any blip, which nothing else in this suite would catch.
-
-        Uses the firewall rather than a restart, so the server keeps its session table and the
-        only thing that changes is reachability.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         manager = cblpytest.edge_servers[0]
@@ -607,23 +483,14 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
                 "must authenticate a reconnect as well as the first connection"
             )
         finally:
-            # A leftover DROP rule hides the host from every later test.
             await manager.reset_firewall()
             await replicator.stop()
             await cblpytest.test_servers[0].cleanup()
 
-    @pytest.mark.slow
     @pytest.mark.asyncio(loop_scope="session")
     async def test_one_time_session_expires(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         A one-time token stops working after its TTL, even if never presented.
-
-        The only observable path to expiry: Edge Server 1.2.0 reports no `expires` field and
-        exposes no TTL override, so the choice is wall-clock or nothing. Marked slow -- it
-        sleeps for the full five minutes and belongs in the nightly run, not the PR pipeline.
-
-        An unused token that never expires would mean a token leaked from a browser's console
-        or a log stays valid indefinitely, which is the risk the short TTL exists to bound.
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
@@ -649,23 +516,12 @@ class TestCblJsEdgeServerSessionAuth(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_one_time_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
-        ESS-19: what happens when a replicator authenticates with a one-time token.
-
-        This records behaviour rather than asserting a specific outcome, because the Edge
-        Server design does not say what a client should present when a connection using a
-        one-time token drops and reconnects -- the token is already consumed. That may be a
-        genuine design gap, and this test exists to produce the evidence for that
-        conversation rather than to pass or fail on a guess.
-
-        The one assertion made is the safe one: a one-time token must not be reusable for a
-        second, independent replication.
+         replicator authenticates with a one-time token
         """
         self.mark_test_step("Configure Edge Server with the `travel` dataset and CORS")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=_DB, config_file=_CONFIG)
 
         self.mark_test_step("Create a one-time session")
-        # Returning at all means Edge Server answered with one_time_session_id; a reusable
-        # response would raise KeyError in the client rather than yielding a token.
         token = await edge_server.create_session(_DB, one_time=True)
         assert token, "Edge Server returned no one-time session token"
 
