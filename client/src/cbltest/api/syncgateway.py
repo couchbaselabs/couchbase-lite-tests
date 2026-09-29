@@ -971,7 +971,6 @@ class _SyncGatewayBase:
     async def get_delta_sync_stats(self, dataset_name: str) -> dict:
         """
         Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
-        Returns an empty dict if the section is absent.
 
         :param dataset_name: The name of the SGW database to inspect.
         """
@@ -979,12 +978,7 @@ class _SyncGatewayBase:
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
 
-        try:
-            db_section = expvars["syncgateway"]["per_db"][dataset_name]
-        except KeyError:
-            return {}
-        delta = db_section.get("delta_sync")
-        return delta if isinstance(delta, dict) else {}
+        return expvars["syncgateway"]["per_db"][dataset_name]["delta_sync"]
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """
@@ -2515,13 +2509,7 @@ class SyncGateway(_SyncGatewayBase):
         resp_data = await self._send_request("get", "/_expvar")
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
-        return (
-            expvars.get("syncgateway", {})
-            .get("per_db", {})
-            .get(db_name, {})
-            .get("shared_bucket_import", {})
-            .get("import_count", 0)
-        )
+        return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
 
     async def reset_user(
         self,
