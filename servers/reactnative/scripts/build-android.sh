@@ -21,9 +21,9 @@ cd android
 
 APK_PATH="app/build/outputs/apk/release/app-release.apk"
 if [ -f "$APK_PATH" ]; then
-    echo "=== Build successful ==="
-    echo "APK: $PROJECT_DIR/android/$APK_PATH"
+  echo "=== Build successful ==="
+  echo "APK: $PROJECT_DIR/android/$APK_PATH"
 else
-    echo "=== Build failed: APK not found ==="
-    exit 1
+  echo "=== Build failed: APK not found ==="
+  exit 1
 fi
