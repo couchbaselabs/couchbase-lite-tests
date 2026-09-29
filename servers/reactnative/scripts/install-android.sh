@@ -17,8 +17,8 @@ WS_URL="${2:-ws://10.0.2.2:8765}"
 APK_PATH="$PROJECT_DIR/android/app/build/outputs/apk/release/app-release.apk"
 
 if [ ! -f "$APK_PATH" ]; then
-    echo "APK not found. Building first..."
-    "$SCRIPT_DIR/build-android.sh"
+  echo "APK not found. Building first..."
+  "$SCRIPT_DIR/build-android.sh"
 fi
 
 echo "=== Installing APK ==="
@@ -26,9 +26,9 @@ adb install -r "$APK_PATH"
 
 echo "=== Launching app with auto-connect ==="
 adb shell am start \
-    -n com.cbltestserver/.MainActivity \
-    --es deviceID "$DEVICE_ID" \
-    --es wsURL "$WS_URL"
+  -n com.cbltestserver/.MainActivity \
+  --es deviceID "$DEVICE_ID" \
+  --es wsURL "$WS_URL"
 
 echo "=== Installed and launched ==="
 echo "Device ID: $DEVICE_ID"
