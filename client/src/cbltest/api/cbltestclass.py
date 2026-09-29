@@ -18,6 +18,7 @@ class CBLTestClass(ABC):
         cbl_info(f"Starting test: {method.__name__}")
         self.__step: int = 1
         self.__skipped: bool = False
+        self.last_test_step: tuple[int, list[str]] | None = None
 
     def teardown_method(self, method: FunctionType) -> None:
         if self.__step == 1 and not self.__skipped:
@@ -29,13 +30,12 @@ class CBLTestClass(ABC):
         all this does is log to the test server log, but could be expanded.
         """
         cbl_info(f"Moving to step {self.__step}:")
-        self.__step += 1
-        for line in description.splitlines():
-            stripped_line = line.strip()
-            if len(stripped_line) == 0:
-                continue
+        lines = [line.strip() for line in description.splitlines() if line.strip()]
+        for line in lines:
+            cbl_info(f"\t{line}")
 
-            cbl_info(f"\t{stripped_line}")
+        self.last_test_step = (self.__step, lines)
+        self.__step += 1
 
     def skip(self, reason: str) -> None:
         """

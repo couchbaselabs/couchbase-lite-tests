@@ -58,6 +58,7 @@ sgcollect_fixture = "cbltest.plugins.sgcollect_fixture"
 es_collect_fixture = "cbltest.plugins.es_collect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
 timeout_fixture = "cbltest.plugins.timeout_fixture"
+test_step_report = "cbltest.plugins.test_step_report"
 cluster_cleanup = "cbltest.plugins.cluster_cleanup"
 sgw_cluster_manager = "cbltest.plugins.sgw_cluster_manager"
 
