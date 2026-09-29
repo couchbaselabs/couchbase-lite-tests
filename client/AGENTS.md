@@ -77,6 +77,7 @@ client/
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
+        ├── test_step_report.py         # last mark_test_step() at the top of a failure's traceback
         └── cluster_cleanup.py          # cluster_cleanup (autouse) — resets Edge Servers, wipes SGW DBs, empties CBS buckets, drops Rosmar ones
 ```
 
