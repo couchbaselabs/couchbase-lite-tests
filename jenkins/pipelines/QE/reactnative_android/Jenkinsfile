@@ -23,7 +23,7 @@ pipeline {
         stage('Prebuild Server') {
             steps {
                 script {
-                    build job: 'prebuild-test-server',
+                    build job: 'prebuild-test-server-rn-temp', // TEST-ONLY (rn/integration). Never merge.
                     parameters: [
                         string(name: 'TS_PLATFORM', value: 'reactnative_android'),
                         string(name: 'CBL_VERSION', value: params.CBL_VERSION),
