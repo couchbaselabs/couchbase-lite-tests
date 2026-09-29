@@ -59,6 +59,8 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
+                    // TEST-ONLY (rn/integration): always build from this branch. Never merge.
+                    env.BUILD_BRANCH = 'rn/integration'
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
