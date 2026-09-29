@@ -209,8 +209,9 @@ the availability of the test servers.
    * `_default.lists`.`db1-list1` (deleted)
    * `_default.tasks`.`db1-list1-task1` (deleted)
    * `_default.tasks`.`db1-list1-task2` (deleted)
-9. Check that the list and two tasks are deleted from `db1`.
-10. Check that the list and two tasks are deleted from `db2`.
+9. Wait for the `db1` replicator to finish pushing the deletions (idle).
+10. Check that the list and two tasks are deleted from `db1`.
+11. Check that the list and two tasks are deleted from `db2`.
 
 ## test_create_tasks_two_users
 

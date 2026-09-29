@@ -115,30 +115,30 @@ Test replication behavior when modifying channel access through roles.
 
 ## test_default_conflict_withConflicts_withChannels
 
-Test conflict resolution behavior with channel-based access control.
+Test default conflict resolution with channel-based access control. Sync Gateway 3.x runs conflict-free (stored conflicts are not supported), so the conflict is produced on the client at pull time through divergent CBL and SGW edits from the same base revision.
 
 1. Reset SG and load `posts` dataset.
 2. Create two users with access to different channels:
    * user1 with access to channel1
    * user2 with access to channel2
 3. Create initial documents in both channels.
-4. Create conflicts by having both users update the same documents:
-   * Both users update from same base revision to create conflict
-   * Documents shared between channels for conflict testing
-5. Create a CBL database.
-6. Start push-pull replication for both users:
+4. Create a CBL database with the `posts` collection (load the `posts` dataset so `_default.posts` exists).
+5. Start a one-shot pull replicator to seed the shared documents into CBL:
    * endpoint: `/posts`
    * collections: `_default.posts`
-   * type: push-and-pull
-   * continuous: true
-   * credentials: user1/pass1 and user2/pass2
-7. Wait for initial replications to be idle.
-8. Verify that conflicts exist in the database.
-9. Update documents in CBL database with different users:
-   * user1 updates shared_doc1
-   * user2 updates shared_doc2
-10. Wait for replication to complete after each update.
-11. Verify documents in Sync Gateway have the latest updates:
-    * Check titles reflect latest updates
-    * Verify version numbers are correct
-    * Ensure proper conflict resolution 
+   * type: pull
+   * continuous: false
+   * credentials: user1/pass1
+6. Verify the shared documents replicated into CBL.
+7. Create a conflict for each shared document via divergent edits from the same base revision:
+   * Edit the document locally in CBL (unsynced).
+   * Edit the same document on Sync Gateway twice, so the server revision is a higher generation than the local edit.
+8. Pull again with the default conflict resolver (none specified); CBL resolves the conflicts without a replication error.
+9. Verify each conflict resolved to a single revision holding one of the conflicting edits.
+10. Update the resolved documents in CBL (final, deterministic state):
+    * shared_doc1 updated by user1, version 3
+    * shared_doc2 updated by user2, version 3
+11. Push the resolved documents back to Sync Gateway (push-and-pull, one-shot, user1/pass1).
+12. Verify Sync Gateway converged on the CBL updates:
+    * Titles reflect the CBL updates
+    * Version numbers are 3

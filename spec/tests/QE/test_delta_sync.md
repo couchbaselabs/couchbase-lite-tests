@@ -113,15 +113,15 @@ Verify delta sync behavior when toggling delta sync enabled/disabled. Ensures th
     * credentials: user1/pass
 17. Wait until the replicator stops.
 18. Verify docs are replicated correctly.
-19. Record the bytes transferred.
+19. Record delta-sync stats before the update and re-pull.
 20. Get existing document size for comparison
 21. Update docs in SGW:
     * Modify the `name` field of the new doc.
 22. Start the same replicator again.
 23. Wait until the replicator stops.
 24. Verify the document was updated correctly in CBL
-25. Record the bytes transferred
-26. Verify delta transferred equivalent to doc size (full doc transfer).
+25. Verify SGW sent a full document, not a delta (delta sync disabled).
+    * The `deltas_sent` counter in SGW's `delta_sync` stats is unchanged.
 
 ## #5 test_delta_sync_within_expiry
 
@@ -141,7 +141,7 @@ Verify that after revision expiry, any document update (even a small change) res
    * continuous: false
    * credentials: user1/pass
 5. Wait until the replicator stops.
-6. Record the bytes transferred.
+6. Record delta-sync stats before the update and re-pull.
 7. Get the current document state and revision before update.
 8. Verify old revision body is accessible before expiry through public API.
 9. Update docs in SGW:
@@ -150,11 +150,10 @@ Verify that after revision expiry, any document update (even a small change) res
 11. Verify old revision is not accessible through public API.
 12. Start the same replicator again.
 13. Wait until the replicator stops.
-14. Record the bytes transferred post expiry.
-15. Verify:
-    * The transferred bytes are approximately equal to the full document size (>3000 bytes)
-    * This indicates SGW correctly sent the full document after revision expiry
-    * The small change forced a full document transfer due to expired revision
+14. Verify SGW sent a full document, not a delta:
+    * The old revision expired, so SGW cannot compute a delta and must fall back to sending the complete document body.
+    * The document has the updated `name` in CBL.
+    * The `deltas_sent` counter in SGW's `delta_sync` stats is unchanged across the post-expiry pull.
 
 ## #6 test_delta_sync_with_no_deltas
 
