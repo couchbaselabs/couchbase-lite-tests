@@ -6,7 +6,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.database import Database, SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.replicator import Replicator, ReplicatorCollectionEntry, ReplicatorType
+from cbltest.api.replicator import Replicator, ReplicatorActivityLevel, ReplicatorCollectionEntry, ReplicatorType
 from cbltest.api.replicator_types import (
     ReplicatorBasicAuthenticator,
     ReplicatorDocumentFlags,
@@ -626,6 +626,9 @@ class TestFest(CBLTestClass):
                 ),
             }
         )
+
+        self.mark_test_step("Wait for repl1 to finish pushing the deletions")
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify that _default.tasks.db1-list1-task1 was deleted from db1")
         snapshot_updater = SnapshotUpdater(snap1)
