@@ -175,6 +175,13 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
                     "url": f"http://{ts.ip_address}:{port}",
                 }
 
+                if ts.platform.startswith("reactnative"):
+                    # React Native test servers connect back to the pytest WebSocket server
+                    ts_definition = {
+                        "url": "ws://localhost:8765",
+                        "transport": "ws",
+                    }
+
                 if ts.dataset_version:
                     ts_definition["dataset_version"] = ts.dataset_version
 
