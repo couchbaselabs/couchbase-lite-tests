@@ -1,0 +1,41 @@
+{
+  "name": "cbl-test-server-reactnative",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Couchbase Lite Test Server for React Native",
+  "scripts": {
+    "android": "react-native run-android",
+    "ios": "react-native run-ios",
+    "start": "react-native start",
+    "build:android": "cd android && ./gradlew assembleDebug",
+    "build:ios": "cd ios && xcodebuild -workspace CblTestServer.xcworkspace -scheme CblTestServer -configuration Debug -sdk iphoneos build",
+    "bundle-datasets": "node scripts/bundle-datasets.js",
+    "lint": "eslint .",
+    "typecheck": "node scripts/bundle-datasets.js && tsc --noEmit",
+    "postinstall": "node scripts/bundle-datasets.js"
+  },
+  "dependencies": {
+    "cbl-reactnative": "npm:@couchbase/couchbase-lite-react-native@1.1.1-3",
+    "react": "18.3.1",
+    "react-native": "0.76.2",
+    "react-native-launch-arguments": "^4.1.1",
+    "react-native-uuid": "^2.0.2"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "16.0.3",
+    "@react-native/babel-preset": "0.76.2",
+    "@react-native/eslint-config": "0.76.2",
+    "@react-native/metro-config": "0.76.2",
+    "@react-native/typescript-config": "0.76.2",
+    "@types/react": "^18.3.12",
+    "eslint": "^8.51.0",
+    "prettier": "^3.4.1",
+    "typescript": "^5.2.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "@react-native-community/cli-server-api": "16.0.3"
+  }
+}
