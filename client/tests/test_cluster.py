@@ -1,14 +1,20 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Any
 from unittest.mock import patch
 
 import pytest
+from cbltest import CBLPyTest
 from cbltest.api import couchbaseserver
 from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
+from cbltest.configparser import ParsedConfig
+from cbltest.requests import RequestFactory
 from conftest import fake_sync_gateways
+
+SCOPES = {"_default": ScopeConfig(collections={"_default": {}})}
 
 
 @contextmanager
@@ -17,19 +23,22 @@ def fake_sync_gateway() -> Iterator[SyncGateway]:
         yield gateways[0]
 
 
-def test_cluster_without_couchbase_server() -> None:
-    with fake_sync_gateway() as sync_gateway:
-        sync_gateway.using_rosmar = False
-        with pytest.raises(
-            CblTestError,
-            match="Couchbase Server must be provided if Sync Gateway",
-        ):
-            CouchbaseCluster([sync_gateway], [])
+@pytest.mark.asyncio
+async def test_cluster_without_couchbase_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without a Couchbase Server, Sync Gateway gets the database with no bucket work first."""
+    sent: list[DatabaseConfig] = []
 
+    async def capture(db_name: str, config: DatabaseConfig) -> None:
+        sent.append(config)
+
+    config = DatabaseConfig(bucket="data-bucket", scopes=SCOPES)
     with fake_sync_gateway() as sync_gateway:
         cluster = CouchbaseCluster([sync_gateway], [])
+        monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", capture)
+        await cluster.create_database("db", config)
 
     assert len(cluster.couchbase_servers) == 0
+    assert sent == [config]
 
 
 def test_cluster_with_couchbase_server() -> None:
@@ -78,7 +87,6 @@ def cluster_on_couchbase_server(monkeypatch: pytest.MonkeyPatch, kv_nodes: int) 
     monkeypatch.setattr(cbs, "_get_cluster_info", lambda: {"nodes": [node] * kv_nodes})
     monkeypatch.setattr(cbs, "create_bucket", lambda *args, **kwargs: False)
     with fake_sync_gateway() as sync_gateway:
-        sync_gateway.using_rosmar = False
         cluster = CouchbaseCluster([sync_gateway], [cbs])
         monkeypatch.setattr(cluster, "create_collections", lambda config: None)
         yield cluster
@@ -97,9 +105,6 @@ async def created_config(
         monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", capture)
         await cluster.create_database("db", config)
     return sent[0] if sent else None
-
-
-SCOPES = {"_default": ScopeConfig(collections={"_default": {}})}
 
 
 @pytest.mark.asyncio
@@ -132,3 +137,30 @@ async def test_the_deprecated_field_is_left_alone(monkeypatch: pytest.MonkeyPatc
     assert config is not None
     assert config.index is None
     assert config.num_index_replicas == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("server", ["couchbases://cbs.example.com", "rosmar:///tmp/rosmar"])
+async def test_create_needs_couchbase_server_unless_rosmar(monkeypatch: pytest.MonkeyPatch, server: str) -> None:
+    """A config with no Couchbase Server is only valid when Sync Gateway runs on Rosmar."""
+
+    async def get_config(*args: Any, **kwargs: Any) -> dict:
+        return {"bootstrap": {"server": server}}
+
+    async def start(self: RequestFactory) -> None:
+        raise _Started()
+
+    monkeypatch.setattr(SyncGateway, "_send_request", get_config)
+    monkeypatch.setattr(RequestFactory, "start", start)
+    config = ParsedConfig({"sync-gateways": [{"hostname": "sgw.example.com"}]})
+    expected = (
+        pytest.raises(_Started)
+        if server.startswith("rosmar")
+        else pytest.raises(CblTestError, match="Couchbase Server must be provided if Sync Gateway")
+    )
+    with fake_sync_gateways(0), expected:
+        await CBLPyTest.create(config)
+
+
+class _Started(Exception):
+    """Raised in place of starting the request factory, once create() is past validation."""

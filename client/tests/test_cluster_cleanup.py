@@ -6,7 +6,7 @@ import pytest
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.plugins.cluster_cleanup import delete_all_databases
-from conftest import fake_sync_gateways
+from conftest import fake_sync_gateways, set_using_rosmar
 
 DeleteDatabase = Callable[[str], Coroutine[Any, Any, None]]
 
@@ -39,8 +39,7 @@ def _stub_cluster(
 
         monkeypatch.setattr(sg, "get_all_databases_verbose", get_all_databases_verbose)
         monkeypatch.setattr(sg, "_delete_database", delete_and_forget)
-        # requests.get is patched out, so using_rosmar defaults to a truthy mock.
-        monkeypatch.setattr(sg, "using_rosmar", False)
+        set_using_rosmar(sg, False)
 
 
 @pytest.mark.asyncio

@@ -136,6 +136,10 @@ class CBLPyTest:
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
+        for cluster in ret_val.clusters:
+            if not cluster.couchbase_servers and not await cluster.sync_gateways[0].using_rosmar:
+                raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
+
         await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
 
@@ -210,7 +214,7 @@ class CBLPyTest:
     async def resolve_api_version(self) -> None:
         apiVersion = 0
         for ts_index, ts in enumerate(self.test_servers):
-            root_info = await ts.get_info()
+            root_info = await ts.info
             if apiVersion != 0 and root_info.version != apiVersion:
                 raise ValueError(
                     f"Test Server at index {ts_index} has API version "

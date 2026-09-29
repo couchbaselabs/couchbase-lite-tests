@@ -3,10 +3,7 @@ get_all_databases_verbose's one-pass list validation, and wait_for_db_online's
 timeout diagnostics.
 
 These exercise the real aiohttp ClientSession/ClientResponse machinery against
-a real (loopback) aiohttp test server, rather than mocking the HTTP layer. The
-only stand-in is the synchronous `requests.get` call SyncGateway.__init__ makes
-against SGW's /_config endpoint during bootstrap, which is orthogonal to the
-async helpers under test here.
+a real (loopback) aiohttp test server, rather than mocking the HTTP layer.
 """
 
 import asyncio
@@ -46,17 +43,6 @@ _URL_KEY = "__url__"
 _BODY_KEY = "__body__"
 
 
-class _FakeConfigResponse:
-    """Stands in for requests.Response from the sync GET /_config bootstrap
-    call in SyncGateway.__init__ - unrelated to the async helpers under test."""
-
-    def json(self) -> dict:
-        return {"bootstrap": {"server": "rosmar"}}
-
-    def raise_for_status(self) -> None:
-        return None
-
-
 @pytest_asyncio.fixture(loop_scope="function")
 async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> AsyncIterator[SyncGatewayFixture]:
     """A SyncGateway backed by a real aiohttp test server, so _send_request and
@@ -68,10 +54,6 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     every request the server saw (plus its target under `_URL_KEY` and its body under
     `_BODY_KEY`), so tests can assert on what went out on the wire."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
-    monkeypatch.setattr(
-        "cbltest.api.syncgateway.requests.get",
-        lambda *args, **kwargs: _FakeConfigResponse(),
-    )
 
     specs: list[dict] = []
     received: list[dict[str, str]] = []
