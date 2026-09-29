@@ -1024,6 +1024,8 @@ class TestReplicationAutoPurge(CBLTestClass):
         local_doc = await db.get_document(DocumentEntry("_default.posts", "post_1"))
         assert local_doc.body["channels"] == ["group1"], "post_1 incorrect locally at end"
 
+        await cblpytest.test_servers[0].cleanup()
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_after_remove_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Reset SG and load `posts` dataset")
@@ -1134,6 +1136,8 @@ class TestReplicationAutoPurge(CBLTestClass):
         assert remote_doc.body["channels"] == ["fake"], (
             f"Unexpected channels value found on remote document -> '{remote_doc.body['channels']}'"
         )
+
+        await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("remove_type", ["delete", "purge"])
