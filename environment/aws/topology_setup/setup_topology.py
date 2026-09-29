@@ -728,6 +728,12 @@ class TopologyConfig:
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
 
+            if test_server_input.platform.startswith("reactnative"):
+                # React Native test servers connect back to the pytest WebSocket
+                # server, so there is no HTTP endpoint to poll here.
+                click.echo(f"Launched {test_server_input.platform} on {test_server_input.location}")
+                continue
+
             if test_server_input.platform == "js":
                 # The JS server connects back to the client, which is too involved to set up just for this check.
                 click.secho("Skipping connection check for js...", fg="yellow")
@@ -751,6 +757,29 @@ class TopologyConfig:
 
             if not success:
                 raise RuntimeError(f"Test server failed to start at {test_server_input.location}")
+
+    def relaunch_test_servers(self) -> None:
+        """
+        Relaunch React Native test servers without reinstalling them.
+
+        The app is installed and launched once during setup, but it can give up
+        reconnecting before pytest binds its WebSocket port. The WebSocket router
+        calls this (via CBL_NATIVE_WS_RELAUNCH_SCRIPT) once the port is bound.
+        """
+        TestServer.initialize()
+        for test_server_input in self.__test_server_inputs:
+            if not test_server_input.platform.startswith("reactnative"):
+                continue
+
+            test_server = TestServer.create(test_server_input.platform, test_server_input.cbl_version)
+            if test_server_input.download:
+                # Uses the cached download if it is already present
+                test_server.download()
+
+            bridge = test_server.create_bridge()
+            bridge.validate(test_server_input.location)
+            bridge.run(test_server_input.location)
+            click.echo(f"Relaunched {test_server_input.platform} on {test_server_input.location}")
 
     def stop_test_servers(self) -> None:
         """
