@@ -301,3 +301,11 @@ async def test_anonymous_client_sends_no_credentials(tmp_path: Path) -> None:
     ):
         await client.get_all_dbs()
         assert "Authorization" not in client_session(client).headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("users", [True, False])
+async def test_admin_client_sends_credentials_only_to_a_config_that_declares_users(tmp_path: Path, users: bool) -> None:
+    async with fake_session_manager(write_config(tmp_path, "initial.json", 59840, users=users)) as manager:
+        headers = client_session(manager.get_admin_client()).headers
+        assert ("Authorization" in headers) == users

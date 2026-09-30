@@ -185,8 +185,8 @@ class EdgeServer:
     ) -> None:
         """
         :param url: Hostname of the Edge Server
-        :param config_file: Config the Edge Server is running on, which decides the port,
-            the scheme, and whether it asks for credentials at all
+        :param config_file: Config the Edge Server is running on, which decides the port
+            and the scheme
         :param headers: Headers to send with every request, e.g. `Authorization` from
             :func:`get_basic_auth_headers`.  None for a client that sends no credentials.
         """
@@ -203,11 +203,6 @@ class EdgeServer:
         self.__replication_url = f"{ws_scheme}{url}:{self.__port}"
         self.scheme = "https://" if self.__secure else "http://"
         self.__session = self._create_session(headers or {})
-
-    @property
-    def needs_auth(self) -> bool:
-        """Whether the running config declares users, so a client can authenticate as one."""
-        return self.__config.declares_users
 
     async def close(self) -> None:
         """Close the session this client requests on, and its Caddy's."""
