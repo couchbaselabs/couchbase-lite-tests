@@ -253,6 +253,8 @@ class CouchbaseServer:
                 f"http://{self.__hostname}:8091",
                 headers={"Authorization": encode_basic_auth(username, password, "ascii")},
             )
+            # The sidecar is a separate service, so it gets no Couchbase Server credentials
+            self.__shell2http = AsyncHTTPClient(f"http://{self.__hostname}:{SHELL2HTTP_PORT}")
 
             self.__cleanup_mode = cleanup_mode
             # Deleting a bucket between tests leaves nothing to reuse, so nothing needs capping.
@@ -272,8 +274,9 @@ class CouchbaseServer:
         return f"{type(self).__name__} {self.__hostname}:{self.__rest_port}"
 
     async def close(self) -> None:
-        """Closes the REST session.  Safe to call more than once."""
+        """Closes the REST and shell2http sessions.  Safe to call more than once."""
         await self.__session.close()
+        await self.__shell2http.close()
 
     async def __send_request(
         self, method: str, path: str, *, allowed_statuses: Container[int] = (), **kwargs: Any
@@ -1465,7 +1468,7 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        async with await self.__session.get(f"http://{self.hostname}:{SHELL2HTTP_PORT}/stop-cbs") as resp:
+        async with await self.__shell2http.get("/stop-cbs") as resp:
             if resp.status != 200:
                 body = await resp.text()
                 raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
@@ -1476,8 +1479,8 @@ class CouchbaseServer:
 
         :param port: REST API port to wait for readiness (default 8091)
         """
-        async with await self.__session.post(
-            f"http://{self.hostname}:{SHELL2HTTP_PORT}/start-cbs",
+        async with await self.__shell2http.post(
+            "/start-cbs",
             data=json.dumps({"port": port}),
             headers={"Content-Type": "application/json"},
         ) as resp:
