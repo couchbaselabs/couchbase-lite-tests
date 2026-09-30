@@ -1,3 +1,4 @@
+import asyncio
 from typing import Final, cast
 from urllib.parse import urljoin, urlparse
 
@@ -45,7 +46,7 @@ class TestServer:
         self.__tracer = get_tracer(__name__, VERSION)
         self.__dataset_version = dataset_version
 
-    @asyncstdlib.cached_property
+    @asyncstdlib.cached_property(asyncio.Lock)
     async def info(self) -> GetRootResponse:
         """Information about the running test server (fetched once)"""
         with self.__tracer.start_as_current_span("info"):

@@ -1995,7 +1995,7 @@ class SyncGateway(_SyncGatewayBase):
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
         self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
 
-    @asyncstdlib.cached_property
+    @asyncstdlib.cached_property(asyncio.Lock)
     async def using_rosmar(self) -> bool:
         """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server (fetched once)"""
         config = await self._send_request("get", "/_config")
