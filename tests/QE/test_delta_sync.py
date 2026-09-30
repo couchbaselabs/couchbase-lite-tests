@@ -16,7 +16,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway, get_basic_auth_headers
 from cbltest.api.test_functions import compare_local_and_remote
 
 
@@ -625,7 +625,7 @@ class TestDeltaSync(CBLTestClass):
         old_revision = sgw_doc_before_update.revision
         assert old_revision is not None, "Document should have a revision"
 
-        async with sync_gateway.get_user_client("user1", "pass") as sg_user:
+        async with sync_gateway.get_user_client(get_basic_auth_headers("user1", "pass")) as sg_user:
             self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
             old_rev_doc = await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
             assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"

@@ -17,7 +17,7 @@ import aiofiles
 import packaging.version
 import requests
 import tenacity
-from aiohttp import ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp import ClientResponse, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError, ClientError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
@@ -749,6 +749,20 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
+def get_basic_auth_headers(username: str, password: str) -> dict[str, str]:
+    """Returns the headers that authenticate a request as `username` with HTTP basic auth"""
+    return {"Authorization": encode_basic_auth(username, password, "ascii")}
+
+
+SYNC_GATEWAY_SESSION_COOKIE = "SyncGatewaySession"
+
+
+def get_sync_gateway_session_headers(session_id: str) -> dict[str, str]:
+    """Returns the headers that authenticate a request with a Sync Gateway session, e.g. one
+    from :func:`SyncGateway.create_session`"""
+    return {"Cookie": f"{SYNC_GATEWAY_SESSION_COOKIE}={session_id}"}
+
+
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -758,8 +772,6 @@ class _SyncGatewayBase:
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int,
         secure: bool = False,
         public_port: int | None = None,
@@ -770,8 +782,9 @@ class _SyncGatewayBase:
         :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
             correct for a client that already talks to the public API; an admin client must pass it,
             since its own `port` is the admin one.
-        :param headers: Headers to send with every request, e.g. the `X-Backend` header that
-            tells a load balancer which node to use.
+        :param headers: Headers to send with every request, e.g. `Authorization` from
+            :func:`get_basic_auth_headers`, or the `X-Backend` header that tells a load balancer
+            which node to use.
         """
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -783,13 +796,7 @@ class _SyncGatewayBase:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__session: AsyncHTTPClient = self._create_session(
-            secure,
-            scheme,
-            url,
-            port,
-            {"Authorization": encode_basic_auth(username, password, "ascii")} | dict(headers or {}),
-        )
+        self.__session: AsyncHTTPClient = self._create_session(secure, scheme, url, port, headers)
 
     def __str__(self) -> str:
         return f"{type(self).__name__} {self.hostname}:{self.port}"
@@ -838,19 +845,15 @@ class _SyncGatewayBase:
         headers: Mapping[str, str] | None = None,
     ) -> AsyncHTTPClient:
         """Create a session that sends `headers` with every request, e.g. the
-        `Authorization` header from `aiohttp.encode_basic_auth`.  None for a session that
+        `Authorization` header from :func:`get_basic_auth_headers`.  None for a session that
         sends none, such as an anonymous one."""
+        connector = None
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            return AsyncHTTPClient(
-                f"{scheme}{url}:{port}",
-                headers=headers,
-                connector=TCPConnector(ssl=ssl_context),
-            )
-        else:
-            return AsyncHTTPClient(f"{scheme}{url}:{port}", headers=headers)
+            connector = TCPConnector(ssl=ssl_context)
+        return AsyncHTTPClient(f"{scheme}{url}:{port}", headers=headers, connector=connector)
 
     async def _send_request(
         self,
@@ -865,6 +868,18 @@ class _SyncGatewayBase:
                              call whose body is large and uninteresting, such as a changes feed read
                              only to find one document; the request and status are still logged.
         """
+        body, _ = await self._send_request_with_response(method, path, payload, params, log_response)
+        return body
+
+    async def _send_request_with_response(
+        self,
+        method: str,
+        path: str,
+        payload: JSONSerializable | DatabaseConfig | None = None,
+        params: dict[str, str] | None = None,
+        log_response: bool = True,
+    ) -> tuple[Any, ClientResponse]:
+        """Like :func:`_send_request`, but also returns the response, for its headers and cookies."""
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
@@ -891,7 +906,7 @@ class _SyncGatewayBase:
                     body=data,
                 )
 
-            return ret_val
+            return ret_val, resp
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -1989,7 +2004,7 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure, public_port)
+        super().__init__(url, port, secure, public_port, get_basic_auth_headers(username, password))
         r = requests.get(
             f"{self.scheme}{url}:{port}/_config",
             auth=(username, password),
@@ -2089,6 +2104,7 @@ class SyncGateway(_SyncGatewayBase):
         password: str | None = None,
         collection_access: dict | None = None,
         admin_roles: list[str] | None = None,
+        disabled: bool | None = None,
     ) -> None:
         """
         Adds or updates the specified user to a Sync Gateway database with the specified channel access
@@ -2100,6 +2116,7 @@ class SyncGateway(_SyncGatewayBase):
             be formatted in the way Sync Gateway expects it, so if you are unsure use
             :func:`create_collection_access_dict()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
+        :param disabled: Whether the user is disabled, or None to leave it as it is
         """
         with self._tracer.start_as_current_span("add_user", attributes={"cbl.user.name": name}):
             body: dict[str, Any] = {
@@ -2114,6 +2131,9 @@ class SyncGateway(_SyncGatewayBase):
 
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
+
+            if disabled is not None:
+                body["disabled"] = disabled
 
             await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
@@ -2134,7 +2154,7 @@ class SyncGateway(_SyncGatewayBase):
                 else:
                     raise
 
-    async def create_session(self, db_name: str, name: str) -> str:
+    async def create_session(self, db_name: str, name: str, ttl: int | None = None) -> str:
         """
         Creates a login session for an existing user via the admin API
         (POST /{db}/_session) and returns its session id.
@@ -2147,10 +2167,14 @@ class SyncGateway(_SyncGatewayBase):
 
         :param db_name: The name of the database to create the session against
         :param name: The user to create the session for
+        :param ttl: How many seconds the session lasts, or None for Sync Gateway's default
         :return: The id of the created session
         """
         with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({"name": name}))
+            body: dict[str, Any] = {"name": name}
+            if ttl is not None:
+                body["ttl"] = ttl
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
             assert isinstance(resp, dict)
             session_id = resp["session_id"]
             assert isinstance(session_id, str)
@@ -2168,6 +2192,16 @@ class SyncGateway(_SyncGatewayBase):
         """
         with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
             await self._send_request("delete", f"/{db_name}/_session/{session_id}")
+
+    async def delete_user_sessions(self, db_name: str, name: str) -> None:
+        """
+        Invalidates every session of a user via the admin API (DELETE /{db}/_user/{name}/_session).
+
+        :param db_name: The name of the database the user belongs to
+        :param name: The user whose sessions to invalidate
+        """
+        with self._tracer.start_as_current_span("delete_user_sessions", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_user/{name}/_session")
 
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
@@ -2535,31 +2569,23 @@ class SyncGateway(_SyncGatewayBase):
         )
 
     @asynccontextmanager
-    async def get_user_client(
-        self,
-        username: str,
-        password: str,
-    ) -> AsyncIterator["SyncGatewayUserClient"]:
+    async def get_user_client(self, headers: Mapping[str, str]) -> AsyncIterator["SyncGatewayUserClient"]:
         """
         Yields a public-API client authenticated as an already existing user (e.g. one the
         dataset created), closing its session on exit.  Use :func:`create_user_client` when
         the user has to be created first.
 
-        :param username: The username to authenticate as
-        :param password: The password for the user
+        :param headers: Headers that authenticate the user, e.g. from :func:`get_basic_auth_headers`
+            or a `SyncGatewaySession` cookie
         :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
-        client = SyncGatewayUserClient(
+        async with SyncGatewayUserClient(
             self.hostname,
-            username,
-            password,
             port=self.public_port,
             secure=self.secure,
-        )
-        try:
+            headers=headers,
+        ) as client:
             yield client
-        finally:
-            await client.close()
 
     @asynccontextmanager
     async def create_user_client(
@@ -2584,7 +2610,7 @@ class SyncGateway(_SyncGatewayBase):
         """
         await self.reset_user(db_name, username, password, channels)
 
-        async with self.get_user_client(username, password) as client:
+        async with self.get_user_client(get_basic_auth_headers(username, password)) as client:
             yield client
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
@@ -2805,8 +2831,6 @@ class SyncGatewayUserClient(_SyncGatewayBase):
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int = 4984,
         secure: bool = False,
         headers: Mapping[str, str] | None = None,
@@ -2815,13 +2839,37 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         Initialize a SyncGatewayUserClient for public API access.
 
         :param url: The hostname/URL of the Sync Gateway instance
-        :param username: Username for authentication
-        :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
-        :param headers: Headers to send with every request, e.g. Authorization.
+        :param headers: Headers to send with every request, e.g. `Authorization` from
+            :func:`get_basic_auth_headers`, or a `SyncGatewaySession` cookie.  None for an anonymous client.
         """
-        super().__init__(url, username, password, port, secure, headers=headers)
+        super().__init__(url, port, secure, headers=headers)
+
+    async def create_session(self, db_name: str) -> str:
+        """
+        Logs in via the public API (POST /{db}/_session) with this client's credentials, and
+        returns the id of the session Sync Gateway creates.  This client keeps no cookies, so
+        pass the id to :func:`get_sync_gateway_session_headers` to use the session.
+
+        :param db_name: The name of the database to log in to
+        :return: The id of the created session
+        """
+        with self._tracer.start_as_current_span("create_public_session", attributes={"sg.database.name": db_name}):
+            _, resp = await self._send_request_with_response("post", f"/{db_name}/_session")
+            cookie = resp.cookies.get(SYNC_GATEWAY_SESSION_COOKIE)
+            assert cookie is not None, f"POST /{db_name}/_session set no {SYNC_GATEWAY_SESSION_COOKIE} cookie"
+            return cookie.value
+
+    async def delete_session(self, db_name: str) -> None:
+        """
+        Logs out via the public API (DELETE /{db}/_session), invalidating the session this
+        client authenticates with.
+
+        :param db_name: The name of the database to log out of
+        """
+        with self._tracer.start_as_current_span("delete_public_session", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_session")
 
     async def __aenter__(self) -> Self:
         return self

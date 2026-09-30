@@ -55,6 +55,11 @@ async def slow_server() -> AsyncIterator[str]:
         await release.wait()
         return resp
 
+    async def cookie(request: web.Request) -> web.Response:
+        resp = web.Response(text=request.headers.get("Cookie", ""))
+        resp.set_cookie("session", "abc")
+        return resp
+
     app = web.Application()
     app.router.add_get("/slow", slow)
     app.router.add_get("/stalled", stalled)
@@ -63,6 +68,7 @@ async def slow_server() -> AsyncIterator[str]:
     app.router.add_get("/missing", missing)
     app.router.add_get("/broken", broken)
     app.router.add_get("/stalled-error", stalled_error)
+    app.router.add_get("/cookie", cookie)
     runner = web.AppRunner(app)
     await runner.setup()
     sock = socket.create_server(("localhost", 0))
@@ -94,6 +100,15 @@ async def test_timeout_names_a_numeric_per_request_budget(slow_server: str) -> N
     async with AsyncHTTPClient(slow_server) as session:
         with pytest.raises(TimeoutError, match=r"\(total 0\.2s\)$"):
             await session.get("/slow", timeout=0.2)  # ty: ignore[invalid-argument-type]
+
+
+@pytest.mark.asyncio
+async def test_a_cookie_a_response_sets_is_not_sent_back(slow_server: str) -> None:
+    async with AsyncHTTPClient(slow_server) as session:
+        first = await session.get("/cookie")
+        assert first.cookies["session"].value == "abc"
+        second = await session.get("/cookie")
+        assert await second.text() == ""
 
 
 class _HangingResolver(AbstractResolver):

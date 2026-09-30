@@ -13,7 +13,6 @@ Valid openid_token config formats (per ES config schema oneOf):
 import asyncio
 from pathlib import Path
 
-import aiohttp
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -131,16 +130,9 @@ class TestJWTSimple(CBLTestClass):
         # If this fails, the JWT/key configuration is wrong.
         # =====================================================================
         self.mark_test_step("Verifying JWT token against SGW REST API.")
-        async with (
-            aiohttp.ClientSession(connector=aiohttp.TCPConnector(ssl=False)) as session,
-            session.get(
-                f"{sync_gateway.public_url}/{sg_db_name}/",
-                headers={"Authorization": f"Bearer {jwt_token}"},
-            ) as resp,
-        ):
-            status_code = resp.status
-            resp_text = await resp.text()
-        assert status_code == 200, f"JWT verification against SGW failed: {status_code} {resp_text}"
+        async with sync_gateway.get_user_client({"Authorization": f"Bearer {jwt_token}"}) as jwt_client:
+            status = await jwt_client.get_database_status(sg_db_name)
+        assert status is not None, f"JWT user cannot see {sg_db_name} on SGW"
 
         # =====================================================================
         # STEP 8: Configure and start Edge Server with inline JWT token.
