@@ -30,6 +30,8 @@ from cbltest.api.syncgateway import (
     ScopeConfig,
     SyncGateway,
     SyncGatewayUserClient,
+    get_basic_auth_headers,
+    get_sync_gateway_session_headers,
 )
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import _HttpLogWriter
@@ -66,7 +68,8 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
     the next one; with exactly one entry left, that response repeats (useful for
     polling loops like wait_for_db_online). `received` accumulates the headers of
     every request the server saw (plus its target under `_URL_KEY` and its body under
-    `_BODY_KEY`), so tests can assert on what went out on the wire."""
+    `_BODY_KEY`), so tests can assert on what went out on the wire.  A spec's optional
+    `cookies` are set on its response."""
     monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
     monkeypatch.setattr(
         "cbltest.api.syncgateway.requests.get",
@@ -85,7 +88,10 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
                 text=spec["text"],
                 content_type=spec.get("content_type", "text/plain"),
             )
-        return web.json_response(spec["json"], status=spec["status"])
+        response = web.json_response(spec["json"], status=spec["status"])
+        for name, value in spec.get("cookies", {}).items():
+            response.set_cookie(name, value)
+        return response
 
     app = web.Application()
     app.router.add_route("*", "/{tail:.*}", handle)
@@ -99,6 +105,22 @@ async def sync_gateway(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Async
 
     await sg.close()
     await server.close()
+
+
+def _redirect_user_clients_to_admin_port(
+    sg: SyncGateway, monkeypatch: pytest.MonkeyPatch, hostname: str | None = None
+) -> None:
+    """A user client talks to the public port, so redirect its session to the test
+    server while leaving the headers it builds alone.  Pass `hostname` to reach the
+    server by another name, e.g. one aiohttp's cookie jar accepts cookies from."""
+    create_session = sg._create_session
+    monkeypatch.setattr(
+        SyncGatewayUserClient,
+        "_create_session",
+        lambda self, secure, scheme, url, port, headers=None: create_session(
+            secure, scheme, hostname or url, sg.port, headers
+        ),
+    )
 
 
 class TestSessionAuth:
@@ -127,9 +149,111 @@ class TestSessionAuth:
             async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.public_port, None):
                 assert "Authorization" not in (client_class.call_args.kwargs["headers"] or {})
 
-            auth_header = encode_basic_auth("alice", "s3cret", "ascii")
-            async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, {"Authorization": auth_header}):
-                assert client_class.call_args.kwargs["headers"]["Authorization"] == auth_header
+            auth_headers = get_basic_auth_headers("alice", "s3cret")
+            async with sg._create_session(sg.secure, sg.scheme, sg.hostname, sg.port, auth_headers):
+                assert client_class.call_args.kwargs["headers"] == auth_headers
+
+    def test_get_basic_auth_headers(self) -> None:
+        assert get_basic_auth_headers("alice", "s3cret") == {
+            "Authorization": encode_basic_auth("alice", "s3cret", "ascii")
+        }
+
+    def test_get_sync_gateway_session_headers(self) -> None:
+        assert get_sync_gateway_session_headers("sess123") == {"Cookie": "SyncGatewaySession=sess123"}
+
+    @pytest.mark.asyncio
+    async def test_create_session_sends_ttl_only_when_given(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {"session_id": "sess123"}}]
+
+        assert await sg.create_session("db1", "alice") == "sess123"
+        assert await sg.create_session("db1", "alice", ttl=5) == "sess123"
+
+        assert [loads(entry[_BODY_KEY]) for entry in received] == [{"name": "alice"}, {"name": "alice", "ttl": 5}]
+
+    @pytest.mark.asyncio
+    async def test_add_user_sends_disabled_only_when_given(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {}}]
+
+        await sg.add_user("db1", "alice", password="pass")
+        await sg.add_user("db1", "alice", disabled=True)
+
+        assert [loads(entry[_BODY_KEY]) for entry in received] == [
+            {"name": "alice", "password": "pass"},
+            {"name": "alice", "disabled": True},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_delete_user_sessions_targets_the_user(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {}}]
+
+        await sg.delete_user_sessions("db1", "alice")
+
+        assert received[0][_URL_KEY] == "/db1/_user/alice/_session"
+
+    @pytest.mark.asyncio
+    async def test_public_create_session_returns_the_cookie_without_keeping_it(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Headers alone decide how a client authenticates, so the session cookie a login sets
+        must not ride along on the client's later requests."""
+        sg, specs, received = sync_gateway
+        specs[:] = [
+            {"status": 200, "json": {"ok": True}, "cookies": {"SyncGatewaySession": "sess123"}},
+            {"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}},
+        ]
+        _redirect_user_clients_to_admin_port(sg, monkeypatch, hostname="localhost")
+
+        async with sg.get_user_client(get_basic_auth_headers("alice", "s3cret")) as client:
+            assert await client.create_session("db1") == "sess123"
+            await client.get_document("db1", "doc1")
+
+        assert received[0][_URL_KEY] == "/db1/_session"
+        assert "Cookie" not in received[1]
+        assert received[1].get("Authorization") == encode_basic_auth("alice", "s3cret", "ascii")
+
+    @pytest.mark.asyncio
+    async def test_public_create_session_fails_without_a_cookie(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sg, specs, _ = sync_gateway
+        specs[:] = [{"status": 200, "json": {"ok": True}}]
+        _redirect_user_clients_to_admin_port(sg, monkeypatch)
+
+        async with sg.get_user_client(get_basic_auth_headers("alice", "s3cret")) as client:
+            with pytest.raises(AssertionError, match="set no SyncGatewaySession cookie"):
+                await client.create_session("db1")
+
+    @pytest.mark.asyncio
+    async def test_public_delete_session_logs_out_with_the_session_cookie(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {}}]
+        _redirect_user_clients_to_admin_port(sg, monkeypatch)
+
+        async with sg.get_user_client(get_sync_gateway_session_headers("sess123")) as client:
+            await client.delete_session("db1")
+
+        assert received[0][_URL_KEY] == "/db1/_session"
+        assert received[0].get("Cookie") == "SyncGatewaySession=sess123"
+        assert "Authorization" not in received[0]
+
+    @pytest.mark.asyncio
+    async def test_user_client_without_headers_is_anonymous(
+        self, sync_gateway: SyncGatewayFixture, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc"}}]
+        _redirect_user_clients_to_admin_port(sg, monkeypatch)
+
+        async with SyncGatewayUserClient(sg.hostname, port=sg.public_port) as client:
+            await client.get_document("db1", "doc1")
+
+        assert "Authorization" not in received[0]
+        assert "Cookie" not in received[0]
 
     @pytest.mark.asyncio
     async def test_user_client_get_document_revision_authenticates_as_given_user(
@@ -138,16 +262,9 @@ class TestSessionAuth:
         sg, specs, received = sync_gateway
         specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-abc", "type": "test"}}]
 
-        # A user client talks to the public port, so redirect its session to the test
-        # server while leaving the credentials it builds alone.
-        create_session = sg._create_session
-        monkeypatch.setattr(
-            SyncGatewayUserClient,
-            "_create_session",
-            lambda self, secure, scheme, url, port, headers=None: create_session(secure, scheme, url, sg.port, headers),
-        )
+        _redirect_user_clients_to_admin_port(sg, monkeypatch)
 
-        async with sg.get_user_client("alice", "s3cret") as user_client:
+        async with sg.get_user_client(get_basic_auth_headers("alice", "s3cret")) as user_client:
             doc = await user_client.get_document("db1", "doc1", revision="1-abc")
 
         assert doc is not None
@@ -418,7 +535,7 @@ class TestWaitForDbUp:
     async def test_get_user_client_makes_no_admin_calls(self, sync_gateway: SyncGatewayFixture) -> None:
         sg, _, received = sync_gateway
 
-        async with sg.get_user_client("test_user", "test_pass") as client:
+        async with sg.get_user_client(get_basic_auth_headers("test_user", "test_pass")) as client:
             assert not client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]
 
         assert client._SyncGatewayBase__session.closed  # ty: ignore[unresolved-attribute]

@@ -4,6 +4,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblEdgeServerBadResponseError
+from cbltest.api.syncgateway import get_basic_auth_headers
 
 SCRIPT_DIR = str(Path(__file__).parent)
 
@@ -25,7 +26,7 @@ class TestAuthentication(CBLTestClass):
             self.mark_test_step(f"Active Tasks: {active_tasks}")
 
         self.mark_test_step("testing invalid auth")
-        async with cblpytest.edge_servers[0].get_user_client(invalid_auth[0], invalid_auth[1]) as invalid_client:
+        async with cblpytest.edge_servers[0].get_user_client(get_basic_auth_headers(*invalid_auth)) as invalid_client:
             with pytest.raises(CblEdgeServerBadResponseError):
                 await invalid_client.get_active_tasks()
 

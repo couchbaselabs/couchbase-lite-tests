@@ -20,6 +20,7 @@ def no_network() -> Iterator[None]:
     """Keep the sessions an Edge Server client opens off the network."""
     with (
         patch("cbltest.httpclient.ClientSession", autospec=True),
+        patch("cbltest.httpclient.DummyCookieJar", autospec=True),
     ):
         yield
 

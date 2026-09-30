@@ -4,13 +4,14 @@ import ssl
 import tempfile
 import urllib.parse
 import uuid
+from collections.abc import Mapping
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5
-from aiohttp import TCPConnector, encode_basic_auth
+from aiohttp import TCPConnector
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, ConfigDict
 
@@ -178,16 +179,15 @@ class EdgeServer:
     def __init__(
         self,
         url: str,
-        user: str | None = None,
-        password: str | None = None,
         config_file: str | None = None,
+        headers: Mapping[str, str] | None = None,
     ) -> None:
         """
         :param url: Hostname of the Edge Server
-        :param user: User to authenticate as, or None for a client that sends no credentials
-        :param password: That user's password
         :param config_file: Config the Edge Server is running on, which decides the port,
             the scheme, and whether it asks for credentials at all
+        :param headers: Headers to send with every request, e.g. `Authorization` from
+            :func:`get_basic_auth_headers`.  None for a client that sends no credentials.
         """
         self.__tracer = get_tracer(__name__, VERSION)
         if config_file is None:
@@ -201,15 +201,12 @@ class EdgeServer:
         ws_scheme = "wss://" if self.__secure else "ws://"
         self.__replication_url = f"{ws_scheme}{url}:{self.__port}"
         self.scheme = "https://" if self.__secure else "http://"
-        # A config that declares no users turns credentials away, so send none against one.
-        self.__needs_auth = self.__config.declares_users
-        credentials = encode_basic_auth(user, password or "", "ascii") if self.__needs_auth and user else None
-        self.__session = self._create_session(credentials)
+        self.__session = self._create_session(headers or {})
 
     @property
     def needs_auth(self) -> bool:
         """Whether the running config declares users, so a client can authenticate as one."""
-        return self.__needs_auth
+        return self.__config.declares_users
 
     async def close(self) -> None:
         """Close the session this client requests on, and its Caddy's."""
@@ -238,10 +235,9 @@ class EdgeServer:
 
         return audit_log
 
-    def _create_session(self, auth_header: str | None) -> AsyncHTTPClient:
-        """Create a session, where `auth_header` is an `Authorization` header value
-        from `aiohttp.encode_basic_auth`, or None for an anonymous session."""
-        headers = {"Authorization": auth_header} if auth_header is not None else None
+    def _create_session(self, headers: Mapping[str, str]) -> AsyncHTTPClient:
+        """Create a session that sends `headers` with every request."""
+        connector = None
         if self.__secure:
             CERT_DIR = Path.home() / ".cbl_certs"
             ssl_context = ssl.create_default_context(cafile=CERT_DIR / "ca_cert.pem")
@@ -252,12 +248,12 @@ class EdgeServer:
                     keyfile=str(CERT_DIR / "client_key.pem"),
                 )
 
-            return AsyncHTTPClient(
-                f"{self.scheme}{self.__hostname}:{self.__port}",
-                headers=headers,
-                connector=TCPConnector(ssl=ssl_context),
-            )
-        return AsyncHTTPClient(f"{self.scheme}{self.__hostname}:{self.__port}", headers=headers)
+            connector = TCPConnector(ssl=ssl_context)
+        return AsyncHTTPClient(
+            f"{self.scheme}{self.__hostname}:{self.__port}",
+            headers=headers,
+            connector=connector,
+        )
 
     async def _send_request(
         self,

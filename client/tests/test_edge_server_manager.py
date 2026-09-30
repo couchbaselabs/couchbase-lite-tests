@@ -13,6 +13,7 @@ from cbltest.api.caddy import Caddy
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.configparser import EdgeServerInfo
 from cbltest.plugins.cluster_cleanup import reset_all_edge_servers
 
@@ -288,7 +289,7 @@ async def test_create_user_client_adds_the_user_and_authenticates_as_them(
 async def test_user_client_needs_a_config_that_declares_users(tmp_path: Path) -> None:
     async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
         with pytest.raises(CblTestError, match="declares no users"):
-            async with manager.get_user_client("username8", "password8"):
+            async with manager.get_user_client(get_basic_auth_headers("username8", "password8")):
                 pass
 
 
