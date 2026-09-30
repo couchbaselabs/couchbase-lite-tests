@@ -22,4 +22,4 @@ class TestListener(CBLTestClass):
             await listener.stop()
             with pytest.raises(aiohttp.ClientConnectorError):
                 async with session.get("https://localhost:59840", ssl=False) as response:
-                    assert False  # Should not reach here
+                    pytest.fail("Should not reach here")

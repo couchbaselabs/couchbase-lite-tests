@@ -102,7 +102,7 @@ class TestChangesFeed(CBLTestClass):
 
         self.mark_test_step("Checking that updates are reflected in changes feed.")
         doc_counter = 11
-        for i in range(1, 6):
+        for _ in range(1, 6):
             doc_id = f"doc_{doc_counter}"
             doc = {
                 "id": doc_id,

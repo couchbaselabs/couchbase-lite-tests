@@ -128,7 +128,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             elif update.document_id == "post_4":
                 assert update.flags & ReplicatorDocumentFlags.DELETED, "Deleted flag missing from post_4"
             else:
-                assert False, f"Stray document update present in list ({update.document_id})"
+                pytest.fail(f"Stray document update present in list ({update.document_id})")
 
         await cblpytest.test_servers[0].cleanup()
 

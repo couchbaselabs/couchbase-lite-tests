@@ -415,7 +415,7 @@ class TestEdgeServerChaos(CBLTestClass):
         operations = ["create", "update", "delete", "read"]
 
         self.mark_test_step("Run randomized CRUD workload")
-        for i in range(1000):
+        for _ in range(1000):
             op = random.choice(operations)
             assert await self.perform_operation(
                 edge_server,

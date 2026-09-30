@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [tool.ruff]
-lint.extend-select = ["ANN", "I", "UP"]
+lint.extend-select = ["ANN", "B", "I", "UP"]
 lint.ignore = [
   "E402",
   "ANN401",  # `Any` is legitimate for JSON (de)serialization boundaries

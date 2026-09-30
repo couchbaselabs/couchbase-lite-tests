@@ -125,7 +125,7 @@ class TestPeerToPeer(CBLTestClass):
             self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
             compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
         self.mark_test_step("Perform concurrent updates to both listener and client")
-        for i in range(3):
+        for _ in range(3):
             await asyncio.gather(
                 *(self._testserver_crud(db, num_of_docs, optype="update", documents=documents) for db in all_dbs[:2])
             )

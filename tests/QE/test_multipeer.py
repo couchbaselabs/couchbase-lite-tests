@@ -555,7 +555,7 @@ class TestMultipeer(CBLTestClass):
 
         # Wait for some initial replication progress (not all devices, just a few)
         devices_to_wait = max(1, len(initial_dbs) // 2)  # Wait for half of initial devices
-        for i, replicator in enumerate(initial_replicators[:devices_to_wait]):
+        for replicator in initial_replicators[:devices_to_wait]:
             status = await replicator.wait_for_idle(timeout=timedelta(seconds=timeout))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
@@ -600,7 +600,7 @@ class TestMultipeer(CBLTestClass):
         devices_to_remove_indices = random.sample(range(len(all_replicators)), devices_to_remove)
         devices_to_remove_indices.sort(reverse=True)  # Remove from highest index first
 
-        all_pairs = list(zip(all_replicators, initial_dbs + additional_dbs))
+        all_pairs = list(zip(all_replicators, initial_dbs + additional_dbs, strict=True))
         removed_replicators = []
         remaining_replicators = []
         remaining_dbs = []
@@ -618,7 +618,7 @@ class TestMultipeer(CBLTestClass):
         self.mark_test_step("Wait for remaining devices to stabilize after removal")
 
         # Wait for remaining devices to reach idle
-        for i, replicator in enumerate(remaining_replicators):
+        for replicator in remaining_replicators:
             status = await replicator.wait_for_idle(timeout=timedelta(seconds=timeout))
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
