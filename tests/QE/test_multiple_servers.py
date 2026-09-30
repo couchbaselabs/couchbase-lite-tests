@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
-import requests
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.cluster import CouchbaseCluster
@@ -29,21 +28,17 @@ def _check_node_in_cluster(cbs_hostname: str, cluster_nodes: list) -> tuple[bool
     return False, False
 
 
-def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> None:
+async def _recover_or_add_node(cbs_one: CouchbaseServer, cbs_two: CouchbaseServer) -> None:
     """Recover or add CBS node based on its cluster state."""
-    session = requests.Session()
-    session.auth = ("Administrator", "password")
-    resp = session.get(f"http://{cbs_one.hostname}:8091/pools/default")
-    resp.raise_for_status()
-    cluster_data = resp.json()
+    cluster_data = await cbs_one._get_cluster_info()
     node_in_cluster, _ = _check_node_in_cluster(cbs_two.hostname, cluster_data.get("nodes", []))
     # Rebalancing after a failover ejects the failed node, so callers that failover first
     # always land on add_node; recover() only applies while the node is still a member.
     if node_in_cluster:
-        cbs_one.recover(cbs_two)
+        await cbs_one.recover(cbs_two)
     else:
-        cbs_one.add_node(cbs_two)
-    cbs_one.rebalance()
+        await cbs_one.add_node(cbs_two)
+    await cbs_one.rebalance()
 
 
 @asynccontextmanager
@@ -85,7 +80,7 @@ class TestMultipleServers(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs_one = cblpytest.couchbase_servers[0]
         cbs_two = cblpytest.couchbase_servers[1]
-        cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
+        await cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
 
         sg_db, bucket_name = "db-rebalance-sanity", "data-bucket"
         num_docs, num_updates = 50, 10
@@ -168,16 +163,16 @@ class TestMultipleServers(CBLTestClass):
             await asyncio.sleep(2)
 
             self.mark_test_step("Rebalance OUT cbs_two from cluster")
-            cbs_one.rebalance(eject_node=cbs_two)
-            if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            await cbs_one.rebalance(eject_node=cbs_two)
+            if not await cbs_one.wait_for_cluster_healthy(timeout=120):
                 pytest.fail("Cluster did not become healthy after rebalance out")
 
             self.mark_test_step("Add cbs_two back to cluster")
-            cbs_one.add_node(cbs_two)
+            await cbs_one.add_node(cbs_two)
 
             self.mark_test_step("Rebalance IN cbs_two to cluster")
-            cbs_one.rebalance()
-            if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            await cbs_one.rebalance()
+            if not await cbs_one.wait_for_cluster_healthy(timeout=120):
                 pytest.fail("Cluster did not become healthy after rebalance in")
 
             self.mark_test_step("Wait for all updates to complete")
@@ -209,7 +204,7 @@ class TestMultipleServers(CBLTestClass):
         sg = cblpytest.sync_gateways[0]
         cbs_one = cblpytest.couchbase_servers[0]
         cbs_two = cblpytest.couchbase_servers[1]
-        cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
+        await cbs_one.ensure_cluster_healthy(cblpytest.couchbase_servers)
 
         sg_db, bucket_name = "db", "data-bucket"
         num_docs = 50
@@ -237,9 +232,9 @@ class TestMultipleServers(CBLTestClass):
             assert len(initial_docs.rows) == num_docs, f"Expected {num_docs} docs, got {len(initial_docs.rows)}"
 
             self.mark_test_step("Failover CBS node 2 to simulate server failure")
-            cbs_one.failover(cbs_two)
-            cbs_one.rebalance(eject_failed_nodes=False)
-            if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            await cbs_one.failover(cbs_two)
+            await cbs_one.rebalance(eject_failed_nodes=False)
+            if not await cbs_one.wait_for_cluster_healthy(timeout=120):
                 pytest.fail("Cluster did not become healthy after failover")
 
             self.mark_test_step("Verify original docs accessible with node 2 failed over")
@@ -267,8 +262,8 @@ class TestMultipleServers(CBLTestClass):
             assert len(all_docs_with_new.rows) == num_docs * 2
 
             self.mark_test_step("Recover CBS node 2")
-            _recover_or_add_node(cbs_one, cbs_two)
-            if not cbs_one.wait_for_cluster_healthy(timeout=120):
+            await _recover_or_add_node(cbs_one, cbs_two)
+            if not await cbs_one.wait_for_cluster_healthy(timeout=120):
                 pytest.fail("Cluster did not become healthy after recovery")
 
             self.mark_test_step("Verify all docs accessible after recovery")

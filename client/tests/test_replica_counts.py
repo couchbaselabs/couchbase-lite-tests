@@ -21,35 +21,46 @@ FAILED_OVER = [node(["kv", "index", "n1ql"]), node(["kv", "index", "n1ql"], memb
 
 
 def make_server(nodes: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch) -> CouchbaseServer:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+    ):
         server = CouchbaseServer("cbs.example.com", "user", "pass")
-    monkeypatch.setattr(server, "_get_cluster_info", lambda: {"nodes": nodes})
+
+    async def cluster_info() -> dict[str, Any]:
+        return {"nodes": nodes}
+
+    monkeypatch.setattr(server, "_get_cluster_info", cluster_info)
     return server
 
 
-def test_single_node_cluster_has_nowhere_to_put_a_replica(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_single_node_cluster_has_nowhere_to_put_a_replica(monkeypatch: pytest.MonkeyPatch) -> None:
     server = make_server(ONE_NODE, monkeypatch)
-    assert server.replica_count(ServiceType.KeyValue) == 0
-    assert server.replica_count(ServiceType.Index) == 0
+    assert await server.replica_count(ServiceType.KeyValue) == 0
+    assert await server.replica_count(ServiceType.Index) == 0
 
 
-def test_multi_node_cluster_keeps_a_second_copy(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_multi_node_cluster_keeps_a_second_copy(monkeypatch: pytest.MonkeyPatch) -> None:
     server = make_server(TWO_NODES, monkeypatch)
-    assert server.replica_count(ServiceType.KeyValue) == 1
-    assert server.replica_count(ServiceType.Index) == 1
+    assert await server.replica_count(ServiceType.KeyValue) == 1
+    assert await server.replica_count(ServiceType.Index) == 1
 
 
-def test_each_service_is_counted_on_its_own(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_each_service_is_counted_on_its_own(monkeypatch: pytest.MonkeyPatch) -> None:
     """A service can run on fewer nodes than the cluster has, and only its own count decides."""
     server = make_server(SPLIT_SERVICES, monkeypatch)
-    assert server.node_count(ServiceType.KeyValue) == 2
-    assert server.node_count(ServiceType.Index) == 1
-    assert server.replica_count(ServiceType.KeyValue) == 1
-    assert server.replica_count(ServiceType.Index) == 0
+    assert await server.node_count(ServiceType.KeyValue) == 2
+    assert await server.node_count(ServiceType.Index) == 1
+    assert await server.replica_count(ServiceType.KeyValue) == 1
+    assert await server.replica_count(ServiceType.Index) == 0
 
 
-def test_a_failed_over_node_cannot_hold_a_replica(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.asyncio
+async def test_a_failed_over_node_cannot_hold_a_replica(monkeypatch: pytest.MonkeyPatch) -> None:
     """A node a failover left behind is still listed, but nothing can be placed on it."""
     server = make_server(FAILED_OVER, monkeypatch)
-    assert server.node_count(ServiceType.KeyValue) == 1
-    assert server.replica_count(ServiceType.KeyValue) == 0
+    assert await server.node_count(ServiceType.KeyValue) == 1
+    assert await server.replica_count(ServiceType.KeyValue) == 0

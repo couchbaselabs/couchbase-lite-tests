@@ -56,6 +56,8 @@ class CouchbaseCluster:
         """Closes all the resources in the cluster"""
         for sgw in self.sync_gateways:
             await sgw.close()
+        for cbs in self.couchbase_servers:
+            await cbs.close()
 
     def create_collections(self, db_payload: DatabaseConfig) -> None:
         """
@@ -168,9 +170,9 @@ class CouchbaseCluster:
             # deprecated num_index_replicas, so a config using the old field is left alone.
             if config.num_index_replicas is None and (config.index is None or config.index.num_replicas is None):
                 config = config.model_copy(
-                    update={"index": IndexConfig(num_replicas=cbs.replica_count(ServiceType.Index))}
+                    update={"index": IndexConfig(num_replicas=await cbs.replica_count(ServiceType.Index))}
                 )
-            bucket_created = cbs.create_bucket(bucket)
+            bucket_created = await cbs.create_bucket(bucket)
             self.create_collections(config)
             # Stale indexes only linger from a previous incarnation of the bucket, so
             # this is only worth waiting on when we just recreated it.

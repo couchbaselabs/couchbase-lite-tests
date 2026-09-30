@@ -21,7 +21,7 @@ class TestChangesFeed(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 5 documents to bucket.")
         for i in range(1, 6):
             doc_id = f"doc_{i}"
