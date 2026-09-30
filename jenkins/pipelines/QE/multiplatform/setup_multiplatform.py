@@ -85,7 +85,7 @@ def fetch_latest_build(platform: str, version: str) -> str:
         return str(build_number)  # Convert to string before returning
 
     except Exception as e:
-        raise Exception(f"Failed to fetch latest build for {platform} v{version}: {e}")
+        raise Exception(f"Failed to fetch latest build for {platform} v{version}: {e}") from e
 
 
 def parse_platform_versions(platform_versions: str, auto_fetch_builds: bool = True) -> list[dict]:
@@ -152,7 +152,7 @@ def parse_platform_versions(platform_versions: str, auto_fetch_builds: bool = Tr
                     raise click.BadParameter(
                         f"Failed to fetch build number for {platform} v{version}: {e}. "
                         f"Please specify build number explicitly (e.g., {platform}:{version}-<build>)"
-                    )
+                    ) from e
             else:
                 # When auto-fetch is disabled but no explicit build provided, error
                 raise click.BadParameter(f"Platform {platform} missing build number and auto-fetch is disabled")

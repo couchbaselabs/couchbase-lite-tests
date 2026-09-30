@@ -144,7 +144,7 @@ class TestSystemMultipeer(CBLTestClass):
             # Update existing documents
             async def update_task() -> None:
                 nonlocal docs_to_update
-                for i in range(num_updates):
+                for _ in range(num_updates):
                     updated_docs = docgen.update_all_documents(docs_to_update)
                     documents.update(updated_docs)
                     for start in range(0, len(to_update), 10):
