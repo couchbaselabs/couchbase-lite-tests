@@ -161,8 +161,8 @@ class CouchbaseCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        # buckets and collections are implicitly created when using Rosmar
-        if self.couchbase_servers:
+        # Rosmar creates buckets and collections implicitly, even if a Couchbase Server is configured
+        if not await self.sync_gateways[0].using_rosmar:
             assert config.bucket, "bucket needs to be specified in a database config"
             bucket = config.bucket
             cbs = self.couchbase_servers[0]
