@@ -19,7 +19,9 @@ from cbltest.logging import cbl_info, cbl_warning
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> AsyncGenerator[None]:
+async def greenboard(
+    cblpytest: CBLPyTest, pytestconfig: pytest.Config, request: pytest.FixtureRequest
+) -> AsyncGenerator[None]:
     if (
         cblpytest.config.greenboard_username is None
         or cblpytest.config.greenboard_password is None
@@ -136,6 +138,11 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 )
                 return
 
+            # An item that never finished its runtest protocol (SIGINT/SIGTERM
+            # abort, or pytest-timeout's --session-timeout) means the session
+            # was cut short before exercising everything it collected.
+            collected = request.session.testscollected
+            incomplete = uploader.items_finished < collected
             xmlpath = pytestconfig.option.xmlpath
             if xmlpath:
                 uploader.upload_from_junit_file(
@@ -145,6 +152,8 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                     library_version,
                     sgw_version,
                     es_version,
+                    incomplete=incomplete,
+                    collected=collected,
                 )
             else:
                 # No --junitxml configured. Normally our pytest_configure
@@ -153,7 +162,15 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
                 # pytest.Config.fromdictargs in unit tests). Fall back to
                 # the in-process counter — mirrors upload_from_junit_file's
                 # file-missing branch.
-                uploader.upload(test_platform, os_name, library_version, sgw_version, es_version)
+                uploader.upload(
+                    test_platform,
+                    os_name,
+                    library_version,
+                    sgw_version,
+                    es_version,
+                    incomplete=incomplete,
+                    collected=collected,
+                )
     finally:
         pytestconfig.pluginmanager.unregister(uploader)
 
