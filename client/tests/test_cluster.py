@@ -12,7 +12,7 @@ from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ScopeConfig, Sy
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.configparser import ParsedConfig
 from cbltest.requests import RequestFactory
-from conftest import fake_sync_gateways
+from conftest import fake_sync_gateways, set_using_rosmar
 
 SCOPES = {"_default": ScopeConfig(collections={"_default": {}})}
 
@@ -33,6 +33,7 @@ async def test_cluster_without_couchbase_server(monkeypatch: pytest.MonkeyPatch)
 
     config = DatabaseConfig(bucket="data-bucket", scopes=SCOPES)
     with fake_sync_gateway() as sync_gateway:
+        set_using_rosmar(sync_gateway, True)
         cluster = CouchbaseCluster([sync_gateway], [])
         monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", capture)
         await cluster.create_database("db", config)
@@ -85,7 +86,9 @@ def test_cluster_multiple_sync_gateways_requires_couchbase_server() -> None:
 
 
 @contextmanager
-def cluster_on_couchbase_server(monkeypatch: pytest.MonkeyPatch, kv_nodes: int) -> Iterator[CouchbaseCluster]:
+def cluster_on_couchbase_server(
+    monkeypatch: pytest.MonkeyPatch, kv_nodes: int, rosmar: bool = False
+) -> Iterator[CouchbaseCluster]:
     """A cluster whose Couchbase Server reports `kv_nodes` nodes and creates buckets for free."""
     with (
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
@@ -103,13 +106,14 @@ def cluster_on_couchbase_server(monkeypatch: pytest.MonkeyPatch, kv_nodes: int) 
     monkeypatch.setattr(cbs, "_get_cluster_info", cluster_info)
     monkeypatch.setattr(cbs, "create_bucket", create_bucket)
     with fake_sync_gateway() as sync_gateway:
+        set_using_rosmar(sync_gateway, rosmar)
         cluster = CouchbaseCluster([sync_gateway], [cbs])
         monkeypatch.setattr(cluster, "create_collections", lambda config: None)
         yield cluster
 
 
 async def created_config(
-    monkeypatch: pytest.MonkeyPatch, kv_nodes: int, config: DatabaseConfig
+    monkeypatch: pytest.MonkeyPatch, kv_nodes: int, config: DatabaseConfig, rosmar: bool = False
 ) -> DatabaseConfig | None:
     """The config `create_database` ends up sending to Sync Gateway."""
     sent: list[DatabaseConfig] = []
@@ -117,10 +121,17 @@ async def created_config(
     async def capture(db_name: str, config: DatabaseConfig) -> None:
         sent.append(config)
 
-    with cluster_on_couchbase_server(monkeypatch, kv_nodes) as cluster:
+    with cluster_on_couchbase_server(monkeypatch, kv_nodes, rosmar) as cluster:
         monkeypatch.setattr(cluster.sync_gateway_cluster, "create_database", capture)
         await cluster.create_database("db", config)
     return sent[0] if sent else None
+
+
+@pytest.mark.asyncio
+async def test_rosmar_skips_a_configured_couchbase_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rosmar makes its own buckets, so a Couchbase Server in the config gets no bucket work."""
+    config = DatabaseConfig(bucket="data-bucket", scopes=SCOPES)
+    assert await created_config(monkeypatch, 2, config, rosmar=True) == config
 
 
 @pytest.mark.asyncio
