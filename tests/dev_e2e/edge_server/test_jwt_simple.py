@@ -53,7 +53,7 @@ class TestJWTSimple(CBLTestClass):
         # =====================================================================
         self.mark_test_step("Creating travel bucket on Couchbase Server.")
         bucket_name = "travel"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         server.create_collections(bucket_name, "travel", ["airlines"])
 
         # =====================================================================

@@ -35,10 +35,12 @@ class Recorder:
         monkeypatch.setattr(server, "delete_bucket", self._delete_bucket)
         monkeypatch.setattr(server, "purge_bucket", self._purge_bucket)
         monkeypatch.setattr(server, "wait_for_bucket_deleted", self._wait_for_bucket_deleted)
-        monkeypatch.setattr(server, "_block_until_bucket_deleted", lambda name, **kwargs: None)
-        monkeypatch.setattr(server, "get_bucket_names", lambda: list(self.buckets))
+        monkeypatch.setattr(server, "get_bucket_names", self._get_bucket_names)
 
-    def _create_bucket(
+    async def _get_bucket_names(self) -> list[str]:
+        return list(self.buckets)
+
+    async def _create_bucket(
         self, name: str, num_replicas: int | None = None, retries: int = 60, interval: float = 2.0
     ) -> bool:
         self.created.append(name)
@@ -61,7 +63,10 @@ class Recorder:
 
 
 def make_server(mode: BucketCleanupMode, monkeypatch: pytest.MonkeyPatch) -> tuple[CouchbaseServer, Recorder]:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+    ):
         server = CouchbaseServer("cbs.example.com", "user", "pass", mode)
     return server, Recorder(server, monkeypatch)
 
@@ -94,8 +99,8 @@ async def test_clean_bucket_follows_the_mode(mode: BucketCleanupMode, monkeypatc
 @pytest.mark.asyncio
 async def test_cleanup_empties_every_bucket(mode: BucketCleanupMode, monkeypatch: pytest.MonkeyPatch) -> None:
     server, recorder = make_server(mode, monkeypatch)
-    server.create_bucket("first")
-    server.create_bucket("second")
+    await server.create_bucket("first")
+    await server.create_bucket("second")
 
     await clean_all_buckets(cast(CouchbaseCluster, FakeCluster(server)))
 
@@ -113,6 +118,6 @@ async def test_only_purging_caps_the_bucket_count(mode: BucketCleanupMode, monke
     server, recorder = make_server(mode, monkeypatch)
 
     for index in range(MAX_BUCKETS + 1):
-        server.create_bucket(f"bucket-{index}")
+        await server.create_bucket(f"bucket-{index}")
 
     assert recorder.deleted == (["bucket-0"] if mode is BucketCleanupMode.PURGE else [])

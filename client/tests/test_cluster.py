@@ -42,7 +42,10 @@ async def test_cluster_without_couchbase_server(monkeypatch: pytest.MonkeyPatch)
 
 
 def test_cluster_with_couchbase_server() -> None:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+    ):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
             username="user",
@@ -54,7 +57,10 @@ def test_cluster_with_couchbase_server() -> None:
 
 
 def test_cluster_with_multiple_sync_gateways() -> None:
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+    ):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
             username="user",
@@ -81,11 +87,21 @@ def test_cluster_multiple_sync_gateways_requires_couchbase_server() -> None:
 @contextmanager
 def cluster_on_couchbase_server(monkeypatch: pytest.MonkeyPatch, kv_nodes: int) -> Iterator[CouchbaseCluster]:
     """A cluster whose Couchbase Server reports `kv_nodes` nodes and creates buckets for free."""
-    with patch("cbltest.api.couchbaseserver.Cluster", autospec=True):
+    with (
+        patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
+        patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+    ):
         cbs = couchbaseserver.CouchbaseServer(url="https://example.com", username="user", password="pass")
     node = {"services": ["kv", "index", "n1ql"], "clusterMembership": "active", "status": "healthy"}
-    monkeypatch.setattr(cbs, "_get_cluster_info", lambda: {"nodes": [node] * kv_nodes})
-    monkeypatch.setattr(cbs, "create_bucket", lambda *args, **kwargs: False)
+
+    async def cluster_info() -> dict[str, Any]:
+        return {"nodes": [node] * kv_nodes}
+
+    async def create_bucket(*args: Any, **kwargs: Any) -> bool:
+        return False
+
+    monkeypatch.setattr(cbs, "_get_cluster_info", cluster_info)
+    monkeypatch.setattr(cbs, "create_bucket", create_bucket)
     with fake_sync_gateway() as sync_gateway:
         cluster = CouchbaseCluster([sync_gateway], [cbs])
         monkeypatch.setattr(cluster, "create_collections", lambda config: None)

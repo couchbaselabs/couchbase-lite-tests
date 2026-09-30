@@ -26,7 +26,7 @@ class TestReplicationSanity(CBLTestClass):
 
         self.mark_test_step("Creating a bucket on server.")
         bucket_name = "bucket-1"
-        server.create_bucket(bucket_name)
+        await server.create_bucket(bucket_name)
         self.mark_test_step("Adding 10 documents to bucket.")
         for i in range(1, 11):
             doc_id = f"doc_{i}"

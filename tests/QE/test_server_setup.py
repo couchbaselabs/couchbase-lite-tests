@@ -76,7 +76,7 @@ class TestServerSetup(CBLTestClass):
         sg_db = "db"
 
         self.mark_test_step("Create bucket on CBS")
-        cbs.create_bucket(bucket_name)
+        await cbs.create_bucket(bucket_name)
 
         self.mark_test_step("Fetch CBS root CA certificate and upload to every SGW node")
         ca_cert_pem = await cbs.get_root_ca_certificate()

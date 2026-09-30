@@ -145,7 +145,7 @@ async def clean_all_buckets(cluster: CouchbaseCluster) -> None:
         return
 
     cbs = cluster.couchbase_servers[0]
-    bucket_names = cbs.get_bucket_names()
+    bucket_names = await cbs.get_bucket_names()
     if not bucket_names:
         cbl_trace(f"🧹 {cbs}: no buckets to clean")
         return
