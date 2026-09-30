@@ -1,6 +1,8 @@
 import os
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 import pytest
 import pytest_asyncio
@@ -9,19 +11,29 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
-# This plugin provides an automatic (i.e. not used directly by tests)
-# fixture that will upload test results to greenboard, if it is
-# properly set up in config.json (see the schema for that file)
-# and if the --no-result-upload flag is not set on the command line.
-#
-# For upgrade jobs (SGW_UPGRADE_VERSIONS is set), each pytest session
-# uploads its own per-step result directly under platform="sgw-upgrade".
+# Automatic fixture that uploads results to greenboard, if configured in config.json and --no-result-upload isn't set.
+# The actual RunResult upload is deferred to pytest_sessionfinish() below, not done in the fixture's own teardown.
+
+
+@dataclass
+class _PendingRunResult:
+    """RunResult parameters gathered in the fixture's teardown (while cblpytest's network clients are still alive) for
+    pytest_sessionfinish to upload later."""
+
+    test_platform: str
+    os_name: str
+    library_version: str
+    sgw_version: CouchbaseVersion | None
+    es_version: CouchbaseVersion | None
+    xmlpath: str | None
+
+
+_uploader_key: Final[pytest.StashKey[GreenboardUploader]] = pytest.StashKey()
+_pending_key: Final[pytest.StashKey[_PendingRunResult]] = pytest.StashKey()
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def greenboard(
-    cblpytest: CBLPyTest, pytestconfig: pytest.Config, request: pytest.FixtureRequest
-) -> AsyncGenerator[None]:
+async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> AsyncGenerator[None]:
     if (
         cblpytest.config.greenboard_username is None
         or cblpytest.config.greenboard_password is None
@@ -57,125 +69,129 @@ async def greenboard(
         cblpytest.config.greenboard_password,
     )
     pytestconfig.pluginmanager.register(uploader)
+    # Stashed before any of the awaits below so pytest_sessionfinish can always find (and unregister) this uploader,
+    # even on a partial failure.
+    pytestconfig.stash[_uploader_key] = uploader
 
-    # This is a pytest-ism.  You may have noticed it in other tests.  The
-    # way that fixtures work is that you can yield in the middle and what
-    # ends up happening is that all other things happening within the scope
-    # will happen, and then return back to this point.  Since the scope here
-    # is 'session' it basically means "before and after the run"
     yield
 
+    if upgrade_versions_str:
+        # Upgrade job: record this iteration to a state file. The aggregate batch doc is uploaded once at the end by
+        # jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py. Doesn't touch items_finished, so no need to defer
+        # this to sessionfinish.
+        results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
+        # The SGW node under upgrade may be mid-restart during rolling phases; record the iteration anyway
+        # (as a failure) rather than dropping it silently.
+        sgw_version: CouchbaseVersion | None = None
+        if len(cblpytest.sync_gateways) > 0:
+            try:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            except Exception as e:
+                cbl_warning(
+                    f"Could not fetch SGW version for upgrade record: {e}; recording iteration with sgw_version=None"
+                )
+        uploader.record_upgrade_step(
+            results_file,
+            sgw_version,
+            upgrade_versions_str,
+            os.environ.get("SGW_UPGRADE_PHASE"),
+            os.environ.get("SGW_UPGRADED_NODE_INDEX"),
+        )
+    else:
+        sgw_version: CouchbaseVersion | None = None
+        es_version: CouchbaseVersion | None = None
+        test_platform: str = "sync-gateway"
+        os_name: str = "n/a"
+        library_version: str = "n/a"
+        if len(cblpytest.test_servers) > 0:
+            test_server_info = await cblpytest.test_servers[0].get_info()
+            # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
+            # test server.
+            library_version = test_server_info.library_version
+            if not uploader.has_sgw_marker():
+                test_platform = test_server_info.cbl
+            if "systemName" in test_server_info.device:
+                os_name = test_server_info.device["systemName"]
+        if len(cblpytest.sync_gateways) > 0:
+            try:
+                sgw_version = await cblpytest.sync_gateways[0].get_version()
+            except Exception as e:
+                cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
+        # A mixed run keeps the test server's platform, so its CBL results are not filed under edge-server.
+        if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
+            if len(cblpytest.test_servers) == 0:
+                test_platform = EDGE_SERVER_PLATFORM
+            try:
+                es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
+            except Exception as e:
+                cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
+        # Edge-Server-only, no min_edge_servers marker: no CBL or SGW version to key the doc on. Skip rather than file
+        # it under sync-gateway.
+        if test_platform == "sync-gateway" and len(cblpytest.sync_gateways) == 0 and len(cblpytest.test_servers) == 0:
+            cbl_warning(
+                "Greenboard upload skipped: only Edge Servers are configured but no test "
+                "carried the min_edge_servers marker, so the run has no platform to file under"
+            )
+            return
+
+        # Upload itself is deferred to pytest_sessionfinish -- see its docstring.
+        pytestconfig.stash[_pending_key] = _PendingRunResult(
+            test_platform=test_platform,
+            os_name=os_name,
+            library_version=library_version,
+            sgw_version=sgw_version,
+            es_version=es_version,
+            xmlpath=pytestconfig.option.xmlpath,
+        )
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    """Upload the pending RunResult (if any) and unregister the uploader.
+
+    ``pytest_sessionfinish`` runs after every item's logfinish, including the last, so it's the first point an
+    accurate items_finished vs testscollected comparison is possible. ``trylast=True`` further guarantees this runs
+    after (a) pytest's own catch-all session-fixture teardown (``_pytest.runner.pytest_sessionfinish``, default
+    priority -- what actually invokes the fixture's teardown in a SIGTERM/SIGINT/ session-timeout-interrupted run,
+    since the per-item chain never reaches ``nextitem=None`` there) and (b) the junitxml plugin (also default priority)
+    writing ``--junitxml``'s output, which ``upload_from_junit_file`` reads.
+    """
+    uploader = session.config.stash.get(_uploader_key, None)
+    if uploader is None:
+        return
     try:
-        if upgrade_versions_str:
-            # Upgrade job — record this iteration's result to a state file.
-            # The aggregate batch document is uploaded once at the end of
-            # the upgrade run by jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py.
-            # Default matches the shell wrapper's path so direct pytest
-            # invocations still record correctly.
-            results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
-            # During rolling phases the SGW node under upgrade may be
-            # destroyed/restarting and get_version() will raise. We must
-            # still record the iteration (with sgw_version=None) so the
-            # failure shows up as a red dot on the track chart instead
-            # of being silently dropped.
-            sgw_version: CouchbaseVersion | None = None
-            if len(cblpytest.sync_gateways) > 0:
-                try:
-                    sgw_version = await cblpytest.sync_gateways[0].get_version()
-                except Exception as e:
-                    cbl_warning(
-                        f"Could not fetch SGW version for upgrade record: {e}; recording iteration with sgw_version=None"
-                    )
-            uploader.record_upgrade_step(
-                results_file,
-                sgw_version,
-                upgrade_versions_str,
-                os.environ.get("SGW_UPGRADE_PHASE"),
-                os.environ.get("SGW_UPGRADED_NODE_INDEX"),
+        pending = session.config.stash.get(_pending_key, None)
+        if pending is None:
+            return
+        collected = session.testscollected
+        incomplete = uploader.items_finished < collected
+        if pending.xmlpath:
+            uploader.upload_from_junit_file(
+                Path(pending.xmlpath),
+                pending.test_platform,
+                pending.os_name,
+                pending.library_version,
+                pending.sgw_version,
+                pending.es_version,
+                incomplete=incomplete,
+                collected=collected,
             )
         else:
-            sgw_version: CouchbaseVersion | None = None
-            es_version: CouchbaseVersion | None = None
-            test_platform: str = "sync-gateway"
-            os_name: str = "n/a"
-            library_version: str = "n/a"
-            if len(cblpytest.test_servers) > 0:
-                test_server_info = await cblpytest.test_servers[0].get_info()
-                # Keep the platform as SGW if it has one of the sgw markers, since
-                # the test might still use test server with it, but still belong
-                # to SGW and not CBL test platform.
-                library_version = test_server_info.library_version
-                if not uploader.has_sgw_marker():
-                    test_platform = test_server_info.cbl
-                if "systemName" in test_server_info.device:
-                    os_name = test_server_info.device["systemName"]
-            if len(cblpytest.sync_gateways) > 0:
-                try:
-                    sgw_version = await cblpytest.sync_gateways[0].get_version()
-                except Exception as e:
-                    cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
-            # A mixed run keeps the test server's platform, so its CBL results are not
-            # filed under edge-server.
-            if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
-                if len(cblpytest.test_servers) == 0:
-                    test_platform = EDGE_SERVER_PLATFORM
-                try:
-                    es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
-                except Exception as e:
-                    cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
-            # An Edge-Server-only run whose tests carry no min_edge_servers
-            # marker has nothing to key the doc on: no CBL version, no SGW
-            # version. Skip it instead of filing it under the default
-            # sync-gateway platform.
-            if (
-                test_platform == "sync-gateway"
-                and len(cblpytest.sync_gateways) == 0
-                and len(cblpytest.test_servers) == 0
-            ):
-                cbl_warning(
-                    "Greenboard upload skipped: only Edge Servers are configured but no test "
-                    "carried the min_edge_servers marker, so the run has no platform to file under"
-                )
-                return
-
-            # An item that never finished its runtest protocol (SIGINT/SIGTERM
-            # abort, or pytest-timeout's --session-timeout) means the session
-            # was cut short before exercising everything it collected.
-            collected = request.session.testscollected
-            incomplete = uploader.items_finished < collected
-            xmlpath = pytestconfig.option.xmlpath
-            if xmlpath:
-                uploader.upload_from_junit_file(
-                    Path(xmlpath),
-                    test_platform,
-                    os_name,
-                    library_version,
-                    sgw_version,
-                    es_version,
-                    incomplete=incomplete,
-                    collected=collected,
-                )
-            else:
-                # No --junitxml configured. Normally our pytest_configure
-                # hook defaults this to "junit_result.xml", but it doesn't
-                # fire for synthetic Configs (e.g. ones built via
-                # pytest.Config.fromdictargs in unit tests). Fall back to
-                # the in-process counter — mirrors upload_from_junit_file's
-                # file-missing branch.
-                uploader.upload(
-                    test_platform,
-                    os_name,
-                    library_version,
-                    sgw_version,
-                    es_version,
-                    incomplete=incomplete,
-                    collected=collected,
-                )
+            # No --junitxml (pytest_configure defaults it, but that hook doesn't fire for synthetic Configs in unit
+            # tests). Falls back to the in-process counter.
+            uploader.upload(
+                pending.test_platform,
+                pending.os_name,
+                pending.library_version,
+                pending.sgw_version,
+                pending.es_version,
+                incomplete=incomplete,
+                collected=collected,
+            )
     finally:
-        pytestconfig.pluginmanager.unregister(uploader)
+        session.config.pluginmanager.unregister(uploader)
 
 
-# This adds CLI options for greenboard result uploads.
 def pytest_addoption(parser: pytest.Parser) -> None:
     group = parser.getgroup("CBL E2E Testing")
     group.addoption(
@@ -204,18 +220,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Default ``--junitxml=junit_result.xml`` so the greenboard fixture's
-    session-finish step can read pass/fail counts from the XML.
+    """Default ``--junitxml=junit_result.xml`` so pytest_sessionfinish can read pass/fail counts from the XML.
 
-    Doing this in code (instead of via ``addopts`` in ``client/pyproject.toml``)
-    is necessary because pytest's rootdir discovery walks up from the cwd and
-    typically picks the repo-root ``pyproject.toml`` for production runs from
-    ``tests/QE`` or ``tests/dev_e2e`` — never reaching ``client/pyproject.toml``.
-    The plugin's entry-point registration guarantees this hook fires on every
-    pytest invocation that imports ``cbltest``.
-
-    Users can override with ``--junitxml=<path>`` on the CLI; pytest's
-    last-wins behavior leaves the explicit flag in charge.
+    Done here rather than ``addopts`` in ``client/pyproject.toml``: pytest's rootdir discovery walks up from the cwd
+    and picks the repo-root ``pyproject.toml`` for production runs from ``tests/QE``/``tests/dev_e2e``, never reaching
+    ``client/pyproject.toml``. An explicit ``--junitxml=<path>`` on the CLI still wins (pytest's last-wins behavior).
     """
     if not getattr(config.option, "xmlpath", None):
         config.option.xmlpath = "junit_result.xml"

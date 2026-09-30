@@ -1,10 +1,10 @@
 """Tests for GreenboardUploader and the greenboard fixture."""
 
 import inspect
+import json
 from collections.abc import AsyncGenerator, Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
@@ -28,6 +28,8 @@ from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
+
+pytest_plugins = ["pytester"]
 
 FIXED_NOW = datetime(2024, 3, 15, 12, 0, 0, tzinfo=UTC)
 FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
@@ -103,13 +105,9 @@ def make_uploader() -> GreenboardUploader:
 
 
 def drive_finished_item(uploader: GreenboardUploader, report: TestReport, item: MagicMock | None = None) -> None:
-    """Simulate one item completing its whole runtest protocol: drives the
-    makereport hookwrapper (pass/fail tallying) and then pytest's real
-    ``pytest_runtest_logfinish`` hook (completion tracking used for
-    incomplete-run detection). An item cut short by a SIGINT/SIGTERM abort
-    or a session-timeout never reaches ``pytest_runtest_logfinish`` — tests
-    that need to simulate a truncated run call ``drive_hook`` alone and
-    skip this."""
+    """Simulate one item completing its whole runtest protocol: makereport
+    tallying plus logfinish. A truncated run should call ``drive_hook``
+    alone, skipping logfinish."""
     drive_hook(uploader, report, item)
     uploader.pytest_runtest_logfinish()
 
@@ -270,17 +268,19 @@ async def _run_fixture(gen: AsyncGenerator) -> None:
         pass
 
 
-def _make_request(config: pytest.Config, *, testscollected: int = 0) -> SimpleNamespace:
-    """Fake the ``request: pytest.FixtureRequest`` the greenboard fixture reads
-    ``request.session.testscollected`` off of.
-
-    No real collection runs in these unit tests, so ``testscollected``
-    defaults to 0 (matching ``items_finished``'s default of 0, i.e.
-    "incomplete" stays False unless a test explicitly sets it up).
-    """
+def _make_session(config: pytest.Config, *, testscollected: int = 0) -> pytest.Session:
+    """A ``pytest.Session`` bound to the same ``config`` used to drive the
+    fixture, so they share a stash and pluginmanager. ``testscollected``
+    defaults to 0, matching ``items_finished``'s default (incomplete=False)."""
     session = pytest.Session.from_config(config)
     session.testscollected = testscollected
-    return SimpleNamespace(session=session)
+    return session
+
+
+def finish_session(config: pytest.Config, *, testscollected: int = 0) -> None:
+    """Run pytest_sessionfinish the way pytest would, after the fixture has
+    been driven to completion."""
+    greenboard_fixture.pytest_sessionfinish(_make_session(config, testscollected=testscollected))
 
 
 class TestCblpytestHelperFidelity:
@@ -606,8 +606,7 @@ class TestItemsFinishedTracking:
         drive_hook(uploader, make_report("call", passed=True))  # cut short, no logfinish
         assert uploader.items_finished == 2
 
-        # pass/fail tally (driven by makereport) is unaffected by logfinish tracking:
-        # all three "call" reports, including the cut-short one, are counted.
+        # pass/fail tally is unaffected: all three "call" reports count.
         with patch.object(uploader, "_upload_document") as mock_upload:
             uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
         doc = mock_upload.call_args[0][0]
@@ -732,13 +731,19 @@ class TestUploadFromJunitFile:
 
 
 class TestGreenboardFixture:
+    """Drives the ``greenboard`` fixture, then calls ``finish_session`` to
+    trigger the actual upload -- mirroring the fixture's two-stage design.
+    ``TestRealPytestLifecycle`` below additionally verifies that split
+    against pytest's real hook-execution order, not just this manual call."""
+
     @pytest.mark.asyncio
     async def test_no_greenboard_config_skips_upload(self) -> None:
         """All three credentials must be set; any None means no upload."""
         cblpytest = _make_cblpytest(url=None, username=None, password=None)
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
@@ -747,7 +752,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(no_upload=True)
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
@@ -757,7 +763,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
@@ -767,7 +774,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -787,7 +795,7 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(uploader, make_report("call", passed=True), make_item(markers=["sgw"]))
@@ -795,6 +803,7 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -814,7 +823,7 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(
@@ -826,6 +835,7 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -856,7 +866,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -877,7 +888,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server], sync_gateways=[sgw])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -897,7 +909,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=350,
             version="4.0.0",
@@ -918,7 +931,7 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
@@ -926,6 +939,7 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=45,
             version="1.1.0",
@@ -947,7 +961,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=1,
             version="3.2.0",
@@ -970,7 +985,7 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(uploader, make_report("call", passed=True), make_item())
@@ -978,6 +993,9 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            # Unregistration is deferred to pytest_sessionfinish, below.
+            assert config.pluginmanager.is_registered(uploader)
+            finish_session(config)
         mock_upload.assert_not_called()
         assert not config.pluginmanager.is_registered(uploader)
 
@@ -991,7 +1009,8 @@ class TestGreenboardFixture:
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=350,
             version="4.0.0",
@@ -1019,7 +1038,7 @@ class TestGreenboardFixture:
         )
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
@@ -1027,34 +1046,35 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_upload_exception_propagates_and_plugin_unregistered(self) -> None:
-        """An exception from _upload_document propagates (fail-loud policy);
-        the finally block still unregisters the plugin so the next session
-        starts clean."""
+        """An exception from _upload_document propagates out of
+        pytest_sessionfinish; its finally block still unregisters the
+        plugin."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
-        with (
-            patch(
-                "cbltest.greenboarduploader.GreenboardUploader._upload_document",
-                side_effect=RuntimeError("connection refused"),
-            ),
-            pytest.raises(RuntimeError, match="connection refused"),
+        with patch(
+            "cbltest.greenboarduploader.GreenboardUploader._upload_document",
+            side_effect=RuntimeError("connection refused"),
         ):
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            with pytest.raises(RuntimeError, match="connection refused"):
+                finish_session(config)
         assert not any(isinstance(p, GreenboardUploader) for p in config.pluginmanager.get_plugins())
 
     @pytest.mark.asyncio
     async def test_uploader_registered_before_yield_unregistered_after(self) -> None:
-        """The uploader is a registered plugin during the session and cleaned up afterward."""
+        """Registered through the fixture's own teardown; only
+        pytest_sessionfinish unregisters it."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document"):
-            gen = _raw_greenboard(cblpytest, config, _make_request(config))
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             assert config.pluginmanager.is_registered(uploader)
@@ -1062,21 +1082,21 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            assert config.pluginmanager.is_registered(uploader)
+            finish_session(config)
         assert not config.pluginmanager.is_registered(uploader)
 
     @pytest.mark.asyncio
     async def test_incomplete_true_when_session_cut_short(self) -> None:
-        """Fewer items finished their protocol than were collected — simulating
-        a Jenkins timeout (SIGTERM->SIGINT) or pytest-timeout session-timeout
-        truncating the run — sets the uploaded doc's incomplete flag and
-        reports the full planned count via ``collected`` (so the frontend can
-        show real coverage, e.g. "2/3", instead of a bare pass/fail ratio)."""
+        """Fewer items finished than were collected sets incomplete=True and
+        reports the full planned count via ``collected`` (so the frontend
+        can show real coverage, e.g. "2/3", instead of a bare pass/fail
+        ratio)."""
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
-        request_stub = _make_request(config, testscollected=3)
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, request_stub)
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_finished_item(uploader, make_report("call", passed=True))
@@ -1086,6 +1106,7 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config, testscollected=3)
         doc = mock_upload.call_args[0][0]
         assert (doc.incomplete, doc.collected) == (True, 3)
 
@@ -1097,9 +1118,8 @@ class TestGreenboardFixture:
         server = _make_server()
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
-        request_stub = _make_request(config, testscollected=2)
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config, request_stub)
+            gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_finished_item(uploader, make_report("call", passed=True))
@@ -1108,6 +1128,7 @@ class TestGreenboardFixture:
                 await gen.__anext__()
             except StopAsyncIteration:
                 pass
+            finish_session(config, testscollected=2)
         doc = mock_upload.call_args[0][0]
         assert (doc.incomplete, doc.collected) == (False, 2)
 
@@ -1345,7 +1366,8 @@ class TestBranchGate:
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(branch="main")
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_called_once()
 
     @pytest.mark.asyncio
@@ -1353,7 +1375,8 @@ class TestBranchGate:
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(branch="my-feature-branch")
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1363,7 +1386,8 @@ class TestBranchGate:
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(branch=None)
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1374,7 +1398,8 @@ class TestBranchGate:
         cblpytest = _make_cblpytest(test_servers=[_make_server()])
         config = _make_pytestconfig(branch=None)
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_upload.assert_called_once()
 
     @pytest.mark.asyncio
@@ -1393,5 +1418,158 @@ class TestBranchGate:
         ]
         config = pytest.Config.fromdictargs({}, args)
         with patch("cbltest.greenboarduploader.GreenboardUploader.record_upgrade_step") as mock_record:
-            await _run_fixture(_raw_greenboard(cblpytest, config, _make_request(config)))
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
         mock_record.assert_called_once()
+
+
+# Overrides the real `cblpytest` fixture by name to avoid real network I/O,
+# while still exercising the real greenboard_fixture module end to end.
+# `_upload_document` writes the captured RunResult to a JSON file, since
+# the subprocess can't hand a Python object back to the outer test.
+_LIFECYCLE_CONFTEST = """
+import json
+from pathlib import Path
+
+import pytest_asyncio
+from cbltest.api import testserver
+from cbltest.configparser import ParsedConfig
+from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.requests import RequestFactory
+from cbltest.responses import GetRootResponse
+
+CAPTURED_PATH = Path(__file__).parent / "captured_doc.json"
+
+
+def _fake_upload_document(self, test_run):
+    CAPTURED_PATH.write_text(json.dumps(test_run.model_dump(by_alias=True)))
+
+
+GreenboardUploader._upload_document = _fake_upload_document
+
+
+class _FakeConfig:
+    greenboard_username = "user"
+    greenboard_password = "pass"
+    greenboard_url = "couchbase://localhost"
+
+
+class _FakeTestServer(testserver.TestServer):
+    def __init__(self):
+        super().__init__(RequestFactory(ParsedConfig({})), 0, "http://localhost:8080", "1")
+
+    async def get_info(self):
+        return GetRootResponse(
+            status_code=200,
+            uuid="test-uuid",
+            json={"version": "3.2.0-b0001", "apiVersion": 1, "cbl": "couchbase-lite-ios", "device": {}},
+        )
+
+
+class _FakeCBLPyTest:
+    def __init__(self):
+        # Built here, not as a class attribute: _FakeTestServer() needs a
+        # running event loop (aiohttp.ClientSession), which only exists once
+        # the async fixture body below starts executing.
+        self.config = _FakeConfig()
+        self.test_servers = [_FakeTestServer()]
+        self.sync_gateways = []
+        self.edge_servers = []
+
+
+@pytest_asyncio.fixture(scope="session")
+async def cblpytest():
+    yield _FakeCBLPyTest()
+"""
+
+_LIFECYCLE_ARGS = (
+    "--config",
+    str(Path(__file__).with_name("empty_config.json")),
+    "--branch",
+    "main",
+    "-p",
+    "no:randomly",
+    # cluster_cleanup is autouse and expects a real CBLPyTest.clusters;
+    # irrelevant to what's under test here (incomplete/collected detection).
+    "-p",
+    "no:cluster_cleanup",
+)
+
+
+class TestRealPytestLifecycle:
+    """Runs a real pytest sub-session -- through pytest's actual hook
+    dispatch, not manually-driven mocks -- against the real
+    ``greenboard_fixture`` module. Regression coverage for the bug where
+    reading ``items_finished`` inside the fixture's own teardown always
+    undercounted the last item (it fires before that item's
+    ``pytest_runtest_logfinish``), flagging every complete run incomplete.
+    A manually-driven test can't catch this, since it controls exactly when
+    each hook fires instead of letting pytest's own scheduler decide.
+    ``runpytest_subprocess`` (a real, isolated process) is required here so
+    the sandboxed conftest's class-level ``_upload_document`` patch can't
+    leak into this file's own process.
+    """
+
+    def test_complete_run_not_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
+        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester.makepyfile("""
+            import pytest
+
+
+            @pytest.mark.asyncio
+            async def test_one():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_two():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_three():
+                pass
+        """)
+        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result.assert_outcomes(passed=3)
+
+        captured_path = pytester.path / "captured_doc.json"
+        assert captured_path.is_file(), (
+            f"greenboard never uploaded a doc -- pytest output:\n{result.stdout.str()}\n{result.stderr.str()}"
+        )
+        doc = json.loads(captured_path.read_text())
+        assert (doc["passCount"], doc["failCount"], doc["incomplete"], doc["collected"]) == (3, 0, False, 3)
+
+    def test_maxfail_stops_early_flags_incomplete(self, pytester: pytest.Pytester) -> None:
+        """``--maxfail=1`` stops the session after the first failure via the
+        same ``session.shouldfail`` early-exit path a session-timeout uses --
+        a real, genuinely truncated session."""
+        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester.makepyfile("""
+            import pytest
+
+
+            @pytest.mark.asyncio
+            async def test_one():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_two():
+                assert False
+
+
+            @pytest.mark.asyncio
+            async def test_three():
+                pass
+        """)
+        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result.assert_outcomes(passed=1, failed=1)
+
+        captured_path = pytester.path / "captured_doc.json"
+        assert captured_path.is_file(), (
+            f"greenboard never uploaded a doc -- pytest output:\n{result.stdout.str()}\n{result.stderr.str()}"
+        )
+        doc = json.loads(captured_path.read_text())
+        # test_three never ran: 2 finished out of 3 collected.
+        assert (doc["passCount"], doc["failCount"], doc["incomplete"], doc["collected"]) == (1, 1, True, 3)
