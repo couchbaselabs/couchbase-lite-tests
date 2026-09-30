@@ -17,7 +17,7 @@ import tenacity
 from aiohttp import ClientConnectorError
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.edgeserver import EdgeServer
+from cbltest.api.edgeserver import EdgeServer, EdgeServerConfig
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import get_basic_auth_headers
@@ -49,13 +49,21 @@ class EdgeServerManager:
     def __str__(self) -> str:
         return self.__info.hostname
 
+    def __declares_users(self) -> bool:
+        """Whether the running config declares users.  One that does not rejects any credentials."""
+        return EdgeServerConfig.load(self.__config_file).declares_users
+
     def get_admin_client(self) -> EdgeServer:
-        """A client that authenticates as the admin user, closed when the manager is."""
-        client = EdgeServer(
-            self.__info.hostname,
-            self.__config_file,
-            get_basic_auth_headers(self.__info.admin_user, self.__info.admin_password),
+        """
+        A client that authenticates as the admin user, or sends no credentials if the running
+        config declares no users.  Closed when the manager is.
+        """
+        headers = (
+            get_basic_auth_headers(self.__info.admin_user, self.__info.admin_password)
+            if self.__declares_users()
+            else None
         )
+        client = EdgeServer(self.__info.hostname, self.__config_file, headers)
         self.__clients.append(client)
         return client
 
@@ -172,13 +180,13 @@ class EdgeServerManager:
 
         :param headers: Headers that authenticate the user, e.g. from :func:`get_basic_auth_headers`
         """
+        if not self.__declares_users():
+            raise CblTestError(
+                f"Edge Server [{self.__info.hostname}] is running a config that declares no users, "
+                "so it would reject any user client"
+            )
         client = EdgeServer(self.__info.hostname, self.__config_file, headers)
         try:
-            if not client.needs_auth:
-                raise CblTestError(
-                    f"Edge Server [{self.__info.hostname}] is running a config that declares no users, "
-                    "so a user client would send no credentials and prove nothing"
-                )
             yield client
         finally:
             await client.close()
