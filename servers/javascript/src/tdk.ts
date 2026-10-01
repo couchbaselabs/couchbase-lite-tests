@@ -491,43 +491,20 @@ function collectionIDWithScope(id: string): string {
     return id.includes(".") ? id : `_default.${id}`;
 }
 
-
-/** The SDK's credentials type, derived from ReplicatorConfig rather than imported by
- *  name, so that this keeps compiling if CBL renames or re-exports the type. */
 type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig['credentials']>;
-/** The default Sync Gateway session cookie name. A SESSION authenticator naming any
- *  other cookie cannot be served on this platform -- see below. */
-const kDefaultSessionCookie = 'SyncGatewaySession';
 /** Maps a TDK authenticator onto the SDK's credentials type.
  *
- *  This is the single seam between the TDK wire format and the SDK's auth API. The SDK
- *  supports five modes; the TDK reaches all of them:
- *
- *  | TDK                                | SDK credentials                    | Flow |
- *  |------------------------------------|------------------------------------|------|
- *  | `BASIC`                            | `{username, password}`             | POSTs `_session?one_time=true` with `Authorization: Basic`, then puts the returned token on the handshake |
- *  | `BASIC` with both fields empty     | `{username: '', password: ''}`     | Legacy cookie mode: no `Authorization` header, `credentials: 'include'` so the browser attaches an existing cookie |
- *  | `BEARER`                           | `{type: Bearer, token}`            | Same as BASIC but `Authorization: Bearer`; needs an `oidc`/`local_jwt` provider on the remote |
- *  | `SESSION`                          | `{type: Session, sessionID}`       | No `_session` call at all; the ID goes straight onto the handshake |
- *  | absent                             | `undefined`                        | Anonymous / GUEST |
- *
- *  Note that unlike every other platform, none of these send a `Cookie` header on the
- *  WebSocket upgrade -- a browser will not allow it. The credential always reaches Sync
- *  Gateway as a session token on the handshake subprotocol, which is why `cookieName`
- *  has no meaning here. */
+ *  | `BASIC`   | `{username, password}`       | Standard user and password auth |
+ *  | `BEARER`  | `{type: Bearer, token}`      | JWT authentication |
+ *  | `SESSION` | `{type: Session, sessionID}` | Pass an explicit sessionID from outside cbl-js |
+ *  | absent    | `undefined`                  | Anonymous / GUEST or Cookie based auth |
+ */
 function credentialsFromAuthenticator(auth: tdk.ReplicatorAuthenticator): ReplicatorCredentials {
     switch (auth.type) {
         case 'BASIC': {
             const basic = auth as tdk.ReplicatorBasicAuthenticator;
             check(typeof basic.username === 'string' && typeof basic.password === 'string',
                   "BASIC authenticator requires username and password");
-            // Both-empty is legacy cookie mode and is deliberately allowed through. A
-            // half-empty credential is not cookie mode -- the SDK would send a literal
-            // `Authorization: Basic` header with a blank half -- so reject it rather
-            // than let a test think it was exercising the cookie path.
-            check(!!basic.username === !!basic.password,
-                  "BASIC authenticator must have both username and password, or neither "
-                  + "(both empty selects legacy cookie mode)");
             return {username: basic.username, password: basic.password};
         }
         case 'BEARER': {
@@ -538,11 +515,8 @@ function credentialsFromAuthenticator(auth: tdk.ReplicatorAuthenticator): Replic
         }
         case 'SESSION': {
             const session = auth as tdk.ReplicatorSessionAuthenticator;
-            if (session.cookieName !== undefined && session.cookieName !== kDefaultSessionCookie)
-                throw new HTTPError(501,
-                    `Custom session cookie names are not supported on this platform `
-                    + `(got "${session.cookieName}"): CBL JS presents the session ID on the `
-                    + `WebSocket handshake, not as a cookie.`);
+            check(typeof session.sessionID === 'string' && session.sessionID.length > 0,
+                  "SESSION authenticator requires a non-empty 'sessionID'");
             return {type: cbl.CredentialType.Session, sessionID: session.sessionID};
         }
         default:
