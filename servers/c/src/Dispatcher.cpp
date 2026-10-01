@@ -72,6 +72,8 @@ namespace ts {
                 return request.respondWithServerError("Request API Not Found");
             }
             return handler(request, session.get());
+        } catch (const ClientError &e) {
+            return request.respondWithError(e.status(), e.what());
         } catch (const CBLException &e) {
             return request.respondWithCBLError(e);
         } catch (const RequestError &e) {
