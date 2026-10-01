@@ -199,8 +199,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             url: rq.config.endpoint,
             collections: {},
         };
-        if (rq.config.authenticator)
-            config.credentials = credentialsFromAuthenticator(rq.config.authenticator);
+        if (rq.config.authenticator) config.credentials = credentialsFromAuthenticator(rq.config.authenticator);
         for (const colls of rq.config.collections) {
             const collCfg: cbl.ReplicatorCollectionConfig = {};
             if (rq.config.replicatorType !== "pull") {
@@ -354,8 +353,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         check(!this.#databases.has(name), `There is already an open database named ${name}`);
         let colls: Record<string, cbl.CollectionConfig> = {};
         if (collections) {
-            for (const coll of collections)
-                colls[normalizeCollectionID(coll)] = {};
+            for (const coll of collections) colls[normalizeCollectionID(coll)] = {};
         }
         this.#logger.info`Reset: Creating database ${name} with ${collections?.length ?? 0} collection(s)`;
         const db = await cbl.Database.open({ name: name, version: 1, collections: colls });
@@ -491,7 +489,7 @@ function collectionIDWithScope(id: string): string {
     return id.includes(".") ? id : `_default.${id}`;
 }
 
-type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig['credentials']>;
+type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig["credentials"]>;
 /** Maps a TDK authenticator onto the SDK's credentials type.
  *
  *  | `BASIC`   | `{username, password}`       | Standard user and password auth |
@@ -501,25 +499,31 @@ type ReplicatorCredentials = NonNullable<cbl.ReplicatorConfig['credentials']>;
  */
 function credentialsFromAuthenticator(auth: tdk.ReplicatorAuthenticator): ReplicatorCredentials {
     switch (auth.type) {
-        case 'BASIC': {
+        case "BASIC": {
             const basic = auth as tdk.ReplicatorBasicAuthenticator;
-            check(typeof basic.username === 'string' && typeof basic.password === 'string',
-                  "BASIC authenticator requires username and password");
-            return {username: basic.username, password: basic.password};
+            check(
+                typeof basic.username === "string" && typeof basic.password === "string",
+                "BASIC authenticator requires username and password",
+            );
+            return { username: basic.username, password: basic.password };
         }
-        case 'BEARER': {
+        case "BEARER": {
             const bearer = auth as tdk.ReplicatorBearerAuthenticator;
-            check(typeof bearer.token === 'string' && bearer.token.length > 0,
-                  "BEARER authenticator requires a non-empty token");
-            return {type: cbl.CredentialType.Bearer, token: bearer.token};
+            check(
+                typeof bearer.token === "string" && bearer.token.length > 0,
+                "BEARER authenticator requires a non-empty token",
+            );
+            return { type: cbl.CredentialType.Bearer, token: bearer.token };
         }
-        case 'SESSION': {
+        case "SESSION": {
             const session = auth as tdk.ReplicatorSessionAuthenticator;
-            check(typeof session.sessionID === 'string' && session.sessionID.length > 0,
-                  "SESSION authenticator requires a non-empty 'sessionID'");
-            return {type: cbl.CredentialType.Session, sessionID: session.sessionID};
+            check(
+                typeof session.sessionID === "string" && session.sessionID.length > 0,
+                "SESSION authenticator requires a non-empty 'sessionID'",
+            );
+            return { type: cbl.CredentialType.Session, sessionID: session.sessionID };
         }
         default:
-            throw new HTTPError(501, `Unsupported authenticator type "${(auth as {type: string}).type}"`);
+            throw new HTTPError(501, `Unsupported authenticator type "${(auth as { type: string }).type}"`);
     }
 }
