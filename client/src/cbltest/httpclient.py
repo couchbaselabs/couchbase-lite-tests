@@ -8,7 +8,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Self, Unpack, cast
 
 import aiofiles
-from aiohttp import BaseConnector, ClientError, ClientResponse, ClientSession, ClientTimeout
+from aiohttp import BaseConnector, ClientError, ClientResponse, ClientSession, ClientTimeout, DummyCookieJar
 from aiohttp.client import DEFAULT_TIMEOUT
 from aiohttp.typedefs import LooseHeaders, Query, StrOrURL
 from yarl import URL
@@ -26,6 +26,7 @@ class AsyncHTTPClient:
     """
     An aiohttp session whose timeouts name the request that timed out, how far it got and
     the budgets that applied.  Owns the session, so close it or use it as an async context manager.
+    Keeps no cookies, so only the headers a caller sends authenticate a request.
     """
 
     def __init__(
@@ -50,6 +51,7 @@ class AsyncHTTPClient:
             headers=headers,
             connector=connector,
             timeout=timeout,
+            cookie_jar=DummyCookieJar(),
             response_class=_DescribedResponse,
         )
 

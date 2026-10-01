@@ -372,7 +372,7 @@ def _call_site_env(
         params = params[1:]
 
     seed: dict[str, str] = {}
-    for param, arg_expr in zip(params, node.args):
+    for param, arg_expr in zip(params, node.args, strict=False):
         inferred = _infer_type(arg_expr, env)
         if inferred is not None:
             seed[param.arg] = inferred

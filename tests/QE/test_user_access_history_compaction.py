@@ -19,6 +19,7 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     ScopeConfig,
     SyncGateway,
+    get_basic_auth_headers,
 )
 
 
@@ -149,7 +150,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         await sg.create_document(db_name, "doc1", {"channels": ["A"]}, wait_for_caching_feed=True)
         await sg.create_document(db_name, "doc2", {"channels": ["B"]}, wait_for_caching_feed=True)
 
-        async with sg.get_user_client("bob", password) as bob:
+        async with sg.get_user_client(get_basic_auth_headers("bob", password)) as bob:
             self.mark_test_step(
                 "Get changes for user bob after user creation, bob should have access to both doc1 and doc2, "
                 "store the checkpoint (last_seq value)"

@@ -49,7 +49,7 @@ class TestEdgeServerSync(CBLTestClass):
 
             assert len(edge_docs.rows) == len(sgw_docs.rows), f"Collection {collection} count mismatch"
 
-            for edge_doc, sgw_doc in zip(edge_docs.rows, sgw_docs.rows):
+            for edge_doc, sgw_doc in zip(edge_docs.rows, sgw_docs.rows, strict=True):
                 assert edge_doc.id == sgw_doc.id, "Document ID mismatch"
 
         self.mark_test_step("Test document updates")
@@ -117,7 +117,7 @@ class TestEdgeServerSync(CBLTestClass):
             edge_docs = await edge_server1.get_all_documents("travel", collection=collection)
             edge2_docs = await edge_server2.get_all_documents("travel", collection=collection)
             assert len(edge_docs.rows) == len(edge2_docs.rows), f"Collection {collection} count mismatch"
-            for edge_doc, edge2_doc in zip(edge_docs.rows, edge2_docs.rows):
+            for edge_doc, edge2_doc in zip(edge_docs.rows, edge2_docs.rows, strict=True):
                 assert edge_doc.id == edge2_doc.id, "Document ID mismatch"
 
         self.mark_test_step("Test document updates")

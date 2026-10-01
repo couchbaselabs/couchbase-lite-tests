@@ -1,4 +1,3 @@
-from abc import ABC
 from types import FunctionType
 
 import pytest
@@ -12,7 +11,7 @@ from cbltest.logging import cbl_info, cbl_warning
 from cbltest.responses import ServerVariant
 
 
-class CBLTestClass(ABC):
+class CBLTestClass:
     def setup_method(self, method: FunctionType) -> None:
         CBLPyTestGlobal.running_test_name = method.__name__
         cbl_info(f"Starting test: {method.__name__}")

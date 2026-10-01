@@ -1,22 +1,35 @@
+import ipaddress
 from datetime import UTC, datetime, timedelta
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives.serialization import Encoding, PrivateFormat, pkcs12
+from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, pkcs12
 from cryptography.x509 import (
     AuthorityKeyIdentifier,
     BasicConstraints,
     Certificate,
     CertificateBuilder,
+    DNSName,
     ExtendedKeyUsage,
     ExtendedKeyUsageOID,
+    GeneralName,
+    IPAddress,
     KeyUsage,
     Name,
     NameAttribute,
     NameOID,
+    SubjectAlternativeName,
     SubjectKeyIdentifier,
     random_serial_number,
 )
+
+
+def _san_entry(value: str) -> GeneralName:
+    """An IPAddress SAN for an IP literal, else a DNSName SAN."""
+    try:
+        return IPAddress(ipaddress.ip_address(value))
+    except ValueError:
+        return DNSName(value)
 
 
 def _key_usage(
@@ -86,6 +99,12 @@ class CertKeyPair:
         """
         return self.certificate.public_bytes(encoding=Encoding.PEM)
 
+    def key_pem_bytes(self) -> bytes:
+        """
+        Returns the private key as an unencrypted PKCS#8 PEM ("BEGIN PRIVATE KEY").
+        """
+        return self.private_key.private_bytes(Encoding.PEM, PrivateFormat.PKCS8, NoEncryption())
+
 
 def create_ca_certificate(CN: str) -> CertKeyPair:
     private_key = rsa.generate_private_key(
@@ -115,7 +134,9 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
     return CertKeyPair(ca_certificate, private_key)
 
 
-def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) -> CertKeyPair:
+def create_leaf_certificate(
+    CN: str, *, issuer_data: CertKeyPair | None = None, sans: list[str] | None = None
+) -> CertKeyPair:
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
@@ -152,6 +173,9 @@ def create_leaf_certificate(CN: str, *, issuer_data: CertKeyPair | None = None) 
                 critical=False,
             )
         )
+
+    if sans:
+        builder = builder.add_extension(SubjectAlternativeName([_san_entry(s) for s in sans]), critical=False)
 
     leaf_certificate = builder.sign(signing_key, hashes.SHA256())
 
