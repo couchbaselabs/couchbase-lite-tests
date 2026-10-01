@@ -2,8 +2,9 @@ from types import FunctionType
 
 import pytest
 from packaging.specifiers import SpecifierSet
-from packaging.version import Version
+from packaging.version import InvalidVersion, Version
 
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
@@ -77,6 +78,23 @@ class CBLTestClass:
         version = Version(version_str)
         spec = SpecifierSet(constraint)
         self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")
+
+    async def skip_if_es_not(self, es: EdgeServer, constraint: str) -> None:
+        """
+        Skips the test if the Edge Server version does not match the specified comparison operation and value.
+        A version the server reports in a form that cannot be parsed runs the test, with a warning.
+
+        :param es: A client for the Edge Server to check the version of.
+        :param constraint: A string representing the comparison operation and version, e.g., ">= 1.1.1".
+        """
+        version_str = (await es.get_version()).version
+        try:
+            version = Version(version_str)
+        except InvalidVersion:
+            cbl_warning(f"Edge Server version '{version_str}' is unparseable; not skipping for '{constraint}'")
+            return
+
+        self.skip_if_not(version in SpecifierSet(constraint), f"Edge Server {version_str} not {constraint}")
 
     async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str) -> None:
         """

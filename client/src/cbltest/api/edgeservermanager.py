@@ -54,6 +54,16 @@ class EdgeServerManager:
         """Whether the running config declares users.  One that does not rejects any credentials."""
         return EdgeServerConfig.load(self.__config_file).declares_users
 
+    @property
+    def admin_user(self) -> str:
+        """The admin user the host was provisioned with, which :func:`get_admin_client` signs in as."""
+        return self.__info.admin_user
+
+    @property
+    def admin_password(self) -> str:
+        """That admin user's password, for a test that writes its own users file."""
+        return self.__info.admin_password
+
     def get_admin_client(self) -> EdgeServer:
         """
         A client that authenticates as the admin user, or sends no credentials if the running
