@@ -48,6 +48,16 @@ class EdgeServerManager:
     def __str__(self) -> str:
         return self.__info.hostname
 
+    @property
+    def admin_user(self) -> str:
+        """The admin user the host was provisioned with, which :func:`get_admin_client` signs in as."""
+        return self.__info.admin_user
+
+    @property
+    def admin_password(self) -> str:
+        """That admin user's password, for a test that writes its own users file."""
+        return self.__info.admin_password
+
     def get_admin_client(self) -> EdgeServer:
         """A client that authenticates as the admin user, closed when the manager is."""
         client = EdgeServer(
