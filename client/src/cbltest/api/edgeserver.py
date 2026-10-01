@@ -115,17 +115,18 @@ class EdgeServerVersion(CouchbaseVersion):
 
     def parse(self, input: str) -> tuple[str, int]:
         first_lparen = input.find("(")
-        first_semicol = input.find(";")
-        if first_lparen == -1 or first_semicol == -1:
+        first_rparen = input.find(")", first_lparen + 1)
+        if first_lparen == -1 or first_rparen == -1:
+            cbl_warning(f"Could not parse Edge Server version string: '{input}'")
             return ("unknown", 0)
 
         version = input[0:first_lparen].strip()
         if not version:
             cbl_warning(f"Could not extract version from Edge Server version string: '{input}'")
             version = "unknown"
-
+        raw_build = input[first_lparen + 1 : first_rparen].strip()
         try:
-            build = int(input[first_lparen + 1 : first_semicol])
+            build = int(raw_build.split(";", 1)[0])
         except ValueError:
             cbl_warning(f"Could not parse build number from Edge Server version string: '{input}'")
             build = 0
