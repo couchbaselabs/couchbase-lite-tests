@@ -19,22 +19,11 @@ def getBuildNumber(String product, String version) {
     ).trim()
 }
 
-// Newest *released* (non-prerelease) version in a train, e.g. 3.2 -> 3.2.6. Used
-// as a fallback when the prerelease feed is ahead of the builds. "" if none.
-def latestReleased(String product, String train) {
-    def url = "http://proget.build.couchbase.com:8080/api/latest_release?product=${product}&version=${train}&prerelease=false"
-    return sh(
-        script: "curl -s --max-time 30 '${url}' | python3 -c 'import json,sys; s=sys.stdin.read().strip(); print(json.loads(s).get(\"version\",\"\") if s.startswith(\"{\") else \"\")'",
-        returnStdout: true
-    ).trim()
-}
-
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
-// build is looked up via ProGet get_version. When the newest (prerelease-inclusive)
-// version has no published build yet (e.g. an in-flight release like 3.2.7), fall
-// back to the newest built release in the same train (e.g. 3.2.6). Returns null
-// when the train has no published build at all yet (a normal new-train state, not
-// an error) so the caller can skip it quietly; genuine failures still throw.
+// build is looked up via ProGet get_version. Returns null when the train's latest
+// version has no published build yet (a normal new-train state right after a
+// manifest version bump, since the previous patch is frozen and can no longer be
+// built) so the caller can skip it quietly; genuine failures still throw.
 def resolveVersionBuild(proget, String product, String param, String label) {
     def version = proget.resolveProgetVersion(product, param, label)
     def buildNo
@@ -44,15 +33,6 @@ def resolveVersionBuild(proget, String product, String param, String label) {
         buildNo = parts[1]
     } else {
         buildNo = getBuildNumber(product, version)
-        if (!buildNo) {
-            def released = latestReleased(product, param)
-            def releasedBuild = released ? getBuildNumber(product, released) : ""
-            if (releasedBuild) {
-                echo "No published build for ${product} ${version}; using latest released ${released}-${releasedBuild}"
-                version = released
-                buildNo = releasedBuild
-            }
-        }
     }
     if (!buildNo) { return null }  // no published build for this train yet
     def major = version.tokenize('.')[0].toInteger()
