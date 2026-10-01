@@ -14,8 +14,8 @@ from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
 import aiofiles
+import asyncstdlib
 import packaging.version
-import requests
 import tenacity
 from aiohttp import ClientResponse, ClientTimeout, TCPConnector, encode_basic_auth
 from aiohttp.client_exceptions import ClientConnectorError, ClientError
@@ -2005,26 +2005,21 @@ class SyncGateway(_SyncGatewayBase):
         :param public_port: Public API port (default 4984)
         """
         super().__init__(url, port, secure, public_port, get_basic_auth_headers(username, password))
-        r = requests.get(
-            f"{self.scheme}{url}:{port}/_config",
-            auth=(username, password),
-            # disable hostname verification as we do in _create_session
-            verify=False,
-            timeout=10,
-        )
-        r.raise_for_status()
-        config = r.json()
-        try:
-            self.using_rosmar = config["bootstrap"]["server"].startswith("rosmar")
-        except KeyError:
-            raise CblTestError(
-                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
-            ) from None
-
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
         self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def using_rosmar(self) -> bool:
+        """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server (fetched once)"""
+        config = await self._send_request("get", "/_config")
+        try:
+            return config["bootstrap"]["server"].startswith("rosmar")
+        except (KeyError, TypeError):
+            raise CblTestError(
+                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
+            ) from None
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """
@@ -2037,7 +2032,7 @@ class SyncGateway(_SyncGatewayBase):
         :raises CblTestError: If this Sync Gateway node is not using Rosmar
         """
         with self._tracer.start_as_current_span("drop_rosmar_bucket", attributes={"cbl.bucket.name": bucket_name}):
-            if not self.using_rosmar:
+            if not await self.using_rosmar:
                 raise CblTestError(f"Cannot drop Rosmar bucket '{bucket_name}', Sync Gateway is not using Rosmar")
 
             try:
@@ -2059,7 +2054,7 @@ class SyncGateway(_SyncGatewayBase):
             True if using Rosmar, or if the database is configured with
             enable_shared_bucket_access=false.
         """
-        if self.using_rosmar:
+        if await self.using_rosmar:
             return True
         config = await self.get_database_config(db_name)
         return config.enable_shared_bucket_access is False

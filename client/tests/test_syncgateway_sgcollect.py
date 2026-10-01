@@ -41,10 +41,7 @@ class FakeSyncGateway(SyncGateway):
     """
 
     def __init__(self, hostname: str = "sg.example.com") -> None:
-        with (
-            patch("cbltest.httpclient.ClientSession", autospec=True),
-            patch("cbltest.api.syncgateway.requests.get", autospec=True),
-        ):
+        with patch("cbltest.httpclient.ClientSession", autospec=True):
             super().__init__(url=hostname, username="user", password="pass")
 
         self.sent_requests: list[tuple[str, str, JSONSerializable | DatabaseConfig | None]] = []

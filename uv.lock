@@ -88,6 +88,15 @@ wheels = [
 ]
 
 [[package]]
+name = "asyncstdlib"
+version = "3.14.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/3a/66/7b76f2b48afc5c8b4648500a4ff9869f83528e3d601a19de51da18b5e8a5/asyncstdlib-3.14.0.tar.gz", hash = "sha256:f99396992a3bba7495d8cf6c832bfe8c8727f61213233d3569a5a9cbd1c04385", size = 51074, upload-time = "2026-03-20T21:06:46.025Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/93/50/463443651ddb0ba66c289d5649369099ab72b4665888b337ed25ea622550/asyncstdlib-3.14.0-py3-none-any.whl", hash = "sha256:cad90c590ce357da6e70c56f0e2ad9e9baaf146a8fc2ede189879da57eb8bd87", size = 44255, upload-time = "2026-03-20T21:06:45.033Z" },
+]
+
+[[package]]
 name = "attrs"
 version = "24.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -132,6 +141,7 @@ source = { editable = "client" }
 dependencies = [
     { name = "aiofiles" },
     { name = "aiohttp" },
+    { name = "asyncstdlib" },
     { name = "couchbase" },
     { name = "cryptography" },
     { name = "deepdiff" },
@@ -157,6 +167,7 @@ dependencies = [
 requires-dist = [
     { name = "aiofiles", specifier = "==25.1.0" },
     { name = "aiohttp", specifier = "==3.14.3" },
+    { name = "asyncstdlib", specifier = "==3.14.0" },
     { name = "couchbase", specifier = "==4.3.4" },
     { name = "cryptography", specifier = "==44.0.0" },
     { name = "deepdiff", specifier = "==8.6.1" },

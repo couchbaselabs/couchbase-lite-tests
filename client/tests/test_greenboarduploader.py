@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Literal, cast
 from unittest.mock import MagicMock, patch
 
+import asyncstdlib
 import pluggy._result
 import pytest
 from _pytest.reports import TestReport
@@ -116,10 +117,7 @@ class FakeSyncGateway(SyncGateway):
     """Test-only SyncGateway that returns a fixed version without network calls."""
 
     def __init__(self, version_str: str) -> None:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"bootstrap": {"server": "couchbase://localhost"}}
-        with patch("cbltest.api.syncgateway.requests.get", return_value=mock_response):
-            super().__init__("localhost", "admin", "password")
+        super().__init__("localhost", "admin", "password")
         self._version_str = version_str
 
     async def get_version(self) -> SyncGatewayVersion:
@@ -151,13 +149,14 @@ class FakeEdgeServerManager(EdgeServerManager):
 
 
 class FakeTestServer(testserver.TestServer):
-    """Test-only TestServer that returns a fixed GetRootResponse from get_info."""
+    """Test-only TestServer whose info comes from get_info_fn."""
 
     def __init__(self, get_info_fn: Callable[[], GetRootResponse]) -> None:
         super().__init__(RequestFactory(ParsedConfig({})), 0, "http://localhost:8080", "1")
         self._get_info_fn = get_info_fn
 
-    async def get_info(self) -> GetRootResponse:
+    @asyncstdlib.cached_property
+    async def info(self) -> GetRootResponse:
         return self._get_info_fn()
 
 
@@ -1431,6 +1430,7 @@ _LIFECYCLE_CONFTEST = """
 import json
 from pathlib import Path
 
+import asyncstdlib
 import pytest_asyncio
 from cbltest.api import testserver
 from cbltest.configparser import ParsedConfig
@@ -1458,7 +1458,8 @@ class _FakeTestServer(testserver.TestServer):
     def __init__(self):
         super().__init__(RequestFactory(ParsedConfig({})), 0, "http://localhost:8080", "1")
 
-    async def get_info(self):
+    @asyncstdlib.cached_property
+    async def info(self):
         return GetRootResponse(
             status_code=200,
             uuid="test-uuid",

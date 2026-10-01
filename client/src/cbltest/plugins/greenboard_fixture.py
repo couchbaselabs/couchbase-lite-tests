@@ -104,7 +104,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
         os_name: str = "n/a"
         library_version: str = "n/a"
         if len(cblpytest.test_servers) > 0:
-            test_server_info = await cblpytest.test_servers[0].get_info()
+            test_server_info = await cblpytest.test_servers[0].info
             # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
             # test server.
             library_version = test_server_info.library_version

@@ -107,7 +107,7 @@ async def delete_all_databases(cluster: SyncGatewayCluster) -> None:
         cbl_trace(f"🧹 {sg}: found databases {list(databases)}")
         for db_name, entry in databases.items():
             owners.setdefault(db_name, sg)
-            if sg.using_rosmar:
+            if await sg.using_rosmar:
                 rosmar_buckets.setdefault(sg, set()).add(entry.bucket)
 
     async def delete_and_wait(db_name: str, sg: SyncGateway) -> None:

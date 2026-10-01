@@ -1,6 +1,8 @@
+import asyncio
 from typing import Final, cast
 from urllib.parse import urljoin, urlparse
 
+import asyncstdlib
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
@@ -42,22 +44,15 @@ class TestServer:
         self.__url = url
         self.__request_factory = request_factory
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__info: GetRootResponse | None = None
         self.__dataset_version = dataset_version
 
-    async def get_info(self) -> GetRootResponse:
-        """
-        Retrieves the information about the running test server.
-        This is cached after the first call.
-        """
-        if self.__info is None:
-            with self.__tracer.start_as_current_span("get_info"):
-                request = self.__request_factory.create_request(TestServerRequestType.ROOT)
-                resp = await self.__request_factory.send_request(self.__index, request)
-                ret_val = cast(GetRootResponse, resp)
-                self.__info = ret_val
-
-        return self.__info
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def info(self) -> GetRootResponse:
+        """Information about the running test server (fetched once)"""
+        with self.__tracer.start_as_current_span("info"):
+            request = self.__request_factory.create_request(TestServerRequestType.ROOT)
+            resp = await self.__request_factory.send_request(self.__index, request)
+            return cast(GetRootResponse, resp)
 
     async def create_and_reset_db(
         self,

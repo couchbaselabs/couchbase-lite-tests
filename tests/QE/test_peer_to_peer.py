@@ -545,7 +545,7 @@ class TestPeerToPeer(CBLTestClass):
         async def stop_restart_task() -> Listener:
             port = listener1.port
             await listener1.stop()
-            variant = (await cblpytest.test_servers[0].get_info()).variant
+            variant = (await cblpytest.test_servers[0].info).variant
             if variant == ServerVariant.JVM:
                 await asyncio.sleep(
                     30

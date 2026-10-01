@@ -49,8 +49,6 @@ class CouchbaseCluster:
             raise CblTestError(
                 "At least one Couchbase Server must be provided when configuring multiple Sync Gateway nodes"
             )
-        elif not sync_gateways[0].using_rosmar:
-            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
 
         self.__tracer = get_tracer(__name__, VERSION)
 
@@ -63,11 +61,11 @@ class CouchbaseCluster:
         """
         Create every scope and collection that the given database config refers to.
 
-        No-ops when using Rosmar, where collections are created implicitly.
+        No-ops without a Couchbase Server, since Rosmar creates collections implicitly.
 
         :param db_payload: The database config naming the bucket, scopes and collections
         """
-        if self.sync_gateways[0].using_rosmar:
+        if not self.couchbase_servers:
             return
         assert db_payload.bucket is not None, "DatabaseConfig is missing required field 'bucket'"
         if db_payload.scopes:
@@ -162,7 +160,7 @@ class CouchbaseCluster:
         :param config: The configuration of the database to create
         """
         # buckets and collections are implicitly created when using Rosmar
-        if not self.sync_gateways[0].using_rosmar:
+        if self.couchbase_servers:
             assert config.bucket, "bucket needs to be specified in a database config"
             bucket = config.bucket
             cbs = self.couchbase_servers[0]

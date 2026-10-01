@@ -61,7 +61,7 @@ class CBLTestClass:
 
         :param platform: The platform to check against.
         """
-        variant = (await server.get_info()).variant
+        variant = (await server.info).variant
         self.skip_if_not(
             variant in allow_platforms,
             f"{variant} is not in the platforms {allow_platforms}",
@@ -73,7 +73,7 @@ class CBLTestClass:
 
         :param constraint: A string representing the comparison operation and version, e.g., ">= 3.3.0".
         """
-        version_str = (await server.get_info()).library_version.split("-")[0]
+        version_str = (await server.info).library_version.split("-")[0]
         version = Version(version_str)
         spec = SpecifierSet(constraint)
         self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")

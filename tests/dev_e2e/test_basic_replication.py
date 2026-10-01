@@ -57,7 +57,7 @@ class TestBasicReplication(CBLTestClass):
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the replicator's error is CBL/10404")
-        if (await cblpytest.test_servers[0].get_info()).variant == ServerVariant.JS:
+        if (await cblpytest.test_servers[0].info).variant == ServerVariant.JS:
             assert status.error is not None and status.error.code == 404
         else:
             assert (
