@@ -124,6 +124,10 @@ class TestSyncGatewayResync(CBLTestClass):
         assert final_status.docs_errored == 0
         assert final_status.docs_processed >= SIMPLE_RESYNC_NUM_DOCS
 
+    @pytest.mark.skip(
+        reason="Flaky: a stop is ignored while the distributed resync feed starts - "
+        "https://jira.issues.couchbase.com/browse/CBG-5946"
+    )
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.min_sync_gateways(1)
     async def test_resync_stop_resume(self, cblpytest: CBLPyTest) -> None:
