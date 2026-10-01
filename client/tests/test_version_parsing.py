@@ -61,6 +61,12 @@ class TestEdgeServerVersionParse:
             ("(100;abc)", "unknown", 100),
             ("1.0.0(xyz;abc)", "1.0.0", 0),
             ("1.0.0", "unknown", 0),
+            ("1.2.0(100)", "1.2.0", 100),
+            ("(100)", "unknown", 100),
+            ("1.1.0(45;abc)", "1.1.0", 45),
+            ("1.2.0(100;abc;def)", "1.2.0", 100),
+            ("1.2.0( 100 ;abc)", "1.2.0", 100),
+            ("1.2.0(abc)", "1.2.0", 0),
         ],
     )
     def test_parse(self, version_string: str, expected_version: str, expected_build: int) -> None:
