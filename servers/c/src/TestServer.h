@@ -17,7 +17,8 @@ namespace ts {
         static constexpr unsigned short API_VERSION = 1;
         static constexpr unsigned short DEFAULT_PORT = 8080;
         /* Subdirectory of the platform location files::filesDir picks, used when no files
-           directory is given: /tmp on Linux and macOS, the working directory on Windows */
+           directory is given: /tmp on Linux, NSTemporaryDirectory() ($TMPDIR) on macOS and iOS,
+           the app's files directory on Android, and the working directory on Windows */
         static constexpr const char *DEFAULT_FILES_SUBDIR = "CBL-C-TestServer";
 
         struct Context {
