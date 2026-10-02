@@ -715,6 +715,98 @@ class TestReplicationUpgrade(CBLTestClass):
         assert tombstone.cv is not None, f"Expected the deletion {tombstone.revid} to have an HLV"
 
     @pytest.mark.asyncio(loop_scope="session")
+    async def test_nonconflict_case_11(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        doc_id = "nonconflict_3"
+        db = await setup_upgrade_env(self, cblpytest, dataset_path)
+        sg = cblpytest.sync_gateways[0]
+
+        legacy = await sg.get_document("upgrade", doc_id)
+        local = await db.get_document(DocumentEntry("_default._default", doc_id))
+        assert local.revid == legacy.revid and local.cv is None and legacy.cv is None, (
+            f"Precondition is invalid: local RevID {local.revid}, HLV {local.cv}; "
+            f"remote RevID {legacy.revid}, HLV {legacy.cv}"
+        )
+
+        self.mark_test_step(f"Delete `{doc_id}` on SGW.")
+        deletion = await sg.delete_document(doc_id, legacy.revid, "upgrade", wait_for_caching_feed=True)
+
+        self.mark_test_step(f"""
+            Start a replicator:
+            * endpoint: '/upgrade'
+            * collections : '_default._default'
+            * type: pull
+            * document_ids: ['{doc_id}']
+            * continuous: False
+        """)
+        replicator = Replicator(
+            db,
+            sg.replication_url("upgrade"),
+            collections=[ReplicatorCollectionEntry(names=["_default._default"], document_ids=[doc_id])],
+            replicator_type=ReplicatorType.PULL,
+            continuous=False,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sg.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step(f"Check that the pull replication of `{doc_id}` has the deleted flag set and no error.")
+        pulled = [e for e in replicator.document_updates if e.document_id == doc_id]
+        assert len(pulled) == 1 and not pulled[0].is_push, (
+            f"Expected one pull replication of '{doc_id}', but got: {[(e.direction, e.flags) for e in pulled]}"
+        )
+        assert ReplicatorDocumentFlags.DELETED in pulled[0].flags, f"Expected the deleted flag, got: {pulled[0].flags}"
+        assert pulled[0].error is None, f"Expected no error, got: {pulled[0].error}"
+
+        self.mark_test_step(f"Check that `{doc_id}` doesn't exist in the local database.")
+        with pytest.raises(CblTestServerBadResponseError) as missing:
+            await db.get_document(DocumentEntry("_default._default", doc_id))
+        assert missing.value.code == 404, f"Expected 404 for the deleted document, got {missing.value.code}"
+
+        self.mark_test_step(f"""
+            Start a replicator:
+            * endpoint: '/upgrade'
+            * collections : '_default._default'
+            * type: push
+            * document_ids: ['{doc_id}']
+            * continuous: False
+        """)
+        replicator = Replicator(
+            db,
+            sg.replication_url("upgrade"),
+            collections=[ReplicatorCollectionEntry(names=["_default._default"], document_ids=[doc_id])],
+            replicator_type=ReplicatorType.PUSH,
+            continuous=False,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sg.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator is stopped.")
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, (
+            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        )
+
+        self.mark_test_step(
+            f"Check that no doc was pushed, and that SGW's `{doc_id}` is still the deletion from step 4."
+        )
+        assert not replicator.document_updates, (
+            f"Expected no document to be pushed, but got: {[e.document_id for e in replicator.document_updates]}"
+        )
+        deleted = await sg.wait_for_documents("upgrade", [doc_id], deleted=True)
+        assert deleted[doc_id].changes[0] == deletion.revid, (
+            f"Expected SGW to still have the deletion {deletion.revid}, but it has {deleted[doc_id].changes[0]}"
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_1(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
         Push replication with a conflict between pre-upgrade CBL and SGW mutations —
