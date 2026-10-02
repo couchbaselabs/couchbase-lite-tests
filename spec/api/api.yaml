@@ -46,6 +46,10 @@ info:
       ```
 
     Changes
+    2.0.4 (09/16/2026)
+    * Correct the revision history format documented for [/getDocument](#operation/getDocument):
+      a version vector separates the historical versions with a semicolon, not a comma
+
     2.0.3 (04/17/2026)
     * Add identity property to [/startListener](#operation/startListener)
 
@@ -155,7 +159,7 @@ info:
     * Changed DocumentReplication.flags type from int to array of enums.
     * Added 'enableDocumentListener' to ReplicatorConfiguration.
     * Added a note that any enum values are case insensitive.
-  version: 2.0.3
+  version: 2.0.4
 tags:
   - name: API
     description: The API endpoints of the test server
@@ -283,7 +287,7 @@ paths:
               * _revs: Revision history including the current revision ID as the first item.
 
             The format of the revision history is described in this document:
-            https://github.com/couchbase/couchbase-lite-core/blob/master/modules/docs/pages/replication-protocol.adoc#4-revision-ids-and-histories
+            https://github.com/couchbase/couchbase-lite-core/wiki/Replication-Protocol#3-versioning-revision-ids-histories-sequences
           content:
             application/json:
               schema:
@@ -1003,7 +1007,7 @@ components:
         Contains document's properties and the metadata.
       type: object
       additionalProperties: {}
-      example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
+      example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw;17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
     DocumentID:
       type: object
       required: ['collection', 'id']
