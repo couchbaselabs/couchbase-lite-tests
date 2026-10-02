@@ -33,6 +33,11 @@ namespace ts::support {
         return tempDir.UTF8String;
     }
 
+    string files::ensureDir(const std::string &dir) {
+        filesystem::create_directories(dir);
+        return dir;
+    }
+
     string files::assetsDir() {
         // TODO: The identifier should be passed into the function instead of hard coding the value here.
         auto bundle = CFBundleGetBundleWithIdentifier(CFSTR("com.couchbase.CBLTestServer"));
