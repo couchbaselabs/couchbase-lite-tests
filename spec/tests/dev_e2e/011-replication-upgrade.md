@@ -5,6 +5,7 @@
 1.3.0 (10/02/2026)
 * Add test_nonconflict_case_10 : delete a doc that both sides have at the same legacy revision, after the upgrade, and push the deletion.
 * Add test_nonconflict_case_11 : delete a doc that both sides have at the same legacy revision on SGW, after the upgrade, and pull the deletion.
+* Add test_conflict_case_9 : edit a doc on CBL after the upgrade while SGW has a different legacy child of the same ancestor, resolve with local wins, and push.
 
 1.2.1 (10/02/2026)
 * test_nonconflict_case_2 : the expected result has no HLV on CBL, as the test checks.
@@ -789,3 +790,57 @@ resolution CBL holds SGW's legacy revision, pulled with a legacy-only history, i
 11. Check that the doc is replicated correctly.
 12. Validate revid and HLV of local and remote doc.
 13. Check that `conflict_2` was pulled.
+
+### #2.9 test_conflict_case_9 (pull_post_upgrade_cbl_mutation_conflict_with_pre_upgrade_sgw_local_wins)
+#### Description
+
+Bidirectional replication conflict between a post-upgrade CBL mutation and a
+pre-upgrade SGW mutation, resolved with the local-wins resolver — CBL and SGW
+have different legacy children of the same revision, and CBL edits its own after
+the 4.x upgrade, so CBL's version has a version vector on top of its legacy
+revision. CBL keeps its version, now on top of SGW's legacy revision instead of
+its own, and pushes it to SGW.
+
+```
++------------------+--------------------------------------+--------------------------------------+
+|                  |              CBL                     |                 SGW                  |
+|                  +---------------+----------------------+---------------+----------------------+
+|                  |   Rev Tree    |         HLV          |   Rev Tree    |         HLV          |
++------------------+---------------+----------------------+---------------+----------------------+
+| Initial State    |     3-abc     |      none            |     3-def     |      none            |
+| After CBL edit   |  none (3-abc) |   [100@CBL1]         |     3-def     |      none            |
+| Expected Result  |      none     | [100@CBL1, 3def@RTE] |  4-ghi, 3-def | [100@CBL1, 3def@RTE] |
++------------------+---------------+----------------------+---------------+----------------------+
+* 3-abc and 3-def are both children of the same legacy revision. "none (3-abc)" is a
+  version vector whose legacy ancestor is 3-abc.
+```
+
+#### Steps
+
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Update `conflict_1` in the local database.
+5. Start a replicator:
+	* endpoint: '/upgrade'
+	* collections : '_default._default'
+	* type: pull
+	* document_ids: ['conflict_1']
+	* continuous: False
+	* conflict_resolver: local-wins
+6. Wait until the replicator is stopped.
+7. Validate revid and HLV of local and remote doc:
+	* The local doc keeps the body from step 4.
+	* The local doc's revision history has SGW's legacy revision instead of its own.
+8. Start a replicator:
+	* endpoint: '/upgrade'
+	* collections : '_default._default'
+	* type: push
+	* document_ids: ['conflict_1']
+	* continuous: False
+9. Wait until the replicator is stopped.
+10. Check that the doc is replicated correctly.
+11. Validate revid and HLV of local and remote doc:
+	* SGW has a new revision.
+	* Its HLV is the same as the local doc's.
+12. Check that SGW's new revision of `conflict_1` is a child of its legacy revision, not a new branch.
