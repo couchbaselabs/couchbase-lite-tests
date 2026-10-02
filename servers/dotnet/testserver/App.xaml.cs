@@ -5,7 +5,7 @@ public partial class App
 	public App()
 	{
 		InitializeComponent();
-
-        Windows[0].Page = new AppShell();
 	}
+
+	protected override Window CreateWindow(IActivationState? activationState) => new(new AppShell());
 }
