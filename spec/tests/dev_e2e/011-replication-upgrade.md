@@ -1,5 +1,10 @@
 # Changes
 
+1.2.1 (10/02/2026)
+* test_nonconflict_case_2 : the expected result has no HLV on CBL, as the test checks.
+* test_conflict_case_6, test_conflict_case_7 : describe what the tests do: CBL's document was created after the upgrade, so it has no revision history and isn't related to SGW's legacy revision.
+* test_conflict_case_7 : the steps use `conflict_7` and the remote-wins resolver, as the test does.
+
 1.2.0 (09/23/2026)
 * Add test_nonconflict_case_7 : pull a legacy-only doc into an empty database, then pull a post-upgrade SGW mutation of it.
 * Add test_nonconflict_case_8 : pull the non-conflict docs (most with legacy-only revisions) into an empty database, update one on SGW, pull again with the checkpoint reset.
@@ -65,7 +70,7 @@ replicated — a mutation made on SGW before the 4.x upgrade has not yet been pu
 |                  |   Rev Tree    |      HLV      |   Rev Tree    |      HLV      |
 +------------------+---------------+---------------+---------------+---------------+
 | Initial State    |     1-abc     |      none     |  2-def,1-abc  |      none     |
-| Expected Result  |  2-def,1-abc  | Encoded 2-def |     2-def     |      none     |
+| Expected Result  |  2-def,1-abc  |      none     |  2-def,1-abc  |      none     |
 +------------------+---------------+---------------+---------------+---------------+
 ```
 
@@ -565,11 +570,11 @@ the local winning revision as a child of the remote revision and push it to SGW.
 ### #2.6 test_conflict_case_6 (pull_post_upgrade_cbl_conflict_local_wins)
 #### Description
 
-Bidirectional replication conflict between a post-upgrade CBL mutation and
-a pre-upgrade SGW mutation, resolved with local wins — SGW and CBL have
-conflicting revisions, with CBL selected as the winner under the legacy
-default conflict resolution. CBL will rewrite the local winning revision
-as a child of the remote revision and push it to SGW.
+Bidirectional replication conflict between a document CBL created after the
+4.x upgrade and an unrelated pre-upgrade SGW document with the same ID,
+resolved with the local-wins resolver — CBL's document has a version vector
+and no revision history, and SGW's has only legacy revisions. CBL keeps its
+version and pushes it to SGW, where it becomes a child of SGW's revision.
 
 ```
 +------------------+-------------------------------------+-------------------------------------+
@@ -609,11 +614,12 @@ as a child of the remote revision and push it to SGW.
 ### #2.7 test_conflict_case_7 (pull_post_upgrade_cbl_conflict_remote_wins)
 #### Description
 
-Bidirectional replication conflict between a post-upgrade CBL mutation and
-a pre-upgrade SGW mutation, resolved with remote wins — SGW and CBL have
-conflicting revisions, with the remote revision selected as the winner
-under the legacy default conflict resolution. CBL will rewrite the local
-winning revision as a child of the remote revision and push it to SGW.
+Bidirectional replication conflict between a document CBL created after the
+4.x upgrade and an unrelated pre-upgrade SGW document with the same ID,
+resolved with the remote-wins resolver — CBL's document has a version vector
+and no revision history, and SGW's has only legacy revisions. CBL takes SGW's
+revision, so its HLV becomes the encoded legacy revision ID, and the push that
+follows leaves SGW unchanged.
 
 ```
 +------------------+---------------------------+---------------------------+
@@ -635,16 +641,16 @@ winning revision as a child of the remote revision and push it to SGW.
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: pull
-	* document_ids: ['conflict_6']
+	* document_ids: ['conflict_7']
 	* continuous: False
-   * conflict_resolver: local-wins
+   * conflict_resolver: remote-wins
 5. Wait until the replicator is stopped.
 6. Validate revid and HLV of local and remote doc.
 7. Start a replicator:
 	* endpoint: '/upgrade'
 	* collections : '_default._default'
 	* type: push
-	* document_ids: ['conflict_6']
+	* document_ids: ['conflict_7']
 	* continuous: False
 8. Wait until the replicator is stopped.
 9. Validate revid and HLV of local and remote doc.
