@@ -30,7 +30,8 @@
    will download the public release CBL binary. The built artifacts will be located at `build/out/bin` directory.
 
    The server listens on port 8080 unless `--port <port>` says otherwise, and keeps its databases
-   in `/tmp/CBL-C-TestServer` (`CBL-C-TestServer` under the working directory on Windows) unless
+   in `CBL-C-TestServer` under `/tmp` on Linux, `$TMPDIR` on macOS and the working directory on
+   Windows, unless
    `--files-dir <dir>` says otherwise. Give each server both if you run more than one on a host:
    a starting server deletes every session it finds in its files directory, so servers sharing one
    destroy each other's databases.
