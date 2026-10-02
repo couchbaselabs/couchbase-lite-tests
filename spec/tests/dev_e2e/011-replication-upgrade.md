@@ -1,5 +1,8 @@
 # Changes
 
+1.3.0 (10/02/2026)
+* Add test_nonconflict_case_10 : delete a doc that both sides have at the same legacy revision, after the upgrade, and push the deletion.
+
 1.2.1 (10/02/2026)
 * test_nonconflict_case_2 : the expected result has no HLV on CBL, as the test checks.
 * test_conflict_case_6, test_conflict_case_7 : describe what the tests do: CBL's document was created after the upgrade, so it has no revision history and isn't related to SGW's legacy revision.
@@ -357,6 +360,46 @@ remote mark for the test's SGW URL.
 12. Check that the doc is replicated correctly.
 13. Validate revid and HLV of local and remote doc.
 14. Check that `nonconflict_3` was pulled.
+
+### #1.10 test_nonconflict_case_10 (push_post_upgrade_cbl_deletion_of_legacy_doc)
+#### Description
+
+Push replication of a post-upgrade CBL deletion of a legacy document — CBL and
+SGW have the same legacy revision, and CBL deletes the document after the 4.x
+upgrade. SGW stores the deletion as a new revision whose parent is the legacy
+revision, with the HLV of CBL's deletion.
+
+```
++------------------+-------------------------------+-------------------------------+
+|                  |             CBL               |              SGW              |
+|                  +---------------+---------------+---------------+---------------+
+|                  |   Rev Tree    |      HLV      |   Rev Tree    |      HLV      |
++------------------+---------------+---------------+---------------+---------------+
+| Initial State    |     2-abc     |      none     |     2-abc     |      none     |
+| Expected Result  |    deleted    |   [100@CBL1]  | 3-def*, 2-abc |   [100@CBL1]  |
++------------------+---------------+---------------+---------------+---------------+
+* 3-def is the deletion.
+```
+
+#### Steps
+
+1. Restore Couchbase Server Bucket using `upgrade` dataset.
+2. Wait for SG to bring the restored database online.
+3. Reset local database, and load `upgrade` dataset.
+4. Delete `nonconflict_3` in the local database.
+5. Start a replicator:
+	* endpoint: '/upgrade'
+	* collections : '_default._default'
+	* type: push
+	* document_ids: ['nonconflict_3']
+	* continuous: False
+6. Wait until the replicator is stopped.
+7. Check that the push replication of `nonconflict_3` has the deleted flag set and no error.
+8. Check that `nonconflict_3` doesn't exist in the local database.
+9. Check SGW's `nonconflict_3`:
+	* Its current revision is a deletion, and not the legacy revision it had before.
+	* The revision's generation is one more than the legacy revision's.
+	* It has an HLV.
 
 ## #2 Conflict Cases
 
