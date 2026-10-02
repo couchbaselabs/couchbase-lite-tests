@@ -121,7 +121,7 @@ export interface Filter {
 }
 
 export interface ReplicatorAuthenticator {
-    type: "BASIC" | "SESSION";
+    type: "BASIC" | "SESSION" | "BEARER";
 }
 
 export interface ReplicatorBasicAuthenticator extends ReplicatorAuthenticator {
@@ -133,7 +133,12 @@ export interface ReplicatorBasicAuthenticator extends ReplicatorAuthenticator {
 export interface ReplicatorSessionAuthenticator extends ReplicatorAuthenticator {
     type: "SESSION";
     sessionID: string;
-    cookieName: string;
+    cookieName?: string;
+}
+
+export interface ReplicatorBearerAuthenticator extends ReplicatorAuthenticator {
+    type: "BEARER";
+    token: string;
 }
 
 export interface StartReplicatorResponse {

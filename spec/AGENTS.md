@@ -96,6 +96,7 @@ spec/
 
 | Version | Date | Change |
 |---|---|---|
+| 2.0.4 | Add ReplicatorBearerAuthenticator to ReplicatorConfiguration.authenticator |
 | 2.0.3 | 04/17/2026 | Add identity property to `startListener` |
 | 2.0.2 | 07/24/2025 | Add peer ID to `startMultipeerReplicator` return |
 | 2.0.1 | 07/10/2025 | Add Merge-Dict conflict resolver |
