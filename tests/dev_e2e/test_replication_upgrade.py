@@ -1521,3 +1521,79 @@ class TestReplicationUpgrade(CBLTestClass):
         assert history[1:2] == [sg_legacy_revid], (
             f"Expected SGW's new revision {remote.revid} to be a child of {sg_legacy_revid}, but its history is {history}"
         )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_conflict_case_10(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        doc_id = "conflict_1"
+        db = await setup_upgrade_env(self, cblpytest, dataset_path, empty_local_db=True)
+        sg = cblpytest.sync_gateways[0]
+        local_doc = DocumentEntry("_default._default", doc_id)
+
+        # The legacy revision both sides start from.
+        legacy_revid = (await sg.get_document("upgrade", doc_id)).revid
+
+        await do_upgrade_replication_test(self, cblpytest, db, doc_ids=[doc_id], replicator_type=ReplicatorType.PULL)
+
+        self.mark_test_step(f"Update `{doc_id}` in the local database.")
+        async with db.batch_updater() as updater:
+            updater.upsert_document("_default._default", doc_id, new_properties=[{"updated_by": "cbl"}])
+        edited = await db.get_document(local_doc)
+
+        self.mark_test_step(f"Update `{doc_id}` on SGW.")
+        remote_doc = await sg.get_document("upgrade", doc_id)
+        await sg.update_documents(
+            "upgrade",
+            [DocumentUpdateEntry(doc_id, remote_doc.revid, body={**remote_doc.body, "updated_by": "sgw"})],
+            wait_for_caching_feed=True,
+        )
+        # SGW's edit, which its new revision must follow after the push.
+        sg_edit_revid = (await sg.get_document("upgrade", doc_id)).revid
+
+        def pull_validator(pre: DocSnapshot, post: DocSnapshot) -> None:
+            # Validate pre-condition: both sides edited the same legacy revision after the upgrade.
+            assert pre.local.revid is None and pre.local.cv is not None and legacy_revid in pre.local.revs, (
+                f"Local precondition is invalid, RevID: {pre.local.revid}, HLV: {pre.local.cv}, revs: {pre.local.revs}"
+            )
+
+            assert pre.remote.cv is not None and pre.remote.revid != legacy_revid, (
+                f"Remote precondition is invalid, RevID: {pre.remote.revid}, HLV: {pre.remote.cv}"
+            )
+
+            # Validate post-condition: the conflict was detected, so CBL keeps its body.
+            assert post.local.body == edited.body, f"Expected the local body {edited.body}, got {post.local.body}"
+
+        await do_upgrade_replication_test(
+            self,
+            cblpytest,
+            db,
+            doc_ids=[doc_id],
+            replicator_type=ReplicatorType.PULL,
+            conflict_resolver=ReplicatorConflictResolver("local-wins"),
+            compare_docs=False,
+            validator=pull_validator,
+        )
+
+        def push_validator(pre: DocSnapshot, post: DocSnapshot) -> None:
+            assert post.remote.revid != pre.remote.revid, (
+                f"Expected a new remote revision, but it is still {pre.remote.revid}"
+            )
+
+            assert post.remote.cv and post.remote.cv == post.local.cv, (
+                f"HLV mismatch: Local: {post.local.cv}, Remote: {post.remote.cv}"
+            )
+
+        await do_upgrade_replication_test(
+            self,
+            cblpytest,
+            db,
+            doc_ids=[doc_id],
+            replicator_type=ReplicatorType.PUSH,
+            validator=push_validator,
+        )
+
+        self.mark_test_step(f"Check that SGW's new revision of `{doc_id}` is a child of SGW's revision from step 8.")
+        remote = await sg.get_document("upgrade", doc_id, revs=True)
+        history = remote.revision_history or []
+        assert history[1:2] == [sg_edit_revid], (
+            f"Expected SGW's new revision {remote.revid} to be a child of {sg_edit_revid}, but its history is {history}"
+        )
