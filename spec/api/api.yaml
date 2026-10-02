@@ -283,15 +283,7 @@ paths:
             The response body is an object containing document properties and metadata. The metadata
             keys are :
               * _id : Document ID
-              * _revs: Revision history, current revision first.
-
-            For a client using revision trees, the history is revision IDs separated by commas.
-
-            For a client using version vectors, the history is a version vector: the current
-            version, then zero or two merge versions, then the historical versions. Commas
-            separate the versions, except for a single semicolon separating the current and merge
-            versions from the historical ones, so a current version with history reads
-            "<current>;<historical>,<historical>" and never "<current>,<historical>".
+              * _revs: Revision history including the current revision ID as the first item.
 
             The format of the revision history is described in this document:
             https://github.com/couchbase/couchbase-lite-core/wiki/Replication-Protocol#3-versioning-revision-ids-histories-sequences
