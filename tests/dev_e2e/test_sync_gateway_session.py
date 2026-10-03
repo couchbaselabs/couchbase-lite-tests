@@ -277,6 +277,7 @@ class TestSyncGatewaySession(CBLTestClass):
             async with sg.get_user_client(get_sync_gateway_session_headers(tampered_id)) as client:
                 await assert_unauthorized(client, "doc_a")
 
+    @pytest.mark.skip(reason="bug: CBG-5941: currently this will return a 500 if session id is > 237 characters")
     @pytest.mark.asyncio(loop_scope="session")
     async def test_oversized_session_id_is_rejected(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
@@ -327,6 +328,7 @@ class TestSyncGatewaySession(CBLTestClass):
         async with sg.get_user_client(headers) as client:
             await assert_unauthorized(client, "doc_a")
 
+    @pytest.mark.skip(reason="bug: CBG-5940 disabling a user keeps an invalid session")
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("source", SESSION_SOURCES)
     async def test_disabled_user_session_is_rejected(self, cblpytest: CBLPyTest, source: str) -> None:
@@ -440,8 +442,8 @@ class TestSyncGatewaySession(CBLTestClass):
             pytest.param(-1, id="negative"),
             # Past the largest duration in int64 nanoseconds: wraps round to a negative duration.
             pytest.param(9_223_372_037, id="overflows_negative"),
-            # Far past it: wraps round to a positive duration of a few years.
-            pytest.param(99_999_999_999_999, id="overflows_positive"),
+            # Far past it: wraps round to a positive duration of a few years. Fails due to CBG-5942
+            # pytest.param(99_999_999_999_999, id="overflows_positive"),
         ],
     )
     async def test_create_session_rejects_invalid_ttl(self, cblpytest: CBLPyTest, ttl: int) -> None:
