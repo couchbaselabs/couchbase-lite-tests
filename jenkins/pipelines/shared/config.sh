@@ -42,9 +42,6 @@ function move_artifacts() {
       echo "Warning: failed to gzip session.log; leaving it uncompressed"
   fi
   mv "$src_dir/http_log" "$dst_dir/http_log" || true
-  # Include the JUnit XML so each platform's results are preserved per
-  # artifacts dir in a multi-pipeline (matrix) build.
-  mv "$src_dir/junit_result.xml" "$dst_dir/junit_result.xml" || true
   # SGW diagnostics downloaded by run_sgcollects() (via --sgcollect-on-test-failure)
   # into the pytest cwd when a test fails; moving them here gets them archived
   # (and later purged) by Jenkins retention. Files are named
