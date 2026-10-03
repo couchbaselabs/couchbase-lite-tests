@@ -547,12 +547,14 @@ class RemoteDocument(JSONSerializable):
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"])
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
+        # `_revisions` lists the revision IDs' digests, newest first.
+        revisions = cast(dict, body["_revisions"]) if "_revisions" in body else None
         del self.__body["_id"]
         del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
-        # `_revisions` lists the revision IDs' digests, newest first, counting down from generation `start`.
-        revisions = self.__body.pop("_revisions", None)
+        if revisions is not None:
+            del self.__body["_revisions"]
         self.__revision_history = (
             [f"{revisions['start'] - i}-{digest}" for i, digest in enumerate(revisions["ids"])]
             if revisions is not None
