@@ -15,7 +15,7 @@ if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }
 
-$pytestArgs = @('-v', '--no-header', '--config', 'config.json', '--dataset-version', $DatasetVersion)
+$pytestArgs = @('-v', '--no-header', '--config', 'config.json', '-m', 'min_test_servers', '--dataset-version', $DatasetVersion)
 if ($TestFilter) {
     $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }

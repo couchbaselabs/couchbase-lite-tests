@@ -44,7 +44,7 @@ echo "Run tests..."
 
 pushd "${DEV_E2E_TESTS_DIR}" >/dev/null
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -k "$TEST_FILTER" --no-result-upload
+  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m min_test_servers -k "$TEST_FILTER" --no-result-upload
 else
-  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json
+  uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m min_test_servers
 fi
