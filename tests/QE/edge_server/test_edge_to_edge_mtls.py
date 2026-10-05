@@ -1,4 +1,5 @@
 import ssl
+import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -25,12 +26,15 @@ SOURCE_TEMPLATE = f"{SCRIPT_DIR}/config/test_e2e_mtls_source.json"
 REMOTE_CERT_DIR = "/home/ec2-user/cert/qe_e2e_mtls"
 ES_PORT = 59840
 DB = "db"
+# How long an empty /_replicate list must last before it counts as the replicator giving up.
+_REJECTION_GRACE_SECONDS = 20
 
 Format = Literal["pem", "der"]
 
 
 @dataclass(frozen=True)
 class MtlsFormats:
+    """The encoding of each piece of TLS material a test writes to the Edge Server hosts."""
 
     server_cert: Format = "pem"
     server_key: Format = "pem"
@@ -219,13 +223,19 @@ class TestEdgeToEdgeMtls(CBLTestClass):
         :return: The final /_replicate list, for the test log
         """
 
+        started = time.monotonic()
+
         async def _poll() -> list:
             tasks = await edge_server.all_replication_status()
-            if tasks:
-                task = tasks[0]
-                assert task.get("status") in ("Stopped", "Offline") or "error" in task, (
-                    f"Replicator is still running: {task}"
-                )
+            if not tasks:
+                # Edge Server drops a replicator after a permanent error, but the list is
+                # also empty before the replicator registers, so only trust it after a grace.
+                assert time.monotonic() - started >= _REJECTION_GRACE_SECONDS, "Replicator not started yet"
+                return tasks
+            task = tasks[0]
+            assert task.get("status") in ("Stopped", "Offline") or "error" in task, (
+                f"Replicator is still running: {task}"
+            )
             return tasks
 
         return await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(60))

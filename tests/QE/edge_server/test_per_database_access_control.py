@@ -14,6 +14,7 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTimeoutError
+from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.asyncfile import read_json_file, write_json_file
 from cbltest.utils import async_retry_assert
 
@@ -149,7 +150,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
 
     async def _probe(self, manager: EdgeServerManager, name: str, password: str, db: str) -> tuple[Outcome, Outcome]:
         """Read and write `db` as `name`, returning how each was answered."""
-        async with manager.get_user_client(name, password) as client:
+        async with manager.get_user_client(get_basic_auth_headers(name, password)) as client:
             read = await _outcome(client.get_all_documents(db))
             write = await _outcome(client.put_document_with_id({"probe": name}, f"probe_{name}_{uuid4().hex}", db))
         return read, write

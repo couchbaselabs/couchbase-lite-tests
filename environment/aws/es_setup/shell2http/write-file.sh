@@ -24,19 +24,19 @@ fi
 
 mkdir -p "$(dirname "$PATH_VALUE")"
 case "$ENCODING" in
-text)
-  printf '%s' "$CONTENT" >"$PATH_VALUE"
-  ;;
-base64)
-  # A shell variable cannot hold a NUL byte, so decode straight into the file.
-  if ! printf '%s' "$CONTENT" | base64 -d >"$PATH_VALUE"; then
-    echo "Error: 'content' is not valid base64"
+  text)
+    printf '%s' "$CONTENT" >"$PATH_VALUE"
+    ;;
+  base64)
+    # A shell variable cannot hold a NUL byte, so decode straight into the file.
+    if ! printf '%s' "$CONTENT" | base64 -d >"$PATH_VALUE"; then
+      echo "Error: 'content' is not valid base64"
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Error: unknown encoding '$ENCODING' (expected 'text' or 'base64')"
     exit 1
-  fi
-  ;;
-*)
-  echo "Error: unknown encoding '$ENCODING' (expected 'text' or 'base64')"
-  exit 1
-  ;;
+    ;;
 esac
 echo '{"ok": true}'

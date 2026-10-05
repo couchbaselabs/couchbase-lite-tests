@@ -4,34 +4,6 @@ These tests validate Edge Server (ES) to Edge Server replication over mutual TLS
 certificates and keys are in DER (binary) form as well as PEM, and that the target really does
 enforce client certificates.
 
-A **source** ES replicates to a **target** ES. The source presents a client certificate
-(`auth.tls_client_cert` / `auth.tls_client_cert_key`) and trusts the target through
-`trusted_root_certs`. The target serves TLS (`https.tls_cert_path` / `https.tls_key_path`) and
-verifies clients against a CA (`https.client_cert_path`). Every path is a file on the ES host,
-in a config-file `replications` block.
-
-The all-PEM handshake is already covered by dev_e2e
-(`spec/tests/dev_e2e/015-edge-to-edge-mtls.md`, the CBL-8862 regression) and is not repeated.
-CBL-8862 was a PEM key that was parsed with the wrong buffer length, and so misread as DER. The fix
-changes how that length is passed, so DER, whose parsing depends on the exact length, is the
-mirror-image risk. It is why DER is tested for the cert and the key separately.
-
-Common setup, used by every test:
-
-- Each test mints its own CA, a target server certificate whose subjectAltName is the target
-  host, a source client certificate, and a separate *framework* client certificate that the test
-  harness uses to reach the target. All are signed by the CA unless a case says otherwise.
-- The harness's `~/.cbl_certs` identity is replaced with the CA and framework certificate for the
-  test's duration and restored afterwards.
-- Certificate files are written to a dedicated directory on each ES host, so the provisioned
-  certificates other tests use are never overwritten. `trusted_root_certs` is always PEM, the only
-  format the replication docs name for it.
-- Before the source starts, the harness checks that the target accepts a TLS client that presents
-  the framework certificate, and refuses one that presents none. The replication itself can't show
-  that the target enforces mTLS: the target allows anonymous users, so if it had silently failed
-  to load its client CA (a DER CA, say) and stopped asking for certificates, replication would
-  still work.
-
 ## test_edge_to_edge_mtls_formats
 
 ### Description

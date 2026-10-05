@@ -1,26 +1,5 @@
 # Per-Database User Access Control Tests (Edge Server)
 
-These tests validate the per-database `enable_user_access_control` flag (CBL-8556, Edge Server
-1.1.1). A `databases.<name>` block may set the flag, and the existing root-level key becomes the
-default for databases that don't. For database D the flag resolves to D's own key if present, else
-the root key, else `false`.
-
-Every test skips on Edge Server older than 1.1.1.
-
-Common setup, used by every test:
-
-- Each test writes its own users file to the Edge Server host, with bcrypt-hashed passwords, and
-  points its config at it. The provisioned admin user is always included, with the `admin` role,
-  so the harness can still manage the server.
-- Every database is created empty (`create: true`) with client writes and client sync enabled.
-- Console logging is on, so the Edge Server's startup messages land in `/home/ec2-user/log/edge.log`,
-  which the tests read for startup errors and warnings.
-- Access is probed over the REST API as each user: a **read** is `GET /{db}/_all_docs` and a
-  **write** is `PUT /{db}/{new doc id}`. "Allow" means the request succeeds, and "deny" means 403.
-  Any other status, a 401 in particular (the user failed to authenticate), is reported as an
-  error in the test rather than read as either.
-- A table-driven test checks every row before failing, and reports every mismatch together.
-
 ## test_flag_resolution
 
 ### Description
@@ -43,9 +22,6 @@ therefore has full access when the database is open, and is denied when it is en
 | `row7_root_true_db_absent` | true | &mdash; | enforcing |
 | `row8_root_true_db_false` | true | false | open |
 | `row9_root_true_db_true` | true | true | enforcing |
-
-Row 7 is how every shipped 1.1 config looks. Row 8 is the only case where the database overrides
-the root.
 
 ### Steps
 

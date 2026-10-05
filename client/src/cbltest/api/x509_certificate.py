@@ -147,15 +147,27 @@ def create_ca_certificate(CN: str) -> CertKeyPair:
 
 
 def create_leaf_certificate(
-    CN: str, *, issuer_data: CertKeyPair | None = None, sans: list[str] | None = None
+    CN: str,
+    *,
+    issuer_data: CertKeyPair | None = None,
+    sans: list[str] | None = None,
+    not_valid_before: datetime | None = None,
+    not_valid_after: datetime | None = None,
 ) -> CertKeyPair:
+    """
+    Create a leaf certificate, valid from now for one day unless a window is given.
+
+    :param not_valid_before: Start of the validity window, or None for now
+    :param not_valid_after: End of the validity window, or None for a day after its start,
+        e.g. a time in the past to mint an already-expired certificate
+    """
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048,
     )
     cn_attribute = Name([NameAttribute(NameOID.COMMON_NAME, CN)])
-    not_valid_before = datetime.now(UTC)
-    not_valid_after = not_valid_before + timedelta(days=1)
+    not_valid_before = not_valid_before or datetime.now(UTC)
+    not_valid_after = not_valid_after or not_valid_before + timedelta(days=1)
     issuer_name = issuer_data.certificate.subject if issuer_data else cn_attribute
     signing_key = issuer_data.private_key if issuer_data else private_key
 
