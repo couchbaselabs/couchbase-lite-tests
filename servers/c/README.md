@@ -29,7 +29,12 @@
    The build script requires CBL version and build number. When specifying the build number = 0, the script 
    will download the public release CBL binary. The built artifacts will be located at `build/out/bin` directory.
 
-   The server listens on port 8080 unless `--port <port>` says otherwise.
+   The server listens on port 8080 unless `--port <port>` says otherwise, and keeps its databases
+   in `CBL-C-TestServer` under `/tmp` on Linux, `$TMPDIR` on macOS and the working directory on
+   Windows, unless
+   `--files-dir <dir>` says otherwise. Give each server both if you run more than one on a host:
+   a starting server deletes every session it finds in its files directory, so servers sharing one
+   destroy each other's databases.
 
 ### macOS
 
@@ -38,6 +43,7 @@
 cd build/out/bin
 ./testserver
 ./testserver --port 8081   # to listen somewhere other than 8080
+./testserver --port 8081 --files-dir /tmp/testserver-8081   # to run a second server alongside
 ```
 
 ### linux
@@ -47,6 +53,7 @@ cd build/out/bin
 cd build/out/bin
 ./testserver
 ./testserver --port 8081   # to listen somewhere other than 8080
+./testserver --port 8081 --files-dir /tmp/testserver-8081   # to run a second server alongside
 ```
 
 ### iOS

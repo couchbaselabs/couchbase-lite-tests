@@ -33,7 +33,7 @@ namespace ts {
         sTestServerInitialized = true;
     }
 
-    TestServer::TestServer(unsigned short port) : _port(port) {
+    TestServer::TestServer(unsigned short port, const string &filesDirectory) : _port(port) {
         if (!sTestServerInitialized) {
             throw runtime_error("TestServer::init() hasn't been called");
         }
@@ -41,7 +41,10 @@ namespace ts {
 #ifdef __ANDROID__
         if (!androidContext()) { throw runtime_error("Android Context is not initialized"); }
 #endif
-        _context = {filesDir("CBL-C-TestServer", true), assetsDir()};
+        _context = {
+            filesDirectory.empty() ? filesDir(DEFAULT_FILES_SUBDIR, true) : ensureDir(filesDirectory),
+            assetsDir()
+        };
         _dispatcher = std::make_unique<Dispatcher>(this);
         _sessionManager = std::make_unique<SessionManager>(this);
     }
