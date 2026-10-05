@@ -109,6 +109,18 @@ async def _write_native(
     await primary.update_documents(db_name, docs)
 
 
+async def _wait_for_caching_feed(sg: SyncGateway, db_name: str) -> None:
+    """
+    Forces a request_plus changes-feed round trip against `sg`, blocking until its channel cache has caught up to
+    the latest sequence it has allocated. wait_for_document_count only confirms a doc via `_all_docs`, which can be
+    satisfied before the channel cache -- what both an admin-scoped `_changes` call and a real BLIP pull actually
+    read from -- has indexed it, whether the doc arrived natively or via cross-node ISGR propagation. A `_changes`
+    call can ask for request_plus itself; a `Replicator` pull cannot, so anything about to run one against `sg`
+    needs this barrier first.
+    """
+    await sg.get_changes(db_name, request_plus=True, log_response=False)
+
+
 async def _pinned_pull(
     db: Database,
     repl_url: str,
@@ -160,7 +172,10 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         self.mark_test_step("Set up same-named DB + user on both SGWs, and a continuous bidirectional ISGR link")
         async with _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password) as (sg1, sg2):
-            self.mark_test_step("Add one seed doc directly on SG1 (native), and wait for it to reach SG2 via ISGR")
+            self.mark_test_step(
+                "Add one seed doc directly on SG1 (native), and wait for it to reach SG2 via ISGR and for the"
+                " channel cache to catch up on both backends"
+            )
             await _write_native(
                 sg1,
                 sg2,
@@ -168,6 +183,8 @@ class TestISGRLoadBalancer(CBLTestClass):
                 [DocumentUpdateEntry(id="seed_doc", revision=None, body={"channels": channels})],
             )
             await sg2.wait_for_document_count(db_name, 1)
+            await _wait_for_caching_feed(sg1, db_name)
+            await _wait_for_caching_feed(sg2, db_name)
 
             self.mark_test_step("Create an empty local CBL database")
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
@@ -192,7 +209,10 @@ class TestISGRLoadBalancer(CBLTestClass):
                 assert await pinned_pull(_SG1_PIN) == 0, "Expected no redundant transfer on an already-known backend"
                 assert await pinned_pull(_SG2_PIN) == 0, "Expected no redundant transfer on an already-known backend"
 
-            self.mark_test_step("Add one more doc directly on SG1, and wait for it to reach SG2 via ISGR")
+            self.mark_test_step(
+                "Add one more doc directly on SG1, and wait for it to reach SG2 via ISGR and for the channel cache"
+                " to catch up on both backends"
+            )
             await _write_native(
                 sg1,
                 sg2,
@@ -200,6 +220,8 @@ class TestISGRLoadBalancer(CBLTestClass):
                 [DocumentUpdateEntry(id="second_doc", revision=None, body={"channels": channels})],
             )
             await sg2.wait_for_document_count(db_name, 2)
+            await _wait_for_caching_feed(sg1, db_name)
+            await _wait_for_caching_feed(sg2, db_name)
 
             self.mark_test_step(
                 "Each backend's next contact after the new write -- expect a non-empty transfer on both (and only these"
@@ -248,12 +270,13 @@ class TestISGRLoadBalancer(CBLTestClass):
                 [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})],
             )
 
-            self.mark_test_step("Wait for the doc to reach SG1 via ISGR")
+            self.mark_test_step("Wait for the doc to reach SG1 via ISGR, and for SG1's channel cache to catch up")
             await sg1.wait_for_document_count(db_name, 1)
+            await _wait_for_caching_feed(sg1, db_name)
 
             self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG1")
             async with sg1.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
-                changes = await scoped_user.get_changes(db_name)
+                changes = await scoped_user.get_changes(db_name, request_plus=True)
                 doc_ids = {entry.id for entry in changes.results}
                 assert doc_id in doc_ids, (
                     f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
