@@ -127,7 +127,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async [tdk.GetDocumentCommand](rq: tdk.GetDocumentRequest): Promise<tdk.GetDocumentResponse> {
         const coll = this.#getDatabase(rq.database).getCollection(normalizeCollectionID(rq.document.collection));
         const doc = await coll.getDocument(rq.document.id);
-        if (!doc) throw new HTTPError(404, `No document "${rq.document.id}"`);
+        if (!doc) throw new HTTPError(404, `Document '${rq.document.collection}.${rq.document.id}' not found`);
         const m = cbl.meta(doc);
         const jsonBody = docToJSON(doc);
         return { _id: rq.document.id, _revs: m.revisionID!, ...jsonBody };

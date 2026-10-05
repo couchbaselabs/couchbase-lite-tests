@@ -12,7 +12,7 @@ from cbltest.globals import CBLPyTestGlobal
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.request_types import GetRootRequest, TestServerRequest, TestServerResponse
-from cbltest.responses import _response_registry
+from cbltest.responses import _response_registry, unwrap_ws_payload
 from cbltest.websocket_router import WebSocketRouter
 
 
@@ -71,7 +71,9 @@ class _RequestHttpTransport(RequestTransport):
 
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if not resp.ok:
-            raise CblTestServerBadResponseError(resp.status, ret_val, f"returned {resp.status}")
+            raise CblTestServerBadResponseError(
+                resp.status, ret_val, f"{request.method.upper()} /{request.http_name} returned {resp.status}"
+            )
 
         return ret_val
 
@@ -140,7 +142,11 @@ class _RequestWebSocketTransport(RequestTransport):
 
         cbl_trace(f"Received {ret_val} from {self.__url}")
         if ret_val.status_code != 200:
-            raise CblTestServerBadResponseError(ret_val.status_code, ret_val, f"returned {ret_val.status_code}")
+            raise CblTestServerBadResponseError(
+                ret_val.status_code,
+                ret_val,
+                f"{request.method.upper()} /{request.http_name} returned {ret_val.status_code}",
+            )
 
         return ret_val
 
@@ -150,12 +156,8 @@ class _RequestWebSocketTransport(RequestTransport):
 
         response_class = _response_registry[(request_type, version)]
 
-        status = 200
-        error = cast(dict | None, ws_payload.get("ts_error"))
-        if error is not None:
-            status = cast(int, error.get("code", 500))
-
-        return cast(TestServerResponse, response_class(status, uuid, ws_payload))
+        status, body = unwrap_ws_payload(ws_payload)
+        return cast(TestServerResponse, response_class(status, uuid, body))
 
 
 class RequestTransportFactory:
