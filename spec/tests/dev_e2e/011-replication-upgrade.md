@@ -1,5 +1,8 @@
 # Changes
 
+1.2.1 (10/05/2026)
+* test_nonconflict_case_7, test_nonconflict_case_8, test_nonconflict_case_9, test_conflict_case_8: require CBL 4.2.0 or later, which has the CBL-8954 fix.
+
 1.2.0 (09/23/2026)
 * Add test_nonconflict_case_7 : pull a legacy-only doc into an empty database, then pull a post-upgrade SGW mutation of it.
 * Add test_nonconflict_case_8 : pull the non-conflict docs (most with legacy-only revisions) into an empty database, update one on SGW, pull again with the checkpoint reset.
@@ -225,7 +228,7 @@ the pushed revision.
 Pull of a document that CBL does not have and that SGW still holds with a legacy
 (pre-upgrade) revision only, followed by a post-upgrade SGW mutation of the same
 document. The first pull stores the document with its legacy revID in the 4.x record
-format; the second pull must accept the new revision (CBL-8954).
+format; the second pull must accept the new revision (CBL-8954). Requires CBL 4.2.0 or later.
 
 ```
 +------------------+-------------------------------+-------------------------------+
@@ -268,7 +271,7 @@ Pull of several documents that CBL does not have, most of them held by SGW with 
 revisions only, followed by a post-upgrade SGW mutation of one of them and a second pull
 with the checkpoint reset. SGW then sends all documents in one `changes` batch. The batch
 must be processed, only the updated document must be pulled, and the other documents must
-be unchanged (CBL-8954).
+be unchanged (CBL-8954). Requires CBL 4.2.0 or later.
 
 ```
 +------------------+-------------------------------+-------------------------------+
@@ -313,7 +316,7 @@ Pull of a document that CBL already has at the same legacy revision as SGW, foll
 by a post-upgrade SGW mutation of that document. The first pull transfers nothing but
 records SGW's revision on the local document, which rewrites it into the 4.x record
 format while keeping its legacy revID. The second pull must accept the new revision
-(CBL-8954).
+(CBL-8954). Requires CBL 4.2.0 or later.
 
 Note: the rewrite in the first pull happens only because the `upgrade` dataset has no
 remote mark for the test's SGW URL.
@@ -656,7 +659,7 @@ winning revision as a child of the remote revision and push it to SGW.
 Pull replication conflict between pre-upgrade CBL and SGW mutations resolved with
 remote wins, followed by a post-upgrade SGW mutation of the same document. After the
 resolution CBL holds SGW's legacy revision, pulled with a legacy-only history, in the
-4.x record format. The second pull must accept the new revision (CBL-8954).
+4.x record format. The second pull must accept the new revision (CBL-8954). Requires CBL 4.2.0 or later.
 
 ```
 +------------------+-------------------------------+-------------------------------+
