@@ -253,6 +253,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
         # cannot send due to limitations of its Websocket library.
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_sgw_not(cblpytest.clusters[1].sync_gateways[0], ">=4.0.8,!=4.1.0.*,!=4.1.1.*")
 
         db_name = "db_isgr_lb_channels"
         channels = ["isgr_lb_channel_test"]
