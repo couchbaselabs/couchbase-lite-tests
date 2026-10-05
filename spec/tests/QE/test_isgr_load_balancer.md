@@ -45,10 +45,13 @@ invisible on that side's `_changes` feed with no error raised anywhere. Confirme
 
 1. Create a same-named database on both SG1 and SG2 (separate buckets), and a matching user on
    both
-2. Start a continuous, bidirectional ISGR link from SG1 to SG2
-3. Add one brand-new document with an explicit channel assignment directly on SG1 (native)
-4. Wait for the document to reach SG2 via ISGR
-5. Verify the document is visible through a `_changes` call scoped to that channel on SG2
-6. Pull the document through a real CBL client pinned to SG2 (`X-Backend: sg-1`), and verify the
+2. Start a continuous, bidirectional ISGR link from SG1 to SG2, with SG1 as the active side
+3. Add one brand-new document with an explicit channel assignment directly on SG2 (native) --
+   since SG1 is the active side of the link, this document reaches SG1 over SG1's own active
+   *pull* leg, the direction this regression is actually about (writing on SG1 instead would
+   only exercise its active *push* leg, never a pull)
+4. Wait for the document to reach SG1 via ISGR
+5. Verify the document is visible through a `_changes` call scoped to that channel on SG1
+6. Pull the document through a real CBL client pinned to SG1 (`X-Backend: sg-0`), and verify the
    pull actually transferred it
 7. Verify the document's channel assignment arrived intact at the CBL client

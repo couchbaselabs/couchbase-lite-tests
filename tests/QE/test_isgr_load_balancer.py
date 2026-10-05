@@ -22,6 +22,7 @@ from cbltest.api.syncgateway import (
     SyncGateway,
 )
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.responses import ServerVariant
 
 _ISGR_REPLICATION_ID = "isgr-lb-link"
 _SG1_PIN = {"X-Backend": "sg-0"}
@@ -149,6 +150,10 @@ async def _pinned_pull(
 class TestISGRLoadBalancer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
+        # cannot send due to limitations of its Websocket library.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         db_name = "db_isgr_lb"
         channels = ["isgr_lb_test"]
         user_name, user_password = "isgr_lb_user", "pass"
@@ -224,6 +229,10 @@ class TestISGRLoadBalancer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
+        # cannot send due to limitations of its Websocket library.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         db_name = "db_isgr_lb_channels"
         channels = ["isgr_lb_channel_test"]
         user_name, user_password = "isgr_lb_channel_user", "pass"
@@ -231,32 +240,32 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         self.mark_test_step("Set up same-named DB + user on both SGWs, and a continuous bidirectional ISGR link")
         async with _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password) as (sg1, sg2):
-            self.mark_test_step("Add one brand-new doc with an explicit channel assignment directly on SG1")
+            self.mark_test_step("Add one brand-new doc with an explicit channel assignment directly on SG2")
             await _write_native(
-                sg1,
                 sg2,
+                sg1,
                 db_name,
                 [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})],
             )
 
-            self.mark_test_step("Wait for the doc to reach SG2 via ISGR")
-            await sg2.wait_for_document_count(db_name, 1)
+            self.mark_test_step("Wait for the doc to reach SG1 via ISGR")
+            await sg1.wait_for_document_count(db_name, 1)
 
-            self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG2")
-            async with sg2.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
+            self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG1")
+            async with sg1.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
                 changes = await scoped_user.get_changes(db_name)
                 doc_ids = {entry.id for entry in changes.results}
                 assert doc_id in doc_ids, (
-                    f"Doc invisible on SG2's channel-scoped _changes feed despite no error: {doc_ids}"
+                    f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
                 )
 
             self.mark_test_step(
-                "Pull the doc through a real CBL client pinned to SG2, and verify its channel assignment arrives intact"
+                "Pull the doc through a real CBL client pinned to SG1, and verify its channel assignment arrives intact"
             )
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
             repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
-            replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG2_PIN)
-            assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG2 to transfer the doc"
+            replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG1_PIN)
+            assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
 
             pulled = await db.get_document(DocumentEntry(_DEFAULT_COLLECTION, doc_id))
             assert pulled.body.get("channels") == channels, (
