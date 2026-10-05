@@ -38,14 +38,20 @@ async def _setup_isgr_pair(
     user_password: str,
 ) -> AsyncIterator[tuple[SyncGateway, SyncGateway]]:
     """
-    Configures a same-named database on each of the first two Sync Gateway nodes (separate buckets, so they are
-    genuinely independent backends), a matching user on both, and a continuous bidirectional ISGR link from the first to
-    the second. Stops the link on exit.
+    Configures a same-named database on two GENUINELY SEPARATE Couchbase clusters (not just two buckets within one
+    shared cluster) -- CouchbaseCluster.create_database() is cluster-wide: it writes the config once and then makes
+    every node in that SAME cluster's sync_gateways apply it, so looping two different bucket configs over one shared
+    cluster would make both nodes fight over the same database instead of being independent backends. Configures a
+    matching user on each, then starts a continuous bidirectional ISGR link from the first to the second. Stops the
+    link on exit.
     """
-    cluster = cblpytest.clusters[0]
-    sg1, sg2 = cluster.sync_gateways[0], cluster.sync_gateways[1]
+    cluster1, cluster2 = cblpytest.clusters[1], cblpytest.clusters[2]
+    sg1, sg2 = cluster1.sync_gateways[0], cluster2.sync_gateways[0]
 
-    for sg, bucket_name in ((sg1, "bucket-isgr-lb-1"), (sg2, "bucket-isgr-lb-2")):
+    for cluster, sg, bucket_name in (
+        (cluster1, sg1, "bucket-isgr-lb-1"),
+        (cluster2, sg2, "bucket-isgr-lb-2"),
+    ):
         await cluster.create_database(
             db_name,
             DatabaseConfig(
@@ -138,7 +144,8 @@ async def _pinned_pull(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(1)
-@pytest.mark.min_load_balancers(1)
+@pytest.mark.min_load_balancers(2)
+@pytest.mark.min_clusters(3)
 class TestISGRLoadBalancer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -159,7 +166,7 @@ class TestISGRLoadBalancer(CBLTestClass):
 
             self.mark_test_step("Create an empty local CBL database")
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-            repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url(db_name, cblpytest.load_balancers[0])
+            repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
             async def pinned_pull(pin: dict[str, str]) -> int:
                 """Runs one pinned pull and returns how many docs it transferred."""
@@ -247,7 +254,7 @@ class TestISGRLoadBalancer(CBLTestClass):
                 "Pull the doc through a real CBL client pinned to SG2, and verify its channel assignment arrives intact"
             )
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-            repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url(db_name, cblpytest.load_balancers[0])
+            repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
             replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG2_PIN)
             assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG2 to transfer the doc"
 
