@@ -38,9 +38,9 @@ async def _setup_isgr_pair(
     user_password: str,
 ) -> AsyncIterator[tuple[SyncGateway, SyncGateway]]:
     """
-    Configures a same-named database on each of the first two Sync Gateway nodes (separate
-    buckets, so they are genuinely independent backends), a matching user on both, and a
-    continuous bidirectional ISGR link from the first to the second.  Stops the link on exit.
+    Configures a same-named database on each of the first two Sync Gateway nodes (separate buckets, so they are
+    genuinely independent backends), a matching user on both, and a continuous bidirectional ISGR link from the first to
+    the second. Stops the link on exit.
     """
     cluster = cblpytest.clusters[0]
     sg1, sg2 = cluster.sync_gateways[0], cluster.sync_gateways[1]
@@ -56,8 +56,8 @@ async def _setup_isgr_pair(
         )
         await sg.reset_user(db_name, user_name, user_password, channels)
 
-    # One pushAndPull replication already covers both directions -- do not also start one
-    # from SG2, that would just be a second, redundant link fighting the first.
+    # One pushAndPull replication already covers both directions -- do not also start one from SG2, that would just be a
+    # second, redundant link fighting the first.
     await sg1.start_isgr(
         db_name,
         ISGRPayload(
@@ -83,11 +83,10 @@ async def _write_native(
     docs: list[DocumentUpdateEntry],
 ) -> None:
     """
-    Writes docs only on `primary`, relying on ISGR to propagate them to `secondary`.  A write
-    with the same id on both would be a genuine write conflict, not the clean one-directional
-    propagation these tests measure, and would silently invalidate what's being asserted.  Checks
-    BEFORE the write (not after, and not just before an ISGR wait) since ISGR is continuous and
-    could already have propagated by any later point -- pre-write is the only race-free check.
+    Writes docs only on `primary`, relying on ISGR to propagate them to `secondary`. A write with the same id on both
+    would be a genuine write conflict, not the clean one-directional propagation these tests measure, and would silently
+    invalidate what's being asserted. Checks BEFORE the write (not after, and not just before an ISGR wait) since ISGR
+    is continuous and could already have propagated by any later point -- pre-write is the only race-free check.
     """
     for entry in docs:
         try:
@@ -97,8 +96,8 @@ async def _write_native(
                 raise
         else:
             raise AssertionError(
-                f"Doc '{entry.id}' already exists on the secondary backend before the native "
-                "write -- that would be a genuine write conflict, not clean ISGR propagation"
+                f"Doc '{entry.id}' already exists on the secondary backend before the native write -- that would be a "
+                "genuine write conflict, not clean ISGR propagation"
             )
     await primary.update_documents(db_name, docs)
 
@@ -111,13 +110,12 @@ async def _pinned_pull(
     pin: dict[str, str],
 ) -> Replicator:
     """
-    Runs one one-shot pull pinned to a specific backend and returns the Replicator so callers can
-    inspect both its transferred-document count and the resulting local documents.  A fresh
-    Replicator object every call, but always the SAME db and repl_url across a loop -- a CBL
-    checkpoint ID is a hash of that tuple (never of the X-Backend pin or the Python object
-    identity), so this is what keeps a series of pinned pulls sharing one checkpoint across both
-    backends.  Never pass reset=True: that would force a fresh checkpoint on every call and make
-    every pull look like first-ever contact, silently turning a loop into a vacuous test.
+    Runs one one-shot pull pinned to a specific backend and returns the Replicator so callers can inspect both its
+    transferred-document count and the resulting local documents. A fresh Replicator object every call, but always the
+    SAME db and repl_url across a loop -- a CBL checkpoint ID is a hash of that tuple (never of the X-Backend pin or the
+    Python object identity), so this is what keeps a series of pinned pulls sharing one checkpoint across both backends.
+    Never pass reset=True: that would force a fresh checkpoint on every call and make every pull look like first-ever
+    contact, silently turning a loop into a vacuous test.
     """
     replicator = Replicator(
         db,
@@ -169,8 +167,8 @@ class TestISGRLoadBalancer(CBLTestClass):
                 return len(replicator.document_updates)
 
             self.mark_test_step(
-                "First-ever contact with each backend: pull pinned to SG1, then to SG2 -- "
-                "expect a non-empty transfer on both"
+                "First-ever contact with each backend: pull pinned to SG1, then to SG2 -- expect a non-empty transfer"
+                " on both"
             )
             assert await pinned_pull(_SG1_PIN) > 0, "Expected SG1's first-ever contact to transfer the seed doc"
             assert await pinned_pull(_SG2_PIN) > 0, "Expected SG2's first-ever contact to transfer the seed doc"
@@ -192,7 +190,8 @@ class TestISGRLoadBalancer(CBLTestClass):
             await sg2.wait_for_document_count(db_name, 2)
 
             self.mark_test_step(
-                "Each backend's next contact after the new write -- expect a non-empty transfer on both (and only these two)"
+                "Each backend's next contact after the new write -- expect a non-empty transfer on both (and only these"
+                " two)"
             )
             assert await pinned_pull(_SG1_PIN) > 0, "Expected SG1's next contact to transfer the new doc"
             assert await pinned_pull(_SG2_PIN) > 0, "Expected SG2's next contact to transfer the new doc"
@@ -202,8 +201,8 @@ class TestISGRLoadBalancer(CBLTestClass):
             assert await pinned_pull(_SG2_PIN) == 0, "Expected no redundant transfer after convergence"
 
             self.mark_test_step(
-                "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) "
-                "agree on the full document set"
+                "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) agree on"
+                " the full document set"
             )
             await compare_local_and_remote(
                 db, sg1, ReplicatorType.PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
