@@ -62,6 +62,7 @@ with the session cookie on the public port.
 3. Delete the session.
 4. Read doc_a with the deleted session, and get 401.
 5. Delete the session again through the admin API, and get 404.
+   Skipped on Rosmar, which deletes a tombstone again without error (CBG-4796).
 
 ## #4 test_sessions_are_independent
 
@@ -168,7 +169,8 @@ Couchbase Server node address.
 
 ### Description
 
-Checks that a session does not authenticate on the admin port. This runs for each source.
+Checks that a session does not authenticate on the admin port. This runs for each source. It is
+skipped when the admin port does not require authentication.
 
 ### Steps
 

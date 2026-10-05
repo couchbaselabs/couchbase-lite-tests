@@ -143,6 +143,11 @@ class TestSyncGatewaySession(CBLTestClass):
             self.mark_test_step("Read doc_a with the deleted session, and get 401")
             await assert_unauthorized(client, "doc_a")
 
+        # Rosmar deletes a tombstone again without error, where Couchbase Server reports it missing.
+        # CBG-4796, fixed by https://github.com/couchbaselabs/rosmar/pull/101
+        if await sg.using_rosmar:
+            return
+
         self.mark_test_step("Delete the session again through the admin API, and get 404")
         with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
             await sg.delete_session(DB_NAME, session_id)
@@ -295,6 +300,8 @@ class TestSyncGatewaySession(CBLTestClass):
     @pytest.mark.parametrize("source", SESSION_SOURCES)
     async def test_session_is_rejected_on_admin_port(self, cblpytest: CBLPyTest, source: str) -> None:
         sg = cblpytest.sync_gateways[0]
+        if not await sg.admin_interface_authentication:
+            pytest.skip("Admin port accepts any request without admin authentication")
         username = await self._create_user(sg)
 
         self.mark_test_step(f"Create a session for {username} through the {source} API")
