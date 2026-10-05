@@ -214,21 +214,41 @@ class TestISGRLoadBalancer(CBLTestClass):
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
             repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
-            async def pinned_pull(pin: dict[str, str]) -> int:
-                """Runs one pinned pull and returns how many docs it transferred."""
+            async def pinned_pull(pin: dict[str, str], sg: SyncGateway) -> tuple[int, int]:
+                """
+                Runs one pinned pull and returns (docs transferred, `sg`'s own since-zero-pull-count delta).
+                The transfer count alone can't distinguish a genuine incremental continuation from a redundant
+                full resync that happens not to transfer anything new (the puller already holds an identical
+                revision for everything proposed either way) -- the since-zero delta is server-observed and
+                unaffected by that ambiguity, since it reflects whether `sg` served this pull from
+                `/_changes?since=0` regardless of what the puller already had.
+                """
+                before = await sg.get_pull_repl_since_zero_count(db_name)
                 replicator = await _pinned_pull(db, repl_url, user_name, user_password, pin)
-                return len(replicator.document_updates)
-
-            self.mark_test_step("First-ever contact with SG1, then with SG2 -- expect a non-empty transfer on SG1 only")
-            assert await pinned_pull(_SG1_PIN) > 0, "Expected SG1's first-ever contact to transfer the seed doc"
-            await pinned_pull(_SG2_PIN)
+                after = await sg.get_pull_repl_since_zero_count(db_name)
+                return len(replicator.document_updates), after - before
 
             self.mark_test_step(
-                "Repeat against both already-known backends with no new writes -- expect zero transfer every time"
+                "First-ever contact with SG1, then with SG2 -- expect a non-empty transfer and a since=0 proposal"
+                " on SG1; SG2 also gets a since=0 proposal, but its transfer count is not asserted"
+            )
+            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+            assert sg1_docs > 0, "Expected SG1's first-ever contact to transfer the seed doc"
+            assert sg1_since_zero == 1, "Expected SG1's first-ever contact to start from since=0"
+            _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+            assert sg2_since_zero == 1, "Expected SG2's first-ever contact to also start from since=0"
+
+            self.mark_test_step(
+                "Repeat against both already-known backends with no new writes -- expect zero transfer and no"
+                " since=0 proposal every time"
             )
             for _ in range(2):
-                assert await pinned_pull(_SG1_PIN) == 0, "Expected no redundant transfer on an already-known backend"
-                assert await pinned_pull(_SG2_PIN) == 0, "Expected no redundant transfer on an already-known backend"
+                sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+                assert sg1_docs == 0, "Expected no redundant transfer on an already-known backend"
+                assert sg1_since_zero == 0, "Expected SG1 to continue incrementally, not restart from since=0"
+                sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+                assert sg2_docs == 0, "Expected no redundant transfer on an already-known backend"
+                assert sg2_since_zero == 0, "Expected SG2 to continue incrementally, not restart from since=0"
 
             self.mark_test_step(
                 "Add one more doc directly on SG1, and wait for it to reach SG2 via ISGR and for the channel cache"
@@ -246,14 +266,27 @@ class TestISGRLoadBalancer(CBLTestClass):
 
             self.mark_test_step(
                 "Each backend's next contact after the new write: SG1, then SG2 -- expect a non-empty transfer on"
-                " SG1 only"
+                " SG1 only, and an incremental (not since=0) continuation on both"
             )
-            assert await pinned_pull(_SG1_PIN) > 0, "Expected SG1's next contact to transfer the new doc"
-            await pinned_pull(_SG2_PIN)
+            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+            assert sg1_docs > 0, "Expected SG1's next contact to transfer the new doc"
+            assert sg1_since_zero == 0, (
+                "Expected SG1's next contact to continue incrementally, not restart from since=0"
+            )
+            _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+            assert sg2_since_zero == 0, (
+                "Expected SG2's next contact to continue incrementally, not restart from since=0"
+            )
 
-            self.mark_test_step("Repeat once more with no further writes -- expect zero transfer again")
-            assert await pinned_pull(_SG1_PIN) == 0, "Expected no redundant transfer after convergence"
-            assert await pinned_pull(_SG2_PIN) == 0, "Expected no redundant transfer after convergence"
+            self.mark_test_step(
+                "Repeat once more with no further writes -- expect zero transfer and no since=0 proposal again"
+            )
+            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+            assert sg1_docs == 0, "Expected no redundant transfer after convergence"
+            assert sg1_since_zero == 0, "Expected SG1 to remain an incremental continuation after convergence"
+            sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+            assert sg2_docs == 0, "Expected no redundant transfer after convergence"
+            assert sg2_since_zero == 0, "Expected SG2 to remain an incremental continuation after convergence"
 
             self.mark_test_step(
                 "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) agree on"

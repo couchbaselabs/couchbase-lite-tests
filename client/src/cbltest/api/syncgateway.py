@@ -2717,6 +2717,23 @@ class SyncGateway(_SyncGatewayBase):
         expvars = cast(dict, resp_data)
         return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
 
+    async def get_pull_repl_since_zero_count(self, db_name: str) -> int:
+        """
+        Gets this node's cbl_replication_pull num_pull_repl_since_zero expvar for the given database:
+        a cumulative counter of pull replications that started from `/_changes?since=0`, i.e. a
+        checkpoint-less, from-scratch proposal. Unlike a client-observed document-transfer count, this
+        is unaffected by the puller already holding an identical revision for every proposed document,
+        so it can distinguish a genuine incremental continuation (no increment) from a redundant full
+        resync that happens not to transfer anything new (an increment) -- the two look identical from
+        the transferred-document count alone.
+
+        :param db_name: The database to read the stat for
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_pull"]["num_pull_repl_since_zero"]
+
     async def reset_user(
         self,
         db_name: str,
