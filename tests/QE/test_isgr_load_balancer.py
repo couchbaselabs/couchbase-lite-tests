@@ -131,10 +131,9 @@ async def _pinned_pull(
     """
     Runs one one-shot pull pinned to a specific backend and returns the Replicator so callers can inspect both its
     transferred-document count and the resulting local documents. A fresh Replicator object every call, but always the
-    SAME db and repl_url across a loop -- a CBL checkpoint ID is a hash of that tuple (never of the X-Backend pin or the
-    Python object identity), so this is what keeps a series of pinned pulls sharing one checkpoint across both backends.
-    Never pass reset=True: that would force a fresh checkpoint on every call and make every pull look like first-ever
-    contact, silently turning a loop into a vacuous test.
+    SAME db and repl_url across a loop, so this is what keeps a series of pinned pulls sharing one checkpoint across
+    both backends. Never pass reset=True: that would force a fresh checkpoint on every call and make every pull look
+    like first-ever contact, silently turning a loop into a vacuous test.
     """
     replicator = Replicator(
         db,
@@ -239,10 +238,10 @@ class TestISGRLoadBalancer(CBLTestClass):
                 " the full document set"
             )
             await compare_local_and_remote(
-                db, sg1, ReplicatorType.PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+                db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
             )
             await compare_local_and_remote(
-                db, sg2, ReplicatorType.PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+                db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
             )
 
             self.mark_test_step("Verify the SG1-to-SG2 ISGR link itself is still healthy")

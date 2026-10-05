@@ -37,7 +37,9 @@ both backends via the `X-Backend` pinning the load balancer already supports.
 9. Repeat the SG1 / SG2 pinned pulls once more with no further writes -- expect zero documents
    transferred again
 10. Verify the local CBL database and both SG1 and SG2 (queried directly, bypassing the load
-    balancer) all agree on the full document set
+    balancer) all agree on the full document set -- an exact bidirectional comparison (matching
+    document count both ways), not a one-directional subset check, so that a backend silently
+    losing a document would be caught
 11. Verify the SG1-to-SG2 ISGR link itself is still healthy (no error status)
 
 ## test_isgr_pull_preserves_channel_set
