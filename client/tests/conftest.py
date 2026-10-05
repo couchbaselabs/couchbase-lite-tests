@@ -35,13 +35,16 @@ def fake_sync_gateways(count: int) -> Iterator[list[syncgateway.SyncGateway]]:
 
 def set_using_rosmar(sync_gateway: syncgateway.SyncGateway, value: bool) -> None:
     """Settle `sync_gateway.using_rosmar` as though it had already fetched /_config."""
+    config = syncgateway.StartupConfigResponse.model_validate(
+        {"bootstrap": {"server": "rosmar:/?mode=memory" if value else "couchbase://localhost"}}
+    )
 
     class Settled:
-        def __await__(self) -> Generator[None, None, bool]:
-            return value
+        def __await__(self) -> Generator[None, None, syncgateway.StartupConfigResponse]:
+            return config
             yield
 
-    sync_gateway.__dict__["using_rosmar"] = Settled()
+    sync_gateway.__dict__["_startup_config"] = Settled()
 
 
 @contextmanager

@@ -698,6 +698,147 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
+class StartupConfigResponse(BaseModel):
+    """
+    Output of GET /_config endpoint of Sync Gateway
+    """
+
+    class Bootstrap(BaseModel):
+        group_id: str | None = None
+        config_update_frequency: str | None = None
+        node_heartbeat_expiry: str | None = None
+        server: str
+        username: str | None = None
+        password: str | None = None
+        ca_cert_path: str | None = None
+        server_tls_skip_verify: bool | None = None
+        x509_cert_path: str | None = None
+        x509_key_path: str | None = None
+        use_tls_server: bool | None = None
+        use_system_metadata_collection: bool | None = None
+
+    class API(BaseModel):
+        class HTTPS(BaseModel):
+            tls_minimum_version: str | None = None
+            tls_cert_path: str | None = None
+            tls_key_path: str | None = None
+
+        class CORS(BaseModel):
+            origin: list[str] | None = None
+            login_origin: list[str] | None = None
+            headers: list[str] | None = None
+            max_age: int | None = None
+
+        public_interface: str | None = None
+        admin_interface: str | None = None
+        metrics_interface: str | None = None
+        profile_interface: str | None = None
+        # Sync Gateway requires admin and metrics authentication unless told otherwise
+        admin_interface_authentication: bool = True
+        metrics_interface_authentication: bool = True
+        enable_advanced_auth_dp: bool | None = None
+        server_read_timeout: str | None = None
+        server_write_timeout: str | None = None
+        read_header_timeout: str | None = None
+        idle_timeout: str | None = None
+        pretty: bool | None = None
+        max_connections: int | None = None
+        compress_responses: bool | None = None
+        hide_product_version: bool | None = None
+        https: HTTPS = Field(default_factory=HTTPS)
+        cors: CORS | None = None
+
+    class Logging(BaseModel):
+        class FileLogger(BaseModel):
+            class Rotation(BaseModel):
+                max_size: int | None = None
+                max_age: int | None = None
+                localtime: bool | None = None
+                rotated_logs_size_limit: int | None = None
+                rotation_interval: str | None = None
+
+            enabled: bool | None = None
+            rotation: Rotation = Field(default_factory=Rotation)
+            collation_buffer_size: int | None = None
+
+        class ConsoleLogger(FileLogger):
+            log_level: str | None = None
+            log_keys: list[str] | None = None
+            color_enabled: bool | None = None
+            file_output: str | None = None
+
+        class AuditLogger(FileLogger):
+            audit_log_file_path: str | None = None
+            enabled_events: list[int] | None = None
+
+        log_file_path: str | None = None
+        redaction_level: str | None = None
+        console: ConsoleLogger | None = None
+        error: FileLogger | None = None
+        warn: FileLogger | None = None
+        info: FileLogger | None = None
+        debug: FileLogger | None = None
+        trace: FileLogger | None = None
+        stats: FileLogger | None = None
+        audit: AuditLogger | None = None
+
+    class Auth(BaseModel):
+        bcrypt_cost: int | None = None
+
+    class Replicator(BaseModel):
+        max_heartbeat: str | None = None
+        blip_compression: int | None = None
+        max_concurrent_replications: int | None = None
+        max_concurrent_changes_batches: int | None = None
+        max_concurrent_revs: int | None = None
+
+    class Unsupported(BaseModel):
+        class Serverless(BaseModel):
+            enabled: bool | None = None
+            min_config_fetch_interval: str | None = None
+
+        class HTTP2(BaseModel):
+            enabled: bool | None = None
+
+        class AuditInfoProvider(BaseModel):
+            global_info_env_var_name: str | None = None
+            request_info_header_name: str | None = None
+
+        stats_log_frequency: str | None = None
+        use_stdlib_json: bool | None = None
+        serverless: Serverless = Field(default_factory=Serverless)
+        http2: HTTP2 | None = None
+        user_queries: bool | None = None
+        use_xattr_config: bool | None = None
+        allow_dbconfig_env_vars: bool | None = None
+        diagnostic_interface: str | None = None
+        effective_user_header_name: str | None = None
+        audit_info_provider: AuditInfoProvider | None = None
+        rosmar_bucket_management: bool | None = None
+        use_gocb_fast_fail_retry: bool | None = None
+
+    class Credentials(BaseModel):
+        """Credentials for a bucket or database, used instead of the bootstrap ones"""
+
+        username: str | None = None
+        password: str | None = None
+        x509_cert_path: str | None = None
+        x509_key_path: str | None = None
+
+    bootstrap: Bootstrap
+    api: API = Field(default_factory=API)
+    logging: Logging = Field(default_factory=Logging)
+    auth: Auth = Field(default_factory=Auth)
+    replicator: Replicator = Field(default_factory=Replicator)
+    unsupported: Unsupported = Field(default_factory=Unsupported)
+    database_credentials: dict[str, Credentials | None] | None = None
+    bucket_credentials: dict[str, Credentials | None] | None = None
+    max_file_descriptors: int | None = None
+    couchbase_keepalive_interval: int | None = None
+    heap_profile_collection_threshold: int | None = None
+    heap_profile_disable_collection: bool | None = None
+
+
 class ResyncAction(str, Enum):
     """The action to perform via POST /{db}/_resync"""
 
@@ -2011,15 +2152,19 @@ class SyncGateway(_SyncGatewayBase):
         self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
 
     @asyncstdlib.cached_property(asyncio.Lock)
+    async def _startup_config(self) -> StartupConfigResponse:
+        """The node's startup config from /_config, which cannot change without a restart (fetched once)"""
+        return StartupConfigResponse.model_validate(await self._send_request("get", "/_config"))
+
+    @property
     async def using_rosmar(self) -> bool:
-        """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server (fetched once)"""
-        config = await self._send_request("get", "/_config")
-        try:
-            return config["bootstrap"]["server"].startswith("rosmar")
-        except (KeyError, TypeError):
-            raise CblTestError(
-                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
-            ) from None
+        """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server"""
+        return (await self._startup_config).bootstrap.server.startswith("rosmar")
+
+    @property
+    async def admin_interface_authentication(self) -> bool:
+        """Whether this Sync Gateway node requires credentials on its admin port"""
+        return (await self._startup_config).api.admin_interface_authentication
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """
