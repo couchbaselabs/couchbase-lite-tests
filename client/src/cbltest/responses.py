@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Flag, auto
-from typing import Any, Final, TypeVar
+from typing import Any, Final, TypeVar, cast
 
 from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.jsonserializable import JSONSerializable
@@ -23,6 +23,15 @@ def register_response(request_type: type, version: int | list[int]) -> Callable[
         return cls
 
     return deco
+
+
+def unwrap_ws_payload(ws_payload: dict) -> tuple[int, dict]:
+    """Gets the status and body of a WebSocket response, which wraps any error in ts_error"""
+    error = cast(dict | None, ws_payload.get("ts_error"))
+    if error is None:
+        return 200, ws_payload
+
+    return cast(int, error.get("code", 500)), error
 
 
 class ServerVariant(Flag):
