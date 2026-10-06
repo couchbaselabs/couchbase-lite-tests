@@ -1,7 +1,10 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from itertools import count
 from pathlib import Path
 
 from cbltest.globals import CBLPyTestGlobal
+from cbltest.logging import cbl_error
 
 _http_num = count(1)
 
@@ -41,6 +44,25 @@ class _HttpLogWriter:
         recv_log_path = self.__get_path("error")
         with open(recv_log_path, "x") as fout:
             fout.write(msg)
+
+    @contextmanager
+    def record_failure(self, request: str, log: bool = True) -> Iterator[None]:
+        """
+        Record an exception raised inside the block, e.g. a timeout or a connection error,
+        in the error file and in testserver.log, then raise it again.
+
+        :param request: What failed, e.g. "Sync Gateway [https://host:4985] <- GET /db/"
+        :param log: Whether to log it in testserver.log too.  Pass False for a poll that
+            expects failures until a server is up.
+        """
+        try:
+            yield
+        except Exception as e:
+            failure = f"{request} failed: {e}"
+            self.write_error(failure)
+            if log:
+                cbl_error(failure, include_stack=False)
+            raise
 
     def write_end(self, header: str, payload: str) -> None:
         send_log_path = self.__get_path("end")

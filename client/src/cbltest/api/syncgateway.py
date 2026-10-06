@@ -1003,13 +1003,17 @@ class _SyncGatewayBase:
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
         log_response: bool = True,
+        log_failure: bool = True,
     ) -> Any:
         """
         :param log_response: Whether to write the response body to the HTTP log.  Pass False for a
                              call whose body is large and uninteresting, such as a changes feed read
                              only to find one document; the request and status are still logged.
+        :param log_failure: Whether to log a request that gets no response in testserver.log.  Pass
+                            False for a poll that expects failures until the node is up; the HTTP
+                            log still records them.
         """
-        body, _ = await self._send_request_with_response(method, path, payload, params, log_response)
+        body, _ = await self._send_request_with_response(method, path, payload, params, log_response, log_failure)
         return body
 
     async def _send_request_with_response(
@@ -1019,6 +1023,7 @@ class _SyncGatewayBase:
         payload: JSONSerializable | DatabaseConfig | None = None,
         params: dict[str, str] | None = None,
         log_response: bool = True,
+        log_failure: bool = True,
     ) -> tuple[Any, ClientResponse]:
         """Like :func:`_send_request`, but also returns the response, for its headers and cookies."""
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
@@ -1029,13 +1034,17 @@ class _SyncGatewayBase:
             logged_path = f"{path}?{urlencode(params)}" if params else path
             writer = get_next_writer()
             writer.write_begin(f"Sync Gateway [{self.__http_url}] -> {method.upper()} {logged_path}", data)
-            resp = await self.__session.request(method, path, data=data, headers=headers, params=params)
-            if resp.content_type.startswith("application/json"):
-                ret_val = await resp.json()
-                data = dumps(ret_val, indent=2)
-            else:
-                data = await resp.text()
-                ret_val = data
+            with writer.record_failure(
+                f"Sync Gateway [{self.__http_url}] <- {method.upper()} {logged_path}", log=log_failure
+            ):
+                resp = await self.__session.request(method, path, data=data, headers=headers, params=params)
+                if resp.content_type.startswith("application/json"):
+                    ret_val = await resp.json()
+                    data = dumps(ret_val, indent=2)
+                else:
+                    data = await resp.text()
+                    ret_val = data
+
             writer.write_end(
                 f"Sync Gateway [{self.__http_url}] <- {method.upper()} {logged_path} {resp.status}",
                 data if log_response or not resp.ok else f"<{len(data)} bytes not logged>",
@@ -2374,7 +2383,7 @@ class SyncGateway(_SyncGatewayBase):
 
         async def _wait_for_rest_api_poll() -> None:
             try:
-                await self._send_request("get", "/_ping")
+                await self._send_request("get", "/_ping", log_failure=False)
             # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
             # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
             except (CblSyncGatewayBadResponseError, ClientError, OSError) as exc:
