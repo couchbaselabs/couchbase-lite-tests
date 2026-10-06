@@ -153,11 +153,11 @@ class BucketPool:
             await self.__server.wait_for_bucket_deleted(oldest)
 
 
-# The collect-logs shell2http endpoint runs `timeout --kill-after=15 300 cbcollect_info`,
-# a ~315s server-side worst case, plus a few seconds to zip and respond; 360s leaves
-# comfortable margin so the client outlasts the endpoint rather than racing its own default
-# 300s aiohttp timeout against it.
-_COLLECT_LOGS_TIMEOUT = ClientTimeout(total=360)
+# The collect-logs shell2http endpoint runs `timeout --kill-after=30 1200 cbcollect_info`,
+# a ~1230s server-side worst case, plus time to zip and respond; 1260s leaves comfortable
+# margin so the client outlasts the endpoint rather than racing its own default aiohttp
+# timeout against it.
+_COLLECT_LOGS_TIMEOUT = ClientTimeout(total=1260)
 
 
 class CouchbaseServer:
@@ -1526,6 +1526,7 @@ class CouchbaseServer:
 
         :param output_dir: Local directory to download the archive into
         :return: Local path of the downloaded archive
+        :raises CblTestError: If the endpoint could not produce an archive
         """
         with self.__tracer.start_as_current_span("collect couchbase server logs"):
             timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
@@ -1535,9 +1536,17 @@ class CouchbaseServer:
             response = await self._call_sidecar(
                 "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
             )
-            # _call_sidecar already raises on anything but a 200, and the endpoint only ever
-            # answers 200 with this exact JSON shape, so no defensive parsing is needed here.
+            # The endpoint always exits 0, success or failure -- shell2http (running -cgi
+            # -500) discards the script's own stdout on a non-zero exit and substitutes a
+            # generic "exec error: ..." instead, so a real exit code is the one thing that
+            # can never reach us. Failure is therefore reported entirely through this body,
+            # not through _call_sidecar's status check.
             body = json.loads(response)
+            if error := body.get("error"):
+                raise CblTestError(
+                    f"cbcollect_info failed on {self}: {error} (rc={body.get('rc')}, stderr={body.get('stderr')})"
+                )
+
             # cbcollect_info can finish with a bundle but still have logged a non-fatal
             # complaint (an unreachable stat endpoint, a skipped component); worth surfacing
             # without failing a collection that otherwise succeeded.

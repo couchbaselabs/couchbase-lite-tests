@@ -20,8 +20,11 @@ esac
 
 CBS_CONTAINER=$(sudo docker ps -a --format '{{.Names}}' | grep -E 'cbs|couchbase' | head -1)
 if [ -z "$CBS_CONTAINER" ]; then
+  # Always exit 0: shell2http (running -cgi -500) discards this script's own stdout on a
+  # non-zero exit and substitutes a generic "exec error: exit status N" instead, so the only
+  # way the caller ever sees this JSON -- success or failure -- is if we exit 0 regardless.
   jq -nc '{error: "CBS container not found"}'
-  exit 1
+  exit 0
 fi
 
 # Written straight into the container's own logs directory, which the host bind-mounts
@@ -41,20 +44,24 @@ rm -f "$LOG_DIR"/cbcollect-*.zip
 
 # Bounded: a stuck GSI/indexer service is exactly the case this exists to diagnose, and
 # cbcollect_info has no timeout of its own -- a wedged node must not hang the whole run.
-# --kill-after=15: plain `timeout` only sends SIGTERM at the deadline, which a wedged or
+# 1200s (20m): cbcollect_info on a cluster with real data volume (thousands of per-vBucket
+# couchstore dumps, stats snapshots, etc.) routinely runs well past a few minutes -- a short
+# budget here kills a collection that was simply still working, not actually stuck.
+# --kill-after=30: plain `timeout` only sends SIGTERM at the deadline, which a wedged or
 # mid-write cbcollect_info can ignore or outlive -- escalate to SIGKILL if it's still
-# running 15s later, rather than let docker exec (and this request) hang indefinitely.
+# running 30s later, rather than let docker exec (and this request) hang indefinitely.
 # stdout carries cbcollect_info's own progress/status noise, not diagnostics -- discard it
 # so only real stderr ends up in COLLECT_ERR (reported as "warnings" below).
-COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=15 300 "$CBCOLLECT_BIN" \
+COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=30 1200 "$CBCOLLECT_BIN" \
   --log-redaction-level=partial \
   "$OUT_PATH_IN_CONTAINER" 2>&1 >/dev/null)
 COLLECT_RC=$?
 
 if [ "$COLLECT_RC" -ne 0 ] || [ ! -s "$OUT_PATH_ON_HOST_REDACTED" ]; then
+  # exit 0 here too -- see the comment on the container-not-found branch above.
   jq -nc --arg err "$COLLECT_ERR" --argjson rc "$COLLECT_RC" \
     '{error: "failed to create archive", rc: $rc, stderr: $err}'
-  exit 1
+  exit 0
 fi
 
 # The unredacted copy has served its purpose (cbcollect_info needed it to derive the
