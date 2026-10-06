@@ -14,7 +14,6 @@ from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_ids, compare_local_and_remote
 from cbltest.responses import ServerVariant
-from cbltest.utils import assert_not_null
 
 
 @pytest.mark.min_test_servers(1)
@@ -36,8 +35,16 @@ class TestReplicationXdcr(CBLTestClass):
         - Start bidirectional XDCR.
         """
         self.mark_test_step("Stop XDCR between cluster 1 and cluster 2 if they are active.")
-        cblpytest.clusters[0].couchbase_servers[0].stop_xcdr(cblpytest.clusters[1].couchbase_servers[0], dataset_name)
-        cblpytest.clusters[1].couchbase_servers[0].stop_xcdr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
+        await (
+            cblpytest.clusters[0]
+            .couchbase_servers[0]
+            .stop_xcdr(cblpytest.clusters[1].couchbase_servers[0], dataset_name)
+        )
+        await (
+            cblpytest.clusters[1]
+            .couchbase_servers[0]
+            .stop_xcdr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
+        )
 
         self.mark_test_step("Reset SGs in cluster 1 and 2, and load dataset.")
 
@@ -45,8 +52,16 @@ class TestReplicationXdcr(CBLTestClass):
         await cblpytest.clusters[1].configure_dataset(dataset_path, dataset_name)
 
         self.mark_test_step("Start XDCR between cluster 1 and cluster 2.")
-        cblpytest.clusters[0].couchbase_servers[0].start_xdcr(cblpytest.clusters[1].couchbase_servers[0], dataset_name)
-        cblpytest.clusters[1].couchbase_servers[0].start_xdcr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
+        await (
+            cblpytest.clusters[0]
+            .couchbase_servers[0]
+            .start_xdcr(cblpytest.clusters[1].couchbase_servers[0], dataset_name)
+        )
+        await (
+            cblpytest.clusters[1]
+            .couchbase_servers[0]
+            .start_xdcr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
+        )
 
         self.mark_test_step("Wait 5 secs to ensure that clusters are ready.")
         await asyncio.sleep(5)
@@ -107,9 +122,8 @@ class TestReplicationXdcr(CBLTestClass):
         # via XDCR use version vectors, so their revids are not comparable.
         local_docs = await db.get_all_documents("_default._default")
         remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        assert compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows).success, (
-            "Local database and SG2 should have the same docs"
-        )
+        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
+        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
 
         self.mark_test_step("""
             Update documents in the local database.
@@ -157,11 +171,10 @@ class TestReplicationXdcr(CBLTestClass):
                     )
                 )
             elif doc.id == "name_102":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await (
                     cblpytest.clusters[1]
                     .sync_gateways[0]
-                    .delete_document(doc.id, revid, "names", "_default", "_default")
+                    .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
         self.mark_test_step("Wait until the replicator is idle.")
@@ -249,9 +262,8 @@ class TestReplicationXdcr(CBLTestClass):
         # via XDCR use version vectors, so their revids are not comparable.
         local_docs = await db.get_all_documents("_default._default")
         remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        assert compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows).success, (
-            "Local database and SG2 should have the same docs"
-        )
+        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
+        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
 
         self.mark_test_step("""
             Update documents in the local database.
@@ -298,11 +310,10 @@ class TestReplicationXdcr(CBLTestClass):
                     )
                 )
             elif doc.id == "name_102":
-                revid = assert_not_null(doc.revid, f"Missing revid on {doc.id}")
                 await (
                     cblpytest.clusters[1]
                     .sync_gateways[0]
-                    .delete_document(doc.id, revid, "names", "_default", "_default")
+                    .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
         self.mark_test_step(

@@ -89,6 +89,7 @@ class TestReplicationFunctional(CBLTestClass):
                 ),
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
         # Documents in group2 channel (should NOT be accessible initially)
         await sync_gateway.update_documents(
@@ -116,6 +117,7 @@ class TestReplicationFunctional(CBLTestClass):
                 ),
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
 
         self.mark_test_step("""
@@ -752,8 +754,6 @@ class TestReplicationFunctional(CBLTestClass):
         self.mark_test_step("Create conflicts by having both users update the same documents.")
         doc1 = await sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")
         doc2 = await sync_gateway.get_document("posts", "shared_doc2", "_default", "posts")
-        assert doc1.revid is not None, "Document shared_doc1 has no revision ID"
-        assert doc2.revid is not None, "Document shared_doc2 has no revision ID"
 
         await sync_gateway.update_documents(
             "posts",

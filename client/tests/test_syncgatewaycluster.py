@@ -5,7 +5,7 @@ from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.globals import CBLPyTestGlobal
-from conftest import fake_sync_gateways
+from conftest import fake_sync_gateways, set_using_rosmar
 
 
 def test_round_robin_node_cycles_through_all_nodes() -> None:
@@ -37,58 +37,73 @@ def test_random_node_returns_a_cluster_member() -> None:
             assert cluster.random_node in sync_gateways
 
 
-def _record_node_calls(monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]) -> list[tuple[str, int]]:
-    """Record the per-node calls the cluster helpers make, as (method name, node index)."""
-    calls: list[tuple[str, int]] = []
+# What the faked writes return, so that the waits can be checked against it.
+_SENTINEL = "config-sentinel"
 
-    def recorder(name: str) -> Callable[..., Awaitable[None]]:
-        async def fake(node: SyncGateway, db_name: str, *args: object, **kwargs: object) -> None:
+
+def _record_node_calls(
+    monkeypatch: pytest.MonkeyPatch, nodes: list[SyncGateway]
+) -> tuple[list[tuple[str, int]], list[object]]:
+    """Record the per-node calls the cluster helpers make, as (method name, node index),
+    along with the sentinel every _wait_for_database_config call was handed."""
+    calls: list[tuple[str, int]] = []
+    awaited_sentinels: list[object] = []
+
+    def recorder(name: str) -> Callable[..., Awaitable[str]]:
+        async def fake(node: SyncGateway, db_name: str, *args: object, **kwargs: object) -> str:
             calls.append((name, next(i for i, n in enumerate(nodes) if n is node)))
+            if name == "_wait_for_database_config":
+                awaited_sentinels.append(args[0] if args else kwargs.get("sentinel"))
+            return _SENTINEL
 
         return fake
 
     for name in (
         "_put_database",
         "_update_database_config",
-        "_refresh_database_config",
+        "_set_database_offline",
+        "_wait_for_database_config",
         "_wait_for_db_state_online",
+        "_wait_for_db_state_offline",
     ):
         monkeypatch.setattr(SyncGateway, name, recorder(name))
 
-    return calls
+    return calls, awaited_sentinels
 
 
 @pytest.mark.asyncio
 async def test_create_database_brings_every_node_online(monkeypatch: pytest.MonkeyPatch) -> None:
     with fake_sync_gateways(3) as sync_gateways:
         cluster = SyncGatewayCluster(sync_gateways)
-        calls = _record_node_calls(monkeypatch, sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
 
         await cluster.create_database("db1", DatabaseConfig(bucket="b1"))
 
     assert calls[0][0] == "_put_database"
-    writer = calls[0][1]
-    others = [i for i in range(3) if i != writer]
 
-    # The writing node already has the config, so only the others re-read it, but every
-    # node comes online in the background and so has to be waited on.
-    assert sorted(calls[1:3]) == [("_refresh_database_config", i) for i in others]
-    assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(3)]
+    # Every node has to pick the config up on its own, and comes online in the background
+    # afterwards, so both waits cover the whole cluster.
+    assert sorted(calls[1:4]) == [("_wait_for_database_config", i) for i in range(3)]
+    assert sorted(calls[4:]) == [("_wait_for_db_state_online", i) for i in range(3)]
+
+    # Every node waits for the config the write returned, not just for any config.
+    assert awaited_sentinels == [_SENTINEL] * 3
 
 
 @pytest.mark.asyncio
 async def test_update_database_config_brings_every_node_online(monkeypatch: pytest.MonkeyPatch) -> None:
     with fake_sync_gateways(2) as sync_gateways:
         cluster = SyncGatewayCluster(sync_gateways)
-        calls = _record_node_calls(monkeypatch, sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
 
         await cluster.update_database_config("db1", DatabaseConfig(bucket="b1"))
 
     assert calls[0][0] == "_update_database_config"
-    writer = calls[0][1]
 
-    assert calls[1] == ("_refresh_database_config", 1 - writer)
-    assert sorted(calls[2:]) == [("_wait_for_db_state_online", i) for i in range(2)]
+    assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
+    assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(2)]
+
+    assert awaited_sentinels == [_SENTINEL] * 2
 
 
 class TestCbcollectNeededOnDatabaseTimeout:
@@ -103,7 +118,7 @@ class TestCbcollectNeededOnDatabaseTimeout:
     @pytest.mark.asyncio
     async def test_sets_flag_on_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
         with fake_sync_gateways(1) as sync_gateways:
-            sync_gateways[0].using_rosmar = False
+            set_using_rosmar(sync_gateways[0], False)
             cluster = SyncGatewayCluster(sync_gateways)
 
             async def _raise(db_name: str, config: DatabaseConfig) -> None:
@@ -119,7 +134,7 @@ class TestCbcollectNeededOnDatabaseTimeout:
     @pytest.mark.asyncio
     async def test_does_not_set_flag_on_a_different_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
         with fake_sync_gateways(1) as sync_gateways:
-            sync_gateways[0].using_rosmar = False
+            set_using_rosmar(sync_gateways[0], False)
             cluster = SyncGatewayCluster(sync_gateways)
 
             async def _raise(db_name: str, config: DatabaseConfig) -> None:
@@ -136,19 +151,24 @@ class TestCbcollectNeededOnDatabaseTimeout:
 
     @pytest.mark.asyncio
     async def test_does_not_set_flag_on_post_put_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """A timeout from _wait_for_db_state_online -- after the PUT already succeeded --
-        must not trigger cbcollect; only a stuck PUT itself is this signature."""
+        """A timeout from _wait_for_db_state_online -- after the PUT and config propagation
+        already succeeded -- must not trigger cbcollect; only a stuck PUT itself is this
+        signature."""
         with fake_sync_gateways(1) as sync_gateways:
-            sync_gateways[0].using_rosmar = False
+            set_using_rosmar(sync_gateways[0], False)
             cluster = SyncGatewayCluster(sync_gateways)
 
-            async def _put_ok(db_name: str, config: DatabaseConfig) -> None:
+            async def _put_ok(db_name: str, config: DatabaseConfig) -> str:
+                return _SENTINEL
+
+            async def _config_ok(db_name: str, sentinel: str) -> None:
                 return None
 
             async def _wait_times_out(db_name: str) -> None:
                 raise TimeoutError()
 
             monkeypatch.setattr(sync_gateways[0], "_put_database", _put_ok)
+            monkeypatch.setattr(sync_gateways[0], "_wait_for_database_config", _config_ok)
             monkeypatch.setattr(sync_gateways[0], "_wait_for_db_state_online", _wait_times_out)
 
             with pytest.raises(TimeoutError):
@@ -162,7 +182,7 @@ class TestCbcollectNeededOnDatabaseTimeout:
     async def test_does_not_set_flag_when_using_rosmar(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Rosmar has no indexer to stall, so a PUT timeout must not flag for collection."""
         with fake_sync_gateways(1) as sync_gateways:
-            sync_gateways[0].using_rosmar = True
+            set_using_rosmar(sync_gateways[0], True)
             cluster = SyncGatewayCluster(sync_gateways)
 
             async def _raise(db_name: str, config: DatabaseConfig) -> None:
@@ -174,3 +194,19 @@ class TestCbcollectNeededOnDatabaseTimeout:
                 await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
 
         assert CBLPyTestGlobal.cbcollect_needed is False, "Rosmar has no indexer to stall"
+
+
+@pytest.mark.asyncio
+async def test_take_database_offline_takes_every_node_offline(monkeypatch: pytest.MonkeyPatch) -> None:
+    with fake_sync_gateways(2) as sync_gateways:
+        cluster = SyncGatewayCluster(sync_gateways)
+        calls, awaited_sentinels = _record_node_calls(monkeypatch, sync_gateways)
+
+        await cluster.take_database_offline("db1", sync_function="function(doc){}")
+
+    assert calls[0][0] == "_set_database_offline"
+
+    assert sorted(calls[1:3]) == [("_wait_for_database_config", i) for i in range(2)]
+    assert sorted(calls[3:]) == [("_wait_for_db_state_offline", i) for i in range(2)]
+
+    assert awaited_sentinels == [_SENTINEL] * 2

@@ -46,7 +46,11 @@ On Windows use `gradlew.bat` and add `--no-daemon`.
 
 ```
 java -jar desktop/app/build/libs/CBLTestServer-Java-Desktop-<server-version>_<cbl-version>.jar server
+java -jar desktop/app/build/libs/CBLTestServer-Java-Desktop-<server-version>_<cbl-version>.jar server --port 8081
 ```
+
+Both the desktop and web service variants listen on 8080 unless `--port <port>` says otherwise,
+and the URL they write to `server.url` names whichever port they got.
 
 **Web service** — start / stop via Gradle (Jetty):
 

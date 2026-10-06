@@ -200,7 +200,7 @@ class TestCrud(CBLTestClass):
         update_task = await edge_server.get_all_documents(db_name=db_name, keys=updated)
         assert len(update_task) == 10, "Updated documents missing"
         for row in update_task.rows:
-            assert row.revid is not None and row.revid.startswith("2")
+            assert row.revid.startswith("2")
 
         delete_task = await edge_server.get_all_documents(db_name=db_name, keys=deleted)
         assert len(delete_task) == 0, "Deleted documents still exist"

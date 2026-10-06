@@ -15,7 +15,7 @@ from cbltest.api.replicator_types import (
     ReplicatorDocumentFlags,
     ReplicatorType,
 )
-from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, RemoteDocument, ScopeConfig, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, RemoteDocument, ScopeConfig, SyncGateway
 
 _CHANNEL_SYNC_FUNCTION = (
     "function foo(doc,oldDoc,meta){if(doc._deleted){channel(oldDoc.channels)}else{channel(doc.channels)}}"
@@ -25,7 +25,6 @@ _BUCKET = "data-bucket"
 
 _CHANNEL_TRACKING_CONFIG = DatabaseConfig(
     bucket=_BUCKET,
-    index=IndexConfig(num_replicas=0),
     scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
 )
 
@@ -88,7 +87,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, "doc1", {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, "doc1", {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         leave_seq = doc.seq
 
@@ -115,12 +113,9 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         self.mark_test_step(
             "Update the document to leave 'ABC' for 'OTHER', then rejoin 'ABC' then remove 'ABC' a second time"
         )
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         first_leave_seq = doc.seq
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["ABC", "OTHER"]}, doc.revid)
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         second_leave_seq = doc.seq
 
@@ -145,7 +140,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         leave_seq = doc.seq
 
@@ -213,7 +207,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
         await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid)
 
         self.mark_test_step("Attempt to compact 'ABC' with a missing 'seq' field; check the request fails with 400")
@@ -254,7 +247,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         revids = {}
         for key, doc_id in doc_ids.items():
             doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
-            assert doc.revid is not None
             revids[key] = doc.revid
 
         self.mark_test_step("Update each document to move it from 'ABC' to 'OTHER'")
@@ -346,7 +338,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         leave_seq = doc.seq
 
@@ -382,7 +373,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
                 enable_shared_bucket_access=True,
             ),
@@ -403,7 +393,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
 
         self.mark_test_step("Update the document through Sync Gateway to move it from 'ABC' to 'OTHER'")
         doc = await sg.get_document(sg_db, doc_id)
-        assert doc is not None and doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         leave_seq = doc.seq
 
@@ -424,7 +413,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC", "OTHER"]})
 
         self.mark_test_step("Update the document to leave 'OTHER' (keeping 'ABC'), creating one historical entry")
-        assert doc.revid is not None
         await sg.update_document(sg_db, doc_id, {"channels": ["ABC"]}, doc.revid)
 
         self.mark_test_step(
@@ -464,12 +452,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to leave 'ABC', recording the sequence at which it left")
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER-0"]}, doc.revid, wait_for_caching_feed=True)
         stale_leave_seq = doc.seq
 
         self.mark_test_step("Make the document rejoin 'ABC'")
-        assert doc.revid is not None
         await sg.update_document(sg_db, doc_id, {"channels": ["ABC"]}, doc.revid)
 
         self.mark_test_step(
@@ -505,7 +491,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={
                     "_default": ScopeConfig(
                         collections={
@@ -524,12 +509,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc2 = await sg.create_document(sg_db, doc_id, {"channels": ["SHARED"]}, collection="col2")
 
         self.mark_test_step("In each collection, update the document to move it out of that channel")
-        assert doc1.revid is not None
         doc1 = await sg.update_document(
             sg_db, doc_id, {"channels": ["OTHER"]}, doc1.revid, collection="col1", wait_for_caching_feed=True
         )
         seq1 = doc1.seq
-        assert doc2.revid is not None
         doc2 = await sg.update_document(
             sg_db, doc_id, {"channels": ["OTHER"]}, doc2.revid, collection="col2", wait_for_caching_feed=True
         )
@@ -570,12 +553,10 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         for attempt in range(race_attempts):
             doc_id = f"doc{attempt}"
             doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
-            assert doc.revid is not None
             doc = await sg.update_document(
                 sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True
             )
             leave_seq = doc.seq
-            assert doc.revid is not None
 
             updating = asyncio.create_task(
                 sg.update_document(sg_db, doc_id, {"channels": ["OTHER"], "marker": "raced"}, doc.revid)
@@ -642,7 +623,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         doc = await sg.create_document(sg_db, doc_id, {"channels": ["ABC"]})
 
         self.mark_test_step("Update the document to move it from 'ABC' to 'OTHER'")
-        assert doc.revid is not None
         doc = await sg.update_document(sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True)
         leave_seq = doc.seq
 
@@ -676,7 +656,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             sg_db,
             DatabaseConfig(
                 bucket=_BUCKET,
-                index=IndexConfig(num_replicas=0),
                 scopes={"_default": ScopeConfig(collections={"_default": {"sync": _CHANNEL_SYNC_FUNCTION}})},
                 import_docs=False,
                 enable_shared_bucket_access=True,
@@ -700,7 +679,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
         )
         imported = await sg.get_document(sg_db, doc_id)
         assert imported is not None, f"{doc_id} was never imported by Sync Gateway"
-        assert imported.revid is not None or imported.cv is not None
         assert imported.body.get("channels") == ["ABC"]
 
     @pytest.mark.min_test_servers(1)
@@ -733,7 +711,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             "While the client is offline (i.e. between the two one-shot pulls), update the document to leave "
             "channel 'ABC' for 'OTHER', then compact the document's channel history for 'ABC' before it reconnects"
         )
-        assert doc.revid is not None
         updated_doc = await sg.update_document(
             sg_db, doc_id, {"channels": ["OTHER"]}, doc.revid, wait_for_caching_feed=True
         )

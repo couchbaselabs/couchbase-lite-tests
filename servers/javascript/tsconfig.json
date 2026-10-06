@@ -3,11 +3,7 @@
         "target": "ES2022",
         "useDefineForClassFields": true,
         "module": "ESNext",
-        "lib": [
-            "ES2024",
-            "DOM",
-            "DOM.Iterable"
-        ],
+        "lib": ["ES2024", "DOM", "DOM.Iterable"],
         "skipLibCheck": true,
         /* Bundler mode */
         "moduleResolution": "bundler",
@@ -23,12 +19,8 @@
         "noUncheckedSideEffectImports": true,
         "verbatimModuleSyntax": true,
         "paths": {
-            "@/*": [
-                "./src/*"
-            ]
+            "@/*": ["./src/*"]
         }
     },
-    "include": [
-        "src/**/*.ts",
-    ]
+    "include": ["src/**/*.ts"]
 }

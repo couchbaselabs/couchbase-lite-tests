@@ -42,9 +42,6 @@ function move_artifacts() {
       echo "Warning: failed to gzip session.log; leaving it uncompressed"
   fi
   mv "$src_dir/http_log" "$dst_dir/http_log" || true
-  # Include the JUnit XML so each platform's results are preserved per
-  # artifacts dir in a multi-pipeline (matrix) build.
-  mv "$src_dir/junit_result.xml" "$dst_dir/junit_result.xml" || true
   # SGW diagnostics downloaded by run_sgcollects() (via --sgcollect-on-test-failure)
   # into the pytest cwd when a test fails; moving them here gets them archived
   # (and later purged) by Jenkins retention. Files are named
@@ -54,6 +51,10 @@ function move_artifacts() {
   # build's archive.
   rm -f "$dst_dir"/*-sgcollectinfo-*.zip
   mv "$src_dir"/*-sgcollectinfo-*.zip "$dst_dir/" 2>/dev/null || true
+  # Same reasoning, for the CBS diagnostics downloaded by run_cbcollects() (see
+  # CouchbaseServer.collect_logs() in cbltest). Files are named "cbcollect-<safe_host>-*.zip".
+  rm -f "$dst_dir"/cbcollect-*.zip
+  mv "$src_dir"/cbcollect-*.zip "$dst_dir/" 2>/dev/null || true
 }
 
 find_dir() {

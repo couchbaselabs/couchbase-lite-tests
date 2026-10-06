@@ -28,6 +28,11 @@ fi
 # to LOG_DIR -- so the finished archive is immediately visible over Caddy, no copy step.
 OUT_PATH_IN_CONTAINER="$CBS_LOGS_DIR_IN_CONTAINER/$FILENAME"
 OUT_PATH_ON_HOST="$LOG_DIR/$FILENAME"
+# --log-redaction-level writes the redacted copy to a second, "-redacted" suffixed file
+# alongside the plain one -- the plain one stays fully unredacted. This is the file we
+# actually want to serve.
+REDACTED_FILENAME="${FILENAME%.zip}-redacted.zip"
+OUT_PATH_ON_HOST_REDACTED="$LOG_DIR/$REDACTED_FILENAME"
 
 # The host outlives the run and nothing else prunes this directory, so keeping every past
 # archive fills the disk. Only prune this endpoint's own naming scheme -- LOG_DIR also holds
@@ -39,19 +44,25 @@ rm -f "$LOG_DIR"/cbcollect-*.zip
 # --kill-after=15: plain `timeout` only sends SIGTERM at the deadline, which a wedged or
 # mid-write cbcollect_info can ignore or outlive -- escalate to SIGKILL if it's still
 # running 15s later, rather than let docker exec (and this request) hang indefinitely.
+# stdout carries cbcollect_info's own progress/status noise, not diagnostics -- discard it
+# so only real stderr ends up in COLLECT_ERR (reported as "warnings" below).
 COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=15 300 "$CBCOLLECT_BIN" \
   --log-redaction-level=partial \
-  "$OUT_PATH_IN_CONTAINER" 2>&1)
+  "$OUT_PATH_IN_CONTAINER" 2>&1 >/dev/null)
 COLLECT_RC=$?
 
-if [ "$COLLECT_RC" -ne 0 ] || [ ! -s "$OUT_PATH_ON_HOST" ]; then
+if [ "$COLLECT_RC" -ne 0 ] || [ ! -s "$OUT_PATH_ON_HOST_REDACTED" ]; then
   jq -nc --arg err "$COLLECT_ERR" --argjson rc "$COLLECT_RC" \
     '{error: "failed to create archive", rc: $rc, stderr: $err}'
   exit 1
 fi
 
-SIZE=$(stat -c%s "$OUT_PATH_ON_HOST" 2>/dev/null)
-jq -nc --arg file "$FILENAME" \
+# The unredacted copy has served its purpose (cbcollect_info needed it to derive the
+# redacted one) and must not linger on disk.
+rm -f "$OUT_PATH_ON_HOST"
+
+SIZE=$(stat -c%s "$OUT_PATH_ON_HOST_REDACTED" 2>/dev/null)
+jq -nc --arg file "$REDACTED_FILENAME" \
   --argjson size "${SIZE:-0}" \
   --arg warnings "$COLLECT_ERR" \
   '{file: $file, size: $size} + (if $warnings == "" then {} else {warnings: $warnings} end)'

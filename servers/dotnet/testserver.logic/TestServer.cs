@@ -7,7 +7,7 @@ namespace TestServer
     {
         public static readonly int ApiVersion = 2;
         public static readonly string ServerID = Guid.NewGuid().ToString();
-        private const ushort DEFAULT_PORT = 8080;
+        public const ushort DEFAULT_PORT = 8080;
         
         private CancellationTokenSource? _cancelSource;
         private HttpListener? _httpListener;

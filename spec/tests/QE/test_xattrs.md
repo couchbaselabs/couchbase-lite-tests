@@ -6,12 +6,12 @@ Test that documents written by Sync Gateway can be updated via SDK and successfu
 
 1. Configure Sync Gateway database endpoint
 2. Create user 'vipul' with access to SG and SDK channels
-3. Bulk create 1000 docs via Sync Gateway
+3. Bulk create 100 docs via Sync Gateway
 4. Verify all SG docs were created successfully and store revisions, versions
-5. Stop Sync Gateway
+5. Delete the Sync Gateway database
 6. Update all SG docs via SDK
-7. Write 1000 new docs via SDK
-8. Restart Sync Gateway (recreate database endpoint)
+7. Write 100 new docs via SDK
+8. Restart Sync Gateway database
 9. Verify revisions, versions and contents of all documents
 
 ## test_purge
@@ -20,8 +20,8 @@ Test purging functionality with XATTR-based documents created via both Sync Gate
 
 1. Configure Sync Gateway database endpoint
 2. Create user 'vipul' with access to channels
-3. Bulk create 1000 docs via Sync Gateway
-4. Bulk create 1000 docs via SDK
+3. Bulk create 100 docs via Sync Gateway
+4. Bulk create 100 docs via SDK
 5. Get all docs via Sync Gateway and save revisions
 6. Store original version vectors for SG docs (optional)
 7. Get all docs via SDK and verify count
@@ -30,8 +30,8 @@ Test purging functionality with XATTR-based documents created via both Sync Gate
 10. Verify non-deleted docs still accessible
 11. Verify new version vectors for deleted docs (optional)
 12. Purge all docs via Sync Gateway
-13. Verify SG can't see any docs after purge
-14. Verify XATTRS are gone using changes feed
+13. Verify XATTRS are gone using changes feed
+14. Verify SG can't see any docs after purge
 15. Verify SDK can't see any docs after purge
 
 ## test_sg_sdk_interop_unique_docs
@@ -48,7 +48,7 @@ Test Sync Gateway and SDK interoperability with unique documents and multiple up
 8. Verify SDK docs don't contain _sync metadata
 9. Bulk update sg docs 10 times via Sync Gateway
 10. Verify SDK sees all doc updates
-11. Verify 'vipul' sees all doc updates via _all_docs (public API)
+11. Verify 'vipul' sees all doc updates via the document API
 12. Verify SDK docs still don't contain _sync after updates
 13. Bulk delete sdk docs via SDK
 14. Bulk delete sg docs via Sync Gateway
@@ -64,7 +64,7 @@ Test concurrent updates and deletes from both Sync Gateway and SDK on shared doc
 3. Bulk create 10 docs via SDK with tracking properties
 4. Bulk create 10 docs via SG with tracking properties
 5. Verify SDK sees all docs
-6. Verify 'vipul' sees all docs via _all_docs (public API)
+6. Verify 'vipul' sees all docs via _changes (public API)
 7. Perform concurrent updates (10 per doc) from SDK and SG
 8. Verify all documents have correct update counts
 9. Perform concurrent deletes from SDK and SG
@@ -82,6 +82,5 @@ Test concurrent xattr updates and xattr-based channel assignment.
 5. Verify user 'vipul' can see all docs in channel 'abc'
 6. Concurrently update xattrs to 'xyz' while querying docs
 7. Delete _sync xattrs to force complete re-processing
-8. Restart Sync Gateway to force re-import with updated xattrs
-9. Verify user 'lupiv' can now see all docs
-10. Verify user 'vipul' can no longer see any docs
+8. Verify user 'lupiv' can now see all docs
+9. Verify user 'vipul' can no longer see any docs

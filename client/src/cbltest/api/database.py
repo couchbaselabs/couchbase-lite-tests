@@ -274,6 +274,20 @@ class VerifyResult:
     def __init__(self, rest_response: PostVerifyDocumentsResponseMethods) -> None:
         self.__response = rest_response
 
+    def __str__(self) -> str:
+        if self.result:
+            return "verification passed"
+
+        parts = [self.description if self.description is not None else "verification failed"]
+        if self.expected.exists:
+            parts.append(f"expected: {self.expected.value}")
+        if self.actual.exists:
+            parts.append(f"actual: {self.actual.value}")
+        if self.document is not None:
+            parts.append(f"document: {self.document}")
+
+        return ", ".join(parts)
+
 
 class GetDocumentResult:
     """
@@ -431,10 +445,22 @@ class Database:
             resp = await self.__request_factory.send_request(self.__index, req)
             return cast(PostSnapshotDocumentsResponseMethods, resp).snapshot_id
 
-    async def verify_documents(self, updater: SnapshotUpdater) -> VerifyResult:
+    async def verify_documents(self, updater: SnapshotUpdater) -> None:
         """
         Verifies a set of documents in the database by applying changes to a snapshot
-        and checking that the on disk results match
+        and checking that the on disk results match, asserting that they do
+
+        :param updater: The id and expected updates
+        :raises AssertionError: If the documents do not match the expected updates
+        """
+        result = await self._get_verify_document_result(updater)
+        assert result.result, str(result)
+
+    async def _get_verify_document_result(self, updater: SnapshotUpdater) -> VerifyResult:
+        """
+        Verifies a set of documents in the database by applying changes to a snapshot
+        and checking that the on disk results match, returning the raw result instead
+        of asserting on it
 
         :param updater: The id and expected updates
         """

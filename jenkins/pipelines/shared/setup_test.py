@@ -188,19 +188,20 @@ def setup_test(
 
         test_servers = cast(list[dict[str, Any]], topology["test_servers"])
         assigned_cbl_versions = distribute_versions(cbl_versions, len(test_servers))
-        for ts, version in zip(test_servers, assigned_cbl_versions):
+        for ts, version in zip(test_servers, assigned_cbl_versions, strict=True):
             ts["cbl_version"] = version
 
         if "sync_gateways" in topology:
             sync_gateways = cast(list[dict[str, Any]], topology["sync_gateways"])
             assigned_sgw_versions = distribute_versions(resolved_sgw_versions, len(sync_gateways))
-            for sgw, version in zip(sync_gateways, assigned_sgw_versions):
+            for sgw, version in zip(sync_gateways, assigned_sgw_versions, strict=True):
                 sgw["version"] = version
 
         with open(topology_file_out, "w") as fout:
             json.dump(topology, fout, indent=4)
 
     download_tool(ToolName.BackupManager, couchbase_server_version)
+    download_tool(ToolName.BucketPool)
 
     topology_obj = TopologyConfig(str(topology_file_out))
     start_backend(

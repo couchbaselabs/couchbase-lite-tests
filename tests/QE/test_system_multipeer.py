@@ -144,7 +144,7 @@ class TestSystemMultipeer(CBLTestClass):
             # Update existing documents
             async def update_task() -> None:
                 nonlocal docs_to_update
-                for i in range(num_updates):
+                for _ in range(num_updates):
                     updated_docs = docgen.update_all_documents(docs_to_update)
                     documents.update(updated_docs)
                     for start in range(0, len(to_update), 10):
@@ -184,11 +184,11 @@ class TestSystemMultipeer(CBLTestClass):
             self.mark_test_step("Verifying that all devices have identical document content")
             all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
             all_docs_results = await asyncio.gather(*all_docs_collection)
-            for all_docs in all_docs_results[1:]:
-                assert compare_doc_results_p2p(
-                    all_docs_results[0]["_default._default"],
-                    all_docs["_default._default"],
-                ), "All databases should have the same content"
+            for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+                self.mark_test_step(
+                    f"Verify that device {device_idx} has the same document IDs and revisions as device 1"
+                )
+                compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Stopping all multipeer replicators")
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
@@ -275,10 +275,9 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Verifying that all devices have identical document content")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
         self.mark_test_step("Stopping all multipeer replicators")
         await asyncio.gather(*[r.stop() for r in multipeer_replicators])
 
@@ -408,8 +407,8 @@ class TestSystemMultipeer(CBLTestClass):
             sgw_docs = docgen.generate_all_documents()
             docs_list = []
             for key, value in sgw_docs.items():
-                docs_list.append(DocumentUpdateEntry(key, revid=None, body=value))
-            await sgw.upsert_documents(db_name, docs_list)
+                docs_list.append(DocumentUpdateEntry(key, revision=None, body=value))
+            await sgw.update_documents(db_name, docs_list)
 
         async def insert_testserver(testserver_db: Database) -> None:
             docgen = JSONGenerator(random.randint(21, 50), size=DOC_COUNT, format="key-value")
@@ -462,10 +461,9 @@ class TestSystemMultipeer(CBLTestClass):
         self.mark_test_step("Verifying that all devices have identical document content")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
-        for all_docs in all_docs_results[1:]:
-            assert compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"]), (
-                "All databases should have the same content"
-            )
+        for device_idx, all_docs in enumerate(all_docs_results[1:], 2):
+            self.mark_test_step(f"Verify that device {device_idx} has the same document IDs and revisions as device 1")
+            compare_doc_results_p2p(all_docs_results[0]["_default._default"], all_docs["_default._default"])
 
         self.mark_test_step("Check that all docs are replicated correctly in SGW1")
         await compare_local_and_remote(

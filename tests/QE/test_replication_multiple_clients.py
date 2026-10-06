@@ -135,8 +135,8 @@ class TestReplicationMultipleClients(CBLTestClass):
 
         self.mark_test_step("Verify all documents have correct revision format")
         for row in sg_all_docs.rows:
-            assert len(row.revision) > 0, f"Document {row.id} has no revision"
-            assert "-" in row.revision, f"Invalid revision format for {row.id}: {row.revision}"
+            assert len(row.revid) > 0, f"Document {row.id} has no revision"
+            assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
         supports_version_vectors = await sg.supports_version_vectors()
         if supports_version_vectors:
@@ -298,8 +298,8 @@ class TestReplicationMultipleClients(CBLTestClass):
 
         self.mark_test_step("Verify all documents have correct revision format")
         for row in sg_all_docs.rows:
-            assert len(row.revision) > 0, f"Document {row.id} has no revision"
-            assert "-" in row.revision, f"Invalid revision format for {row.id}: {row.revision}"
+            assert len(row.revid) > 0, f"Document {row.id} has no revision"
+            assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
         sgw_version_obj = await sg.get_version()
         sgw_version = Version(sgw_version_obj.version)

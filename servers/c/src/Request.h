@@ -2,6 +2,7 @@
 
 // support
 #include "Error.h"
+#include "HTTPStatus.h"
 
 // lib
 #include <nlohmann/json.hpp>
@@ -40,6 +41,9 @@ namespace ts {
 
         [[nodiscard]] int respondWithJSON(const nlohmann::json &json) const;
 
+        [[nodiscard]] int
+        respondWithError(ts::support::HTTPStatus status, const char *message) const;
+
         [[nodiscard]] int respondWithRequestError(const char *message) const;
 
         [[nodiscard]] int respondWithServerError(const char *message) const;
@@ -51,7 +55,8 @@ namespace ts {
         void addCommonResponseHeaders() const;
 
         [[nodiscard]] int
-        respond(int status, const std::optional<std::string> &json = std::nullopt) const;
+        respond(ts::support::HTTPStatus status,
+                const std::optional<std::string> &json = std::nullopt) const;
 
         mg_connection *_conn;
         const Dispatcher *_dispatcher;

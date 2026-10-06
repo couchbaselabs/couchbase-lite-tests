@@ -21,7 +21,7 @@ class FakeCaddy(Caddy):
     """
 
     def __init__(self, owner: "FakeSyncGateway") -> None:
-        with patch("cbltest.api.caddy.ClientSession", autospec=True):
+        with patch("cbltest.httpclient.ClientSession", autospec=True):
             super().__init__(owner.hostname)
         self.__owner = owner
 
@@ -41,11 +41,7 @@ class FakeSyncGateway(SyncGateway):
     """
 
     def __init__(self, hostname: str = "sg.example.com") -> None:
-        with (
-            patch("cbltest.api.syncgateway.ClientSession", autospec=True),
-            patch("cbltest.api.caddy.ClientSession", autospec=True),
-            patch("cbltest.api.syncgateway.requests.get", autospec=True),
-        ):
+        with patch("cbltest.httpclient.ClientSession", autospec=True):
             super().__init__(url=hostname, username="user", password="pass")
 
         self.sent_requests: list[tuple[str, str, JSONSerializable | DatabaseConfig | None]] = []

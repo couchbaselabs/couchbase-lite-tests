@@ -3,7 +3,8 @@
     "server": "couchbases://{{server-ip}}",
     "server_tls_skip_verify": true,
     "username": "admin",
-    "password": "password"
+    "password": "password",
+    "config_update_frequency": "200ms"
   },
   "api": {
     "public_interface": ":4984",

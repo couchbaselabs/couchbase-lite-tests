@@ -1,4 +1,3 @@
-from abc import ABC
 from types import FunctionType
 
 import pytest
@@ -12,12 +11,13 @@ from cbltest.logging import cbl_info, cbl_warning
 from cbltest.responses import ServerVariant
 
 
-class CBLTestClass(ABC):
+class CBLTestClass:
     def setup_method(self, method: FunctionType) -> None:
         CBLPyTestGlobal.running_test_name = method.__name__
         cbl_info(f"Starting test: {method.__name__}")
         self.__step: int = 1
         self.__skipped: bool = False
+        self.last_test_step: tuple[int, list[str]] | None = None
 
     def teardown_method(self, method: FunctionType) -> None:
         if self.__step == 1 and not self.__skipped:
@@ -29,13 +29,12 @@ class CBLTestClass(ABC):
         all this does is log to the test server log, but could be expanded.
         """
         cbl_info(f"Moving to step {self.__step}:")
-        self.__step += 1
-        for line in description.splitlines():
-            stripped_line = line.strip()
-            if len(stripped_line) == 0:
-                continue
+        lines = [line.strip() for line in description.splitlines() if line.strip()]
+        for line in lines:
+            cbl_info(f"\t{line}")
 
-            cbl_info(f"\t{stripped_line}")
+        self.last_test_step = (self.__step, lines)
+        self.__step += 1
 
     def skip(self, reason: str) -> None:
         """
@@ -62,7 +61,7 @@ class CBLTestClass(ABC):
 
         :param platform: The platform to check against.
         """
-        variant = (await server.get_info()).variant
+        variant = (await server.info).variant
         self.skip_if_not(
             variant in allow_platforms,
             f"{variant} is not in the platforms {allow_platforms}",
@@ -74,7 +73,7 @@ class CBLTestClass(ABC):
 
         :param constraint: A string representing the comparison operation and version, e.g., ">= 3.3.0".
         """
-        version_str = (await server.get_info()).library_version.split("-")[0]
+        version_str = (await server.info).library_version.split("-")[0]
         version = Version(version_str)
         spec = SpecifierSet(constraint)
         self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")

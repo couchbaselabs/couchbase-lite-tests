@@ -4,7 +4,8 @@
     "server_tls_skip_verify": true,
     "use_tls_server": false,
     "username": "Administrator",
-    "password": "password"
+    "password": "password",
+    "config_update_frequency": "200ms"
   },
   "logging": {
     "console": {
@@ -12,6 +13,10 @@
       "log_level": "debug",
       "log_keys": ["*"]
     }
+  },
+  "api": {
+    "admin_interface_authentication": false,
+    "metrics_interface_authentication": false
   },
   "unsupported": {
     "rosmar_bucket_management": true

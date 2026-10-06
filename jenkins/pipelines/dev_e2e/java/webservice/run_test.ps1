@@ -9,7 +9,7 @@ Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
 
 uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
 
-$pytestArgs = @('-v', '--no-header', '--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '--dataset-version', $DatasetVersion)
+$pytestArgs = @('-v', '--no-header', '--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '-m', 'min_test_servers', '--dataset-version', $DatasetVersion)
 if ($TestFilter) {
     $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }

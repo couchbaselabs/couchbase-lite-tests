@@ -13,7 +13,7 @@ class TestGetRoot:
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_root(self, cblpytest: CBLPyTest) -> None:
-        info = await cblpytest.test_servers[0].get_info()
+        info = await cblpytest.test_servers[0].info
         assert info.cbl is not None, "cbl information is empty"
         assert isinstance(info.cbl, str), "cbl information is not string"
         assert info.device is not None, "device information is empty"

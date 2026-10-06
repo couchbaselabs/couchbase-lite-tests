@@ -127,6 +127,8 @@ class RunResult(BaseModel):
     platform: str  # CBL platform
     os: str  # Operating system for CBL
     job_url: str = Field(alias="jobUrl")  # Jenkins BUILD_URL, or "local" off-CI
+    incomplete: bool = False  # True if the session was cut short before every collected test ran
+    collected: int = 0  # Planned test count (session.testscollected); 0 means unknown/not supplied
 
 
 class GreenboardUploader:
@@ -163,6 +165,23 @@ class GreenboardUploader:
         self.__test_ran = False
         self.__has_sgw_marker = False
         self.__has_es_marker = False
+        self.__items_finished = 0
+
+    def pytest_runtest_logfinish(self) -> None:
+        # Fires once per item after its full setup/call/teardown protocol
+        # completes, whatever the outcome (pass/fail/skip/error). An item
+        # whose protocol was cut short by a SIGINT/SIGTERM (converted by
+        # sigterm_handler.py) or a pytest-timeout session-timeout never
+        # reaches this hook, and neither does any item still uncollected-
+        # but-unreached when the session stops early — so comparing this
+        # count against ``session.testscollected`` is what the greenboard
+        # fixture uses to detect a truncated ("incomplete") run.
+        self.__items_finished += 1
+
+    @property
+    def items_finished(self) -> int:
+        """Number of collected items that finished their full runtest protocol."""
+        return self.__items_finished
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any]:
@@ -214,6 +233,8 @@ class GreenboardUploader:
         *,
         pass_count: int | None = None,
         fail_count: int | None = None,
+        incomplete: bool = False,
+        collected: int = 0,
     ) -> None:
         """
         Uploads the results using the specified platform and version.  The reason that they
@@ -230,6 +251,14 @@ class GreenboardUploader:
             value is used instead.
         :param fail_count: Optional override for the fail count. Same
             semantics as ``pass_count``.
+        :param incomplete: Whether the pytest session was cut short (e.g. a
+            Jenkins timeout) before every collected test ran. Computed by
+            the greenboard fixture from :py:attr:`items_finished` vs.
+            ``session.testscollected``.
+        :param collected: The planned test count (``session.testscollected``).
+            0 means unknown/not supplied. Lets the frontend show real
+            coverage (e.g. "29/42") for a clean-incomplete run, where
+            pass/fail counts alone always read as 100%.
 
         A setup/teardown failure skips the upload unless *both* counts are
         supplied: the in-process counter stops tallying at the failure, so
@@ -294,6 +323,8 @@ class GreenboardUploader:
                 platform=platform,
                 os=os_name,
                 jobUrl=resolve_job_url(),
+                incomplete=incomplete,
+                collected=collected,
             )
         )
 
@@ -305,10 +336,19 @@ class GreenboardUploader:
         version: str | None,
         sgw_version: CouchbaseVersion | None,
         es_version: CouchbaseVersion | None = None,
+        *,
+        incomplete: bool = False,
+        collected: int = 0,
     ) -> None:
         """
         Upload one greenboard doc whose pass/fail counts come from a JUnit
         XML file produced by pytest.
+
+        :param incomplete: Whether the pytest session was cut short before
+            every collected test ran. Passed through verbatim to
+            :py:meth:`upload`.
+        :param collected: The planned test count. Passed through verbatim to
+            :py:meth:`upload`.
 
         Policy:
         - If ``junit_output`` doesn't exist, fall back to the in-process
@@ -337,7 +377,7 @@ class GreenboardUploader:
         if not junit_output.is_file():
             # Pytest didn't write an XML for this session; use the in-process
             # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version, es_version)
+            self.upload(platform, os_name, version, sgw_version, es_version, incomplete=incomplete, collected=collected)
             return
 
         junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
@@ -356,6 +396,8 @@ class GreenboardUploader:
             es_version,
             pass_count=junit_pass,
             fail_count=junit_fail + junit_error,
+            incomplete=incomplete,
+            collected=collected,
         )
 
     def record_upgrade_step(

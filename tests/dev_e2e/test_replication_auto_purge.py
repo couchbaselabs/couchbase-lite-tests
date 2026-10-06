@@ -128,7 +128,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             elif update.document_id == "post_4":
                 assert update.flags & ReplicatorDocumentFlags.DELETED, "Deleted flag missing from post_4"
             else:
-                assert False, f"Stray document update present in list ({update.document_id})"
+                pytest.fail(f"Stray document update present in list ({update.document_id})")
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -409,8 +409,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             new_properties=[{"channels": ["group2"]}],
             removed_properties=["collection", "content", "owner", "scope", "title"],
         )
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -657,8 +656,7 @@ class TestReplicationAutoPurge(CBLTestClass):
 
         snapshot_updater = SnapshotUpdater(snap)
         snapshot_updater.delete_document("_default.posts", "post_1")
-        verify_result = await db.verify_documents(snapshot_updater)
-        assert verify_result.result is True, f"Local docs are not as expected: {verify_result.description}"
+        await db.verify_documents(snapshot_updater)
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -814,6 +812,7 @@ class TestReplicationAutoPurge(CBLTestClass):
                 )
             ],
             collection="posts",
+            wait_for_caching_feed=True,
         )
 
         self.mark_test_step(f"""
@@ -1198,7 +1197,7 @@ class TestReplicationAutoPurge(CBLTestClass):
             [
                 DocumentUpdateEntry(
                     "post_1",
-                    revid=None,
+                    revision=None,
                     body={"title": "Post 1", "channels": ["group1"]},
                 )
             ],

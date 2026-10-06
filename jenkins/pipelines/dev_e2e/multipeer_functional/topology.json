@@ -23,8 +23,8 @@
         {
             "platform": "swift_ios",
             "cbl_version": "{{version}}",
-            "location": "422841e97a85afc19bc869f216a5a81db9903ea6",
-            "ip_hint": "10.100.150.59",
+            "location": "00008110-001055002213401E",
+            "ip_hint": "10.100.150.42",
             "download": true
         }
     ]

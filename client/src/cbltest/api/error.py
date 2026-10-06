@@ -33,46 +33,36 @@ class CblTestServerBadResponseError(Exception):
         return self.__message
 
 
-class CblTimeoutError(Exception):
+class CblTimeoutError(TimeoutError):
     """A timeout occurred while waiting for an event"""
 
-    def __init__(self, *args: Any) -> None:
+    # One message only, since OSError reads two arguments as (errno, strerror).
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+
+
+class CblRemoteBadResponseError(Exception):
+    """A bad response was returned from a remote service"""
+
+    @property
+    def code(self) -> int:
+        """Gets the code that the remote service returned"""
+        return self.__code
+
+    @property
+    def body(self) -> str:
+        """Gets the response body that the remote service returned"""
+        return self.__body
+
+    def __init__(self, code: int, *args: Any, body: str) -> None:
+        self.__code = code
+        self.__body = body
         super().__init__(*args)
 
 
-class CblSyncGatewayBadResponseError(Exception):
+class CblSyncGatewayBadResponseError(CblRemoteBadResponseError):
     """A bad HTTP code was returned from Sync Gateway"""
 
-    @property
-    def code(self) -> int:
-        """Gets the code that Sync Gateway returned"""
-        return self.__code
 
-    @property
-    def body(self) -> str:
-        """Gets the response body that Sync Gateway returned"""
-        return self.__body
-
-    def __init__(self, code: int, *args: Any, body: str) -> None:
-        self.__code = code
-        self.__body = body
-        super().__init__(*args)
-
-
-class CblEdgeServerBadResponseError(Exception):
+class CblEdgeServerBadResponseError(CblRemoteBadResponseError):
     """A bad HTTP code was returned from Edge Server"""
-
-    @property
-    def code(self) -> int:
-        """Gets the code that Edge Server returned"""
-        return self.__code
-
-    @property
-    def body(self) -> str:
-        """Gets the response body that Edge Server returned"""
-        return self.__body
-
-    def __init__(self, code: int, *args: Any, body: str) -> None:
-        self.__code = code
-        self.__body = body
-        super().__init__(*args)

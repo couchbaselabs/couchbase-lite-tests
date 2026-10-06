@@ -6,9 +6,9 @@ from typing import cast
 import aiofiles
 from opentelemetry.trace import get_tracer
 
-from cbltest.api.couchbaseserver import CouchbaseServer
+from cbltest.api.couchbaseserver import CouchbaseServer, ServiceType
 from cbltest.api.error import CblTestError
-from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
+from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.assertions import _assert_not_null
 from cbltest.jsonhelper import _get_typed_required
@@ -49,8 +49,6 @@ class CouchbaseCluster:
             raise CblTestError(
                 "At least one Couchbase Server must be provided when configuring multiple Sync Gateway nodes"
             )
-        elif not sync_gateways[0].using_rosmar:
-            raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
 
         self.__tracer = get_tracer(__name__, VERSION)
 
@@ -65,11 +63,11 @@ class CouchbaseCluster:
         """
         Create every scope and collection that the given database config refers to.
 
-        No-ops when using Rosmar, where collections are created implicitly.
+        No-ops without a Couchbase Server, since Rosmar creates collections implicitly.
 
         :param db_payload: The database config naming the bucket, scopes and collections
         """
-        if self.sync_gateways[0].using_rosmar:
+        if not self.couchbase_servers:
             return
         assert db_payload.bucket is not None, "DatabaseConfig is missing required field 'bucket'"
         if db_payload.scopes:
@@ -152,22 +150,32 @@ class CouchbaseCluster:
 
             await sg.load_dataset(dataset_name, data_filepath)
 
-    async def create_database(self, db_name: str, config: DatabaseConfig, *, bucket_replicas: int = 0) -> None:
+    async def create_database(self, db_name: str, config: DatabaseConfig) -> None:
         """
         Create the backing bucket and collections for a database, then create the
         database itself on the Sync Gateway cluster.
 
+        A config that names no index replica count gets one to suit the cluster, as the bucket
+        does; one that names a count is left alone.
+
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
-        :param bucket_replicas: The number of replicas for the backing bucket (default 0)
         """
-        # buckets and collections are implicitly created when using Rosmar
-        if not self.sync_gateways[0].using_rosmar:
+        # Rosmar creates buckets and collections implicitly, even if a Couchbase Server is configured
+        if not await self.sync_gateways[0].using_rosmar:
             assert config.bucket, "bucket needs to be specified in a database config"
-            bucket_created = self.couchbase_servers[0].create_bucket(config.bucket, num_replicas=bucket_replicas)
+            bucket = config.bucket
+            cbs = self.couchbase_servers[0]
+            # Sync Gateway rejects a config that sets both index.num_replicas and the
+            # deprecated num_index_replicas, so a config using the old field is left alone.
+            if config.num_index_replicas is None and (config.index is None or config.index.num_replicas is None):
+                config = config.model_copy(
+                    update={"index": IndexConfig(num_replicas=await cbs.replica_count(ServiceType.Index))}
+                )
+            bucket_created = await cbs.create_bucket(bucket)
             self.create_collections(config)
             # Stale indexes only linger from a previous incarnation of the bucket, so
             # this is only worth waiting on when we just recreated it.
             if bucket_created:
-                self.couchbase_servers[0].wait_for_indexes_removed(config.bucket)
+                cbs.wait_for_indexes_removed(bucket)
         await self.sync_gateway_cluster.create_database(db_name, config)

@@ -11,23 +11,26 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any, Self, cast
 from urllib.parse import urlencode, urljoin
+from uuid import uuid4
 
 import aiofiles
+import asyncstdlib
 import packaging.version
-import requests
 import tenacity
-from aiohttp import ClientSession, ClientTimeout, TCPConnector, encode_basic_auth
-from aiohttp.client_exceptions import ClientConnectorError
+from aiohttp import ClientResponse, ClientTimeout, TCPConnector, encode_basic_auth
+from aiohttp.client_exceptions import ClientConnectorError, ClientError
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, Field, TypeAdapter
 
 from cbltest.api import caddy
+from cbltest.api.bulk_docs import analyze_bulk_docs_response
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
 from cbltest.assertions import _assert_not_null
+from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
-from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
+from cbltest.logging import cbl_error, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
@@ -260,6 +263,11 @@ class ISGRPayload(JSONSerializable):
         return body
 
 
+# The fields DocumentUpdateEntry derives from its own id/revision arguments, which it
+# refuses to take in a body.
+_UPDATE_ENTRY_METADATA = frozenset({"_id", "_rev", "_cv"})
+
+
 class AllDocumentsResponseRow:
     """
     A class representing a single entry in an all_docs response from Sync Gateway
@@ -276,7 +284,7 @@ class AllDocumentsResponseRow:
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the row"""
         return self.__revid
 
@@ -286,20 +294,23 @@ class AllDocumentsResponseRow:
         return self.__cv
 
     @property
-    def revision(self) -> str:
-        """Gets the either revid or cv, whichever is populated (at least one must be)"""
-        return cast(str, self.__revid if self.__revid is not None else self.__cv)
-
-    @property
     def doc(self) -> dict | None:
         """Gets the document body (only available if include_docs=True was used)"""
         return self.__doc
+
+    @property
+    def body(self) -> dict | None:
+        """The document body without the metadata that DocumentUpdateEntry sets itself."""
+        if self.__doc is None:
+            return None
+
+        return {k: v for k, v in self.__doc.items() if k not in _UPDATE_ENTRY_METADATA}
 
     def __init__(
         self,
         key: str,
         id: str,
-        revid: str | None,
+        revid: str,
         cv: str | None,
         doc: dict | None = None,
     ) -> None:
@@ -338,12 +349,12 @@ class AllDocumentsResponse:
                 AllDocumentsResponseRow(
                     row["key"],
                     row["id"],
-                    cast(str, rev["rev"]) if "rev" in rev else None,
+                    rev["rev"],
                     cast(str, rev["cv"]) if "cv" in rev else None,
                     doc,
                 )
             )
-            self.__revmap[row["id"]] = cast(str, rev["rev"]) if "rev" in rev else None
+            self.__revmap[row["id"]] = cast(str, rev["rev"])
 
 
 class ChangesResponseEntry:
@@ -375,14 +386,32 @@ class ChangesResponseEntry:
         """Gets whether this document was deleted"""
         return self.__deleted
 
+    @property
+    def removed(self) -> list[str]:
+        """
+        Gets the channels this document was removed from, empty unless the entry is a removal
+        notice.  Sync Gateway sends one to a user that has lost access, so an entry carrying
+        this reports that the document went away, not that the user can still see it.
+        """
+        return self.__removed
+
     def __init__(self, entry: dict) -> None:
         seq = entry.get("seq")
         assert isinstance(seq, int | str), f"Unusable sequence in changes feed entry: {seq!r}"
         self.__seq = seq
         self.__id = cast(str, entry["id"])
         self.__deleted = entry.get("deleted", False)
+        self.__removed = cast(list[str], entry.get("removed", []))
         changes_list = cast(list[dict], entry.get("changes", []))
-        self.__changes = [cast(str, c.get("rev") or c.get("cv")) for c in changes_list]
+        self.__changes: list[str] = []
+        for change in changes_list:
+            # The feed's version_type decides which of the two a change carries, so unlike a
+            # document body (which always has a rev) either one can be the missing one here.
+            version = change.get("rev", change.get("cv"))
+            assert isinstance(version, str), (
+                f"Changes feed entry for {self.__id} has neither a rev nor a cv: {change!r}"
+            )
+            self.__changes.append(version)
 
 
 class ChangesResponse:
@@ -416,42 +445,31 @@ class ChangesResponse:
 class DocumentUpdateEntry(JSONSerializable):
     """
     A class that represents an update to a document.
-    For creating a new document, set revid to None.
+    For creating a new document, set revision to None.
     """
 
     @property
     def id(self) -> str:
         """
-        Gets the ID of the entry (NOTE: Will go away once SGW supports VV in REST)
+        Gets the ID of the entry
         """
         return cast(str, self.__body["_id"])
-
-    @property
-    def rev(self) -> str | None:
-        """
-        Gets the rev ID of the entry (NOTE: Will go away once SGW supports VV in REST)
-        """
-        if "_rev" not in self.__body:
-            return None
-
-        return cast(str, self.__body["_rev"])
 
     @property
     def deleted(self) -> bool:
         """Gets whether this entry deletes the document"""
         return bool(self.__body.get("_deleted", False))
 
-    def __init__(self, id: str, revid: str | None, body: dict) -> None:
+    def __init__(self, id: str, revision: str | None, body: dict) -> None:
+        for field in _UPDATE_ENTRY_METADATA:
+            assert field not in body, f"{field} will be overwritten from the id/revision arguments"
         self.__body = body.copy()
         self.__body["_id"] = id
-        if revid:
-            self.__body["_rev"] = revid
-
-    def swap_rev(self, revid: str) -> None:
-        """
-        Changes the revid to the provided one (NOTE: Will go away once SGW supports VV in REST)
-        """
-        self.__body["_rev"] = revid
+        if revision:
+            if "@" in revision:
+                self.__body["_cv"] = revision
+            else:
+                self.__body["_rev"] = revision
 
     def to_json(self) -> Any:
         return self.__body
@@ -468,7 +486,7 @@ class RemoteDocument(JSONSerializable):
         return self.__id
 
     @property
-    def revid(self) -> str | None:
+    def revid(self) -> str:
         """Gets the revision ID of the document"""
         return self.__rev
 
@@ -493,7 +511,6 @@ class RemoteDocument(JSONSerializable):
         if self.__cv is not None:
             return self.__cv
 
-        assert self.__rev is not None
         return self.__rev
 
     @property
@@ -516,18 +533,14 @@ class RemoteDocument(JSONSerializable):
         return self.__seq
 
     def __init__(self, body: dict, seq: int | None = None, tombstone: bool = False) -> None:
-        if "error" in body:
-            raise ValueError("Trying to create remote document from error response")
-
         self.__seq = seq
         self.__tombstone = tombstone
         self.__body = body.copy()
         self.__id = cast(str, body["_id"])
-        self.__rev = cast(str, body["_rev"]) if "_rev" in body else None
+        self.__rev = cast(str, body["_rev"])
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
         del self.__body["_id"]
-        if self.__rev is not None:
-            del self.__body["_rev"]
+        del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
 
@@ -537,6 +550,18 @@ class RemoteDocument(JSONSerializable):
         ret_val["_rev"] = self.__rev
         ret_val["_cv"] = self.__cv
         return ret_val
+
+
+def _write_response_body(response: dict, doc_id: str) -> dict:
+    """
+    Builds a document body out of the response to a write, which reports the same values as a
+    document body but under `id`, `rev` and (Sync Gateway 4.0 and later) `cv`.  A delete
+    acknowledgement does not always name the document, so `doc_id` stands in for a missing `id`.
+    """
+    assert "rev" in response, f"Unexpected response to a document write: {dumps(response)}"
+    body = {f"_{key}": response[key] for key in ("rev", "cv") if key in response}
+    body["_id"] = response.get("id", doc_id)
+    return body
 
 
 class CouchbaseVersion(ABC):
@@ -673,6 +698,180 @@ class AllDatabasesVerboseEntry(BaseModel):
 _all_databases_verbose_adapter = TypeAdapter(list[AllDatabasesVerboseEntry])
 
 
+class StartupConfigResponse(BaseModel):
+    """
+    Output of GET /_config endpoint of Sync Gateway
+    """
+
+    class Bootstrap(BaseModel):
+        group_id: str | None = None
+        config_update_frequency: str | None = None
+        node_heartbeat_expiry: str | None = None
+        server: str
+        username: str | None = None
+        password: str | None = None
+        ca_cert_path: str | None = None
+        server_tls_skip_verify: bool | None = None
+        x509_cert_path: str | None = None
+        x509_key_path: str | None = None
+        use_tls_server: bool | None = None
+        use_system_metadata_collection: bool | None = None
+
+    class API(BaseModel):
+        class HTTPS(BaseModel):
+            tls_minimum_version: str | None = None
+            tls_cert_path: str | None = None
+            tls_key_path: str | None = None
+
+        class CORS(BaseModel):
+            origin: list[str] | None = None
+            login_origin: list[str] | None = None
+            headers: list[str] | None = None
+            max_age: int | None = None
+
+        public_interface: str | None = None
+        admin_interface: str | None = None
+        metrics_interface: str | None = None
+        profile_interface: str | None = None
+        # Sync Gateway requires admin and metrics authentication unless told otherwise
+        admin_interface_authentication: bool = True
+        metrics_interface_authentication: bool = True
+        enable_advanced_auth_dp: bool | None = None
+        server_read_timeout: str | None = None
+        server_write_timeout: str | None = None
+        read_header_timeout: str | None = None
+        idle_timeout: str | None = None
+        pretty: bool | None = None
+        max_connections: int | None = None
+        compress_responses: bool | None = None
+        hide_product_version: bool | None = None
+        https: HTTPS = Field(default_factory=HTTPS)
+        cors: CORS | None = None
+
+    class Logging(BaseModel):
+        class FileLogger(BaseModel):
+            class Rotation(BaseModel):
+                max_size: int | None = None
+                max_age: int | None = None
+                localtime: bool | None = None
+                rotated_logs_size_limit: int | None = None
+                rotation_interval: str | None = None
+
+            enabled: bool | None = None
+            rotation: Rotation = Field(default_factory=Rotation)
+            collation_buffer_size: int | None = None
+
+        class ConsoleLogger(FileLogger):
+            log_level: str | None = None
+            log_keys: list[str] | None = None
+            color_enabled: bool | None = None
+            file_output: str | None = None
+
+        class AuditLogger(FileLogger):
+            audit_log_file_path: str | None = None
+            enabled_events: list[int] | None = None
+
+        log_file_path: str | None = None
+        redaction_level: str | None = None
+        console: ConsoleLogger | None = None
+        error: FileLogger | None = None
+        warn: FileLogger | None = None
+        info: FileLogger | None = None
+        debug: FileLogger | None = None
+        trace: FileLogger | None = None
+        stats: FileLogger | None = None
+        audit: AuditLogger | None = None
+
+    class Auth(BaseModel):
+        bcrypt_cost: int | None = None
+
+    class Replicator(BaseModel):
+        max_heartbeat: str | None = None
+        blip_compression: int | None = None
+        max_concurrent_replications: int | None = None
+        max_concurrent_changes_batches: int | None = None
+        max_concurrent_revs: int | None = None
+
+    class Unsupported(BaseModel):
+        class Serverless(BaseModel):
+            enabled: bool | None = None
+            min_config_fetch_interval: str | None = None
+
+        class HTTP2(BaseModel):
+            enabled: bool | None = None
+
+        class AuditInfoProvider(BaseModel):
+            global_info_env_var_name: str | None = None
+            request_info_header_name: str | None = None
+
+        stats_log_frequency: str | None = None
+        use_stdlib_json: bool | None = None
+        serverless: Serverless = Field(default_factory=Serverless)
+        http2: HTTP2 | None = None
+        user_queries: bool | None = None
+        use_xattr_config: bool | None = None
+        allow_dbconfig_env_vars: bool | None = None
+        diagnostic_interface: str | None = None
+        effective_user_header_name: str | None = None
+        audit_info_provider: AuditInfoProvider | None = None
+        rosmar_bucket_management: bool | None = None
+        use_gocb_fast_fail_retry: bool | None = None
+
+    class Credentials(BaseModel):
+        """Credentials for a bucket or database, used instead of the bootstrap ones"""
+
+        username: str | None = None
+        password: str | None = None
+        x509_cert_path: str | None = None
+        x509_key_path: str | None = None
+
+    bootstrap: Bootstrap
+    api: API = Field(default_factory=API)
+    logging: Logging = Field(default_factory=Logging)
+    auth: Auth = Field(default_factory=Auth)
+    replicator: Replicator = Field(default_factory=Replicator)
+    unsupported: Unsupported = Field(default_factory=Unsupported)
+    database_credentials: dict[str, Credentials | None] | None = None
+    bucket_credentials: dict[str, Credentials | None] | None = None
+    max_file_descriptors: int | None = None
+    couchbase_keepalive_interval: int | None = None
+    heap_profile_collection_threshold: int | None = None
+    heap_profile_disable_collection: bool | None = None
+
+
+class ResyncAction(str, Enum):
+    """The action to perform via POST /{db}/_resync"""
+
+    START = "start"
+    STOP = "stop"
+
+
+class ResyncState(str, Enum):
+    """The state of a Sync Gateway resync process, as reported by /{db}/_resync"""
+
+    RUNNING = "running"
+    COMPLETED = "completed"
+    STOPPING = "stopping"
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+class ResyncStatusResponse(BaseModel):
+    """
+    Output of GET /{db}/_resync (and POST /{db}/_resync) endpoints of Sync Gateway
+    """
+
+    status: ResyncState
+    start_time: str = ""
+    last_error: str = ""
+    resync_id: str = ""
+    collections_processing: dict[str, list[str]] | None = None
+    docs_changed: int = 0
+    docs_processed: int = 0
+    docs_errored: int = 0
+    docs_targeted: int = 0
+
+
 class SGCollectRedactLevel(str, Enum):
     """Redaction level accepted by Sync Gateway's /_sgcollect_info endpoint"""
 
@@ -691,6 +890,20 @@ class SGCollectOptions(BaseModel):
     output_dir: str | None = None
 
 
+def get_basic_auth_headers(username: str, password: str) -> dict[str, str]:
+    """Returns the headers that authenticate a request as `username` with HTTP basic auth"""
+    return {"Authorization": encode_basic_auth(username, password, "ascii")}
+
+
+SYNC_GATEWAY_SESSION_COOKIE = "SyncGatewaySession"
+
+
+def get_sync_gateway_session_headers(session_id: str) -> dict[str, str]:
+    """Returns the headers that authenticate a request with a Sync Gateway session, e.g. one
+    from :func:`SyncGateway.create_session`"""
+    return {"Cookie": f"{SYNC_GATEWAY_SESSION_COOKIE}={session_id}"}
+
+
 class _SyncGatewayBase:
     """
     Base class for Sync Gateway clients containing common document and database operations.
@@ -700,8 +913,6 @@ class _SyncGatewayBase:
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int,
         secure: bool = False,
         public_port: int | None = None,
@@ -712,8 +923,9 @@ class _SyncGatewayBase:
         :param public_port: The instance's public REST/replication port. Defaults to `port`, which is
             correct for a client that already talks to the public API; an admin client must pass it,
             since its own `port` is the admin one.
-        :param headers: Headers to send with every request, e.g. the `X-Backend` header that
-            tells a load balancer which node to use.
+        :param headers: Headers to send with every request, e.g. `Authorization` from
+            :func:`get_basic_auth_headers`, or the `X-Backend` header that tells a load balancer
+            which node to use.
         """
         scheme = "https://" if secure else "http://"
         ws_scheme = "wss://" if secure else "ws://"
@@ -725,13 +937,7 @@ class _SyncGatewayBase:
         self.__secure: bool = secure
         self.__hostname: str = url
         self.__port: int = port
-        self.__session: ClientSession = self._create_session(
-            secure,
-            scheme,
-            url,
-            port,
-            {"Authorization": encode_basic_auth(username, password, "ascii")} | dict(headers or {}),
-        )
+        self.__session: AsyncHTTPClient = self._create_session(secure, scheme, url, port, headers)
 
     def __str__(self) -> str:
         return f"{type(self).__name__} {self.hostname}:{self.port}"
@@ -778,21 +984,17 @@ class _SyncGatewayBase:
         url: str,
         port: int,
         headers: Mapping[str, str] | None = None,
-    ) -> ClientSession:
+    ) -> AsyncHTTPClient:
         """Create a session that sends `headers` with every request, e.g. the
-        `Authorization` header from `aiohttp.encode_basic_auth`.  None for a session that
+        `Authorization` header from :func:`get_basic_auth_headers`.  None for a session that
         sends none, such as an anonymous one."""
+        connector = None
         if secure:
             ssl_context = ssl.create_default_context(cadata=_SGW_CA_CERT)
             # Disable hostname check so that the pre-generated SG can be used on any machines.
             ssl_context.check_hostname = False
-            return ClientSession(
-                f"{scheme}{url}:{port}",
-                headers=headers,
-                connector=TCPConnector(ssl=ssl_context),
-            )
-        else:
-            return ClientSession(f"{scheme}{url}:{port}", headers=headers)
+            connector = TCPConnector(ssl=ssl_context)
+        return AsyncHTTPClient(f"{scheme}{url}:{port}", headers=headers, connector=connector)
 
     async def _send_request(
         self,
@@ -807,6 +1009,18 @@ class _SyncGatewayBase:
                              call whose body is large and uninteresting, such as a changes feed read
                              only to find one document; the request and status are still logged.
         """
+        body, _ = await self._send_request_with_response(method, path, payload, params, log_response)
+        return body
+
+    async def _send_request_with_response(
+        self,
+        method: str,
+        path: str,
+        payload: JSONSerializable | DatabaseConfig | None = None,
+        params: dict[str, str] | None = None,
+        log_response: bool = True,
+    ) -> tuple[Any, ClientResponse]:
+        """Like :func:`_send_request`, but also returns the response, for its headers and cookies."""
         with self._tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
@@ -833,7 +1047,7 @@ class _SyncGatewayBase:
                     body=data,
                 )
 
-            return ret_val
+            return ret_val, resp
 
     async def supports_version_vectors(self) -> bool:
         """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
@@ -913,7 +1127,6 @@ class _SyncGatewayBase:
     async def get_delta_sync_stats(self, dataset_name: str) -> dict:
         """
         Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
-        Returns an empty dict if the section is absent.
 
         :param dataset_name: The name of the SGW database to inspect.
         """
@@ -921,14 +1134,9 @@ class _SyncGatewayBase:
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
 
-        try:
-            db_section = expvars["syncgateway"]["per_db"][dataset_name]
-        except KeyError:
-            return {}
-        delta = db_section.get("delta_sync")
-        return delta if isinstance(delta, dict) else {}
+        return expvars["syncgateway"]["per_db"][dataset_name]["delta_sync"]
 
-    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Upsert a database configuration on the Sync Gateway instance
 
@@ -938,11 +1146,17 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("update_database_config", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("post", f"/{db_name}/_config", payload)
+            return payload.feed_type
 
-    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> None:
+    async def _put_database(self, db_name: str, payload: DatabaseConfig) -> str:
         """
         Attempts to create a database on the Sync Gateway instance
 
@@ -951,9 +1165,15 @@ class _SyncGatewayBase:
 
         :param db_name: The name of the DB to create
         :param payload: The options for the DB to create
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
         """
         with self._tracer.start_as_current_span("put_database", attributes={"sg.database.name": db_name}):
+            # feed_type is an unused field of the Database Config, borrowed because
+            # /db/_config reports the config on disk, not the one running in memory.
+            payload.feed_type = uuid4().hex
             await self._send_request("put", f"/{db_name}/", payload)
+            return payload.feed_type
 
     async def get_database_status(self, db_name: str) -> DatabaseStatusResponse | None:
         """
@@ -975,14 +1195,17 @@ class _SyncGatewayBase:
     async def _wait_for_database_gone(
         self,
         db_name: str,
-        timeout: float = 30.0,
+        timeout: float = 150.0,
         retry_delay: float = 1.0,
     ) -> None:
         """
         Wait until this node stops reporting db_name.
 
         :param db_name: Database the node should stop serving.
-        :param timeout: Seconds to wait, against a default config poll interval of 10s.
+        :param timeout: Seconds to wait.  A node drops a database deleted elsewhere on its
+                        config poll, every 10s by default, but that poll re-reads the config
+                        and skips the removal whenever the read fails transiently, so the
+                        budget has to cover several missed polls.
         :param retry_delay: Seconds between polls.
         :raises TimeoutError: if the node is still serving the database after timeout
         """
@@ -1007,7 +1230,7 @@ class _SyncGatewayBase:
 
         .. warning:: This will not delete the data from the Couchbase Server bucket.
             To delete the data see the
-            :func:`drop_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.drop_bucket>` function
+            :func:`purge_bucket()<cbltest.api.couchbaseserver.CouchbaseServer.purge_bucket>` function
 
         :param db_name: The name of the Database to delete
         :param retry_count: Retries already spent on this delete
@@ -1061,19 +1284,6 @@ class _SyncGatewayBase:
             entries = _all_databases_verbose_adapter.validate_python(resp)
             return {entry.db_name: entry for entry in entries}
 
-    def _analyze_dataset_response(self, response: list) -> None:
-        assert isinstance(response, list), "Invalid bulk docs response (not a list)"
-        typed_response = cast(list, response)
-        for r in typed_response:
-            info = cast(dict, r)
-            assert isinstance(info, dict), "Invalid item inside bulk docs response list (not an object)"
-            if "error" in info:
-                raise CblSyncGatewayBadResponseError(
-                    info["status"],
-                    f"At least one bulk docs insert failed ({info['error']})",
-                    body=dumps(info),
-                )
-
     async def load_dataset(self, db_name: str, path: Path) -> None:
         """
         Populates a given database name with the JSON contents at the specified path
@@ -1108,7 +1318,7 @@ class _SyncGatewayBase:
                             f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                             JSONDictionary({"docs": collected}),
                         )
-                        self._analyze_dataset_response(resp)
+                        analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
                         collected.clear()
 
                     last_scope = scope
@@ -1121,7 +1331,7 @@ class _SyncGatewayBase:
                     f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
                     JSONDictionary({"docs": collected}),
                 )
-                self._analyze_dataset_response(cast(list, resp))
+                analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
 
     async def get_all_documents(
         self,
@@ -1131,7 +1341,7 @@ class _SyncGatewayBase:
         include_docs: bool = False,
     ) -> AllDocumentsResponse:
         """
-        Gets all the documents in the given collection from Sync Gateway (id and revid)
+        Gets all the documents in the given collection from Sync Gateway (id, revid and CV)
 
         :param db_name: The name of the Sync Gateway database to query
         :param scope: The scope to use when querying Sync Gateway
@@ -1147,7 +1357,7 @@ class _SyncGatewayBase:
                 "cbl.include_docs": include_docs,
             },
         ):
-            params = {}
+            params = {"show_cv": "true"}
             if include_docs:
                 params["include_docs"] = "true"
 
@@ -1191,22 +1401,63 @@ class _SyncGatewayBase:
         doc_ids: Collection[str],
         scope: str = "_default",
         collection: str = "_default",
-    ) -> ChangesResponse:
+        deleted: bool = False,
+        version_type: str = "rev",
+        since: int | str | None = None,
+    ) -> dict[str, ChangesResponseEntry]:
         """
-        Retry the _doc_ids filtered changes feed until every doc in doc_ids is
-        present and not a tombstone, then return the response.  Raises TimeoutError
-        if they have not all arrived within 60s.
+        Retry the changes feed until every doc in doc_ids has appeared in the wanted state,
+        then return the entry that matched for each.  Raises TimeoutError if they have not
+        all arrived within 60s.
 
         Use this rather than wait_for_document_count when the collection also holds
-        unrelated documents.
+        unrelated documents, or when the documents being waited on are tombstones.
+
+        The feed is read unfiltered and matched here rather than through `_doc_ids`, which
+        `DocIDChangesFeed` serves out of the bucket and so reports documents a replicator
+        still cannot see.  Each poll resumes from the last one's `last_seq`, so a wait that
+        spans several polls re-reads only what has arrived since.
+
+        That resumption is also the one sharp edge: a document is matched once and never
+        looked at again, so a write that changes its state later in the same wait leaves the
+        entry returned for it stale.  Wait on a batch of writes that has already been made,
+        not on one still in flight.  When the documents are already on the feed in another
+        state, pass `since` so that those earlier entries cannot satisfy the wait.
+
+        :param db_name: The name of the Sync Gateway database to query
+        :param doc_ids: The documents to wait for
+        :param scope: The scope to use when querying Sync Gateway
+        :param collection: The collection to use when querying Sync Gateway
+        :param deleted: If True, wait for each document to appear as a tombstone instead of alive
+        :param version_type: The version type to use ('rev' for revision IDs, 'cv' for version
+                             vectors in SGW 4.0+)
+        :param since: Start the wait from this sequence instead of the beginning of the feed.
+                      Pass a sequence captured before the writes being waited on so that an
+                      earlier state of the same documents cannot satisfy the wait
         """
         wanted = set(doc_ids)
+        found: dict[str, ChangesResponseEntry] = {}
+        state = "tombstoned" if deleted else "present"
 
-        async def _wait_for_documents_poll() -> ChangesResponse:
-            changes = await self.get_changes(db_name, scope, collection, doc_ids=sorted(wanted))
-            missing = wanted - {entry.id for entry in changes.results if not entry.deleted}
-            assert not missing, f"Documents missing from {db_name}.{scope}.{collection}: {sorted(missing)}"
-            return changes
+        async def _wait_for_documents_poll() -> dict[str, ChangesResponseEntry]:
+            nonlocal since
+            changes = await self.get_changes(db_name, scope, collection, version_type=version_type, since=since)
+            since = changes.last_seq
+            for entry in changes.results:
+                if entry.id not in wanted or entry.deleted != deleted:
+                    continue
+
+                # A removal notice says the reader lost access, so it answers a wait for the
+                # document going away but never one for the document arriving.  A tombstone on
+                # a user's feed carries both, since a deleted document grants no channels.
+                if entry.removed and not deleted:
+                    continue
+
+                found[entry.id] = entry
+
+            missing = wanted - found.keys()
+            assert not missing, f"Documents not {state} in {db_name}.{scope}.{collection}: {sorted(missing)}"
+            return dict(found)
 
         # Import lands on SGW's polling cadence, not sub-second.
         return await async_retry_assert(
@@ -1269,37 +1520,6 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return ChangesResponse(cast(dict, resp))
 
-    async def _rewrite_rev_ids(
-        self,
-        db_name: str,
-        updates: list[DocumentUpdateEntry],
-        scope: str,
-        collection: str,
-    ) -> None:
-        all_docs_body = [u.id for u in updates if u.rev is not None]
-        all_docs_response = await self._send_request(
-            "post",
-            f"/{db_name}.{scope}.{collection}/_all_docs",
-            JSONDictionary({"keys": all_docs_body}),
-        )
-
-        if not isinstance(all_docs_response, dict):
-            raise ValueError("Inappropriate response from sync gateway _all_docs (not JSON dict)")
-
-        rows = cast(dict, all_docs_response)["rows"]
-        if not isinstance(rows, list):
-            raise ValueError("Inappropriate response from sync gateway _all_docs (rows not a list)")
-
-        for r in cast(list, rows):
-            next_id = r["id"]
-            found = assert_not_null(
-                next((u for u in updates if u.id == next_id), None),
-                f"Unable to find {next_id} in updates!",
-            )
-            new_rev_id = r["value"]["rev"]
-            cbl_info(f"For document {found.id}: Swapping revid from {found.rev} to {new_rev_id}")
-            found.swap_rev(new_rev_id)
-
     async def update_documents(
         self,
         db_name: str,
@@ -1316,12 +1536,12 @@ class _SyncGatewayBase:
         :param scope: The scope that the updates will be applied to (default '_default')
         :param collection: The collection that the updates will be applied to (default '_default')
         :param wait_for_caching_feed: If True, wait for a `request_plus` changes feed to report the last
-                                      revision this wrote, which covers the earlier ones too, and fail on
-                                      any update Sync Gateway rejected.  A replication started straight
-                                      after would otherwise read a feed that still has the documents at
-                                      their previous revisions (default False)
-        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway rejected an update,
-            answered with no usable entries, or the feed never reported the last revision written
+                                      revision this wrote, which covers the earlier ones too.  A replication
+                                      started straight after would otherwise read a feed that still has the
+                                      documents at their previous revisions (default False)
+        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update
+        :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway answered with no usable
+            entries, or the feed never reported the last revision written
         """
         with self._tracer.start_as_current_span(
             "update_documents",
@@ -1331,8 +1551,6 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            await self._rewrite_rev_ids(db_name, updates, scope, collection)
-
             body = {"docs": [u.to_json() for u in updates]}
 
             response = await self._send_request(
@@ -1340,26 +1558,17 @@ class _SyncGatewayBase:
                 f"/{db_name}.{scope}.{collection}/_bulk_docs",
                 JSONDictionary(body),
             )
+            entries = analyze_bulk_docs_response(response, CblSyncGatewayBadResponseError)
 
             if not wait_for_caching_feed:
                 return
 
-            assert isinstance(response, list), f"Bulk update returned {response!r}, not a JSON array"
-            entries = cast(list[dict], response)
             assert entries, f"Bulk update of {len(updates)} documents returned no entries"
-            for entry in entries:
-                # _bulk_docs answers 201 even for writes it rejected
-                assert "error" not in entry, f"Bulk update was rejected: {dumps(entry)}"
 
             # The last revision's wait covers the earlier ones
-            last = entries[-1]
+            last = cast(dict, entries[-1])
             doc_id = last.get("id")
             assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
-            written = {"_id": doc_id}
-            if "rev" in last:
-                written["_rev"] = last["rev"]
-            if "cv" in last:
-                written["_cv"] = last["cv"]
 
             # A batch can end on a deletion, which the feed reports as deleted rather than live
             last_update = assert_not_null(
@@ -1368,71 +1577,13 @@ class _SyncGatewayBase:
             )
 
             await self._document_with_sequence(
-                written,
+                _write_response_body(last, doc_id),
                 db_name=db_name,
                 doc_id=doc_id,
                 scope=scope,
                 collection=collection,
                 tombstone=last_update.deleted,
             )
-
-    async def upsert_documents(
-        self,
-        db_name: str,
-        updates: list[DocumentUpdateEntry],
-        scope: str = "_default",
-        collection: str = "_default",
-    ) -> None:
-        """
-        Upserts a list of documents on Sync Gateway.
-        Its different from update_documents in that it will not overwrite the doc body in case the
-            doc already exists.
-        It will preserve the existing body fields and only add / update whatever is being passed,
-            like the behaviour shown by the function batch_upsert used in CBL updates.
-
-        :param db_name: The name of the DB endpoint to upsert
-        :param updates: A list of upserts to perform
-        :param scope: The scope that the upserts will be applied to (default '_default')
-        :param collection: The collection that the upserts will be applied to (default '_default')
-        """
-        with self._tracer.start_as_current_span(
-            "update_documents",
-            attributes={
-                "cbl.database.name": db_name,
-                "cbl.scope.name": scope,
-                "cbl.collection.name": collection,
-            },
-        ):
-            merged_updates = []
-            for update in updates:
-                try:
-                    current_doc = await self.get_document(db_name, update.id, scope, collection)
-                    if current_doc is not None:
-                        current_body = dict(current_doc.body)
-                        current_body.update(update.to_json())
-                        current_body["_id"] = update.id
-                        if update.rev:
-                            current_body["_rev"] = update.rev
-                    else:
-                        current_body = update.to_json()
-                except Exception:
-                    current_body = update.to_json()
-                merged_updates.append(DocumentUpdateEntry(update.id, update.rev, current_body))
-
-            await self._rewrite_rev_ids(db_name, merged_updates, scope, collection)
-            body = {"docs": [u.to_json() for u in merged_updates]}
-            await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary(body),
-            )
-
-    async def _replaced_revid(self, doc_id: str, revid: str, db_name: str, scope: str, collection: str) -> str:
-        response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}?show_cv=true")
-        assert isinstance(response, dict)
-        response_dict = cast(dict, response)
-        assert revid == response_dict["_cv"] or revid == response_dict["_rev"]
-        return cast(dict, response)["_rev"]
 
     async def delete_document(
         self,
@@ -1442,7 +1593,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Deletes a document from Sync Gateway
@@ -1456,9 +1606,6 @@ class _SyncGatewayBase:
                                       A delete reaches the changes feed on the same asynchronous
                                       cadence as a write, so without this a caller that goes on to
                                       read a feed can still see the document alive
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
         :return: The tombstone.  Its `body` is Sync Gateway's delete acknowledgement rather than
                  document content, and its `seq` is only populated when waiting for the caching feed
         """
@@ -1471,15 +1618,12 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
-            if "@" in revid:
-                new_rev_id = await self._replaced_revid(doc_id, revid, db_name, scope, collection)
-            else:
-                new_rev_id = revid
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
 
             response = await self._send_request(
                 "delete",
                 f"/{db_name}.{scope}.{collection}/{doc_id}",
-                params={"rev": new_rev_id},
+                params={"rev": revid},
             )
 
             if not isinstance(response, dict):
@@ -1491,24 +1635,12 @@ class _SyncGatewayBase:
             if "error" in response:
                 raise CblSyncGatewayBadResponseError(500, f"Failed to delete document {doc_id}", body=dumps(response))
 
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
-            # RemoteDocument requires an ID, and the delete ack does not always carry one.
-            cast_resp.setdefault("_id", doc_id)
-
+            deleted = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp, tombstone=True)
+                return RemoteDocument(deleted, tombstone=True)
 
             return await self._document_with_sequence(
-                cast_resp,
+                deleted,
                 db_name=db_name,
                 doc_id=doc_id,
                 scope=scope,
@@ -1589,6 +1721,22 @@ class _SyncGatewayBase:
                 cast(dict, response), db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
             )
 
+    async def get_last_sequence(self, db_name: str) -> int:
+        """
+        Gets the sequence Sync Gateway has most recently allocated in the database.
+
+        Read this before a write to bound the feed read that waits for it: the write lands at a
+        higher sequence, so the wait does not have to re-read the feed from the start.
+
+        :param db_name: The name of the Sync Gateway database to query
+        """
+        with self._tracer.start_as_current_span("get_last_sequence", attributes={"cbl.database.name": db_name}):
+            response = await self._send_request("get", f"/{db_name}/", log_response=False)
+            assert isinstance(response, dict), f"Unusable response from GET /{db_name}/: {response!r}"
+            update_seq = response.get("update_seq")
+            assert isinstance(update_seq, int), f"Unusable update_seq for database {db_name}: {update_seq!r}"
+            return update_seq
+
     async def _document_with_sequence(
         self,
         body: dict,
@@ -1598,27 +1746,26 @@ class _SyncGatewayBase:
         scope: str,
         collection: str,
         tombstone: bool = False,
-        since: int | str | None = None,
+        since: int | None = None,
     ) -> RemoteDocument:
         """Wait for the write `body` describes to reach the caching feed, and return it with its sequence."""
-        assert "_rev" in body or "_cv" in body, (
-            f"Write of document {doc_id} returned neither a revision ID nor a CV, "
-            "so its sequence cannot be read back from the changes feed"
+        assert "_rev" in body, (
+            f"Write of document {doc_id} returned no revision ID, so its sequence cannot be read "
+            "back from the changes feed"
         )
-        version_type = "rev" if "_rev" in body else "cv"
-        expected_revision = cast(str, body[f"_{version_type}"])
+        expected_revision = cast(str, body["_rev"])
 
         # No `doc_ids`: only the unfiltered feed honours `request_plus`.  `RequestPlusSeq` is read
         # by `SimpleMultiChangesFeed` alone, while a `_doc_ids` feed comes from `DocIDChangesFeed`,
         # which reads each document straight from the bucket and never waits for the cache.
         #
         # Without a `since` this reads the collection's whole feed, which is quadratic over a loop
-        # of writes.  Callers writing in a loop pass the previous write's sequence to bound it.
+        # of writes, so the caller reads the database's sequence before the write and passes it.
         changes = await self.get_changes(
             db_name,
             scope,
             collection,
-            version_type=version_type,
+            version_type="rev",
             request_plus=True,
             since=since,
             log_response=False,
@@ -1649,7 +1796,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Creates a document in Sync Gateway
@@ -1664,10 +1810,7 @@ class _SyncGatewayBase:
                                       document is readable by ID but not yet in the changes feed,
                                       so a caller that reads a feed -- or waits on something
                                       replicating out of this Sync Gateway -- races the write
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
-        :return: The created document.  Never None; every failure raises
+        :return: The written document's id and revision (a write reports no body)
         :raises CblSyncGatewayBadResponseError: if the write is rejected, or the response is not a
                                                 document
         """
@@ -1680,6 +1823,7 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
             body = dict(document)
             body["_id"] = doc_id  # Ensure document has _id before sending
             response = await self._send_request(
@@ -1695,25 +1839,13 @@ class _SyncGatewayBase:
                     f"Failed to create document {doc_id}: unexpected response type",
                     body=str(response),
                 )
-            if "error" in response:
-                raise CblSyncGatewayBadResponseError(500, f"Failed to create document {doc_id}", body=dumps(response))
 
-            # Convert response to match expected format
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
+            created = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp)
+                return RemoteDocument(created)
 
             return await self._document_with_sequence(
-                cast_resp, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
+                created, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
             )
 
     async def update_document(
@@ -1725,7 +1857,6 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
-        since: int | str | None = None,
     ) -> RemoteDocument:
         """
         Updates a document in Sync Gateway.
@@ -1741,10 +1872,7 @@ class _SyncGatewayBase:
                                       this update's own sequence rather than a stale pre-write one.
                                       Raises if a concurrent write superseded this one first, since
                                       the feed then reports only that later sequence
-        :param since: Only meaningful with `wait_for_caching_feed`.  Bounds the feed read to changes
-                      after this sequence; pass the `seq` of the previous write when writing in a
-                      loop, so each wait does not re-read the whole feed
-        :return: The updated document as a RemoteDocument object
+        :return: The written document's id and revision (a write reports no body)
         :raises AssertionError: if `wait_for_caching_feed` is set and the response carries no revision,
             or the feed never reported the revision written
         """
@@ -1757,7 +1885,11 @@ class _SyncGatewayBase:
                 "cbl.document.id": doc_id,
             },
         ):
+            since = await self.get_last_sequence(db_name) if wait_for_caching_feed else None
             body = dict(document)
+            assert "_id" not in body, f"_id will be overwritten by {doc_id}"
+            assert "_rev" not in body, f"_rev will be overwritten by {rev}"
+            assert "_cv" not in body, "_cv would be ignored by _rev"
             body["_id"] = doc_id
             body["_rev"] = rev
 
@@ -1776,35 +1908,19 @@ class _SyncGatewayBase:
                     f"Failed to update document {doc_id} with rev {rev}: unexpected response type",
                     body=str(response),
                 )
-            if "error" in response:
-                raise CblSyncGatewayBadResponseError(
-                    500, f"Failed to update document {doc_id} with rev {rev}", body=dumps(response)
-                )
-
-            # Convert response to match expected format
-            cast_resp = cast(dict, response)
-
-            # Ensure RemoteDocument fields exist
-            if "id" in cast_resp:
-                cast_resp["_id"] = cast_resp.pop("id")  # Rename "id" to "_id"
-            if "rev" in cast_resp:
-                cast_resp["_rev"] = cast_resp.pop("rev")  # Rename "rev" to "_rev"
-            if "cv" in cast_resp:
-                cast_resp["_cv"] = cast_resp.pop("cv")  # Rename "cv" to "_cv"
-
+            updated = _write_response_body(cast(dict, response), doc_id)
             if not wait_for_caching_feed:
-                return RemoteDocument(cast_resp)
+                return RemoteDocument(updated)
 
             return await self._document_with_sequence(
-                cast_resp, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
+                updated, db_name=db_name, doc_id=doc_id, scope=scope, collection=collection, since=since
             )
 
     async def close(self) -> None:
         """
         Closes this Sync Gateway's aiohttp session, and its Caddy's
         """
-        if not self.__session.closed:
-            await self.__session.close()
+        await self.__session.close()
         await self._caddy.close()
 
     async def get_database_config(self, db_name: str) -> DatabaseConfig:
@@ -1819,20 +1935,59 @@ class _SyncGatewayBase:
             resp = await self._send_request("GET", f"/{db_name}/_config")
             return DatabaseConfig.model_validate(resp)
 
-    async def _refresh_database_config(self, db_name: str) -> None:
+    async def _get_database_runtime_config(self, db_name: str) -> dict:
         """
-        Make this node apply the database config from the bucket now, rather than at its
-        next config poll, so that a config written on another node takes effect here
-        straight away.  A node that has not loaded the database at all loads it here.
+        Gets the config this node is running for a database, rather than the config that
+        is stored in the bucket, with a value filled in for every setting the config it
+        was given left out.
 
-        :param db_name: The name of the database to reload the config for
-        :raises CblSyncGatewayBadResponseError: if the node cannot re-read the config: 404
-            when it serves the database but the config is gone from the bucket, 403 when it
-            does not serve the database at all
+        :param db_name: The name of the database to get the running configuration for
+        :return: The configuration this node is running, as JSON
         """
         _assert_not_null(db_name, "db_name")
-        with self._tracer.start_as_current_span("refresh_database_config", attributes={"cbl.database.name": db_name}):
-            await self._send_request("GET", f"/{db_name}/_config", params={"refresh_config": "true"})
+        with self._tracer.start_as_current_span(
+            "get_database_runtime_config", attributes={"cbl.database.name": db_name}
+        ):
+            resp = await self._send_request("GET", f"/{db_name}/_config", params={"include_runtime": "true"})
+            assert isinstance(resp, dict)
+            return cast(dict, resp)
+
+    async def _wait_for_database_config(
+        self,
+        db_name: str,
+        sentinel: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node runs the revision of the config the given sentinel
+        identifies.  A node picks up a config another node wrote on its next config poll,
+        and loads the database if it did not serve it before.
+
+        :param db_name: The database whose config to wait for.
+        :param sentinel: The sentinel value :func:`_put_database` or
+            :func:`_update_database_config` returned.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        :raises TimeoutError: if the node is not running the config once the polls run out
+        """
+
+        async def _poll() -> None:
+            try:
+                actual = await self._get_database_runtime_config(db_name)
+            except CblSyncGatewayBadResponseError as e:
+                if e.code not in (403, 404, 503):
+                    raise
+                raise AssertionError(f"{self} does not serve database {db_name} yet ({e.code})") from e
+
+            running = actual.get("feed_type")
+            assert running == sentinel, (
+                f"{self} is not running config {sentinel} for {db_name}, it is running {running!r}"
+            )
+
+        with self._tracer.start_as_current_span("wait_for_database_config", attributes={"cbl.database.name": db_name}):
+            await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
     @property
     def caddy(self) -> caddy.Caddy:
@@ -1990,27 +2145,26 @@ class SyncGateway(_SyncGatewayBase):
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
         """
-        super().__init__(url, username, password, port, secure, public_port)
-        r = requests.get(
-            f"{self.scheme}{url}:{port}/_config",
-            auth=(username, password),
-            # disable hostname verification as we do in _create_session
-            verify=False,
-            timeout=10,
-        )
-        r.raise_for_status()
-        config = r.json()
-        try:
-            self.using_rosmar = config["bootstrap"]["server"].startswith("rosmar")
-        except KeyError:
-            raise CblTestError(
-                f"Unexpected response from Sync Gateway /_config endpoint, cannot determine if using Rosmar. {config}"
-            ) from None
-
+        super().__init__(url, port, secure, public_port, get_basic_auth_headers(username, password))
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
         self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def _startup_config(self) -> StartupConfigResponse:
+        """The node's startup config from /_config, which cannot change without a restart (fetched once)"""
+        return StartupConfigResponse.model_validate(await self._send_request("get", "/_config"))
+
+    @property
+    async def using_rosmar(self) -> bool:
+        """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server"""
+        return (await self._startup_config).bootstrap.server.startswith("rosmar")
+
+    @property
+    async def admin_interface_authentication(self) -> bool:
+        """Whether this Sync Gateway node requires credentials on its admin port"""
+        return (await self._startup_config).api.admin_interface_authentication
 
     async def drop_rosmar_bucket(self, bucket_name: str) -> None:
         """
@@ -2023,7 +2177,7 @@ class SyncGateway(_SyncGatewayBase):
         :raises CblTestError: If this Sync Gateway node is not using Rosmar
         """
         with self._tracer.start_as_current_span("drop_rosmar_bucket", attributes={"cbl.bucket.name": bucket_name}):
-            if not self.using_rosmar:
+            if not await self.using_rosmar:
                 raise CblTestError(f"Cannot drop Rosmar bucket '{bucket_name}', Sync Gateway is not using Rosmar")
 
             try:
@@ -2045,7 +2199,7 @@ class SyncGateway(_SyncGatewayBase):
             True if using Rosmar, or if the database is configured with
             enable_shared_bucket_access=false.
         """
-        if self.using_rosmar:
+        if await self.using_rosmar:
             return True
         config = await self.get_database_config(db_name)
         return config.enable_shared_bucket_access is False
@@ -2090,6 +2244,7 @@ class SyncGateway(_SyncGatewayBase):
         password: str | None = None,
         collection_access: dict | None = None,
         admin_roles: list[str] | None = None,
+        disabled: bool | None = None,
     ) -> None:
         """
         Adds or updates the specified user to a Sync Gateway database with the specified channel access
@@ -2099,8 +2254,9 @@ class SyncGateway(_SyncGatewayBase):
         :param password: The password for the user that will be added
         :param collection_access: The collections that the user will have access to.  This needs to
             be formatted in the way Sync Gateway expects it, so if you are unsure use
-            :func:`drop_bucket()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
+            :func:`create_collection_access_dict()<cbltest.api.syncgateway.SyncGateway.create_collection_access_dict>`
         :param admin_roles: The admin roles
+        :param disabled: Whether the user is disabled, or None to leave it as it is
         """
         with self._tracer.start_as_current_span("add_user", attributes={"cbl.user.name": name}):
             body: dict[str, Any] = {
@@ -2115,6 +2271,9 @@ class SyncGateway(_SyncGatewayBase):
 
             if admin_roles is not None:
                 body["admin_roles"] = admin_roles
+
+            if disabled is not None:
+                body["disabled"] = disabled
 
             await self._send_request("put", f"/{db_name}/_user/{name}", JSONDictionary(body))
 
@@ -2135,7 +2294,7 @@ class SyncGateway(_SyncGatewayBase):
                 else:
                     raise
 
-    async def create_session(self, db_name: str, name: str) -> str:
+    async def create_session(self, db_name: str, name: str, ttl: int | None = None) -> str:
         """
         Creates a login session for an existing user via the admin API
         (POST /{db}/_session) and returns its session id.
@@ -2148,10 +2307,14 @@ class SyncGateway(_SyncGatewayBase):
 
         :param db_name: The name of the database to create the session against
         :param name: The user to create the session for
+        :param ttl: How many seconds the session lasts, or None for Sync Gateway's default
         :return: The id of the created session
         """
         with self._tracer.start_as_current_span("create_session", attributes={"sg.database.name": db_name}):
-            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary({"name": name}))
+            body: dict[str, Any] = {"name": name}
+            if ttl is not None:
+                body["ttl"] = ttl
+            resp = await self._send_request("post", f"/{db_name}/_session", JSONDictionary(body))
             assert isinstance(resp, dict)
             session_id = resp["session_id"]
             assert isinstance(session_id, str)
@@ -2169,6 +2332,16 @@ class SyncGateway(_SyncGatewayBase):
         """
         with self._tracer.start_as_current_span("delete_session", attributes={"sg.database.name": db_name}):
             await self._send_request("delete", f"/{db_name}/_session/{session_id}")
+
+    async def delete_user_sessions(self, db_name: str, name: str) -> None:
+        """
+        Invalidates every session of a user via the admin API (DELETE /{db}/_user/{name}/_session).
+
+        :param db_name: The name of the database the user belongs to
+        :param name: The user whose sessions to invalidate
+        """
+        with self._tracer.start_as_current_span("delete_user_sessions", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_user/{name}/_session")
 
     async def add_role(self, db_name: str, role: str, collection_access: dict) -> None:
         """
@@ -2202,7 +2375,9 @@ class SyncGateway(_SyncGatewayBase):
         async def _wait_for_rest_api_poll() -> None:
             try:
                 await self._send_request("get", "/_ping")
-            except (CblSyncGatewayBadResponseError, ClientConnectorError) as exc:
+            # A restart drops in-flight connections, which surfaces as ServerDisconnectedError or
+            # ClientOSError as well as ClientConnectorError - all are ClientError/OSError.
+            except (CblSyncGatewayBadResponseError, ClientError, OSError) as exc:
                 raise AssertionError(f"SGW REST API is not ready: {exc}") from exc
 
         await async_retry_assert(
@@ -2216,7 +2391,7 @@ class SyncGateway(_SyncGatewayBase):
         try:
             async with (
                 self._create_session(self.secure, self.scheme, self.hostname, self.public_port, None) as session,
-                session.get("/", timeout=ClientTimeout(total=5)) as resp,
+                await session.get("/", timeout=ClientTimeout(total=5)) as resp,
             ):
                 return resp.status == 200
         except (ClientConnectorError, TimeoutError):
@@ -2230,20 +2405,14 @@ class SyncGateway(_SyncGatewayBase):
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until the SGW node serves the database, force one config re-read so that
-        the caller does not go on to use a config version the node cached earlier, then
-        wait until the node reports the database as Online again, because the re-read
-        re-opens the database on the node.
+        Wait until the SGW node serves the database, then wait until it reports that
+        database as Online.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each of the two waits.
         :param retry_delay: Seconds between polls.
-        :raises CblSyncGatewayBadResponseError: if the config is gone by the time the node
-            is asked to re-read it.  A database it still serves re-reads in any state,
-            Offline and Resyncing included, so there is no transient failure to retry.
         """
         await self._wait_for_db_present(db_name, max_retries=max_retries, retry_delay=retry_delay)
-        await self._refresh_database_config(db_name)
         await self._wait_for_db_state_online(db_name, max_retries=max_retries, retry_delay=retry_delay)
 
     async def _wait_for_db_present(
@@ -2267,6 +2436,35 @@ class SyncGateway(_SyncGatewayBase):
 
         await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
 
+    async def _wait_for_db_state(
+        self,
+        db_name: str,
+        target_state: DatabaseState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> None:
+        """
+        Wait until this node reports the database in the given state.  Sync Gateway applies
+        a state change in the background, so every config write and every config re-read
+        leaves the database in a transitional state for a while, and a request to a database
+        that is not Online gets a 503.
+
+        :param db_name: Database name to poll.
+        :param target_state: The state to wait for.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        state_name = target_state.value.lower()
+
+        async def _poll() -> None:
+            dbs = await self.get_all_databases_verbose()
+            entry = dbs.get(db_name)
+            assert entry is not None, f"{self} stopped serving database {db_name} while it was going {state_name}"
+            assert entry.state == target_state, f"Database {db_name} is not {state_name}: {entry}"
+
+        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
+
     async def _wait_for_db_state_online(
         self,
         db_name: str,
@@ -2275,22 +2473,204 @@ class SyncGateway(_SyncGatewayBase):
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until this node reports the database Online.  Sync Gateway brings a database
-        online in the background, so every config write and every config re-read leaves it
-        Starting for a while, and a request to a database that is not Online gets a 503.
+        Wait until this node reports the database Online.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out.
         :param retry_delay: Seconds between polls.
         """
+        await self._wait_for_db_state(db_name, DatabaseState.ONLINE, max_retries=max_retries, retry_delay=retry_delay)
 
-        async def _poll() -> None:
-            dbs = await self.get_all_databases_verbose()
-            entry = dbs.get(db_name)
-            assert entry is not None, f"{self} stopped serving database {db_name} while it was coming online"
-            assert entry.state == DatabaseState.ONLINE, f"Database {db_name} is not online: {entry}"
+    async def _wait_for_db_state_offline(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 70,
+        retry_delay: int = 1,
+    ) -> None:
+        """
+        Wait until this node reports the database Offline.
 
-        await async_retry_assert(_poll, tenacity.wait_fixed(retry_delay), tenacity.stop_after_attempt(max_retries))
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        await self._wait_for_db_state(db_name, DatabaseState.OFFLINE, max_retries=max_retries, retry_delay=retry_delay)
+
+    async def _set_database_offline(
+        self,
+        db_name: str,
+        *,
+        sync_function: str | None = None,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> str:
+        """
+        Takes a database offline by POSTing {"offline": true} to its /_config endpoint,
+        replacing a collection's sync function in the same write when one is given.
+
+        Private: use `SyncGatewayCluster.take_database_offline` instead of calling this
+        directly, so that every node in the cluster is offline when the caller returns.
+
+        :param db_name: Database name to take offline.
+        :param sync_function: A new sync function for the collection.  Defaults to leaving
+            the sync function as it is.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection the sync function belongs to (default '_default').
+        :return: A sentinel value used to identify this revision of the database config,
+            to pass to :func:`_wait_for_database_config`
+        """
+        with self._tracer.start_as_current_span("set_database_offline", attributes={"sg.database.name": db_name}):
+            scopes = (
+                {scope: ScopeConfig(collections={collection: {"sync": sync_function}})}
+                if sync_function is not None
+                else None
+            )
+            return await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
+
+    async def _put_resync(
+        self,
+        db_name: str,
+        *,
+        action: ResyncAction,
+        reset: bool = False,
+    ) -> ResyncStatusResponse:
+        """
+        Starts or stops a resync operation via POST /{db}/_resync. The database
+        must be offline (see `SyncGatewayCluster.take_database_offline`) before
+        starting a resync.
+
+        :param db_name: The name of the database to resync.
+        :param action: Whether to start or stop the resync operation.
+        :param reset: Whether to discard previous resync progress before starting.
+            Only meaningful when ``action`` is :attr:`ResyncAction.START`.
+        """
+        with self._tracer.start_as_current_span(
+            "put_resync",
+            attributes={"sg.database.name": db_name, "sg.resync.action": action.value},
+        ):
+            params = {"action": action.value, "reset": "true" if reset else "false"}
+            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def start_resync(self, db_name: str, *, reset: bool = False) -> ResyncStatusResponse:
+        """
+        Starts a resync operation via POST /{db}/_resync. The database must be
+        offline (see `SyncGatewayCluster.take_database_offline`) before starting
+        a resync.
+
+        :param db_name: The name of the database to resync.
+        :param reset: Whether to discard previous resync progress before starting.
+        """
+        return await self._put_resync(db_name, action=ResyncAction.START, reset=reset)
+
+    async def stop_resync(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Stops a running resync operation via POST /{db}/_resync.
+
+        :param db_name: The name of the database whose resync operation to stop.
+        """
+        return await self._put_resync(db_name, action=ResyncAction.STOP)
+
+    async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
+        """
+        Gets the current resync status via GET /{db}/_resync.
+
+        :param db_name: The name of the database to query.
+        """
+        with self._tracer.start_as_current_span("get_resync_status", attributes={"sg.database.name": db_name}):
+            resp = await self._send_request("get", f"/{db_name}/_resync")
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
+
+    async def _wait_for_resync_state(
+        self,
+        db_name: str,
+        target_state: ResyncState,
+        *,
+        max_retries: int,
+        retry_delay: int,
+    ) -> ResyncStatusResponse:
+        async def _wait_for_resync_state_poll() -> ResyncStatusResponse:
+            status = await self.get_resync_status(db_name)
+            # A terminal state never becomes the target, so polling it out just wastes the budget.
+            if status.status is ResyncState.ERROR and target_state is not ResyncState.ERROR:
+                raise CblTestError(f"Resync on database {db_name} failed: {status.last_error}")
+            assert status.status == target_state, f"Resync on database {db_name} is {status.status}, not {target_state}"
+            return status
+
+        return await async_retry_assert(
+            _wait_for_resync_state_poll,
+            tenacity.wait_fixed(retry_delay),
+            tenacity.stop_after_attempt(max_retries),
+        )
+
+    async def wait_for_resync_running(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 1,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Running, then
+        return its status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.RUNNING,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+    async def wait_for_resync_completed(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 300,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Completed, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.COMPLETED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
+
+    async def wait_for_resync_stopped(
+        self,
+        db_name: str,
+        *,
+        max_retries: int = 30,
+        retry_delay: int = 2,
+    ) -> ResyncStatusResponse:
+        """
+        Wait until the resync operation on this node reports Stopped, then
+        return its final status.
+
+        :param db_name: Database name to poll.
+        :param max_retries: Number of polls before timing out.
+        :param retry_delay: Seconds between polls.
+        """
+        return await self._wait_for_resync_state(
+            db_name,
+            ResyncState.STOPPED,
+            max_retries=max_retries,
+            retry_delay=retry_delay,
+        )
 
     async def get_import_count(self, db_name: str) -> int:
         """
@@ -2303,13 +2683,7 @@ class SyncGateway(_SyncGatewayBase):
         resp_data = await self._send_request("get", "/_expvar")
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
-        return (
-            expvars.get("syncgateway", {})
-            .get("per_db", {})
-            .get(db_name, {})
-            .get("shared_bucket_import", {})
-            .get("import_count", 0)
-        )
+        return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
 
     async def reset_user(
         self,
@@ -2335,31 +2709,23 @@ class SyncGateway(_SyncGatewayBase):
         )
 
     @asynccontextmanager
-    async def get_user_client(
-        self,
-        username: str,
-        password: str,
-    ) -> AsyncIterator["SyncGatewayUserClient"]:
+    async def get_user_client(self, headers: Mapping[str, str]) -> AsyncIterator["SyncGatewayUserClient"]:
         """
         Yields a public-API client authenticated as an already existing user (e.g. one the
         dataset created), closing its session on exit.  Use :func:`create_user_client` when
         the user has to be created first.
 
-        :param username: The username to authenticate as
-        :param password: The password for the user
+        :param headers: Headers that authenticate the user, e.g. from :func:`get_basic_auth_headers`
+            or a `SyncGatewaySession` cookie
         :return: An AsyncIterator yielding a SyncGatewayUserClient instance authenticated as the user (uses public port)
         """
-        client = SyncGatewayUserClient(
+        async with SyncGatewayUserClient(
             self.hostname,
-            username,
-            password,
             port=self.public_port,
             secure=self.secure,
-        )
-        try:
+            headers=headers,
+        ) as client:
             yield client
-        finally:
-            await client.close()
 
     @asynccontextmanager
     async def create_user_client(
@@ -2384,7 +2750,7 @@ class SyncGateway(_SyncGatewayBase):
         """
         await self.reset_user(db_name, username, password, channels)
 
-        async with self.get_user_client(username, password) as client:
+        async with self.get_user_client(get_basic_auth_headers(username, password)) as client:
             yield client
 
     async def start_isgr(self, db_name: str, payload: ISGRPayload) -> str:
@@ -2605,8 +2971,6 @@ class SyncGatewayUserClient(_SyncGatewayBase):
     def __init__(
         self,
         url: str,
-        username: str,
-        password: str,
         port: int = 4984,
         secure: bool = False,
         headers: Mapping[str, str] | None = None,
@@ -2615,13 +2979,37 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         Initialize a SyncGatewayUserClient for public API access.
 
         :param url: The hostname/URL of the Sync Gateway instance
-        :param username: Username for authentication
-        :param password: Password for authentication
         :param port: Public API port (default 4984)
         :param secure: Whether to use TLS/HTTPS
-        :param headers: Headers to send with every request, e.g. Authorization.
+        :param headers: Headers to send with every request, e.g. `Authorization` from
+            :func:`get_basic_auth_headers`, or a `SyncGatewaySession` cookie.  None for an anonymous client.
         """
-        super().__init__(url, username, password, port, secure, headers=headers)
+        super().__init__(url, port, secure, headers=headers)
+
+    async def create_session(self, db_name: str) -> str:
+        """
+        Logs in via the public API (POST /{db}/_session) with this client's credentials, and
+        returns the id of the session Sync Gateway creates.  This client keeps no cookies, so
+        pass the id to :func:`get_sync_gateway_session_headers` to use the session.
+
+        :param db_name: The name of the database to log in to
+        :return: The id of the created session
+        """
+        with self._tracer.start_as_current_span("create_public_session", attributes={"sg.database.name": db_name}):
+            _, resp = await self._send_request_with_response("post", f"/{db_name}/_session")
+            cookie = resp.cookies.get(SYNC_GATEWAY_SESSION_COOKIE)
+            assert cookie is not None, f"POST /{db_name}/_session set no {SYNC_GATEWAY_SESSION_COOKIE} cookie"
+            return cookie.value
+
+    async def delete_session(self, db_name: str) -> None:
+        """
+        Logs out via the public API (DELETE /{db}/_session), invalidating the session this
+        client authenticates with.
+
+        :param db_name: The name of the database to log out of
+        """
+        with self._tracer.start_as_current_span("delete_public_session", attributes={"sg.database.name": db_name}):
+            await self._send_request("delete", f"/{db_name}/_session")
 
     async def __aenter__(self) -> Self:
         return self

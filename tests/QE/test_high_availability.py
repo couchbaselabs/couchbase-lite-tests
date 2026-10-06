@@ -6,9 +6,9 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
     SyncGatewayUserClient,
+    get_basic_auth_headers,
 )
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
@@ -39,7 +39,6 @@ class TestHighAvailability(CBLTestClass):
         self.mark_test_step("Configure database on all SGW nodes")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -48,13 +47,15 @@ class TestHighAvailability(CBLTestClass):
         await cblpytest.sync_gateways[0].reset_user(sg_db, username, password, channels)
         self.mark_test_step(f"Create user client via load balancer ({lb_url})")
         # Hardcoded because `load_balancers` config carries no port of its own.
-        lb_user = SyncGatewayUserClient(lb_url, username, password, port=4984, secure=False)
+        lb_user = SyncGatewayUserClient(
+            lb_url, port=4984, secure=False, headers=get_basic_auth_headers(username, password)
+        )
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")
         docs = [
             DocumentUpdateEntry(
                 id=f"doc_{i}",
-                revid=None,
+                revision=None,
                 body={"type": "test_doc", "index": i, "content": f"Document {i}"},
             )
             for i in range(num_docs)
@@ -109,7 +110,7 @@ class TestHighAvailability(CBLTestClass):
         final_docs = [
             DocumentUpdateEntry(
                 id=f"final_doc_{i}",
-                revid=None,
+                revision=None,
                 body={"type": "final_test", "index": i},
             )
             for i in range(10)
@@ -127,7 +128,10 @@ class TestHighAvailability(CBLTestClass):
         for index in range(len(cblpytest.sync_gateways)):
             self.mark_test_step(f"Force the load balancer to node sg-{index}, and verify that node serves every doc")
             async with SyncGatewayUserClient(
-                lb_url, username, password, port=4984, secure=False, headers={"X-Backend": f"sg-{index}"}
+                lb_url,
+                port=4984,
+                secure=False,
+                headers=get_basic_auth_headers(username, password) | {"X-Backend": f"sg-{index}"},
             ) as pinned_user:
                 pinned_docs = await pinned_user.wait_for_document_count(sg_db, total_docs)
 

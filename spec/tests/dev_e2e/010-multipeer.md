@@ -19,6 +19,7 @@ Test that if populating data on one device in a mesh, it replicates to all other
     - collections: default collection
 4. Wait for idle status on all devices except device 1
 5. Check that all databases on devices other than 1 have identical content to the database on device 1
+    - For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 
 ## test_medium_mesh_consistency
 
@@ -39,6 +40,7 @@ Test that if populating data on all devices in a mesh setup, all devices end up 
     - collections: default collection
 4. Wait for idle status on all devices
 5. Check that all device databases have the same content
+    - For each device other than device 1, verify that the device has the same document IDs and revisions as device 1
 
 ## test_rapid_availability_changes
 

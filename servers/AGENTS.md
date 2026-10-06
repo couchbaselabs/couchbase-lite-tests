@@ -130,7 +130,8 @@ javascript/
 ├── package.json                # @couchbase/test-server
 ├── tsconfig.json
 ├── vite.config.js
-├── eslint.config.mjs
+├── eslint.config.mjs           # Lint rules
+├── biome.json                  # Formatter
 └── src/
     ├── testServer.ts           # Main server (WebSocket)
     ├── tdk.ts
@@ -190,11 +191,24 @@ Each platform is registered for AWS deployment in [environment/aws/topology_setu
 - **New platform?** Follow existing patterns and add a `*_register.py` in `environment/aws/topology_setup/test_server_platforms/`.
 - **Build scripts** must support release (`BLD_NUM=0`) and CI URLs.
 - **Keep handler logic consistent** across platforms — same validation and error semantics.
+- **Desktop/CLI servers take `--port <port>`** (C, jak desktop, jak webservice, .NET CLI), defaulting
+  to 8080. The mobile servers listen on their fixed platform port. Nothing in `environment/` or
+  `jenkins/` passes `--port`, so every deployed server still lands on its default.
+- **The C server also takes `--files-dir <dir>`**, defaulting to `CBL-C-TestServer` under `/tmp`
+  on Linux, under `$TMPDIR` on macOS, and under the working directory on Windows. Running two
+  servers on one host needs both flags: a starting server deletes every session directory it
+  finds under its files directory, so servers sharing one destroy each other's databases.
+- **The jak desktop and web service servers need no such flag.** They share
+  `<java.io.tmpdir>/TestServerTemp`, but each session gets its own randomly named `tests_*`
+  directory under it and nothing clears the whole directory, so servers on one host stay apart.
+- **The .NET CLI server keeps every session's databases in `testfiles` next to its own
+  assembly**, under the database names the test chose. Two servers run from one install open,
+  delete and replace each other's databases; run each from its own copy of the install.
 
 ## Commands
 
 ```bash
-# C
+# C  (./testserver [--port <port>] [--files-dir <dir>]; defaults 8080 and <temp dir>/CBL-C-TestServer)
 cd servers/c && ./scripts/build_macos.sh 4.0.0 43 && cd build/out/bin && ./testserver
 cd servers/c && ./scripts/build_linux.sh   enterprise 4.0.0 43
 cd servers/c && ./scripts/build_ios.sh     all 4.0.0 43
@@ -202,11 +216,13 @@ cd servers/c && ./scripts/build_android.sh all enterprise 4.0.0 43
 cd servers/c && .\scripts\build_wins.ps1 -Edition enterprise -Version 4.0.0 -Build 43   # PowerShell
 
 # .NET — built via the orchestrator (dotnet_register.py runs `dotnet publish`), no standalone build script
+cd servers/dotnet && dotnet run --project testserver.cli -- --port 8081   # a bare port also still works
 
 # iOS
 cd servers/ios && ./Scripts/build.sh all enterprise 4.0.0 43
 
 # JVM (CBL version required via -PcblVersion, or Gradle fails at configure time)
+# run the built desktop/webservice jar with [--port <port>]
 cd servers/jak/desktop    && ./gradlew jar            -PcblVersion=4.0.0-43 -PdatasetVersion=3.2
 cd servers/jak/android    && ./gradlew assembleRelease -PcblVersion=4.0.0-43 -PdatasetVersion=3.2
 cd servers/jak/webservice && ./gradlew jar            -PcblVersion=4.0.0-43 -PdatasetVersion=3.2

@@ -7,7 +7,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
-    IndexConfig,
     ScopeConfig,
 )
 
@@ -32,7 +31,6 @@ class TestUsersChannels(CBLTestClass):
         self.mark_test_step(f"Configure database '{sg_db}' on all {num_sgs} SGW nodes (pointing to shared bucket)")
         db_payload = DatabaseConfig(
             bucket=bucket_name,
-            index=IndexConfig(num_replicas=0),
             scopes={"_default": ScopeConfig(collections={"_default": {}})},
         )
         await cblpytest.clusters[0].create_database(sg_db, db_payload)
@@ -99,8 +97,8 @@ class TestUsersChannels(CBLTestClass):
             self.mark_test_step("Verify all documents have correct revision format")
             for row in all_docs.rows:
                 if row.id in doc_ids:
-                    assert len(row.revision) > 0, f"Document {row.id} has no revision"
-                    assert "-" in row.revision, f"Invalid revision format for {row.id}: {row.revision}"
+                    assert len(row.revid) > 0, f"Document {row.id} has no revision"
+                    assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
             supports_version_vectors = await sgs[0].supports_version_vectors()
             if supports_version_vectors:

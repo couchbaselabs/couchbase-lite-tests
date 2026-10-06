@@ -33,7 +33,9 @@ client/
     ├── jsonhelper.py             # JSON helpers (_assert_string_entry, _get_typed, …)
     ├── assertions.py             # _assert_not_null and friends
     │
+    ├── bucketpool.py             # Runs the downloaded bucketpool tool, the DCP bucket-emptying helper
     ├── logging.py                # cbl_info / cbl_error / cbl_warning / cbl_log_init, LogLevel
+    ├── httpclient.py             # AsyncHTTPClient: wraps ClientSession so timeouts name the request; stream_download()
     ├── httplog.py                # HTTP request/response logging (get_next_writer)
     ├── greenboarduploader.py     # Upload test results to Greenboard
     ├── websocket_router.py       # WebSocket routing (used by JS server)
@@ -50,7 +52,7 @@ client/
     │   ├── multipeer_replicator.py
     │   ├── multipeer_replicator_types.py
     │   ├── syncgateway.py        # SyncGateway admin API
-    │   ├── couchbaseserver.py    # CBS bucket/scope/collection mgmt (via SDK)
+    │   ├── couchbaseserver.py    # CBS bucket/scope/collection mgmt (via SDK); BucketCleanupMode, BucketPool
     │   ├── edgeserver.py         # EdgeServer REST client + EdgeServerConfig, its parsed config file
     │   ├── edgeservermanager.py  # EdgeServerManager — Edge Server state, via the shell2http sidecar
     │   ├── cluster.py            # CouchbaseCluster — SGW+CBS cluster grouping
@@ -76,7 +78,8 @@ client/
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
-        └── cluster_cleanup.py          # cluster_cleanup (autouse) — resets Edge Servers, wipes SGW DBs + CBS/Rosmar buckets
+        ├── test_step_report.py         # last mark_test_step() at the top of a failure's traceback
+        └── cluster_cleanup.py          # cluster_cleanup (autouse) — resets Edge Servers, wipes SGW DBs, empties CBS buckets, drops Rosmar ones
 ```
 
 ## Core Concepts
@@ -141,6 +144,7 @@ CLI options added by `cblpytest_fixture`:
 | `--test-props PATH` | Extra test properties JSON |
 | `--otel-endpoint HOST` | OpenTelemetry collector |
 | `--dataset-version VERSION` | Default `"4.0"` |
+| `--bucketpool MODE` | How to empty a CBS bucket between tests: `purge` (default) or `delete` |
 
 ## How To Add Things
 

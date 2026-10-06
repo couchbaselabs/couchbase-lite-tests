@@ -45,11 +45,10 @@ class SyncGatewayCluster:
         retry_delay: int = 1,
     ) -> None:
         """
-        Wait until every node in the cluster serves the database, re-reads its config and
-        reports it Online, polling all nodes concurrently.  Only for waits on something
-        outside our control, such as a restored bucket or a node that is still starting:
-        after a config write, :func:`_refresh_database_config` gets the config there
-        without polling.
+        Wait until every node in the cluster serves the database and reports it Online,
+        polling all nodes concurrently.  Only for waits on something outside our control,
+        such as a restored bucket or a node that is still starting: after a config write,
+        :func:`_wait_for_database_config` waits on the config that was written instead.
 
         :param db_name: Database name to poll.
         :param max_retries: Number of polls before timing out, for each wait a node makes.
@@ -62,26 +61,23 @@ class SyncGatewayCluster:
             )
         )
 
-    async def _refresh_database_config(self, db_name: str, *, skip: SyncGateway | None = None) -> None:
+    async def _wait_for_database_config(self, db_name: str, sentinel: str) -> None:
         """
-        Make every node apply the database config from the bucket now, rather than at
-        its next config poll.  A node that has not loaded the database at all loads it
-        here, so a caller that has just written the config does not need to poll for it
-        to land.  The node starts applying the config before returning but comes online
-        in the background, so pair this with :func:`_wait_for_db_state_online`.
+        Wait until every node runs the config the given sentinel marks, polling all nodes
+        concurrently.  A node that did not serve the database before loads it as it picks
+        the config up, and comes online in the background, so pair this with
+        :func:`_wait_for_db_state_online`.
 
-        :param db_name: The database whose config the nodes must reload.
-        :param skip: A node that has applied this config already.  A re-read re-opens the
-            database even when the config has not changed, which the node that took the
-            write does not need.
-        :raises CblSyncGatewayBadResponseError: if a node has no config for the database
+        :param db_name: The database whose config the nodes must pick up.
+        :param sentinel: The value the write to one node returned.
+        :raises TimeoutError: if a node is not running the config once the polls run out
         """
-        await asyncio.gather(*(sg._refresh_database_config(db_name) for sg in self.__sync_gateways if sg is not skip))
+        await asyncio.gather(*(sg._wait_for_database_config(db_name, sentinel) for sg in self.__sync_gateways))
 
     async def _wait_for_db_state_online(self, db_name: str) -> None:
         """
-        Wait until every node reports the database Online, without asking any of them to
-        re-read the config first.
+        Wait until every node reports the database Online, whatever config each of them
+        is running.
 
         :param db_name: Database name to poll.
         """
@@ -95,14 +91,13 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        node = self.random_node
         try:
-            await node._put_database(db_name, config)
+            sentinel = await self.random_node._put_database(db_name, config)
         except TimeoutError:
-            if not self.sync_gateways[0].using_rosmar:
+            if not await self.sync_gateways[0].using_rosmar:
                 CBLPyTestGlobal.cbcollect_needed = True
             raise
-        await self._refresh_database_config(db_name, skip=node)
+        await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
 
     async def wait_for_no_database(self, db_name: str) -> None:
@@ -137,7 +132,32 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to update
         :param config: The configuration to apply
         """
-        node = self.random_node
-        await node._update_database_config(db_name, config)
-        await self._refresh_database_config(db_name, skip=node)
+        sentinel = await self.random_node._update_database_config(db_name, config)
+        await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
+
+    async def take_database_offline(
+        self,
+        db_name: str,
+        *,
+        sync_function: str | None = None,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> None:
+        """
+        Take a database offline on one node of the cluster, and make every node apply the
+        config that was just written, so that every node reports the database Offline
+        before returning.  A resync needs the database offline on every node.
+
+        :param db_name: Database name to take offline.
+        :param sync_function: A new sync function for the collection, written in the same
+            config write that takes the database offline.  Defaults to leaving the sync
+            function as it is.
+        :param scope: The scope containing the collection (default '_default').
+        :param collection: The collection the sync function belongs to (default '_default').
+        """
+        sentinel = await self.random_node._set_database_offline(
+            db_name, sync_function=sync_function, scope=scope, collection=collection
+        )
+        await self._wait_for_database_config(db_name, sentinel)
+        await asyncio.gather(*(sg._wait_for_db_state_offline(db_name) for sg in self.__sync_gateways))

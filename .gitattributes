@@ -5,3 +5,8 @@ dataset/server/**/*.blob filter=lfs diff=lfs merge=lfs -text
 dataset/couchbase-server/**/*.zip filter=lfs diff=lfs merge=lfs -text
 dataset/edge-server/**/*.jpg filter=lfs diff=lfs merge=lfs -text
 dataset/edge-server/**/*.png filter=lfs diff=lfs merge=lfs -text
+
+servers/javascript/src/**/*.ts text eol=lf
+servers/javascript/*.js text eol=lf
+servers/javascript/*.mjs text eol=lf
+servers/javascript/*.json text eol=lf

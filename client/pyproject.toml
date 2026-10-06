@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [
   "aiofiles==25.1.0",
   "aiohttp==3.14.3",
+  "asyncstdlib==3.14.0",
   "couchbase==4.3.4",
   "cryptography==44.0.0",
   "deepdiff==8.6.1",
@@ -59,6 +60,7 @@ es_collect_fixture = "cbltest.plugins.es_collect_fixture"
 cbcollect_fixture = "cbltest.plugins.cbcollect_fixture"
 sigterm_handler = "cbltest.plugins.sigterm_handler"
 timeout_fixture = "cbltest.plugins.timeout_fixture"
+test_step_report = "cbltest.plugins.test_step_report"
 cluster_cleanup = "cbltest.plugins.cluster_cleanup"
 sgw_cluster_manager = "cbltest.plugins.sgw_cluster_manager"
 

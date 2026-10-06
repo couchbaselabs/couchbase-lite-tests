@@ -3,7 +3,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from aiohttp import ClientSession, TCPConnector, web
@@ -103,12 +102,10 @@ class TestSyncGatewayCaCertificate:
             pytest.skip(_SKIP_REASON)
 
         async with _tls_server(_SG_CERT_FILE, _SG_KEY_FILE) as port:
-            # SyncGateway's constructor pings the host over plain HTTP; not what this tests.
-            with patch("cbltest.api.syncgateway.requests.get", autospec=True):
-                sync_gateway = SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True)
+            sync_gateway = SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True)
 
             session = sync_gateway._create_session(True, "https://", "127.0.0.1", port, None)
-            async with session, session.get("/") as response:
+            async with session, await session.get("/") as response:
                 assert response.status == 200
 
 

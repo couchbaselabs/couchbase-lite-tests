@@ -54,11 +54,17 @@ class DocsCompareResult:
         self.__success = success
         self.__message = message
 
+    def __bool__(self) -> bool:
+        return self.__success
+
+    def __str__(self) -> str:
+        return "documents match" if self.__success else (self.__message or "documents do not match")
+
 
 _test_function_tracer = get_tracer("test_functions", VERSION)
 
 
-def compare_doc_results(
+def _compare_doc_results(
     local: list[AllDocumentsEntry],
     remote: list[AllDocumentsResponseRow],
     mode: ReplicatorType,
@@ -116,41 +122,75 @@ def compare_doc_results(
         return DocsCompareResult(True)
 
 
-def compare_doc_results_p2p(local: list[AllDocumentsEntry], remote: list[AllDocumentsEntry]) -> DocsCompareResult:
-    local_dict: dict[str, str] = {entry.id: entry.rev for entry in local}
-    remote_dict: dict[str, str] = {entry.id: entry.rev for entry in remote}
+def _same_p2p_revision(rev: str, other: str) -> bool:
+    if rev == other:
+        return True
 
-    for id, rev in local_dict.items():
-        if id not in remote_dict:
-            return DocsCompareResult(False, f"Doc '{id}' present in {local_dict} but not {remote_dict}")
+    # A peer reports the source of its own changes as "*", other peers report its full source ID
+    if rev.endswith("@*") or other.endswith("@*"):
+        return rev.split("@")[0] == other.split("@")[0]
 
-        if not _compare_revisions(rev, [remote_dict[id], None]):
-            return DocsCompareResult(
-                False,
-                f"Doc '{id}' mismatched revid (local: {rev}, remote: {remote_dict[id]})",
-            )
+    return False
 
-    return DocsCompareResult(True)
+
+def compare_doc_results(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsResponseRow],
+    mode: ReplicatorType,
+) -> None:
+    """
+    Asserts that a list of local documents and a list of remote documents are consistent,
+    as described in :func:`_compare_doc_results()<cbltest.api.test_functions._compare_doc_results>`
+
+    :param local: The list of documents from the local side (Couchbase Lite)
+    :param remote: The list of documents from the remote side (Sync Gateway)
+    :param mode: The mode of replication that was run
+    :raises AssertionError: If the documents are not consistent
+    """
+    result = _compare_doc_results(local, remote, mode)
+    if not result:
+        raise AssertionError(str(result))
+
+
+def compare_doc_results_p2p(
+    local: list[AllDocumentsEntry],
+    remote: list[AllDocumentsEntry],
+) -> None:
+    """
+    Asserts that two peers hold the same documents at the same revisions
+
+    :param local: The list of documents from the local peer
+    :param remote: The list of documents from the remote peer
+    :raises AssertionError: If a document is missing from either peer or has a different revision
+    """
+    local_revs = {entry.id: entry.rev for entry in local}
+    remote_revs = {entry.id: entry.rev for entry in remote}
+    for id, rev in local_revs.items():
+        if id in remote_revs and _same_p2p_revision(rev, remote_revs[id]):
+            remote_revs[id] = rev
+
+    # Compare only the differing entries, so the pytest diff stays small when it is not truncated on CI
+    local_only = {id: rev for id, rev in local_revs.items() if remote_revs.get(id) != rev}
+    remote_only = {id: rev for id, rev in remote_revs.items() if local_revs.get(id) != rev}
+    assert local_only == remote_only
 
 
 def compare_doc_ids(
     local: list[AllDocumentsEntry],
     remote: list[AllDocumentsResponseRow],
-) -> DocsCompareResult:
-    local_ids = {e.id for e in local}
-    remote_ids = {e.id for e in remote}
+) -> None:
+    """
+    Asserts that the local and remote sides hold the same document IDs, ignoring revisions
 
-    missing_on_remote = local_ids - remote_ids
-    if missing_on_remote:
-        missing_id = next(iter(missing_on_remote))
-        return DocsCompareResult(False, f"Doc '{missing_id}' present locally but missing on remote")
+    :param local: The list of documents from the local side (Couchbase Lite)
+    :param remote: The list of documents from the remote side (Sync Gateway)
+    :raises AssertionError: If a document ID is missing from either side
+    """
+    local_ids = {entry.id for entry in local}
+    remote_ids = {entry.id for entry in remote}
 
-    missing_on_local = remote_ids - local_ids
-    if missing_on_local:
-        missing_id = next(iter(missing_on_local))
-        return DocsCompareResult(False, f"Doc '{missing_id}' present on remote but missing locally")
-
-    return DocsCompareResult(True)
+    # Compare only the differing IDs, so the pytest diff stays small when it is not truncated on CI
+    assert local_ids - remote_ids == remote_ids - local_ids
 
 
 async def compare_local_and_remote(
@@ -163,8 +203,10 @@ async def compare_local_and_remote(
 ) -> None:
     """
     Checks the specified collections for consistency between local and remote, using the
-    :func:`compare_doc_results()<cbltest.api.test_functions.compare_doc_results>` function
+    :func:`_compare_doc_results()<cbltest.api.test_functions._compare_doc_results>` function
     for each collection
+
+    :raises AssertionError: If the documents in any collection are not consistent
     """
     with _test_function_tracer.start_as_current_span("compare_local_and_remote"):
         lite_all_docs = await local.get_all_documents(*collections)
@@ -181,5 +223,6 @@ async def compare_local_and_remote(
                 lite_docs = [entry for entry in lite_docs if entry.id in doc_ids]
                 sg_docs = [entry for entry in sg_docs if entry.id in doc_ids]
 
-            compare_result = compare_doc_results(lite_docs, sg_docs, mode)
-            assert compare_result.success, f"{compare_result.message} ({collection})"
+            compare_result = _compare_doc_results(lite_docs, sg_docs, mode)
+            if not compare_result:
+                raise AssertionError(f"{compare_result} ({collection})")

@@ -13,6 +13,7 @@ from cbltest.api.caddy import Caddy
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
+from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.configparser import EdgeServerInfo
 from cbltest.plugins.cluster_cleanup import reset_all_edge_servers
 
@@ -25,9 +26,7 @@ SidecarCall = tuple[str, str, Any]
 def no_network() -> Iterator[None]:
     """Keep every session an Edge Server or a manager opens off the network."""
     with (
-        patch("cbltest.api.edgeserver.ClientSession", autospec=True),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
@@ -234,9 +233,8 @@ class FakeSession:
 def fake_sessions() -> Iterator[None]:
     """Serve every Edge Server request from a FakeSession, so its headers are readable."""
     with (
-        patch("cbltest.api.edgeserver.ClientSession", FakeSession),
-        patch("cbltest.api.caddy.ClientSession", autospec=True),
-        patch("cbltest.api.edgeservermanager.ClientSession", autospec=True),
+        patch("cbltest.api.edgeserver.AsyncHTTPClient", FakeSession),
+        patch("cbltest.httpclient.ClientSession", autospec=True),
         # A TLS config reads client certificates out of ~/.cbl_certs, which exist only on a
         # machine that has provisioned an Edge Server topology.
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
@@ -291,7 +289,7 @@ async def test_create_user_client_adds_the_user_and_authenticates_as_them(
 async def test_user_client_needs_a_config_that_declares_users(tmp_path: Path) -> None:
     async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
         with pytest.raises(CblTestError, match="declares no users"):
-            async with manager.get_user_client("username8", "password8"):
+            async with manager.get_user_client(get_basic_auth_headers("username8", "password8")):
                 pass
 
 
@@ -303,3 +301,11 @@ async def test_anonymous_client_sends_no_credentials(tmp_path: Path) -> None:
     ):
         await client.get_all_dbs()
         assert "Authorization" not in client_session(client).headers
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("users", [True, False])
+async def test_admin_client_sends_credentials_only_to_a_config_that_declares_users(tmp_path: Path, users: bool) -> None:
+    async with fake_session_manager(write_config(tmp_path, "initial.json", 59840, users=users)) as manager:
+        headers = client_session(manager.get_admin_client()).headers
+        assert ("Authorization" in headers) == users

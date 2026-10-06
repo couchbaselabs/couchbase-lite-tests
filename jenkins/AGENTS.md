@@ -130,7 +130,7 @@ if __name__ == "__main__":
 4. Assigns resolved `sgw_versions` the same way to `sync_gateways`, **but only when `sync_gateways` is defined directly in `topology_file_in`** — topologies that pull it in via `include` (e.g. the single-test-server dev_e2e/QE pipelines) always get one SGW at `defaults.sgw.version` (the first resolved version)
 5. Sets `defaults.cbs.version` / `defaults.sgw.version`, `tag`
 6. Writes final topology to `environment/aws/topology_setup/topology.json`
-7. Downloads `cbbackupmgr` for the CBS version
+7. Downloads `cbbackupmgr` for the CBS version, and `bucketpool`
 8. Creates `TopologyConfig` → calls `start_backend()`
 
 CLI wrappers accept comma-separated versions (`"4.0.0,4.1.0"`) via the `VersionType` click param type, which converts the argument to a `list[str]` (using `parse_versions()`) before `cli_entry` ever sees it.
