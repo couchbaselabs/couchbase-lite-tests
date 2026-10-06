@@ -77,7 +77,7 @@ def retry_assert[T](
     return retrying(checked_function)
 
 
-# Port the shell2http sidecar listens on, on every Sync Gateway and Edge Server host.
+# Port the shell2http sidecar listens on, on every Couchbase Server, Sync Gateway and Edge Server host.
 SHELL2HTTP_PORT = 20001
 
 

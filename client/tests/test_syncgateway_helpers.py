@@ -8,6 +8,7 @@ a real (loopback) aiohttp test server, rather than mocking the HTTP layer.
 
 import asyncio
 import inspect
+import logging
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
@@ -1078,3 +1079,36 @@ class TestWaitForDocuments:
         by_id = {entry.id: entry for entry in changes.results}
         assert by_id["doc1"].removed == [], "a normal entry carries no removal"
         assert by_id["doc2"].removed == ["abc"]
+
+
+class TestFailedRequestLogging:
+    """A request that gets no usable response still leaves a record of why."""
+
+    @pytest.mark.asyncio
+    async def test_failure_writes_an_error_and_logs_it(
+        self, sync_gateway: SyncGatewayFixture, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        sg, specs, _ = sync_gateway
+        specs.append({"status": 200, "text": "not json", "content_type": "application/json"})
+
+        with caplog.at_level(logging.ERROR, logger="CBL"), pytest.raises(ValueError):
+            await sg._send_request("get", "/db/")
+
+        errors = list((tmp_path / "http_log").rglob("*_error.txt"))
+        assert len(errors) == 1
+        assert errors[0].read_text().startswith("Sync Gateway [") and " <- GET /db/ failed: " in errors[0].read_text()
+        assert [r.getMessage() for r in caplog.records] == [errors[0].read_text()]
+
+    @pytest.mark.asyncio
+    async def test_quiet_failure_writes_an_error_but_does_not_log_it(
+        self, sync_gateway: SyncGatewayFixture, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A readiness poll expects failures, so they stay out of testserver.log."""
+        sg, specs, _ = sync_gateway
+        specs.append({"status": 200, "text": "not json", "content_type": "application/json"})
+
+        with caplog.at_level(logging.DEBUG, logger="CBL"), pytest.raises(ValueError):
+            await sg._send_request("get", "/_ping", log_failure=False)
+
+        assert len(list((tmp_path / "http_log").rglob("*_error.txt"))) == 1
+        assert caplog.records == []

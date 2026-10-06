@@ -63,7 +63,7 @@ def _stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: SyncGatewayClusterMa
     for index, node in enumerate(manager.nodes):
 
         async def _call_sidecar(
-            method: str, path: str, data: str | None = None, timeout: int = 120, index: int = index
+            method: str, path: str, data: str | None = None, timeout: float = 120, index: int = index
         ) -> None:
             calls.append((f"{index}:{method}", path, data))
 

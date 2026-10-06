@@ -23,6 +23,7 @@ from environment.aws.common.io import (
     get_ec2_hostname,
     realtime_output,
     sftp_progress_bar,
+    upload_shell2http_scripts,
 )
 from environment.aws.common.output import header
 from environment.aws.common.ssh import connect_ssh
@@ -106,10 +107,8 @@ def setup_node(
         "Setting up machine",
     )
 
-    # Upload shell2http scripts (directory created by configure-system.sh)
-    shell2http_dir = SCRIPT_DIR / "shell2http"
-    for file in shell2http_dir.iterdir():
-        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
+    # Directory created by configure-system.sh
+    upload_shell2http_scripts(sftp, SCRIPT_DIR)
     sftp.close()
 
     # Make shell2http scripts executable
