@@ -705,12 +705,10 @@ class TestReplicationUpgrade(CBLTestClass):
         self.mark_test_step(f"Check SGW's `{doc_id}`.")
         # SGW returns a deleted doc only by its revision ID; use changes feed to get the revision ID of the deleted doc.
         deleted = await sg.wait_for_documents("upgrade", [doc_id], deleted=True)
-        tombstone = await sg.get_document("upgrade", doc_id, revision=deleted[doc_id].changes[0])
-        assert tombstone.revid != legacy.revid, f"Expected a new revision, but SGW still has {legacy.revid}"
-        generation = int(tombstone.revid.split("-")[0])
-        legacy_generation = int(legacy.revid.split("-")[0])
-        assert generation == legacy_generation + 1, (
-            f"Expected the deletion to follow {legacy.revid}, but its revision is {tombstone.revid}"
+        tombstone = await sg.get_document("upgrade", doc_id, revision=deleted[doc_id].changes[0], revs=True)
+        history = tombstone.revision_history or []
+        assert history[1:2] == [legacy.revid], (
+            f"Expected the deletion to be a child of {legacy.revid}, but its history is {history}"
         )
         assert tombstone.cv is not None, f"Expected the deletion {tombstone.revid} to have an HLV"
 
@@ -729,6 +727,12 @@ class TestReplicationUpgrade(CBLTestClass):
 
         self.mark_test_step(f"Delete `{doc_id}` on SGW.")
         deletion = await sg.delete_document(doc_id, legacy.revid, "upgrade", wait_for_caching_feed=True)
+        tombstone = await sg.get_document("upgrade", doc_id, revision=deletion.revid, revs=True)
+        history = tombstone.revision_history or []
+        assert tombstone.cv is not None and history[1:2] == [legacy.revid], (
+            f"Precondition is invalid: expected a deletion with an HLV and {legacy.revid} as its parent, "
+            f"but got HLV {tombstone.cv}, history {history}"
+        )
 
         self.mark_test_step(f"""
             Start a replicator:

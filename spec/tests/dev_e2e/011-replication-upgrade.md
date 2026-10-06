@@ -403,7 +403,7 @@ revision, with the HLV of CBL's deletion.
 8. Check that `nonconflict_3` doesn't exist in the local database.
 9. Check SGW's `nonconflict_3`:
 	* Its current revision is a deletion, and not the legacy revision it had before.
-	* The revision's generation is one more than the legacy revision's.
+	* The revision's parent is that legacy revision.
 	* It has an HLV.
 
 ### #1.11 test_nonconflict_case_11 (pull_post_upgrade_sgw_deletion_of_legacy_doc)
