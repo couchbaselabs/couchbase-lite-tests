@@ -1,9 +1,7 @@
 # Per-Database User Access Control Tests (Edge Server)
 
 These tests validate the per-database `enable_user_access_control` flag (CBL-8556, Edge Server
-1.1.1). For database D the flag resolves to D's own key, else the root key, else `false`. Every
-test skips on Edge Server older than 1.1.1.
-
+1.1.1). For database D the flag resolves to D's own key, else the root key, else `false`. 
 Each test writes its users to `/home/ec2-user/user/per_db_access_users.json`, always including the
 admin `qe_admin`, and then starts Edge Server. Console logging is on, so startup warnings can be read
 from `/home/ec2-user/log/edge.log`. Over REST, a **read** is `_all_docs` and a **write** is a `PUT`
