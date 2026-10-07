@@ -857,18 +857,34 @@ class EdgeServer:
                 return [line.decode(errors="replace").rstrip("\r\n") for line in f if needle in line]
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
-        is_idle = False
+        missing_polls = 0
         retry = 6
-        while not is_idle and retry > 0:
+        while retry > 0:
             status = await self.all_replication_status()
-            if len(status) != 0:
-                assert "error" not in status[replicator_key], f"Replication setup failure: {status}"
-                if status[replicator_key]["status"] == "Idle":
-                    is_idle = True
-                else:
-                    await asyncio.sleep(timeout)
-                    retry -= 1
-            else:
-                is_idle = True
-        if not is_idle and retry == 0:
-            raise CblTimeoutError("Timeout waiting for replicator status")
+            if len(status) <= replicator_key:
+                missing_polls += 1
+                if missing_polls == 5:
+                    raise CblEdgeServerBadResponseError(
+                        404,
+                        f"Replicator {replicator_key} is not running on {self.__hostname}",
+                        body=json.dumps(status),
+                    )
+                await asyncio.sleep(2)
+                continue
+
+            replicator = status[replicator_key]
+            if "error" in replicator:
+                error = replicator["error"]
+                code = error.get("x-litecore-code") if isinstance(error, dict) else None
+                raise CblEdgeServerBadResponseError(
+                    code if isinstance(code, int) else 500,
+                    f"Replicator {replicator_key} on {self.__hostname} failed: {replicator}",
+                    body=json.dumps(replicator),
+                )
+            if replicator["status"] == "Idle":
+                return
+
+            await asyncio.sleep(timeout)
+            retry -= 1
+
+        raise CblTimeoutError("Timeout waiting for replicator status")
