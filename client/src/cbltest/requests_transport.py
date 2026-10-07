@@ -1,12 +1,13 @@
 import json
 from abc import ABC, abstractmethod
+from asyncio import wait_for
 from typing import cast
 from urllib.parse import urljoin
 from uuid import uuid4
 
 from aiohttp import ClientResponse
 
-from cbltest.api.error import CblTestError, CblTestServerBadResponseError
+from cbltest.api.error import CblTestError, CblTestServerBadResponseError, CblTimeoutError
 from cbltest.configparser import TransportType
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.httpclient import AsyncHTTPClient
@@ -121,7 +122,11 @@ class _RequestWebSocketTransport(RequestTransport):
         future = self.__ws_router.register(message_no)
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
-        resp = await future
+        try:
+            resp = await wait_for(future, timeout=120)
+        except TimeoutError:
+            self.__ws_router.unregister(message_no)
+            raise CblTimeoutError(f"No response to {data['ts_command']} from {self.__url} after 120 seconds") from None
 
         resp_version = cast(int, resp.get("ts_apiVersion", 0))
         uuid = resp.get("ts_serverID")
