@@ -3,7 +3,7 @@
 Regression coverage for CBG-5867: a load balancer fronting two independently-replicating Sync
 Gateway backends (kept in sync with continuous bidirectional ISGR) shares one checkpoint
 identity across both, since a CBL checkpoint ID is derived from the replication config (the load
-balancer's own URL, local db, direction, collections) and never from which physical backend
+balancer's own URL, local db, collections) and never from which physical backend
 answers. The confirmed, expected behavior is: a checkpoint ID's first-ever contact with a given
 backend forces a one-time full resync (that backend genuinely has no record of it, since ISGR
 intentionally never replicates checkpoint docs between the two backends), every later contact
