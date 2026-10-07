@@ -1,0 +1,45 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "users": "/home/ec2-user/user/per_db_access_users.json",
+    "databases": {
+        "travel": {
+            "path": "/home/ec2-user/database/travel.cblite2",
+            "enable_client_writes": true,
+            "enable_client_sync": true,
+            "enable_user_access_control": true,
+            "queries": {
+                "hotel_ids": {
+                    "statement": "SELECT meta().id FROM travel.hotels LIMIT 5"
+                },
+                "airline_ids": {
+                    "statement": "SELECT meta().id FROM travel.airlines LIMIT 5",
+                    "allow": {
+                        "collections": ["travel.airlines"]
+                    }
+                }
+            }
+        },
+        "names": {
+            "path": "/home/ec2-user/database/names.cblite2",
+            "enable_client_writes": true,
+            "enable_client_sync": true,
+            "enable_user_access_control": false,
+            "queries": {
+                "name_ids": {
+                    "statement": "SELECT meta().id FROM _default LIMIT 5"
+                }
+            }
+        }
+    },
+    "logging": {
+        "console": true,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}
