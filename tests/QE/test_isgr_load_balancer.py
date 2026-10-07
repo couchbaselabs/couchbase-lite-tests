@@ -157,7 +157,7 @@ async def _pinned_replication(
     replicator_type: ReplicatorType = ReplicatorType.PULL,
 ) -> Replicator:
     """
-    Runs one one-shot replication pinned to a specific backend and returns the Replicator so callers can inspect both
+    Runs a one-shot replication pinned to a specific backend and returns the Replicator so callers can inspect both
     its transferred-document count and the resulting local documents. A fresh Replicator object every call, but
     always the SAME db and repl_url across a loop, so this is what keeps a series of pinned calls sharing one
     checkpoint across both backends. Never pass reset=True: that would force a fresh checkpoint on every call and
