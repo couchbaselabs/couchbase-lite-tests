@@ -506,6 +506,14 @@ class RemoteDocument(JSONSerializable):
         return self.__tombstone
 
     @property
+    def revision_history(self) -> list[str] | None:
+        """
+        The revision IDs from this revision back to the oldest one Sync Gateway kept, newest first, so
+        the second one is this revision's parent.  None unless the document was read with `revs=True`.
+        """
+        return self.__revision_history
+
+    @property
     def revision(self) -> str:
         """Gets either the CV (preferred) or revid of the document"""
         if self.__cv is not None:
@@ -539,10 +547,19 @@ class RemoteDocument(JSONSerializable):
         self.__id = cast(str, body["_id"])
         self.__rev = cast(str, body["_rev"])
         self.__cv = cast(str, body["_cv"]) if "_cv" in body else None
+        # `_revisions` lists the revision IDs' digests, newest first.
+        revisions = cast(dict, body["_revisions"]) if "_revisions" in body else None
         del self.__body["_id"]
         del self.__body["_rev"]
         if self.__cv is not None:
             del self.__body["_cv"]
+        if revisions is not None:
+            del self.__body["_revisions"]
+        self.__revision_history = (
+            [f"{revisions['start'] - i}-{digest}" for i, digest in enumerate(revisions["ids"])]
+            if revisions is not None
+            else None
+        )
 
     def to_json(self) -> Any:
         ret_val = self.__body.copy()
@@ -1694,6 +1711,7 @@ class _SyncGatewayBase:
         collection: str = "_default",
         revision: str | None = None,
         wait_for_caching_feed: bool = False,
+        revs: bool = False,
     ) -> RemoteDocument:
         """
         Gets a document from Sync Gateway
@@ -1707,6 +1725,7 @@ class _SyncGatewayBase:
                                       that was read.  Reading a document Couchbase Server wrote behind
                                       Sync Gateway's back imports it on demand, so without this it reads
                                       back while a replicator still cannot see it (default False)
+        :param revs: If True, also get the revision history (`RemoteDocument.revision_history`) (default False)
         :raises CblSyncGatewayBadResponseError: If Sync Gateway does not return the document. Returns a 404 for a non existent or tombstoned document.
         """
         with self._tracer.start_as_current_span(
@@ -1718,8 +1737,12 @@ class _SyncGatewayBase:
                 "sg.document.id": doc_id,
             },
         ):
-            params = {"rev": revision} if revision is not None else None
-            response = await self._send_request("get", f"/{db_name}.{scope}.{collection}/{doc_id}", params=params)
+            params = {"rev": revision} if revision is not None else {}
+            if revs:
+                params["revs"] = "true"
+            response = await self._send_request(
+                "get", f"/{db_name}.{scope}.{collection}/{doc_id}", params=params or None
+            )
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from sync gateway get /doc (not JSON)")
 

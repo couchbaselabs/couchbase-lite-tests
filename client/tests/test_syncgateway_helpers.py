@@ -727,6 +727,36 @@ class TestGetLastSequence:
             await sg.get_last_sequence("db")
 
 
+class TestGetDocumentRevisionHistory:
+    """get_document(revs=True) asks Sync Gateway for the revision history."""
+
+    @pytest.mark.asyncio
+    async def test_revs_reads_the_revision_history(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [
+            {
+                "status": 200,
+                "json": {"_id": "doc1", "_rev": "2-bbb", "_revisions": {"start": 2, "ids": ["bbb", "aaa"]}, "n": 2},
+            }
+        ]
+
+        doc = await sg.get_document("db", "doc1", revs=True)
+
+        assert received[0][_URL_KEY] == "/db._default._default/doc1?revs=true"
+        assert doc.revision_history == ["2-bbb", "1-aaa"]
+        assert doc.body == {"n": 2}
+
+    @pytest.mark.asyncio
+    async def test_no_revision_history_without_revs(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-aaa"}}]
+
+        doc = await sg.get_document("db", "doc1")
+
+        assert received[0][_URL_KEY] == "/db._default._default/doc1"
+        assert doc.revision_history is None
+
+
 class TestWaitForCachingFeed:
     """update_document(wait_for_caching_feed=True) has to read the unfiltered changes feed.
 
