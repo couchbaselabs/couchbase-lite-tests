@@ -895,3 +895,34 @@ class EdgeServer:
             retry -= 1
 
         raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def wait_for_documents(
+        self,
+        db_name: str,
+        doc_ids: set[str] | list[str],
+        scope: str = "",
+        collection: str = "",
+        timeout: float = 30,
+        poll_interval: float = 2,
+    ) -> set[str]:
+        """
+        Polls ``GET /{keyspace}/_all_docs`` until every id in ``doc_ids`` is present,
+        or until ``timeout`` seconds (total, not per-poll) have elapsed. Returns the
+        set of ids that had arrived — compare it against the expected set to assert.
+
+        :param db_name: The database (keyspace) to query
+        :param doc_ids: The document ids to wait for
+        :param scope: Optional scope component of the keyspace
+        :param collection: Optional collection component of the keyspace
+        :param timeout: Total seconds to wait before giving up
+        :param poll_interval: Seconds to sleep between polls
+        """
+        expected = set(doc_ids)
+        deadline = asyncio.get_event_loop().time() + timeout
+        arrived: set[str] = set()
+        while True:
+            response = await self.get_all_documents(db_name, scope=scope, collection=collection)
+            arrived = expected & {row.id for row in response.rows}
+            if arrived == expected or asyncio.get_event_loop().time() >= deadline:
+                return arrived
+            await asyncio.sleep(poll_interval)

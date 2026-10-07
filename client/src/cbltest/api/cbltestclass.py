@@ -4,6 +4,7 @@ import pytest
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
@@ -90,3 +91,15 @@ class CBLTestClass:
         version = Version(version_str)
         spec = SpecifierSet(constraint)
         self.skip_if_not(version in spec, f"SGW {version_str} not {constraint}")
+
+    async def skip_if_es_not(self, es: EdgeServer, constraint: str) -> None:
+        """
+        Skips the test if the Edge Server version does not match the specified comparison operation and value.
+
+        :param es: The EdgeServer instance to check version for.
+        :param constraint: A string representing the comparison operation and version, e.g., ">= 1.1.1".
+        """
+        version_str = (await es.get_version()).version
+        version = Version(version_str)
+        spec = SpecifierSet(constraint)
+        self.skip_if_not(version in spec, f"Edge Server {version_str} not {constraint}")

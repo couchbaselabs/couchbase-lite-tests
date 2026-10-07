@@ -2694,6 +2694,25 @@ class SyncGateway(_SyncGatewayBase):
         expvars = cast(dict, resp_data)
         return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
 
+    async def get_auth_failed_count(self, db_name: str) -> int:
+        """
+        Gets this node's security.auth_failed_count expvar for the given database.
+        It increments when SGW rejects a request's credentials — a bad or revoked
+        session cookie, or no credentials at all when guest access is off.
+
+        :param db_name: The database to read the stat for
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        return (
+            expvars.get("syncgateway", {})
+            .get("per_db", {})
+            .get(db_name, {})
+            .get("security", {})
+            .get("auth_failed_count", 0)
+        )
+
     async def reset_user(
         self,
         db_name: str,
