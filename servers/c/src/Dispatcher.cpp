@@ -29,6 +29,7 @@ namespace ts {
         addRule({"POST", "/getDocument", HANDLER(handlePOSTGetDocument)});
         addRule({"POST", "/updateDatabase", HANDLER(handlePOSTUpdateDatabase)});
         addRule({"POST", "/startReplicator", HANDLER(handlePOSTStartReplicator)});
+        addRule({"POST", "/stopReplicator", HANDLER(handlePOSTStopReplicator)});
         addRule({"POST", "/startListener", HANDLER(handlePOSTStartListener)});
         addRule({"POST", "/stopListener", HANDLER(handlePOSTStopListener)});
         addRule({"POST", "/getReplicatorStatus", HANDLER(handlePOSTGetReplicatorStatus)});
