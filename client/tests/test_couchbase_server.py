@@ -6,12 +6,11 @@ from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import patch
 
-import aiohttp
 import pytest
 from cbltest.api.caddy import Caddy
 from cbltest.api.couchbaseserver import _COLLECT_LOGS_TIMEOUT, CouchbaseServer
 
-SidecarCall = tuple[str, str, str | None, aiohttp.ClientTimeout | None]
+SidecarCall = tuple[str, str, str | None, float | None]
 
 
 def make_server() -> CouchbaseServer:
@@ -39,9 +38,7 @@ def stub_sidecar(
     """Record what a server sends to its sidecar, so nothing reaches the network."""
     calls: list[SidecarCall] = []
 
-    async def _call_sidecar(
-        method: str, path: str, data: str | None = None, timeout: aiohttp.ClientTimeout | None = None
-    ) -> str:
+    async def _call_sidecar(method: str, path: str, data: str | None = None, timeout: float | None = None) -> str:
         calls.append((method, path, data, timeout))
         return response if isinstance(response, str) else response(data)
 

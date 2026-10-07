@@ -39,7 +39,7 @@ from cbltest.api import caddy
 from cbltest.api.error import CblTestError
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_info, cbl_warning
-from cbltest.shell2http import Shell2HttpClient
+from cbltest.shell2http import DEFAULT_SHELL2HTTP_TIMEOUT, Shell2HttpClient
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
@@ -158,7 +158,7 @@ class BucketPool:
 # a ~1230s server-side worst case, plus time to zip and respond; 1260s leaves comfortable
 # margin so the client outlasts the endpoint rather than racing its own default aiohttp
 # timeout against it.
-_COLLECT_LOGS_TIMEOUT = ClientTimeout(total=1260)
+_COLLECT_LOGS_TIMEOUT: float = 1260
 
 
 class CouchbaseServer:
@@ -262,8 +262,6 @@ class CouchbaseServer:
                 f"http://{self.__hostname}:8091",
                 headers={"Authorization": encode_basic_auth(username, password, "ascii")},
             )
-            # The sidecar is a separate service, so it gets no Couchbase Server credentials
-            self.__shell2http = AsyncHTTPClient(f"http://{self.__hostname}:{SHELL2HTTP_PORT}")
             self.__caddy = caddy.Caddy(self.__hostname)
             self.__shell2http = Shell2HttpClient("Couchbase Server", self.__hostname)
 
@@ -1496,25 +1494,23 @@ class CouchbaseServer:
         )
 
     async def _call_sidecar(
-        self, method: str, path: str, data: str | None = None, timeout: ClientTimeout | None = None
+        self, method: str, path: str, data: str | None = None, timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT
     ) -> str:
         """
-        Call a shell2http endpoint on this node's host, raising on anything but a 200.
+        Call a shell2http endpoint on this node's host, raising unless the script succeeded.
 
-        :param timeout: Overrides this client's default total timeout, for endpoints whose
-            server-side work can legitimately run that long or longer. Left as the default
-            for cheap operations, so a hang there is still caught reasonably quickly.
+        :param timeout: Total HTTP timeout in seconds, for endpoints whose server-side work
+            can legitimately run that long or longer. Left as the default for cheap
+            operations, so a hang there is still caught reasonably quickly.
         :return: The response body
         """
-        headers = {"Content-Type": "application/json"} if data is not None else None
-        kwargs: dict[str, Any] = {"data": data, "headers": headers}
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        async with await self.__shell2http.request(method, path, **kwargs) as resp:
-            body = await resp.text()
-            if resp.status != 200:
-                raise CblTestError(f"{method.upper()} {path} failed on {self}: {resp.status} - {body}")
-            return body
+        return await self.__shell2http.call(
+            method,
+            path,
+            data=data,
+            content_type="application/json" if data is not None else None,
+            timeout=timeout,
+        )
 
     async def collect_logs(self, output_dir: Path) -> Path:
         """
