@@ -38,6 +38,7 @@ async def _setup_isgr_pair(
     channels: list[str],
     user_name: str,
     user_password: str,
+    revs_limit: int | None = None,
 ) -> AsyncIterator[tuple[SyncGateway, SyncGateway]]:
     """
     Configures a same-named database on two GENUINELY SEPARATE Couchbase clusters (not just two buckets within one
@@ -61,6 +62,7 @@ async def _setup_isgr_pair(
                 num_index_replicas=0,
                 scopes={"_default": ScopeConfig(collections={"_default": {}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
+                revs_limit=revs_limit,
             ),
         )
         await sg.reset_user(db_name, user_name, user_password, channels)
@@ -146,24 +148,25 @@ async def _wait_for_caching_feed(sg: SyncGateway, db_name: str) -> None:
     await sg.get_changes(db_name, request_plus=True, log_response=False)
 
 
-async def _pinned_pull(
+async def _pinned_replication(
     db: Database,
     repl_url: str,
     user_name: str,
     user_password: str,
     pin: dict[str, str],
+    replicator_type: ReplicatorType = ReplicatorType.PULL,
 ) -> Replicator:
     """
-    Runs one one-shot pull pinned to a specific backend and returns the Replicator so callers can inspect both its
-    transferred-document count and the resulting local documents. A fresh Replicator object every call, but always the
-    SAME db and repl_url across a loop, so this is what keeps a series of pinned pulls sharing one checkpoint across
-    both backends. Never pass reset=True: that would force a fresh checkpoint on every call and make every pull look
-    like first-ever contact, silently turning a loop into a vacuous test.
+    Runs one one-shot replication pinned to a specific backend and returns the Replicator so callers can inspect both
+    its transferred-document count and the resulting local documents. A fresh Replicator object every call, but
+    always the SAME db and repl_url across a loop, so this is what keeps a series of pinned calls sharing one
+    checkpoint across both backends. Never pass reset=True: that would force a fresh checkpoint on every call and
+    make every call look like first-ever contact, silently turning a loop into a vacuous test.
     """
     replicator = Replicator(
         db,
         repl_url,
-        replicator_type=ReplicatorType.PULL,
+        replicator_type=replicator_type,
         continuous=False,
         authenticator=ReplicatorBasicAuthenticator(user_name, user_password),
         enable_document_listener=True,
@@ -172,7 +175,7 @@ async def _pinned_pull(
     await replicator.start()
     status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     assert status.error is None, (
-        f"Pinned pull ({pin}) failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        f"Pinned {replicator_type} ({pin}) failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
     )
     return replicator
 
@@ -224,7 +227,7 @@ class TestISGRLoadBalancer(CBLTestClass):
                 `/_changes?since=0` regardless of what the puller already had.
                 """
                 before = await sg.get_pull_repl_since_zero_count(db_name)
-                replicator = await _pinned_pull(db, repl_url, user_name, user_password, pin)
+                replicator = await _pinned_replication(db, repl_url, user_name, user_password, pin)
                 after = await sg.get_pull_repl_since_zero_count(db_name)
                 return len(replicator.document_updates), after - before
 
@@ -342,10 +345,116 @@ class TestISGRLoadBalancer(CBLTestClass):
             )
             db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
             repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
-            replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG1_PIN)
+            replicator = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN)
             assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
 
             pulled = await db.get_document(DocumentEntry(_DEFAULT_COLLECTION, doc_id))
             assert pulled.body.get("channels") == channels, (
                 f"Doc arrived at the CBL client with the wrong channel assignment: {pulled.body}"
+            )
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_checkpoint_404_resurrects_tombstoned_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
+        # cannot send due to limitations of its Websocket library.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_sgw_not(cblpytest.clusters[1].sync_gateways[0], "<4.0.0")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], "<4.0.0")
+
+        db_name = "db_isgr_lb_resurrection"
+        channels = ["isgr_lb_resurrection_test"]
+        user_name, user_password = "isgr_lb_resurrection_user", "pass"
+        doc_id = "d1"
+        revs_limit = 5
+
+        self.mark_test_step(
+            "Set up same-named DB + user on both SGWs with revs_limit=5, and a continuous bidirectional ISGR link"
+        )
+        async with _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password, revs_limit=revs_limit) as (
+            sg1,
+            sg2,
+        ):
+            self.mark_test_step(
+                "Create doc d1 directly on SG1 (native), and wait for it to reach SG2 via ISGR and for the channel"
+                " cache to catch up on both backends"
+            )
+            await _write_native(
+                sg1, sg2, db_name, [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})]
+            )
+            await _wait_for_propagation(sg1, sg2, db_name, 1, link_owner=sg1)
+            await _wait_for_caching_feed(sg1, db_name)
+            await _wait_for_caching_feed(sg2, db_name)
+
+            self.mark_test_step(
+                "Create an empty local CBL database, and pull once pinned to SG1 -- the only contact this CBL"
+                " client ever has with SG1 before the tombstone, establishing the checkpoint this test's bug"
+                " hinges on"
+            )
+            db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+            repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+            seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN)
+            assert len(seed_pull.document_updates) > 0, "Expected the seeding pull pinned to SG1 to transfer d1"
+
+            self.mark_test_step(
+                f"Mutate d1 on SG1 six times past its revs_limit ({revs_limit}), then tombstone it -- landing the"
+                " tombstone at revision generation 8 -- without the local CBL client ever being told"
+            )
+            current = await sg1.get_document(db_name, doc_id)
+            for mutation_index in range(6):
+                await sg1.update_documents(
+                    db_name,
+                    [
+                        DocumentUpdateEntry(
+                            id=doc_id,
+                            revision=current.revid,
+                            body={"channels": channels, "mutation": mutation_index},
+                        )
+                    ],
+                )
+                current = await sg1.get_document(db_name, doc_id)
+            tombstone = await sg1.delete_document(doc_id, current.revid, db_name)
+            assert tombstone.revid.split("-")[0] == "8", (
+                f"Expected the tombstone to land at revision generation 8, got {tombstone.revid}"
+            )
+            since_sg1 = await sg1.get_last_sequence(db_name)
+
+            self.mark_test_step("Wait for the tombstone to propagate to SG2 via the continuous ISGR link")
+            await sg2.wait_for_documents(db_name, {doc_id}, deleted=True)
+            since_sg2 = await sg2.get_last_sequence(db_name)
+            await _wait_for_caching_feed(sg2, db_name)
+
+            self.mark_test_step(
+                "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL"
+                " client, a genuine checkpoint-404, not a client-driven reset. The client still offers d1 only at"
+                " the stale revision it pulled before any mutation or tombstone happened"
+            )
+            await _pinned_replication(
+                db,
+                repl_url,
+                user_name,
+                user_password,
+                _SG2_PIN,
+                replicator_type=ReplicatorType.PUSH_AND_PULL,
+            )
+
+            self.mark_test_step(
+                "Confirm d1 is resurrected on SG2 as a disconnected new rev-tree root (generation 1), orphaned"
+                " from its 8-generation tombstoned history"
+            )
+            await sg2.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg2)
+            resurrected_sg2 = await sg2.get_document(db_name, doc_id)
+            assert not resurrected_sg2.tombstone, "Expected d1 to come back alive on SG2, not stay a tombstone"
+            assert resurrected_sg2.revid.split("-")[0] == "1", (
+                f"Expected a disconnected new rev-tree root (generation 1) on SG2, got {resurrected_sg2.revid}"
+            )
+
+            self.mark_test_step(
+                "Wait for the continuous ISGR link to propagate that same resurrection back to SG1, and confirm"
+                " it there too"
+            )
+            await sg1.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg1)
+            resurrected_sg1 = await sg1.get_document(db_name, doc_id)
+            assert not resurrected_sg1.tombstone, "Expected d1 to come back alive on SG1, not stay a tombstone"
+            assert resurrected_sg1.revid.split("-")[0] == "1", (
+                f"Expected a disconnected new rev-tree root (generation 1) on SG1, got {resurrected_sg1.revid}"
             )

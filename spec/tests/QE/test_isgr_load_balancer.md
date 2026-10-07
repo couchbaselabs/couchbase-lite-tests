@@ -103,3 +103,43 @@ invisible on that side's `_changes` feed with no error raised anywhere. Confirme
 6. Pull the document through a real CBL client pinned to SG1 (`X-Backend: sg-0`), and verify the
    pull actually transferred it
 7. Verify the document's channel assignment arrived intact at the CBL client
+
+## test_checkpoint_404_resurrects_tombstoned_doc
+
+Regression coverage for CBG-5904 (root cause CBSE-23569): a checkpoint ID is shared between a pull
+and a pushAndPull replicator for the same (local db, remote URL, collections) tuple, direction is
+not part of its hash. Combined with the load-balancer checkpoint-sharing mechanism this suite
+already exercises, a CBL client that has only ever pulled through SG1 presents that SAME checkpoint
+ID to SG2 the first time a replication lands there. SG2 has no record of it -- a genuine
+checkpoint-404, not a client-driven reset -- so it runs `proposeChanges` with an empty
+`remoteAncestorRev`. LiteCore's anti-echo protection, which guards against this exact push/pull race
+in continuous mode, is not wired up for one-shot `pushAndPull`, so the client's stale, long-since
+tombstoned revision gets proposed and accepted by Sync Gateway as a disconnected new rev-tree root
+(`branched:true` in Sync Gateway's own logs, no 409, no conflict rejection). This is confirmed,
+currently-unmitigated behavior on Sync Gateway and Couchbase Lite versions before 4.0 -- the suite
+asserts the resurrection happens, not that it's prevented.
+
+Runs only below SGW and CBL version 4.0.0, where this is confirmed to reproduce; not run against
+mixed SGW/CBL versions.
+
+1. Create a same-named database on both SG1 and SG2 (separate buckets) with `revs_limit` set to 5,
+   and a matching user on both
+2. Start a continuous, bidirectional ISGR link from SG1 to SG2
+3. Create doc `d1` directly on SG1 (native), and wait for it to reach SG2 via ISGR and for the
+   channel cache to catch up on both backends
+4. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`) -- the only
+   contact this CBL client ever has with SG1 before the tombstone below, establishing the
+   checkpoint this test's bug hinges on. The client now holds `d1` at revision generation 1 and is
+   never told about anything that happens to it afterward
+5. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it -- landing the
+   tombstone at revision generation 8, matching the generation observed in the original
+   reproduction
+6. Wait for the tombstone to propagate to SG2 via the continuous ISGR link, and for SG2's channel
+   cache to catch up
+7. Fire a one-shot bidirectional (pushAndPull) replication pinned to SG2 (`X-Backend: sg-1`) --
+   SG2's first-ever contact with this CBL client. The client still offers only the stale
+   generation-1 revision it pulled in step 4
+8. Confirm `d1` comes back alive on SG2 at revision generation 1 -- a disconnected new rev-tree
+   root, orphaned from its 8-generation tombstoned history, not a continuation of it
+9. Wait for the continuous ISGR link to propagate that same resurrection back to SG1, and confirm
+   it there too at revision generation 1
