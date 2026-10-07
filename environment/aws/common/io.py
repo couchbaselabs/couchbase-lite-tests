@@ -97,6 +97,20 @@ def sftp_progress_bar(sftp: paramiko.SFTPClient, local_path: Path, remote_path: 
         sftp.put(local_path, remote_path, callback=callback)
 
 
+def upload_shell2http_scripts(sftp: paramiko.SFTPClient, script_dir: Path) -> None:
+    """
+    Upload a host's shell2http endpoint scripts, plus the shared with-timeout.sh that
+    start.sh runs every endpoint through.
+
+    Args:
+        sftp (paramiko.SFTPClient): The SFTP client.
+        script_dir (Path): The directory holding the host's ``shell2http`` script directory.
+    """
+    shared = Path(__file__).resolve().parent / "shell2http"
+    for file in [*(script_dir / "shell2http").iterdir(), *shared.iterdir()]:
+        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
+
+
 def zip_directory(input: Path, output: Path, excludes: list[str] | None = None) -> None:
     """
     Zip the contents of a directory.

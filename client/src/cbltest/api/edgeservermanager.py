@@ -22,10 +22,8 @@ from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.configparser import EdgeServerInfo
-from cbltest.httpclient import AsyncHTTPClient
-from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_warning
-from cbltest.utils import SHELL2HTTP_PORT
+from cbltest.shell2http import DEFAULT_SHELL2HTTP_TIMEOUT, Shell2HttpClient
 from cbltest.version import VERSION
 
 
@@ -42,7 +40,7 @@ class EdgeServerManager:
         # What the host was provisioned with, which reset_to_initial_state() goes back to.
         self.__info = info
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__shell2http_session = AsyncHTTPClient(f"http://{info.hostname}:{SHELL2HTTP_PORT}")
+        self.__sidecar = Shell2HttpClient("Edge Server", info.hostname, error=CblEdgeServerBadResponseError)
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
 
@@ -69,32 +67,30 @@ class EdgeServerManager:
 
     async def close(self) -> None:
         """Close the sidecar session and every client handed out."""
-        await self.__shell2http_session.close()
+        await self.__sidecar.close()
         for client in self.__clients:
             await client.close()
         self.__clients.clear()
 
-    async def _call_sidecar(self, method: str, path: str, payload: JSONDictionary | None = None) -> str:
-        """Call a shell2http endpoint on the Edge Server host, raising on anything but a 2xx.
+    async def _call_sidecar(
+        self,
+        method: str,
+        path: str,
+        payload: JSONDictionary | None = None,
+        timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT,
+    ) -> str:
+        """Call a shell2http endpoint on the Edge Server host, raising unless the script succeeded.
 
+        :param timeout: Total HTTP timeout in seconds.  See :meth:`Shell2HttpClient.call`.
         :return: The response body, which every endpoint but this one ignores
         """
-        data = "" if payload is None else payload.serialize()
-        headers = {"Content-Type": "application/json"} if payload is not None else None
-        writer = get_next_writer()
-        writer.write_begin(f"Edge Server host [{self.__info.hostname}] -> {method.upper()} {path}", data)
-        resp = await self.__shell2http_session.request(method, path, data=data, headers=headers)
-        # A sidecar echoes raw files back -- start-edgeserver cats the Edge Server's log
-        # on a failed start -- so one odd byte must not fail the whole call.
-        body = await resp.text(errors="replace")
-        writer.write_end(
-            f"Edge Server host [{self.__info.hostname}] <- {method.upper()} {path} {resp.status}",
-            body,
+        return await self.__sidecar.call(
+            method,
+            path,
+            data="" if payload is None else payload.serialize(),
+            content_type="application/json" if payload is not None else None,
+            timeout=timeout,
         )
-        if not resp.ok:
-            raise CblEdgeServerBadResponseError(resp.status, f"{method} {path} returned {resp.status}", body=body)
-
-        return body
 
     async def kill_server(self) -> None:
         """Stop the Edge Server process."""
@@ -126,7 +122,7 @@ class EdgeServerManager:
         process exists, which is before it is listening.
         """
         try:
-            await client.get_version()
+            await client._send_request("get", "/", log_failure=False)
         except CblEdgeServerBadResponseError:
             # A rejection is still an answer, so the Edge Server is serving.  A config
             # that declares users answers 401 here.

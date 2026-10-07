@@ -39,7 +39,8 @@ from cbltest.api import caddy
 from cbltest.api.error import CblTestError
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_info, cbl_warning
-from cbltest.utils import SHELL2HTTP_PORT, async_retry_assert, retry_assert
+from cbltest.shell2http import Shell2HttpClient
+from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
 T = TypeVar("T")
@@ -264,6 +265,7 @@ class CouchbaseServer:
             # The sidecar is a separate service, so it gets no Couchbase Server credentials
             self.__shell2http = AsyncHTTPClient(f"http://{self.__hostname}:{SHELL2HTTP_PORT}")
             self.__caddy = caddy.Caddy(self.__hostname)
+            self.__shell2http = Shell2HttpClient("Couchbase Server", self.__hostname)
 
             self.__cleanup_mode = cleanup_mode
             # Deleting a bucket between tests leaves nothing to reuse, so nothing needs capping.
@@ -1478,10 +1480,7 @@ class CouchbaseServer:
         """
         Stop the Couchbase Server service via shell2http.
         """
-        async with await self.__shell2http.get("/stop-cbs") as resp:
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to stop CBS: {resp.status} - {body}")
+        await self.__shell2http.call("get", "/stop-cbs")
 
     async def start_server(self, port: int = 8091) -> None:
         """
@@ -1489,14 +1488,12 @@ class CouchbaseServer:
 
         :param port: REST API port to wait for readiness (default 8091)
         """
-        async with await self.__shell2http.post(
+        await self.__shell2http.call(
+            "post",
             "/start-cbs",
             data=json.dumps({"port": port}),
-            headers={"Content-Type": "application/json"},
-        ) as resp:
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"Failed to start CBS: {resp.status} - {body}")
+            content_type="application/json",
+        )
 
     async def _call_sidecar(
         self, method: str, path: str, data: str | None = None, timeout: ClientTimeout | None = None

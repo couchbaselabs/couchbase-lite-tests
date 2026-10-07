@@ -17,7 +17,8 @@ if pgrep -f "sync_gateway" >/dev/null; then
   exit 0
 fi
 
-nohup /opt/couchbase-sync-gateway/bin/sync_gateway "${CONFIG_FILE}" >/home/ec2-user/logs/sgw.log 2>&1 &
+# setsid keeps Sync Gateway out of the process group that a ?timeout= kills.
+setsid /opt/couchbase-sync-gateway/bin/sync_gateway "${CONFIG_FILE}" >/home/ec2-user/logs/sgw.log 2>&1 </dev/null &
 SGW_PID=$!
 
 echo "Waiting for Sync Gateway to start (PID: $SGW_PID)..."

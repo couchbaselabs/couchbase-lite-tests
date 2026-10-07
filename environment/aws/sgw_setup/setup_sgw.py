@@ -37,7 +37,7 @@ import paramiko
 import requests
 from tqdm import tqdm
 
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar, upload_shell2http_scripts
 from environment.aws.common.output import header
 from environment.aws.common.ssh import connect_ssh
 from environment.aws.topology_setup.setup_topology import TopologyConfig
@@ -334,8 +334,7 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownload
     sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem")
     sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem")
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
-    for file in (SCRIPT_DIR / "shell2http").iterdir():
-        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
+    upload_shell2http_scripts(sftp, SCRIPT_DIR)
     sftp.close()
 
     # Make shell2http scripts executable

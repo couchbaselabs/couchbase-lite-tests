@@ -12,13 +12,12 @@ from collections.abc import AsyncGenerator, Callable, Coroutine, Sequence
 from typing import Any
 
 import pytest_asyncio
-from aiohttp import ClientTimeout
 from cbltest import CBLPyTest
 from cbltest.api.error import CblTestError
-from cbltest.api.syncgateway import SHELL2HTTP_PORT, SyncGateway
+from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
-from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_info
+from cbltest.shell2http import Shell2HttpClient
 from cbltest.version import VERSION
 from opentelemetry.trace import get_tracer
 
@@ -59,7 +58,7 @@ class SyncGatewayManager:
         _check_token(token, type(self).__name__)
         self.__node = node
         self.__tracer = get_tracer(__name__, VERSION)
-        self.__session = AsyncHTTPClient(f"http://{node.hostname}:{SHELL2HTTP_PORT}")
+        self.__sidecar = Shell2HttpClient("Sync Gateway", node.hostname)
 
     def __str__(self) -> str:
         return str(self.__node)
@@ -67,37 +66,33 @@ class SyncGatewayManager:
     @property
     def closed(self) -> bool:
         """Whether this node's sidecar session has been closed."""
-        return self.__session.closed
+        return self.__sidecar.closed
 
     async def close(self) -> None:
         """Close this node's sidecar session. The fixture calls this at teardown."""
-        await self.__session.close()
+        await self.__sidecar.close()
 
     @property
     def has_shell2http_sidecar(self) -> bool:
         """Whether this node exposes the shell2http sidecar every operation here goes through."""
         return self.__node.has_shell2http_sidecar
 
-    async def _call_sidecar(self, method: str, path: str, data: str | None = None, timeout: int = 120) -> None:
+    async def _call_sidecar(self, method: str, path: str, data: str | None = None, timeout: float = 120) -> None:
         """
-        Call a sidecar endpoint, raising on anything but a 200.
+        Call a sidecar endpoint, raising unless the script succeeded.
 
         :param method: HTTP method to use
         :param path: Sidecar path, including any query string
         :param data: Request body, for the endpoints that take one
-        :param timeout: Total timeout in seconds
+        :param timeout: Total HTTP timeout in seconds.  See :meth:`Shell2HttpClient.call`.
         """
-        headers = {"Content-Type": "text/plain"} if data is not None else None
-        async with await self.__session.request(
+        await self.__sidecar.call(
             method,
             path,
             data=data,
-            headers=headers,
-            timeout=ClientTimeout(total=timeout),
-        ) as resp:
-            if resp.status != 200:
-                body = await resp.text()
-                raise CblTestError(f"{method.upper()} {path} failed on {self}: {resp.status} - {body}")
+            content_type="text/plain" if data is not None else None,
+            timeout=timeout,
+        )
 
     async def restart_with_config(self, config_name: str = DEFAULT_CONFIG_NAME) -> None:
         """

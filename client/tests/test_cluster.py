@@ -47,6 +47,7 @@ def test_cluster_with_couchbase_server() -> None:
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
         patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
+        patch("cbltest.api.couchbaseserver.Shell2HttpClient", autospec=True),
     ):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
@@ -63,6 +64,7 @@ def test_cluster_with_multiple_sync_gateways() -> None:
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
         patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
+        patch("cbltest.api.couchbaseserver.Shell2HttpClient", autospec=True),
     ):
         cbs = couchbaseserver.CouchbaseServer(
             url="https://example.com",
@@ -96,6 +98,7 @@ def cluster_on_couchbase_server(
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
         patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
+        patch("cbltest.api.couchbaseserver.Shell2HttpClient", autospec=True),
     ):
         cbs = couchbaseserver.CouchbaseServer(url="https://example.com", username="user", password="pass")
     node = {"services": ["kv", "index", "n1ql"], "clusterMembership": "active", "status": "healthy"}

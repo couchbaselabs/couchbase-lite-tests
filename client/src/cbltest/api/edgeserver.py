@@ -256,20 +256,27 @@ class EdgeServer:
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
+        log_failure: bool = True,
     ) -> Any:
+        """
+        :param log_failure: Whether to log a request that gets no response in testserver.log.  Pass
+                            False for a poll that expects failures until the server is up; the HTTP
+                            log still records them.
+        """
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await self.__session.request(method, path, data=data, headers=headers)
+            with writer.record_failure(f"Edge Server [{self.__hostname}] <- {method.upper()} {path}", log=log_failure):
+                resp = await self.__session.request(method, path, data=data, headers=headers)
+                if resp.content_type.startswith("application/json"):
+                    ret_val = await resp.json()
+                    data = dumps(ret_val, indent=2)
+                else:
+                    data = await resp.text()
+                    ret_val = data
 
-            if resp.content_type.startswith("application/json"):
-                ret_val = await resp.json()
-                data = dumps(ret_val, indent=2)
-            else:
-                data = await resp.text()
-                ret_val = data
             writer.write_end(
                 f"Edge Server [{self.__hostname}] <- {method.upper()} {path} {resp.status}",
                 data,
