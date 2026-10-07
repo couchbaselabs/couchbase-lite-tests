@@ -52,7 +52,6 @@ class WebSocketRouter:
             timeout = 30
             if CBLPyTestGlobal.auto_start_tdk_page:
                 webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
-                timeout = 10
 
             await wait_for(self.__conn_sem.acquire(), timeout=timeout)
             cbl_info(f"Connected to test server at {url}!")
@@ -118,6 +117,9 @@ class WebSocketRouter:
         future: Future[dict] = Future()
         self.__pending[ts_id] = future
         return future
+
+    def unregister(self, ts_id: int) -> None:
+        self.__pending.pop(ts_id, None)
 
     def _lookup_ip(self, remote_url: str) -> str:
         if "localhost" in remote_url:

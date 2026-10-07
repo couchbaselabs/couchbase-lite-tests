@@ -39,6 +39,17 @@ source $SCRIPT_DIR/../../shared/config.sh
 echo "Setup backend..."
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
 
+CHROME_APP="/Applications/Google Chrome.app"
+if [ ! -d "$CHROME_APP" ]; then
+  CHROME_APP="${HOME}/Applications/Google Chrome.app"
+fi
+if [ ! -d "$CHROME_APP" ]; then
+  echo "Google Chrome is required to run the JS test server"
+  exit 1
+fi
+rm -rf "${HOME}/.tdk-chrome"
+export BROWSER="open -na '${CHROME_APP}' --args --user-data-dir=${HOME}/.tdk-chrome --no-first-run --no-default-browser-check --ignore-certificate-errors --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows --enable-logging --v=0 %s"
+
 # Run Tests :
 echo "Run tests..."
 
