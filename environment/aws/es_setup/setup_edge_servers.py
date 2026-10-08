@@ -305,6 +305,7 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec_bg(ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server")
+    remote_exec(ssh, "rm -f /home/ec2-user/user/users.json", "Resetting the Edge Server users file")
     remote_exec(
         ssh,
         'echo \'{"name":"admin_user","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',

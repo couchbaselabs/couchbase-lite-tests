@@ -895,3 +895,22 @@ class EdgeServer:
             retry -= 1
 
         raise CblTimeoutError("Timeout waiting for replicator status")
+    async def create_session(self, db_name: str, one_time: bool | str | None = True) -> dict:
+        """
+        :param db_name: Database to mint the session for
+        :param one_time: True or False to send ``one_time=true`` / ``one_time=false``, a string
+            to send verbatim, or None to leave the query parameter off
+        :return: The response body, ``{"ok": true, "one_time_session_id": "<32 hex chars>"}``
+        """
+        with self.__tracer.start_as_current_span("create_session", attributes={"es.database.name": db_name}):
+            path = f"/{db_name}/_session"
+            if one_time is not None:
+                value = str(one_time).lower() if isinstance(one_time, bool) else one_time
+                path += f"?one_time={urllib.parse.quote(value, safe='')}"
+            resp = await self._send_request("post", path)
+            if not isinstance(resp, dict):
+                raise CblEdgeServerBadResponseError(
+                    500, f"Unexpected response type from POST {path}: {type(resp)}", body=str(resp)
+                )
+            return cast(dict, resp)
+
