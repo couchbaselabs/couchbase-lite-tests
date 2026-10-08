@@ -1,0 +1,109 @@
+{
+    "admin_user": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "roles": [
+            "admin"
+        ]
+    },
+    "admin_with_access": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "roles": [
+            "admin"
+        ],
+        "access": {
+            "names": [
+                "read"
+            ]
+        }
+    },
+    "replicator": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "roles": [
+            "replicate"
+        ],
+        "access": {}
+    },
+    "rw": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.*": [
+                "read",
+                "write"
+            ]
+        }
+    },
+    "ro": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.*": [
+                "read"
+            ]
+        }
+    },
+    "wo": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.*": [
+                "write"
+            ]
+        }
+    },
+    "none": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {}
+    },
+    "mixed": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.travel.hotels": [
+                "read",
+                "write"
+            ],
+            "travel.travel.airlines": [
+                "read"
+            ]
+        }
+    },
+    "scope_reader": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.travel.*": [
+                "read"
+            ]
+        }
+    },
+    "default_reader": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel": [
+                "read"
+            ]
+        }
+    },
+    "names_rw": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "names.*": [
+                "read",
+                "write"
+            ]
+        }
+    },
+    "landmark_reader": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.travel.landmarks": [
+                "read"
+            ]
+        }
+    },
+    "airline_rw": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "access": {
+            "travel.travel.airlines": [
+                "read",
+                "write"
+            ]
+        }
+    }
+}
