@@ -19,9 +19,10 @@ esac
 
 CBS_CONTAINER=$(sudo docker ps -a --format '{{.Names}}' | grep -E 'cbs|couchbase' | head -1)
 if [ -z "$CBS_CONTAINER" ]; then
-  # Always exit 0: shell2http (running -cgi -500) discards this script's own stdout on a
-  # non-zero exit and substitutes a generic "exec error: exit status N" instead, so the only
-  # way the caller ever sees this JSON -- success or failure -- is if we exit 0 regardless.
+  # Always exit 0 and report failure in the JSON body instead. On a non-zero exit, shell2http (-cgi -500) answers
+  # HTTP 500 with this script's stdout followed by "exec error: exit status N", and Shell2HttpClient.call() raises
+  # CblRemoteBadResponseError for it, so collect_logs() never gets a JSON body it can parse. This script's stderr
+  # never reaches the caller either way: shell2http writes it only to its own log, which start.sh sends to /dev/null.
   jq -nc '{error: "CBS container not found"}'
   exit 0
 fi
@@ -57,14 +58,15 @@ STAGED_REDACTED_IN_CONTAINER="$STAGING_DIR_IN_CONTAINER/$REDACTED_FILENAME"
 # --kill-after=30: plain `timeout` only sends SIGTERM at the deadline, which a wedged or
 # mid-write cbcollect_info can ignore or outlive -- escalate to SIGKILL if it's still
 # running 30s later, rather than let docker exec (and this request) hang indefinitely.
-# stdout carries cbcollect_info's own progress/status noise, not diagnostics -- discard it
-# so only real stderr ends up in COLLECT_ERR (reported as "warnings" below).
+# Only stderr is captured, into COLLECT_ERR; stdout is discarded. cbcollect_info logs every message to stderr,
+# including a "<task> - OK" or "Exit code N" line per task -- thousands on a loaded cluster.
 COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=30 1200 "$CBCOLLECT_BIN" \
   --log-redaction-level=partial \
   "$OUT_PATH_IN_CONTAINER" 2>&1 >/dev/null)
 COLLECT_RC=$?
-# cbcollect_info logs a progress line per task to stderr (thousands on a loaded cluster), and Linux caps one argv
-# string at 128 KiB: past that, `jq --arg` below fails to exec with exit 126 and prints nothing. Keep only the tail.
+# Linux caps one argv string at 128 KiB: past that, `jq --arg` below fails to exec with exit 126 and prints nothing.
+# Keep only the tail: it holds whatever cbcollect_info logged just before exiting, such as a fatal error. Earlier
+# per-task failures can be cut off here, but the archive keeps the full log as cbcollect_info.log.
 COLLECT_ERR=$(tail -c 4096 <<<"$COLLECT_ERR")
 
 if [ "$COLLECT_RC" -ne 0 ] || ! sudo docker exec "$CBS_CONTAINER" test -s "$STAGED_REDACTED_IN_CONTAINER"; then

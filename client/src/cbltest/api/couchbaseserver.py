@@ -154,10 +154,10 @@ class BucketPool:
             await self.__server.wait_for_bucket_deleted(oldest)
 
 
-# The collect-logs shell2http endpoint runs `timeout --kill-after=30 1200 cbcollect_info`,
-# a ~1230s server-side worst case, plus time to zip and respond; 1260s leaves comfortable
-# margin so the client outlasts the endpoint rather than racing its own default aiohttp
-# timeout against it.
+# The collect-logs shell2http endpoint runs `timeout --kill-after=30 1200 cbcollect_info`, which builds the archive
+# itself: it is stopped at 1200s and killed by 1230s at the latest. After that the script copies the archive out of the
+# container and prints its JSON, steps with no time limit of their own; 1260s leaves them 30s. Not wrapped in
+# with-timeout.sh, so the ?timeout= this client sends is ignored on the host.
 _COLLECT_LOGS_TIMEOUT: float = 1260
 
 
@@ -1529,22 +1529,16 @@ class CouchbaseServer:
             response = await self._call_sidecar(
                 "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
             )
-            # The endpoint always exits 0, success or failure -- shell2http (running -cgi
-            # -500) discards the script's own stdout on a non-zero exit and substitutes a
-            # generic "exec error: ..." instead, so a real exit code is the one thing that
-            # can never reach us. Failure is therefore reported entirely through this body,
-            # not through _call_sidecar's status check.
+            # The endpoint always exits 0 and reports failure through an "error" key in this body. A non-zero exit would
+            # make shell2http answer HTTP 500 with the script's stdout followed by "exec error: exit status N", and
+            # _call_sidecar would raise CblRemoteBadResponseError for it before this JSON could be parsed.
             body = json.loads(response)
             if error := body.get("error"):
                 raise CblTestError(
                     f"cbcollect_info failed on {self}: {error} (rc={body.get('rc')}, stderr={body.get('stderr')})"
                 )
-
-            # cbcollect_info can finish with a bundle but still have logged a non-fatal
-            # complaint (an unreachable stat endpoint, a skipped component); worth surfacing
-            # without failing a collection that otherwise succeeded.
             if warnings := body.get("warnings"):
-                cbl_warning(f"Couchbase Server [{self.hostname}] collected logs with warnings: {warnings}")
+                cbl_info(f"Couchbase Server [{self.hostname}] cbcollect_info stderr (last 4 KiB): {warnings}")
 
             # --log-redaction-level makes the endpoint produce (and report back) a redacted
             # archive under a different name than the one requested -- see collect-logs.sh.

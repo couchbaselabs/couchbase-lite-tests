@@ -46,10 +46,8 @@ def stub_sidecar(
     return calls
 
 
-@pytest.mark.asyncio
-async def test_collect_logs_downloads_the_archive_the_sidecar_made(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def stub_download(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Path]]:
+    """Record what Caddy is asked to download, so nothing reaches the network."""
     downloads: list[tuple[str, Path]] = []
 
     async def fake_download(self: Caddy, filename: str, local_path: str | Path) -> Path:
@@ -57,7 +55,14 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
         return Path(local_path)
 
     monkeypatch.setattr(Caddy, "download", fake_download)
+    return downloads
 
+
+@pytest.mark.asyncio
+async def test_collect_logs_downloads_the_archive_the_sidecar_made(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    downloads = stub_download(monkeypatch)
     server = make_server()
     calls = stub_sidecar(monkeypatch, server)
 
@@ -85,28 +90,30 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
 
 
 @pytest.mark.asyncio
-async def test_collect_logs_surfaces_warnings_without_failing(
+async def test_collect_logs_logs_stderr_at_info_without_failing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    async def fake_download(self: Caddy, filename: str, local_path: str | Path) -> Path:
-        return Path(local_path)
-
-    monkeypatch.setattr(Caddy, "download", fake_download)
-
+    downloads = stub_download(monkeypatch)
     server = make_server()
+    archive_name = "cbcollect-cbs-example-com-x-redacted.zip"
     stub_sidecar(
         monkeypatch,
         server,
-        response='{"file": "cbcollect-cbs-example-com-x-redacted.zip", "warnings": "some component was unreachable"}',
+        response=json.dumps({"file": archive_name, "warnings": "some component was unreachable"}),
     )
 
-    with caplog.at_level(logging.WARNING, logger="CBL"):
+    with caplog.at_level(logging.INFO, logger="CBL"):
         try:
             archive = await server.collect_logs(tmp_path)
         finally:
             await server.close()
 
-    assert archive.suffix == ".zip"
-    assert any("some component was unreachable" in record.message for record in caplog.records), (
-        "collect_logs must surface the sidecar's reported warnings, not just succeed silently"
+    assert downloads == [(archive_name, tmp_path / archive_name)], (
+        "stderr in the response must not stop the reported archive from being downloaded"
+    )
+    assert archive == tmp_path / archive_name
+    records = [record for record in caplog.records if "some component was unreachable" in record.message]
+    assert records, "collect_logs must log the stderr tail the sidecar reports, not drop it"
+    assert all(record.levelno == logging.INFO for record in records), (
+        "a successful collection's stderr is mostly progress lines, so it must be logged at info, not as a warning"
     )
