@@ -30,18 +30,19 @@ surfaced failure.
 Test that a CBL client pulling through a round-robin load balancer in front of two
 continuously-ISGR-linked Sync Gateway backends sees a bounded, self-healing resync pattern
 (never an unbounded resync loop, never data loss), by forcing deterministic alternation between
-both backends via the `X-Backend` pinning the load balancer already supports.
+both backends via the `X-Backend` pinning the load balancer already supports. Skipped on SGW
+4.0.0-4.0.7 and 4.1.0-4.1.1 (including 4.1.0.1): the ISGR channel-loss bug that
+`test_isgr_pull_preserves_channel_set` covers leaves SG2's feed empty for the seed document, and on
+4.0.7 the first repeat SG1 pull was seen restarting at since=0.
 
 1. Create a same-named database on both SG1 and SG2 (separate buckets, each with
    `sgr_tls_skip_verify` set since both backends' HTTPS certificates are signed by the harness's
    own private CA, which neither side trusts by default), and a matching user on both
 2. Start a continuous, bidirectional ISGR link from SG1 to SG2
-3. Add one seed document directly on SG1 (native), confirm it landed on SG1 itself, then wait for
-   it to reach SG2 via ISGR and for the channel cache to catch up on both backends -- a document
-   can satisfy a plain document-count check before the channel cache that a real pull actually
-   reads from has indexed it, so this wait is required, not just the document-count one. A
+3. Add one seed document directly on SG1 (native), waiting until SG1's own changes feed shows it,
+   then wait for that document ID to appear on SG2's changes feed via ISGR. A
    propagation timeout attaches the SG1-to-SG2 ISGR link's own status to the failure, so a broken
-   link surfaces directly instead of a bare doc-count mismatch
+   link surfaces directly instead of a bare timeout
 4. Create an empty local CBL database and a reusable one-shot pull `Replicator` pointed at the
    load balancer, with its document listener enabled
 5. Pull once pinned to SG1 (`X-Backend: sg-0`) -- first-ever contact with SG1, local CBL db is
@@ -61,9 +62,8 @@ both backends via the `X-Backend` pinning the load balancer already supports.
    count alone reads zero whether the backend is genuinely continuing incrementally or wrongly
    re-running a full resync of already-known content, so only the since-zero signal can tell those
    two apart
-7. Add one more document directly on SG1 and wait for it to reach SG2 via ISGR and for the
-   channel cache to catch up on both backends, as in step 3 (including the landed-on-SG1 check
-   and the ISGR-status-on-timeout diagnostic)
+7. Add one more document directly on SG1 and wait for SG1's changes feed to show it and for it to
+   reach SG2 via ISGR, as in step 3 (including the ISGR-status-on-timeout diagnostic)
 8. Pull once pinned to SG1 -- both backends already hold a valid checkpoint for this client by
    now, so this is a genuine incremental diff containing only the new document, which CBL has
    never seen anywhere; expect a non-empty transfer and no since-zero-pull increment (an
@@ -81,10 +81,10 @@ both backends via the `X-Backend` pinning the load balancer already supports.
 
 ## test_isgr_pull_preserves_channel_set
 
-Regression test for a fixed bug (SGW 4.0.0-4.0.7, 4.1.0-4.1.1): an ISGR pull of a brand-new
-document could leave its `_sync.channel_set` null on the receiving side, making the document
-invisible on that side's `_changes` feed with no error raised anywhere. Confirmed fixed in
-4.0.8 / 4.1.2; this asserts the fix holds on the current default Sync Gateway version.
+Regression test for a fixed bug (SGW 4.0.0-4.0.7, 4.1.0-4.1.1, including 4.1.0.1): an ISGR pull of
+a brand-new document could leave its `_sync.channel_set` null on the receiving side, making the
+document invisible on that side's `_changes` feed with no error raised anywhere. Confirmed fixed in
+4.0.8 / 4.1.2; skipped on the affected versions and run on every other Sync Gateway version.
 
 1. Create a same-named database on both SG1 and SG2 (separate buckets), and a matching user on
    both
@@ -93,11 +93,9 @@ invisible on that side's `_changes` feed with no error raised anywhere. Confirme
    since SG1 is the active side of the link, this document reaches SG1 over SG1's own active
    *pull* leg, the direction this regression is actually about (writing on SG1 instead would
    only exercise its active *push* leg, never a pull)
-4. Confirm the document landed on SG2 itself, then wait for it to reach SG1 via ISGR, and for
-   SG1's channel cache to catch up -- a document can satisfy a plain document-count check before
-   the channel cache that both a channel-scoped `_changes` call and a real pull actually read from
-   has indexed it. A propagation timeout attaches the SG1-to-SG2 ISGR link's own status to the
-   failure, so a broken link surfaces directly instead of a bare doc-count mismatch
+4. Wait for the document ID to appear on SG1's changes feed via ISGR. A propagation timeout
+   attaches the SG1-to-SG2 ISGR link's own status to the failure, so a broken link surfaces
+   directly instead of a bare timeout
 5. Verify the document is visible through a `request_plus`-consistent `_changes` call scoped to
    that channel on SG1
 6. Pull the document through a real CBL client pinned to SG1 (`X-Backend: sg-0`), and verify the
