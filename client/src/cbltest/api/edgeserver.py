@@ -895,6 +895,7 @@ class EdgeServer:
             retry -= 1
 
         raise CblTimeoutError("Timeout waiting for replicator status")
+
     async def create_session(self, db_name: str, one_time: bool | str | None = True) -> dict:
         """
         :param db_name: Database to mint the session for
@@ -913,4 +914,3 @@ class EdgeServer:
                     500, f"Unexpected response type from POST {path}: {type(resp)}", body=str(resp)
                 )
             return cast(dict, resp)
-
