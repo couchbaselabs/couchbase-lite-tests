@@ -63,6 +63,9 @@ COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=30 1200 "$C
   --log-redaction-level=partial \
   "$OUT_PATH_IN_CONTAINER" 2>&1 >/dev/null)
 COLLECT_RC=$?
+# cbcollect_info logs a progress line per task to stderr (thousands on a loaded cluster), and Linux caps one argv
+# string at 128 KiB: past that, `jq --arg` below fails to exec with exit 126 and prints nothing. Keep only the tail.
+COLLECT_ERR=$(tail -c 4096 <<<"$COLLECT_ERR")
 
 if [ "$COLLECT_RC" -ne 0 ] || ! sudo docker exec "$CBS_CONTAINER" test -s "$STAGED_REDACTED_IN_CONTAINER"; then
   # exit 0 here too -- see the comment on the container-not-found branch above.

@@ -97,6 +97,11 @@ class SyncGatewayCluster:
             if not await self.sync_gateways[0].using_rosmar:
                 CBLPyTestGlobal.cbcollect_needed = True
             raise
+        # TEMPORARY (CBG-5733 verification only) -- force cbcollect on a PASSING run so the real collect -> zip ->
+        # Caddy -> move_artifacts -> Jenkins-archive pipeline can be checked on live infra without needing an actual
+        # timeout. REVERT before merging.
+        if not await self.sync_gateways[0].using_rosmar:
+            CBLPyTestGlobal.cbcollect_needed = True
         await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
 
