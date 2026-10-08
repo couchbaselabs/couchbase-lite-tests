@@ -1,5 +1,3 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 import pytest
@@ -7,7 +5,6 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -31,21 +28,20 @@ _SG2_PIN = {"X-Backend": "sg-1"}
 _DEFAULT_COLLECTION = "_default._default"
 
 
-@asynccontextmanager
 async def _setup_isgr_pair(
     cblpytest: CBLPyTest,
     db_name: str,
     channels: list[str],
     user_name: str,
     user_password: str,
-) -> AsyncIterator[tuple[SyncGateway, SyncGateway]]:
+) -> tuple[SyncGateway, SyncGateway]:
     """
     Configures a same-named database on two GENUINELY SEPARATE Couchbase clusters (not just two buckets within one
     shared cluster) -- CouchbaseCluster.create_database() is cluster-wide: it writes the config once and then makes
     every node in that SAME cluster's sync_gateways apply it, so looping two different bucket configs over one shared
     cluster would make both nodes fight over the same database instead of being independent backends. Configures a
-    matching user on each, then starts a continuous bidirectional ISGR link from the first to the second. Stops the
-    link on exit.
+    matching user on each, then starts a continuous bidirectional ISGR link from the first to the second. The link is
+    left running; `cluster_cleanup` deletes both databases, which stops it, before the next test.
     """
     cluster1, cluster2 = cblpytest.clusters[1], cblpytest.clusters[2]
     sg1, sg2 = cluster1.sync_gateways[0], cluster2.sync_gateways[0]
@@ -79,71 +75,21 @@ async def _setup_isgr_pair(
             remote_password="password",
         ),
     )
-    try:
-        yield sg1, sg2
-    finally:
-        await sg1.stop_isgr(db_name, _ISGR_REPLICATION_ID, continuous=True)
-
-
-async def _write_native(
-    primary: SyncGateway,
-    secondary: SyncGateway,
-    db_name: str,
-    docs: list[DocumentUpdateEntry],
-) -> None:
-    """
-    Writes docs only on `primary`, relying on ISGR to propagate them to `secondary`. A write with the same id on both
-    would be a genuine write conflict, not the clean one-directional propagation these tests measure, and would silently
-    invalidate what's being asserted. Checks BEFORE the write (not after, and not just before an ISGR wait) since ISGR
-    is continuous and could already have propagated by any later point -- pre-write is the only race-free check.
-    """
-    for entry in docs:
-        try:
-            await secondary.get_document(db_name, entry.id)
-        except CblSyncGatewayBadResponseError as e:
-            if e.code != 404:
-                raise
-        else:
-            raise AssertionError(
-                f"Doc '{entry.id}' already exists on the secondary backend before the native write -- that would be a "
-                "genuine write conflict, not clean ISGR propagation"
-            )
-    await primary.update_documents(db_name, docs)
+    return sg1, sg2
 
 
 async def _wait_for_propagation(
-    primary: SyncGateway,
     secondary: SyncGateway,
     db_name: str,
-    expected_count: int,
+    doc_ids: list[str],
     link_owner: SyncGateway,
 ) -> None:
-    """
-    Confirms the native write actually landed on `primary` before waiting on `secondary` via ISGR -- otherwise a
-    failed write and a failed ISGR propagation look identical (both would otherwise surface as "secondary has too
-    few docs"). On a propagation timeout, re-raises with `link_owner`'s ISGR status attached, so a connection/auth
-    failure on the link itself is visible directly in the failure message instead of a bare doc-count mismatch.
-    `link_owner` is always SG1 regardless of which of `primary`/`secondary` it is in a given call: `_setup_isgr_pair`
-    only ever registers the replication config on SG1, so asking the other backend for its status 404s.
-    """
-    await primary.wait_for_document_count(db_name, expected_count)
+    """Waits for `doc_ids` to reach `secondary` via ISGR, attaching `link_owner`'s ISGR status on a timeout."""
     try:
-        await secondary.wait_for_document_count(db_name, expected_count)
-    except AssertionError as e:
+        await secondary.wait_for_documents(db_name, doc_ids)
+    except TimeoutError as e:
         status = await link_owner.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
-
-
-async def _wait_for_caching_feed(sg: SyncGateway, db_name: str) -> None:
-    """
-    Forces a request_plus changes-feed round trip against `sg`, blocking until its channel cache has caught up to
-    the latest sequence it has allocated. wait_for_document_count only confirms a doc via `_all_docs`, which can be
-    satisfied before the channel cache -- what both an admin-scoped `_changes` call and a real BLIP pull actually
-    read from -- has indexed it, whether the doc arrived natively or via cross-node ISGR propagation. A `_changes`
-    call can ask for request_plus itself; a `Replicator` pull cannot, so anything about to run one against `sg`
-    needs this barrier first.
-    """
-    await sg.get_changes(db_name, request_plus=True, log_response=False)
 
 
 async def _pinned_pull(
@@ -184,131 +130,127 @@ async def _pinned_pull(
 @pytest.mark.min_load_balancers(2)
 @pytest.mark.min_clusters(3)
 class TestISGRLoadBalancer(CBLTestClass):
+    async def _skip_if_unsupported(self, cblpytest: CBLPyTest) -> None:
+        """
+        Skips on the JS test server, whose Websocket library cannot send the X-Backend header these tests pin with, and
+        on SGW versions without the ISGR channel-loss fix (CBG-5772 in 4.0.8, CBG-5773 in 4.1.2; 4.1.0.1 lacks it).
+        """
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_sgw_not(
+            cblpytest.clusters[1].sync_gateways[0],
+            "!=4.0.0,!=4.0.1,!=4.0.2,!=4.0.3,!=4.0.4,!=4.0.5,!=4.0.6,!=4.0.7,!=4.1.0.*,!=4.1.1",
+        )
+
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
-        # cannot send due to limitations of its Websocket library.
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self._skip_if_unsupported(cblpytest)
 
         db_name = "db_isgr_lb"
         channels = ["isgr_lb_test"]
         user_name, user_password = "isgr_lb_user", "pass"
 
         self.mark_test_step("Set up same-named DB + user on both SGWs, and a continuous bidirectional ISGR link")
-        async with _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password) as (sg1, sg2):
-            self.mark_test_step(
-                "Add one seed doc directly on SG1 (native), and wait for it to reach SG2 via ISGR and for the"
-                " channel cache to catch up on both backends"
-            )
-            await _write_native(
-                sg1,
-                sg2,
-                db_name,
-                [DocumentUpdateEntry(id="seed_doc", revision=None, body={"channels": channels})],
-            )
-            await _wait_for_propagation(sg1, sg2, db_name, 1, link_owner=sg1)
-            await _wait_for_caching_feed(sg1, db_name)
-            await _wait_for_caching_feed(sg2, db_name)
+        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+        self.mark_test_step(
+            "Add one seed doc directly on SG1 (native), and wait for SG1's changes feed to show it and for it"
+            " to reach SG2 via ISGR"
+        )
+        await sg1.update_documents(
+            db_name,
+            [DocumentUpdateEntry(id="seed_doc", revision=None, body={"channels": channels})],
+            wait_for_caching_feed=True,
+        )
+        await _wait_for_propagation(sg2, db_name, ["seed_doc"], link_owner=sg1)
 
-            self.mark_test_step("Create an empty local CBL database")
-            db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-            repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        self.mark_test_step("Create an empty local CBL database")
+        db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
-            async def pinned_pull(pin: dict[str, str], sg: SyncGateway) -> tuple[int, int]:
-                """
-                Runs one pinned pull and returns (docs transferred, `sg`'s own since-zero-pull-count delta).
-                The transfer count alone can't distinguish a genuine incremental continuation from a redundant
-                full resync that happens not to transfer anything new (the puller already holds an identical
-                revision for everything proposed either way) -- the since-zero delta is server-observed and
-                unaffected by that ambiguity, since it reflects whether `sg` served this pull from
-                `/_changes?since=0` regardless of what the puller already had.
-                """
-                before = await sg.get_pull_repl_since_zero_count(db_name)
-                replicator = await _pinned_pull(db, repl_url, user_name, user_password, pin)
-                after = await sg.get_pull_repl_since_zero_count(db_name)
-                return len(replicator.document_updates), after - before
+        async def pinned_pull(pin: dict[str, str], sg: SyncGateway) -> tuple[int, int]:
+            """
+            Runs one pinned pull and returns (docs transferred, `sg`'s own since-zero-pull-count delta).
+            The transfer count alone can't distinguish a genuine incremental continuation from a redundant
+            full resync that happens not to transfer anything new (the puller already holds an identical
+            revision for everything proposed either way) -- the since-zero delta is server-observed and
+            unaffected by that ambiguity, since it reflects whether `sg` served this pull from
+            `/_changes?since=0` regardless of what the puller already had.
+            """
+            before = await sg.get_pull_repl_since_zero_count(db_name)
+            replicator = await _pinned_pull(db, repl_url, user_name, user_password, pin)
+            after = await sg.get_pull_repl_since_zero_count(db_name)
+            return len(replicator.document_updates), after - before
 
-            self.mark_test_step(
-                "First-ever contact with SG1, then with SG2 -- expect a non-empty transfer and a since=0 proposal"
-                " on SG1; SG2 also gets a since=0 proposal, but its transfer count is not asserted"
-            )
+        self.mark_test_step(
+            "First-ever contact with SG1, then with SG2 -- expect a non-empty transfer and a since=0 proposal"
+            " on SG1; SG2 also gets a since=0 proposal, but its transfer count is not asserted"
+        )
+        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+        assert sg1_docs > 0, "Expected SG1's first-ever contact to transfer the seed doc"
+        assert sg1_since_zero == 1, "Expected SG1's first-ever contact to start from since=0"
+        _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+        assert sg2_since_zero == 1, "Expected SG2's first-ever contact to also start from since=0"
+
+        self.mark_test_step(
+            "Repeat against both already-known backends with no new writes -- expect zero transfer and no"
+            " since=0 proposal every time"
+        )
+        for _ in range(2):
             sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
-            assert sg1_docs > 0, "Expected SG1's first-ever contact to transfer the seed doc"
-            assert sg1_since_zero == 1, "Expected SG1's first-ever contact to start from since=0"
-            _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
-            assert sg2_since_zero == 1, "Expected SG2's first-ever contact to also start from since=0"
-
-            self.mark_test_step(
-                "Repeat against both already-known backends with no new writes -- expect zero transfer and no"
-                " since=0 proposal every time"
-            )
-            for _ in range(2):
-                sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
-                assert sg1_docs == 0, "Expected no redundant transfer on an already-known backend"
-                assert sg1_since_zero == 0, "Expected SG1 to continue incrementally, not restart from since=0"
-                sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
-                assert sg2_docs == 0, "Expected no redundant transfer on an already-known backend"
-                assert sg2_since_zero == 0, "Expected SG2 to continue incrementally, not restart from since=0"
-
-            self.mark_test_step(
-                "Add one more doc directly on SG1, and wait for it to reach SG2 via ISGR and for the channel cache"
-                " to catch up on both backends"
-            )
-            await _write_native(
-                sg1,
-                sg2,
-                db_name,
-                [DocumentUpdateEntry(id="second_doc", revision=None, body={"channels": channels})],
-            )
-            await _wait_for_propagation(sg1, sg2, db_name, 2, link_owner=sg1)
-            await _wait_for_caching_feed(sg1, db_name)
-            await _wait_for_caching_feed(sg2, db_name)
-
-            self.mark_test_step(
-                "Each backend's next contact after the new write: SG1, then SG2 -- expect a non-empty transfer on"
-                " SG1 only, and an incremental (not since=0) continuation on both"
-            )
-            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
-            assert sg1_docs > 0, "Expected SG1's next contact to transfer the new doc"
-            assert sg1_since_zero == 0, (
-                "Expected SG1's next contact to continue incrementally, not restart from since=0"
-            )
-            _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
-            assert sg2_since_zero == 0, (
-                "Expected SG2's next contact to continue incrementally, not restart from since=0"
-            )
-
-            self.mark_test_step(
-                "Repeat once more with no further writes -- expect zero transfer and no since=0 proposal again"
-            )
-            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
-            assert sg1_docs == 0, "Expected no redundant transfer after convergence"
-            assert sg1_since_zero == 0, "Expected SG1 to remain an incremental continuation after convergence"
+            assert sg1_docs == 0, "Expected no redundant transfer on an already-known backend"
+            assert sg1_since_zero == 0, "Expected SG1 to continue incrementally, not restart from since=0"
             sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
-            assert sg2_docs == 0, "Expected no redundant transfer after convergence"
-            assert sg2_since_zero == 0, "Expected SG2 to remain an incremental continuation after convergence"
+            assert sg2_docs == 0, "Expected no redundant transfer on an already-known backend"
+            assert sg2_since_zero == 0, "Expected SG2 to continue incrementally, not restart from since=0"
 
-            self.mark_test_step(
-                "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) agree on"
-                " the full document set"
-            )
-            await compare_local_and_remote(
-                db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-            )
-            await compare_local_and_remote(
-                db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-            )
+        self.mark_test_step(
+            "Add one more doc directly on SG1, and wait for SG1's changes feed to show it and for it to reach"
+            " SG2 via ISGR"
+        )
+        await sg1.update_documents(
+            db_name,
+            [DocumentUpdateEntry(id="second_doc", revision=None, body={"channels": channels})],
+            wait_for_caching_feed=True,
+        )
+        await _wait_for_propagation(sg2, db_name, ["second_doc"], link_owner=sg1)
 
-            self.mark_test_step("Verify the SG1-to-SG2 ISGR link itself is still healthy")
-            link_status = await sg1.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
-            assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
+        self.mark_test_step(
+            "Each backend's next contact after the new write: SG1, then SG2 -- expect a non-empty transfer on"
+            " SG1 only, and an incremental (not since=0) continuation on both"
+        )
+        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+        assert sg1_docs > 0, "Expected SG1's next contact to transfer the new doc"
+        assert sg1_since_zero == 0, "Expected SG1's next contact to continue incrementally, not restart from since=0"
+        _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+        assert sg2_since_zero == 0, "Expected SG2's next contact to continue incrementally, not restart from since=0"
+
+        self.mark_test_step(
+            "Repeat once more with no further writes -- expect zero transfer and no since=0 proposal again"
+        )
+        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1)
+        assert sg1_docs == 0, "Expected no redundant transfer after convergence"
+        assert sg1_since_zero == 0, "Expected SG1 to remain an incremental continuation after convergence"
+        sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2)
+        assert sg2_docs == 0, "Expected no redundant transfer after convergence"
+        assert sg2_since_zero == 0, "Expected SG2 to remain an incremental continuation after convergence"
+
+        self.mark_test_step(
+            "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) agree on"
+            " the full document set"
+        )
+        await compare_local_and_remote(
+            db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+        )
+        await compare_local_and_remote(
+            db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+        )
+
+        self.mark_test_step("Verify the SG1-to-SG2 ISGR link itself is still healthy")
+        link_status = await sg1.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
+        assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        # This test pins the replicator to one Sync Gateway with an X-Backend header, which the JS test server
-        # cannot send due to limitations of its Websocket library.
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
-        await self.skip_if_sgw_not(cblpytest.clusters[1].sync_gateways[0], ">=4.0.8,!=4.1.0.*,!=4.1.1.*")
+        await self._skip_if_unsupported(cblpytest)
 
         db_name = "db_isgr_lb_channels"
         channels = ["isgr_lb_channel_test"]
@@ -316,36 +258,30 @@ class TestISGRLoadBalancer(CBLTestClass):
         doc_id = "channel_set_doc"
 
         self.mark_test_step("Set up same-named DB + user on both SGWs, and a continuous bidirectional ISGR link")
-        async with _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password) as (sg1, sg2):
-            self.mark_test_step("Add one brand-new doc with an explicit channel assignment directly on SG2")
-            await _write_native(
-                sg2,
-                sg1,
-                db_name,
-                [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})],
-            )
+        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+        self.mark_test_step("Add one brand-new doc with an explicit channel assignment directly on SG2")
+        await sg2.update_documents(
+            db_name, [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})]
+        )
 
-            self.mark_test_step("Wait for the doc to reach SG1 via ISGR, and for SG1's channel cache to catch up")
-            await _wait_for_propagation(sg2, sg1, db_name, 1, link_owner=sg1)
-            await _wait_for_caching_feed(sg1, db_name)
+        self.mark_test_step("Wait for the doc to reach SG1 via ISGR")
+        await _wait_for_propagation(sg1, db_name, [doc_id], link_owner=sg1)
 
-            self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG1")
-            async with sg1.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
-                changes = await scoped_user.get_changes(db_name, request_plus=True)
-                doc_ids = {entry.id for entry in changes.results}
-                assert doc_id in doc_ids, (
-                    f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
-                )
+        self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG1")
+        async with sg1.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
+            changes = await scoped_user.get_changes(db_name, request_plus=True)
+            doc_ids = {entry.id for entry in changes.results}
+            assert doc_id in doc_ids, f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
 
-            self.mark_test_step(
-                "Pull the doc through a real CBL client pinned to SG1, and verify its channel assignment arrives intact"
-            )
-            db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-            repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
-            replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG1_PIN)
-            assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
+        self.mark_test_step(
+            "Pull the doc through a real CBL client pinned to SG1, and verify its channel assignment arrives intact"
+        )
+        db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG1_PIN)
+        assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
 
-            pulled = await db.get_document(DocumentEntry(_DEFAULT_COLLECTION, doc_id))
-            assert pulled.body.get("channels") == channels, (
-                f"Doc arrived at the CBL client with the wrong channel assignment: {pulled.body}"
-            )
+        pulled = await db.get_document(DocumentEntry(_DEFAULT_COLLECTION, doc_id))
+        assert pulled.body.get("channels") == channels, (
+            f"Doc arrived at the CBL client with the wrong channel assignment: {pulled.body}"
+        )
