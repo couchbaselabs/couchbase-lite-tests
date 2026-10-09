@@ -1,6 +1,16 @@
 def SGW_PRODUCT = "sync-gateway"          // dedup key: the thing under test
 def CBL_PRODUCT = "couchbase-lite-c"      // c_macos test-server client, passed through
 
+// Look up a version's build number via ProGet get_version. Returns "" when the
+// version has no published build yet (404 / non-JSON body) rather than throwing.
+def getBuildNumber(String product, String version) {
+    def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
+    return sh(
+        script: "curl -s '${url}' | python3 -c 'import json,sys; s=sys.stdin.read().strip(); print(json.loads(s).get(\"BuildNumber\",\"\") if s.startswith(\"{\") else \"\")'",
+        returnStdout: true
+    ).trim()
+}
+
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
 // build is looked up via ProGet get_version.
 //
@@ -15,11 +25,7 @@ def resolveVersionBuild(proget, String product, String param, String label, bool
         version = parts[0]
         buildNo = parts[1]
     } else {
-        def buildUrl = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
-        buildNo = sh(
-            script: "curl -sf '${buildUrl}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"BuildNumber\",\"\"))'",
-            returnStdout: true
-        ).trim()
+        buildNo = getBuildNumber(product, version)
     }
     if (!buildNo) { error "Could not resolve build number for ${product} ${version}" }
     return [version: version, build: buildNo]
