@@ -8,7 +8,7 @@ import time
 import zipfile
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Container, Sequence
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, TypeVar, cast
@@ -35,10 +35,11 @@ from couchbase.options import ClusterOptions, ClusterTimeoutOptions, MutateInOpt
 from opentelemetry.trace import get_tracer
 
 from cbltest import bucketpool
+from cbltest.api import caddy
 from cbltest.api.error import CblTestError
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.logging import cbl_info, cbl_warning
-from cbltest.shell2http import Shell2HttpClient
+from cbltest.shell2http import DEFAULT_SHELL2HTTP_TIMEOUT, Shell2HttpClient
 from cbltest.utils import async_retry_assert, retry_assert
 from cbltest.version import VERSION
 
@@ -153,6 +154,13 @@ class BucketPool:
             await self.__server.wait_for_bucket_deleted(oldest)
 
 
+# The collect-logs shell2http endpoint runs `timeout --kill-after=30 1200 cbcollect_info`, which builds the archive
+# itself: it is stopped at 1200s and killed by 1230s at the latest. After that the script copies the archive out of the
+# container and prints its JSON, steps with no time limit of their own; 1260s leaves them 30s. Not wrapped in
+# with-timeout.sh, so the ?timeout= this client sends is ignored on the host.
+_COLLECT_LOGS_TIMEOUT: float = 1260
+
+
 class CouchbaseServer:
     """
     A class that interacts with a Couchbase Server cluster
@@ -254,7 +262,7 @@ class CouchbaseServer:
                 f"http://{self.__hostname}:8091",
                 headers={"Authorization": encode_basic_auth(username, password, "ascii")},
             )
-            # The sidecar is a separate service, so it gets no Couchbase Server credentials
+            self.__caddy = caddy.Caddy(self.__hostname)
             self.__shell2http = Shell2HttpClient("Couchbase Server", self.__hostname)
 
             self.__cleanup_mode = cleanup_mode
@@ -275,9 +283,10 @@ class CouchbaseServer:
         return f"{type(self).__name__} {self.__hostname}:{self.__rest_port}"
 
     async def close(self) -> None:
-        """Closes the REST and shell2http sessions.  Safe to call more than once."""
+        """Closes the REST, shell2http and Caddy sessions.  Safe to call more than once."""
         await self.__session.close()
         await self.__shell2http.close()
+        await self.__caddy.close()
 
     async def __send_request(
         self, method: str, path: str, *, allowed_statuses: Container[int] = (), **kwargs: Any
@@ -1483,6 +1492,58 @@ class CouchbaseServer:
             data=json.dumps({"port": port}),
             content_type="application/json",
         )
+
+    async def _call_sidecar(
+        self, method: str, path: str, data: str | None = None, timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT
+    ) -> str:
+        """
+        Call a shell2http endpoint on this node's host, raising unless the script succeeded.
+
+        :param timeout: Total HTTP timeout in seconds, for endpoints whose server-side work
+            can legitimately run that long or longer. Left as the default for cheap
+            operations, so a hang there is still caught reasonably quickly.
+        :return: The response body
+        """
+        return await self.__shell2http.call(
+            method,
+            path,
+            data=data,
+            content_type="application/json" if data is not None else None,
+            timeout=timeout,
+        )
+
+    async def collect_logs(self, output_dir: Path) -> Path:
+        """
+        Runs cbcollect_info inside this node's Couchbase Server container via shell2http,
+        then downloads the resulting archive through this node's Caddy.
+
+        :param output_dir: Local directory to download the archive into
+        :return: Local path of the downloaded archive
+        :raises CblTestError: If the endpoint could not produce an archive
+        """
+        with self.__tracer.start_as_current_span("collect couchbase server logs"):
+            timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
+            safe_host = self.hostname.replace(".", "-").replace(":", "-")
+            filename = f"cbcollect-{safe_host}-{timestamp}.zip"
+
+            response = await self._call_sidecar(
+                "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
+            )
+            # The endpoint always exits 0 and reports failure through an "error" key in this body. A non-zero exit would
+            # make shell2http answer HTTP 500 with the script's stdout followed by "exec error: exit status N", and
+            # _call_sidecar would raise CblRemoteBadResponseError for it before this JSON could be parsed.
+            body = json.loads(response)
+            if error := body.get("error"):
+                raise CblTestError(
+                    f"cbcollect_info failed on {self}: {error} (rc={body.get('rc')}, stderr={body.get('stderr')})"
+                )
+            if warnings := body.get("warnings"):
+                cbl_info(f"Couchbase Server [{self.hostname}] cbcollect_info stderr (last 4 KiB): {warnings}")
+
+            # --log-redaction-level makes the endpoint produce (and report back) a redacted
+            # archive under a different name than the one requested -- see collect-logs.sh.
+            archive_name = body["file"]
+            return await self.__caddy.download(archive_name, output_dir / archive_name)
 
     async def get_root_ca_certificate(self) -> bytes:
         """

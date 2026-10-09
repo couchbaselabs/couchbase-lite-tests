@@ -47,13 +47,16 @@ pipeline {
                 TS_ARTIFACTS_DIR = 'sgw'
                 // pytest's graceful stop budget (seconds), applied by the timeout_fixture plugin via
                 // --session-timeout. Kept comfortably below the stage timeout below so pytest stops itself
-                // gracefully -- with a runway to finish junit/greenboard/sgcollect -- before Jenkins' hard SIGTERM.
+                // gracefully -- with a runway to finish junit/greenboard/sgcollect/cbcollect -- before Jenkins' hard
+                // SIGTERM. The sgcollect and cbcollect session fixtures tear down one after the other, not in parallel,
+                // so the runway must cover both: up to ~8.5m of sgcollect polling plus up to 21m for cbcollect (the
+                // 1260s _COLLECT_LOGS_TIMEOUT in couchbaseserver.py), plus archive downloads.
                 CBL_PYTEST_SESSION_TIMEOUT = '9000'
             }
             steps {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
-                timeout(time: 180, unit: 'MINUTES') {
+                timeout(time: 210, unit: 'MINUTES') {
                     sh "jenkins/pipelines/QE/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --dataset-version '${env.TS_DATASET_VERSION}' --test-filter '${env.TS_TEST_FILTER}'"
                 }
             }

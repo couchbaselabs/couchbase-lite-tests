@@ -51,6 +51,10 @@ function move_artifacts() {
   # build's archive.
   rm -f "$dst_dir"/*-sgcollectinfo-*.zip
   mv "$src_dir"/*-sgcollectinfo-*.zip "$dst_dir/" 2>/dev/null || true
+  # Same reasoning, for the CBS diagnostics downloaded by run_cbcollects() (see
+  # CouchbaseServer.collect_logs() in cbltest). Files are named "cbcollect-<safe_host>-*.zip".
+  rm -f "$dst_dir"/cbcollect-*.zip
+  mv "$src_dir"/cbcollect-*.zip "$dst_dir/" 2>/dev/null || true
 }
 
 find_dir() {

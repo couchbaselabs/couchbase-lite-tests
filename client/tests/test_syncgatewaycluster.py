@@ -1,9 +1,11 @@
 from collections.abc import Awaitable, Callable
 
 import pytest
+from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
-from conftest import fake_sync_gateways
+from cbltest.globals import CBLPyTestGlobal
+from conftest import fake_sync_gateways, set_using_rosmar
 
 
 def test_round_robin_node_cycles_through_all_nodes() -> None:
@@ -102,6 +104,96 @@ async def test_update_database_config_brings_every_node_online(monkeypatch: pyte
     assert sorted(calls[3:]) == [("_wait_for_db_state_online", i) for i in range(2)]
 
     assert awaited_sentinels == [_SENTINEL] * 2
+
+
+class TestCbcollectNeededOnDatabaseTimeout:
+    """create_database sets CBLPyTestGlobal.cbcollect_needed only for a TimeoutError from
+    the PUT phase, and only when the cluster isn't using Rosmar. Lives here, not in
+    test_cluster.py, since the trigger must fire for every caller of this bundled method,
+    not just CouchbaseCluster's own call site."""
+
+    def teardown_method(self) -> None:
+        CBLPyTestGlobal.cbcollect_needed = False
+
+    @pytest.mark.asyncio
+    async def test_sets_flag_on_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        with fake_sync_gateways(1) as sync_gateways:
+            set_using_rosmar(sync_gateways[0], False)
+            cluster = SyncGatewayCluster(sync_gateways)
+
+            async def _raise(db_name: str, config: DatabaseConfig) -> None:
+                raise TimeoutError()
+
+            monkeypatch.setattr(sync_gateways[0], "_put_database", _raise)
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is True, "a timeout with a real CBS present must flag for collection"
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_on_a_different_error(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        with fake_sync_gateways(1) as sync_gateways:
+            set_using_rosmar(sync_gateways[0], False)
+            cluster = SyncGatewayCluster(sync_gateways)
+
+            async def _raise(db_name: str, config: DatabaseConfig) -> None:
+                raise CblTestError("some unrelated failure")
+
+            monkeypatch.setattr(sync_gateways[0], "_put_database", _raise)
+
+            with pytest.raises(CblTestError, match="some unrelated failure"):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, (
+            "this must stay narrow to the PUT-timeout signature, not any create_database failure"
+        )
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_on_post_put_timeout(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """A timeout from _wait_for_db_state_online -- after the PUT and config propagation
+        already succeeded -- must not trigger cbcollect; only a stuck PUT itself is this
+        signature."""
+        with fake_sync_gateways(1) as sync_gateways:
+            set_using_rosmar(sync_gateways[0], False)
+            cluster = SyncGatewayCluster(sync_gateways)
+
+            async def _put_ok(db_name: str, config: DatabaseConfig) -> str:
+                return _SENTINEL
+
+            async def _config_ok(db_name: str, sentinel: str) -> None:
+                return None
+
+            async def _wait_times_out(db_name: str) -> None:
+                raise TimeoutError()
+
+            monkeypatch.setattr(sync_gateways[0], "_put_database", _put_ok)
+            monkeypatch.setattr(sync_gateways[0], "_wait_for_database_config", _config_ok)
+            monkeypatch.setattr(sync_gateways[0], "_wait_for_db_state_online", _wait_times_out)
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, (
+            "a timeout after the PUT already succeeded is not this signature"
+        )
+
+    @pytest.mark.asyncio
+    async def test_does_not_set_flag_when_using_rosmar(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Rosmar has no indexer to stall, so a PUT timeout must not flag for collection."""
+        with fake_sync_gateways(1) as sync_gateways:
+            set_using_rosmar(sync_gateways[0], True)
+            cluster = SyncGatewayCluster(sync_gateways)
+
+            async def _raise(db_name: str, config: DatabaseConfig) -> None:
+                raise TimeoutError()
+
+            monkeypatch.setattr(sync_gateways[0], "_put_database", _raise)
+
+            with pytest.raises(TimeoutError):
+                await cluster.create_database("db", DatabaseConfig(bucket="a-bucket"))
+
+        assert CBLPyTestGlobal.cbcollect_needed is False, "Rosmar has no indexer to stall"
 
 
 @pytest.mark.asyncio

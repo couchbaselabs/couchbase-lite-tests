@@ -66,6 +66,7 @@ def make_server(mode: BucketCleanupMode, monkeypatch: pytest.MonkeyPatch) -> tup
     with (
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
         patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+        patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.couchbaseserver.Shell2HttpClient", autospec=True),
     ):
         server = CouchbaseServer("cbs.example.com", "user", "pass", mode)

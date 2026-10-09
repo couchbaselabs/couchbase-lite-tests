@@ -3,6 +3,7 @@ import random
 from collections.abc import Sequence
 
 from cbltest.api.syncgateway import DatabaseConfig, SyncGateway
+from cbltest.globals import CBLPyTestGlobal
 
 
 class SyncGatewayCluster:
@@ -90,7 +91,12 @@ class SyncGatewayCluster:
         :param db_name: The name of the database to create
         :param config: The configuration of the database to create
         """
-        sentinel = await self.random_node._put_database(db_name, config)
+        try:
+            sentinel = await self.random_node._put_database(db_name, config)
+        except TimeoutError:
+            if not await self.sync_gateways[0].using_rosmar:
+                CBLPyTestGlobal.cbcollect_needed = True
+            raise
         await self._wait_for_database_config(db_name, sentinel)
         await self._wait_for_db_state_online(db_name)
 
