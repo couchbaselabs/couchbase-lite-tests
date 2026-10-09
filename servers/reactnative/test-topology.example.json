@@ -1,0 +1,20 @@
+{
+  "clusters": [
+    {
+      "server_count": 1
+    }
+  ],
+  "sync_gateways": [
+    {
+      "cluster": 0
+    }
+  ],
+  "test_servers": [
+    {
+      "location": "local",
+      "platform": "reactnative",
+      "cbl_version": "3.3.0"
+    }
+  ],
+  "logslurp": true
+}
