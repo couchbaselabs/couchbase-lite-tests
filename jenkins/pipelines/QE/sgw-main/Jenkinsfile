@@ -12,7 +12,10 @@ def getBuildNumber(String product, String version) {
 }
 
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
-// build is looked up via ProGet get_version.
+// build is looked up via ProGet get_version. Returns null when the train's latest
+// version has no published build yet (a normal new-train state right after a
+// manifest version bump, since the previous patch is frozen and can no longer be
+// built) so the caller can skip it quietly; genuine failures still throw.
 //
 // `includePrerelease` is true for the product under test (SGW, where a nightly must
 // pick up the newest build) and false for the CBL client, which is held at GA so that
@@ -27,7 +30,7 @@ def resolveVersionBuild(proget, String product, String param, String label, bool
     } else {
         buildNo = getBuildNumber(product, version)
     }
-    if (!buildNo) { error "Could not resolve build number for ${product} ${version}" }
+    if (!buildNo) { return null }  // no published build for this train yet
     return [version: version, build: buildNo]
 }
 
@@ -72,6 +75,9 @@ pipeline {
                     // The CBL client is shared across all SGW trains, and is pinned to the
                     // latest GA build -- never a prerelease -- so it stays a fixed control.
                     def cbl = resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION', false)
+                    // Unlike a train, the client has no fallback: without it there is
+                    // nothing to run the suite with, so an unresolved CBL is fatal.
+                    if (cbl == null) { error "Could not resolve a published build for ${CBL_PRODUCT}" }
                     def cblFull = "${cbl.version}-${cbl.build}"
                     echo "CBL (client): ${cblFull}"
                     echo "FORCE: ${params.FORCE_TRIGGER}"
@@ -111,6 +117,12 @@ pipeline {
                         } catch (Exception e) {
                             echo "WARN: Could not resolve SGW train ${train}: ${e}"
                             failed << train
+                            continue
+                        }
+                        if (sgw == null) {
+                            // No published build yet (new train) — normal, not a failure.
+                            echo "SKIP: SGW train ${train} — no published build yet"
+                            skipped << "${train} (no build)"
                             continue
                         }
                         def sgwFull = "${sgw.version}-${sgw.build}"
