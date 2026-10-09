@@ -2528,6 +2528,25 @@ class SyncGateway(_SyncGatewayBase):
         expvars = cast(dict, resp_data)
         return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_pull"]["num_pull_repl_since_zero"]
 
+    async def get_push_propose_change_count(self, db_name: str) -> int:
+        """
+        Gets this node's cbl_replication_push propose_change_count expvar for the given database: a cumulative count of
+        the documents proposed to this node in changes/proposeChanges messages, including ones it already holds. Push
+        has no counterpart to num_pull_repl_since_zero, so this is the push-side checkpoint signal: a pusher that lost
+        its checkpoint proposes every local document again, while an incremental push with nothing new proposes none. A
+        client-observed transfer count cannot tell those apart when the node already holds every document.
+
+        .. note:: The stat belongs to the passive replication endpoint, which also serves the passive side of an ISGR
+            link, so the active side's push leg raises it too. The active side of a link keeps separate ISGR stats, so
+            its own count covers CBL clients only.
+
+        :param db_name: The database to read the stat for
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_push"]["propose_change_count"]
+
     async def reset_user(
         self,
         db_name: str,
