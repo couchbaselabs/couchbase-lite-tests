@@ -3,8 +3,12 @@ def CBL_PRODUCT = "couchbase-lite-c"      // c_macos test-server client, passed 
 
 // A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
 // build is looked up via ProGet get_version.
-def resolveVersionBuild(proget, String product, String param, String label) {
-    def version = proget.resolveProgetVersion(product, param, label)
+//
+// `includePrerelease` is true for the product under test (SGW, where a nightly must
+// pick up the newest build) and false for the CBL client, which is held at GA so that
+// a red run is attributable to SGW rather than to an unshipped CBL change.
+def resolveVersionBuild(proget, String product, String param, String label, boolean includePrerelease) {
+    def version = proget.resolveProgetVersion(product, param, label, includePrerelease)
     def buildNo
     if (version.contains('-')) {
         def parts = version.split('-', 2)
@@ -40,7 +44,7 @@ pipeline {
     }
     parameters {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or train (e.g. 4.2.0 or 4.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0). Leave blank to auto-resolve the latest prerelease via ProGet. The build number is resolved automatically.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0). Leave blank to auto-resolve the latest GA release via ProGet (prereleases are deliberately excluded so the client stays a fixed control). The build number is resolved automatically.')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the SGW test job even if this SGW version+build already ran')
     }
     options {
@@ -59,8 +63,9 @@ pipeline {
                 script {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
 
-                    // The CBL client is shared across all SGW trains.
-                    def cbl = resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION')
+                    // The CBL client is shared across all SGW trains, and is pinned to the
+                    // latest GA build -- never a prerelease -- so it stays a fixed control.
+                    def cbl = resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION', false)
                     def cblFull = "${cbl.version}-${cbl.build}"
                     echo "CBL (client): ${cblFull}"
                     echo "FORCE: ${params.FORCE_TRIGGER}"
@@ -96,7 +101,7 @@ pipeline {
                     for (train in trains) {
                         def sgw
                         try {
-                            sgw = resolveVersionBuild(proget, SGW_PRODUCT, train, 'SGW_VERSION')
+                            sgw = resolveVersionBuild(proget, SGW_PRODUCT, train, 'SGW_VERSION', true)
                         } catch (Exception e) {
                             echo "WARN: Could not resolve SGW train ${train}: ${e}"
                             failed << train
