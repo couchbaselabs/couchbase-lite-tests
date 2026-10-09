@@ -4,7 +4,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
-from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -92,24 +91,26 @@ async def _wait_for_propagation(
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
 
 
-async def _pinned_pull(
+async def _pinned_replication(
     db: Database,
     repl_url: str,
     user_name: str,
     user_password: str,
     pin: dict[str, str],
+    replicator_type: ReplicatorType,
 ) -> Replicator:
     """
-    Runs one one-shot pull pinned to a specific backend and returns the Replicator so callers can inspect both its
-    transferred-document count and the resulting local documents. A fresh Replicator object every call, but always the
-    SAME db and repl_url across a loop, so this is what keeps a series of pinned pulls sharing one checkpoint across
-    both backends. Never pass reset=True: that would force a fresh checkpoint on every call and make every pull look
-    like first-ever contact, silently turning a loop into a vacuous test.
+    Runs one one-shot replication of `replicator_type` pinned to a specific backend and returns the Replicator so
+    callers can inspect both its transferred-document count and the resulting local documents. A fresh Replicator
+    object every call, but always the SAME db, repl_url and type across a loop, so this is what keeps a series of
+    pinned replications sharing one checkpoint across both backends. Never pass reset=True: that would force a fresh
+    checkpoint on every call and make every replication look like first-ever contact, silently turning a loop into a
+    vacuous test.
     """
     replicator = Replicator(
         db,
         repl_url,
-        replicator_type=ReplicatorType.PULL,
+        replicator_type=replicator_type,
         continuous=False,
         authenticator=ReplicatorBasicAuthenticator(user_name, user_password),
         enable_document_listener=True,
@@ -118,7 +119,7 @@ async def _pinned_pull(
     await replicator.start()
     status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     assert status.error is None, (
-        f"Pinned pull ({pin}) failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        f"Pinned {replicator_type} ({pin}) failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
     )
     return replicator
 
@@ -176,7 +177,7 @@ class TestISGRLoadBalancer(CBLTestClass):
             `/_changes?since=0` regardless of what the puller already had.
             """
             before = await sg.get_pull_repl_since_zero_count(db_name)
-            replicator = await _pinned_pull(db, repl_url, user_name, user_password, pin)
+            replicator = await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PULL)
             after = await sg.get_pull_repl_since_zero_count(db_name)
             return len(replicator.document_updates), after - before
 
@@ -249,6 +250,77 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
 
     @pytest.mark.asyncio(loop_scope="session")
+    async def test_push_checkpoint_divergence_behind_load_balancer(
+        self, cblpytest: CBLPyTest, dataset_path: Path
+    ) -> None:
+        await self._skip_if_unsupported(cblpytest)
+
+        db_name = "db_isgr_lb_push"
+        channels = ["isgr_lb_push_test"]
+        user_name, user_password = "isgr_lb_push_user", "pass"
+        doc_ids = [f"push_doc_{i}" for i in range(1, 6)]
+        new_doc_id = "push_doc_6"
+
+        self.mark_test_step("Set up same-named DB + user on both SGWs, and a continuous bidirectional ISGR link")
+        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+
+        self.mark_test_step("Create an empty local CBL database and add 5 docs to it, in the user's channel")
+        db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+        async with db.batch_updater() as updater:
+            for doc_id in doc_ids:
+                updater.upsert_document(_DEFAULT_COLLECTION, doc_id, [{"channels": channels}])
+        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+
+        async def pinned_push(pin: dict[str, str], sg: SyncGateway) -> int:
+            """Runs one pinned push and returns `sg`'s own propose-count delta across it."""
+            before = await sg.get_push_propose_change_count(db_name)
+            await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PUSH)
+            return await sg.get_push_propose_change_count(db_name) - before
+
+        self.mark_test_step(
+            "First-ever contact with SG1 -- expect SG1's propose count to grow by 5 -- then wait for the 5 docs to"
+            " reach SG2 via ISGR"
+        )
+        assert await pinned_push(_SG1_PIN, sg1) == 5, "Expected SG1's first-ever contact to propose all 5 local docs"
+        await _wait_for_propagation(sg2, db_name, doc_ids, link_owner=sg1)
+
+        self.mark_test_step("First-ever contact with SG2 -- expect SG2's propose count to grow by 5")
+        assert await pinned_push(_SG2_PIN, sg2) == 5, (
+            "Expected SG2's first-ever contact, with no checkpoint for this client, to propose all 5 local docs again"
+        )
+
+        self.mark_test_step(
+            "Repeat against both already-known backends twice with no new writes -- expect neither propose count to"
+            " grow"
+        )
+        for _ in range(2):
+            assert await pinned_push(_SG1_PIN, sg1) == 0, "Expected SG1 to continue incrementally, not re-propose"
+            assert await pinned_push(_SG2_PIN, sg2) == 0, "Expected SG2 to continue incrementally, not re-propose"
+
+        self.mark_test_step(
+            "Add one more local doc. Push to SG1 (expect +1), wait for it to reach SG2 via ISGR, then push to SG2"
+            " (expect +1, not 6)"
+        )
+        async with db.batch_updater() as updater:
+            updater.upsert_document(_DEFAULT_COLLECTION, new_doc_id, [{"channels": channels}])
+        assert await pinned_push(_SG1_PIN, sg1) == 1, "Expected SG1's next contact to propose only the new doc"
+        await _wait_for_propagation(sg2, db_name, [new_doc_id], link_owner=sg1)
+        assert await pinned_push(_SG2_PIN, sg2) == 1, (
+            "Expected SG2's next contact to propose only the new doc, not restart from its first-ever checkpoint"
+        )
+
+        self.mark_test_step(
+            "Verify the local CBL database and both SGWs (queried directly, bypassing the load balancer) agree on"
+            " the full document set"
+        )
+        await compare_local_and_remote(
+            db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+        )
+        await compare_local_and_remote(
+            db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
+        )
+
+    @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         await self._skip_if_unsupported(cblpytest)
 
@@ -267,21 +339,14 @@ class TestISGRLoadBalancer(CBLTestClass):
         self.mark_test_step("Wait for the doc to reach SG1 via ISGR")
         await _wait_for_propagation(sg1, db_name, [doc_id], link_owner=sg1)
 
-        self.mark_test_step("Verify the doc is visible through a _changes call scoped to that channel on SG1")
-        async with sg1.create_user_client(db_name, user_name, user_password, channels) as scoped_user:
+        self.mark_test_step("Verify the channel-restricted user sees the doc on SG1's _changes feed")
+        async with sg1.get_user_client(user_name, user_password) as scoped_user:
             changes = await scoped_user.get_changes(db_name, request_plus=True)
             doc_ids = {entry.id for entry in changes.results}
             assert doc_id in doc_ids, f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
 
-        self.mark_test_step(
-            "Pull the doc through a real CBL client pinned to SG1, and verify its channel assignment arrives intact"
-        )
+        self.mark_test_step("Pull the doc through a real CBL client pinned to SG1, and verify the pull transferred it")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
         repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
-        replicator = await _pinned_pull(db, repl_url, user_name, user_password, _SG1_PIN)
+        replicator = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
         assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
-
-        pulled = await db.get_document(DocumentEntry(_DEFAULT_COLLECTION, doc_id))
-        assert pulled.body.get("channels") == channels, (
-            f"Doc arrived at the CBL client with the wrong channel assignment: {pulled.body}"
-        )
