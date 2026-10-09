@@ -79,6 +79,41 @@ both backends via the `X-Backend` pinning the load balancer already supports. Sk
     losing a document would be caught
 11. Verify the SG1-to-SG2 ISGR link itself is still healthy (no error status)
 
+## test_push_checkpoint_divergence_behind_load_balancer
+
+The push counterpart of `test_checkpoint_divergence_behind_load_balancer`. CBL stores its push checkpoint on the Sync
+Gateway backend as well, so a push through the load balancer meets the same per-backend checkpoint: a backend contacted
+for the first time has no record of it and gets every local document proposed again. Skipped on the same Sync Gateway
+versions, for the same reason.
+
+Push has no counterpart to `num_pull_repl_since_zero`. The signal is each backend's own
+`cbl_replication_push.propose_change_count` expvar (via `SyncGateway.get_push_propose_change_count()`), which grows by
+the number of documents in every changes/proposeChanges message the backend receives, including documents it already
+holds. A push that lost its checkpoint re-proposes all local documents; an incremental push with nothing new proposes
+none. As with the pull stat, a before/after delta around each pinned push isolates that one call.
+
+That stat belongs to Sync Gateway's passive replication endpoint, which also serves the passive side of an ISGR link.
+SG1 is the active side, so the link's push leg proposes to SG2 on that same endpoint and raises SG2's count whenever it
+copies documents from SG1 to SG2. SG1's own count is unaffected, since the active side keeps separate ISGR stats. So
+every push to SG1 is followed by a wait for its documents to reach SG2 before SG2's "before" value is read.
+
+1. Create a same-named database on both SG1 and SG2 (separate buckets), and a matching user on both
+2. Start a continuous, bidirectional ISGR link from SG1 to SG2
+3. Create an empty local CBL database and add 5 documents to it, in a channel the user can access
+4. Push once pinned to SG1 (`X-Backend: sg-0`) -- first-ever contact with SG1, expect SG1's propose count to grow by
+   5. Then wait for the 5 document IDs to reach SG2 via ISGR. A propagation timeout attaches the SG1-to-SG2 ISGR
+   link's own status to the failure
+5. Push once pinned to SG2 (`X-Backend: sg-1`) -- first-ever contact with SG2, which has no checkpoint for this
+   client, expect SG2's propose count to grow by 5 (every local document proposed again, though SG2 already holds them
+   all via ISGR and writes nothing new)
+6. Repeat the SG1 / SG2 pinned pushes twice with no new writes in between -- expect each backend's propose count not
+   to grow
+7. Add one more document to the local database. Push once pinned to SG1 -- expect SG1's propose count to grow by 1.
+   Wait for the document to reach SG2 via ISGR, as in step 4. Push once pinned to SG2 -- expect SG2's propose count to
+   grow by 1, not 6: the checkpoint SG2 has held since step 5 lets it continue rather than restart
+8. Verify the local CBL database and both SG1 and SG2 (queried directly, bypassing the load balancer) all agree on the
+   full document set
+
 ## test_isgr_pull_preserves_channel_set
 
 Regression test for a fixed bug (SGW 4.0.0-4.0.7, 4.1.0-4.1.1, including 4.1.0.1): an ISGR pull of
@@ -96,8 +131,8 @@ document invisible on that side's `_changes` feed with no error raised anywhere.
 4. Wait for the document ID to appear on SG1's changes feed via ISGR. A propagation timeout
    attaches the SG1-to-SG2 ISGR link's own status to the failure, so a broken link surfaces
    directly instead of a bare timeout
-5. Verify the document is visible through a `request_plus`-consistent `_changes` call scoped to
-   that channel on SG1
-6. Pull the document through a real CBL client pinned to SG1 (`X-Backend: sg-0`), and verify the
-   pull actually transferred it
-7. Verify the document's channel assignment arrived intact at the CBL client
+5. Verify the channel-restricted user sees the document on SG1's `request_plus`-consistent
+   `_changes` feed -- only possible if SG1 computed and stored the document's channel, which is
+   what the bug lost
+6. Pull the document through a real CBL client pinned to SG1 (`X-Backend: sg-0`) as that user, and
+   verify the pull actually transferred it
