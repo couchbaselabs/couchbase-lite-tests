@@ -12,7 +12,9 @@ document a backend proposes. Each pinned replication is instead judged by a Sync
 it: `num_pull_repl_since_zero` for a pull, `propose_change_count` for a push. Two more checks make sure a change in that
 counter came from CBL:
 
-- SG1's ISGR connect-attempt count must not change, since an ISGR reconnect can move the same counters.
+- SG1's ISGR connect-attempt count must not change, since an ISGR reconnect can move the same counters. For the same
+  reason, setup returns only after a channel-less document has crossed the link in each direction, so both ISGR legs
+  have made their first connection before anything is measured.
 - The backend that was not pinned must not move, so a wrong `sg-0`/`sg-1` order fails as a pin-mapping error.
 
 ## test_checkpoint_divergence_behind_load_balancer
@@ -23,7 +25,7 @@ again. Skipped on SGW 4.0.0-4.0.7 and 4.1.0-4.1.1 (including 4.1.0.1): the ISGR 
 from since=0.
 
 1. Create a same-named database and user on SG1 and SG2 (separate clusters, with `sgr_tls_skip_verify` because both use
-   the harness's private CA), and start the ISGR link
+   the harness's private CA), start the ISGR link, and wait for a channel-less document to cross it each way
 2. Add a seed document on SG1 and wait for its ID on SG2's changes feed. A timeout reports the ISGR link's status
 3. Create an empty local database
 4. Pull pinned to SG1, then to SG2, the first contact with each. Expect SG1 to transfer documents and both since-zero
@@ -33,7 +35,8 @@ from since=0.
 6. Add a document on SG1 and wait for it on SG2, as in step 2
 7. Pull pinned to SG1, then to SG2. Expect SG1 to transfer the new document and neither since-zero count to grow
 8. Pull pinned to SG1 then SG2 once more. Expect no transfer and no since-zero growth
-9. Verify the local database matches SG1 and SG2 exactly, reading both directly rather than through the load balancer
+9. Verify the local database matches SG1 and SG2 exactly for the test's documents, reading both directly rather than
+   through the load balancer
 10. Verify the ISGR link is not in an error state
 
 ## test_push_checkpoint_divergence_behind_load_balancer
@@ -51,17 +54,18 @@ is still caught there, because SG1 would read 0 instead of 5 on the first push.
 4. Push pinned to SG2, the first contact: expect SG2's propose count to grow by 5, though SG2 already holds them all
 5. Twice, push pinned to SG1 then SG2 with no new writes. Expect neither propose count to grow
 6. Add a local document. Push pinned to SG1 (expect +1), wait for it on SG2, then push pinned to SG2 (expect +1, not 6)
-7. Verify the local database matches SG1 and SG2 exactly
+7. Verify the local database matches SG1 and SG2 exactly for the test's documents
 
 ## test_isgr_pull_preserves_channel_set
 
 Regression test for a bug fixed in SGW 4.0.8 and 4.1.2: an ISGR pull of a new document could leave its
 `_sync.channel_set` null on the receiving side, hiding the document from that side's `_changes` feed with no error.
-Skipped on the affected versions (4.0.0-4.0.7, 4.1.0-4.1.1, including 4.1.0.1).
+Skipped on the affected versions (4.0.0-4.0.7, 4.1.0-4.1.1, including 4.1.0.1). It pulls from SG1 directly, not through
+the load balancer, so it also runs on the JS test server.
 
 1. Create the database, user and ISGR link as in the first test
 2. Add a new document with a channel on SG2, so it reaches SG1 through SG1's ISGR pull, the direction the bug affects
 3. Wait for its ID on SG1's changes feed. A timeout reports the ISGR link's status
 4. Verify the channel-restricted user sees it on SG1's `request_plus` `_changes` feed, which needs the channel the bug
    lost
-5. Pull it through CBL pinned to SG1 as that user, and verify the pull transferred it
+5. Pull it through CBL directly from SG1 as that user, and verify the pull transferred it

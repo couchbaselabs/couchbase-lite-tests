@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -36,7 +34,8 @@ async def _setup_isgr_pair(
 ) -> tuple[SyncGateway, SyncGateway]:
     """
     Gives a test two independent backends, SG1 and SG2, with the same database and user, kept in sync by ISGR. Each
-    lives in its own cluster because `create_database` applies one config to every node of a cluster.
+    lives in its own cluster because `create_database` applies one config to every node of a cluster. Returns only once
+    both ISGR legs are up, since each leg moves the counters the tests measure when it first connects.
     """
     cluster1, cluster2 = cblpytest.clusters[1], cblpytest.clusters[2]
     sg1, sg2 = cluster1.sync_gateways[0], cluster2.sync_gateways[0]
@@ -69,6 +68,10 @@ async def _setup_isgr_pair(
             remote_password="password",
         ),
     )
+    # Channel-less, so no CBL user ever replicates them.
+    for writer, reader, doc_id in ((sg1, sg2, "isgr_push_leg_up"), (sg2, sg1, "isgr_pull_leg_up")):
+        await writer.update_documents(db_name, [DocumentUpdateEntry(id=doc_id, revision=None, body={})])
+        await _wait_for_propagation(reader, db_name, [doc_id], link_owner=sg1)
     return sg1, sg2
 
 
@@ -131,20 +134,21 @@ async def _pinned_replication(
 @pytest.mark.min_load_balancers(2)
 @pytest.mark.min_clusters(3)
 class TestISGRLoadBalancer(CBLTestClass):
-    async def _skip_if_unsupported(self, cblpytest: CBLPyTest) -> None:
-        """
-        Skips where these tests can't give a meaningful result: the JS test server can't send the X-Backend pin header,
-        and SGW without the ISGR channel-loss fix (CBG-5772 in 4.0.8, CBG-5773 in 4.1.2; 4.1.0.1 lacks it) fails them.
-        """
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+    async def _skip_if_unfixed_sgw(self, cblpytest: CBLPyTest) -> None:
+        """Skips SGW without the ISGR channel-loss fix (CBG-5772 in 4.0.8, CBG-5773 in 4.1.2; 4.1.0.1 lacks it)."""
         await self.skip_if_sgw_not(
             cblpytest.clusters[1].sync_gateways[0],
             "!=4.0.0,!=4.0.1,!=4.0.2,!=4.0.3,!=4.0.4,!=4.0.5,!=4.0.6,!=4.0.7,!=4.1.0.*,!=4.1.1",
         )
 
+    async def _skip_if_unpinnable(self, cblpytest: CBLPyTest) -> None:
+        """Skips the JS test server, which can't send the X-Backend pin header, and SGW without the channel-loss fix."""
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self._skip_if_unfixed_sgw(cblpytest)
+
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self._skip_if_unsupported(cblpytest)
+    async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
+        await self._skip_if_unpinnable(cblpytest)
 
         db_name = "db_isgr_lb"
         channels = ["isgr_lb_test"]
@@ -218,22 +222,18 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert sg2_since_zero == 0, "Expected SG2 to continue, not restart from since=0"
 
         self.mark_test_step("Verify the local database matches SG1 and SG2 exactly")
-        await compare_local_and_remote(
-            db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-        )
-        await compare_local_and_remote(
-            db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-        )
+        for sg in (sg1, sg2):
+            await compare_local_and_remote(
+                db, sg, ReplicatorType.PUSH_AND_PULL, db_name, [_DEFAULT_COLLECTION], doc_ids=["seed_doc", "second_doc"]
+            )
 
         self.mark_test_step("Verify the ISGR link is not in an error state")
         link_status = await sg1.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_push_checkpoint_divergence_behind_load_balancer(
-        self, cblpytest: CBLPyTest, dataset_path: Path
-    ) -> None:
-        await self._skip_if_unsupported(cblpytest)
+    async def test_push_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
+        await self._skip_if_unpinnable(cblpytest)
 
         db_name = "db_isgr_lb_push"
         channels = ["isgr_lb_push_test"]
@@ -290,16 +290,14 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert await pinned_push(_SG2_PIN, sg2) == 1, "Expected SG2 to propose only the new doc, not restart"
 
         self.mark_test_step("Verify the local database matches SG1 and SG2 exactly")
-        await compare_local_and_remote(
-            db, sg1, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-        )
-        await compare_local_and_remote(
-            db, sg2, ReplicatorType.PUSH_AND_PULL, bucket=db_name, collections=[_DEFAULT_COLLECTION]
-        )
+        for sg in (sg1, sg2):
+            await compare_local_and_remote(
+                db, sg, ReplicatorType.PUSH_AND_PULL, db_name, [_DEFAULT_COLLECTION], doc_ids=[*doc_ids, new_doc_id]
+            )
 
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self._skip_if_unsupported(cblpytest)
+    async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest) -> None:
+        await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb_channels"
         channels = ["isgr_lb_channel_test"]
@@ -322,8 +320,19 @@ class TestISGRLoadBalancer(CBLTestClass):
             doc_ids = {entry.id for entry in changes.results}
             assert doc_id in doc_ids, f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
 
-        self.mark_test_step("Pull the doc through CBL pinned to SG1, and verify it transferred")
+        self.mark_test_step("Pull the doc through CBL directly from SG1, and verify it transferred")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
-        replicator = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
-        assert len(replicator.document_updates) > 0, "Expected the pull pinned to SG1 to transfer the doc"
+        replicator = Replicator(
+            db,
+            sg1.replication_url(db_name),
+            replicator_type=ReplicatorType.PULL,
+            continuous=False,
+            authenticator=ReplicatorBasicAuthenticator(user_name, user_password),
+            pinned_server_cert=sg1.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        assert status.error is None, f"Pull from SG1 failed: {status.error}"
+        pulled = {update.document_id for update in replicator.document_updates}
+        assert doc_id in pulled, f"Expected the pull from SG1 to transfer {doc_id}, got {pulled}"
