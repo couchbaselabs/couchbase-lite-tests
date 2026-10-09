@@ -2717,6 +2717,47 @@ class SyncGateway(_SyncGatewayBase):
         expvars = cast(dict, resp_data)
         return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
 
+    async def get_pull_repl_since_zero_count(self, db_name: str) -> int:
+        """
+        Gets this node's count of changes feeds that started from scratch (since=0) for the given database. It shows a
+        needless full resync even when the puller already holds every document and so transfers nothing. It is not
+        specific to CBL: ISGR's changes feeds and continuous REST `_changes` feeds add to it too.
+
+        :param db_name: The database to read the stat for
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_pull"]["num_pull_repl_since_zero"]
+
+    async def get_push_propose_change_count(self, db_name: str) -> int:
+        """
+        Gets this node's count of documents proposed to it by pushers for the given database, including ones it already
+        holds. It shows a pusher that lost its checkpoint, which proposes everything again but writes nothing new.
+
+        .. note:: ISGR pushes into its passive side through the same endpoint, so the count there includes ISGR's.
+
+        :param db_name: The database to read the stat for
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_push"]["propose_change_count"]
+
+    async def get_isgr_connect_attempts(self, db_name: str, replication_id: str) -> int:
+        """
+        Gets how many times this node, the replication's active side, has connected the given ISGR replication. An
+        unchanged value shows the link didn't drop and reconnect in between.
+
+        :param db_name: The database the replication runs on
+        :param replication_id: The ID of the replication
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        stats = expvars["syncgateway"]["per_db"][db_name]["replications"][replication_id]
+        return stats["sgr_num_connect_attempts_pull"] + stats["sgr_num_connect_attempts_push"]
+
     async def reset_user(
         self,
         db_name: str,
