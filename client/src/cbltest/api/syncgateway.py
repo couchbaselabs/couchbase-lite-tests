@@ -2719,13 +2719,8 @@ class SyncGateway(_SyncGatewayBase):
 
     async def get_pull_repl_since_zero_count(self, db_name: str) -> int:
         """
-        Gets this node's cbl_replication_pull num_pull_repl_since_zero expvar for the given database:
-        a cumulative counter of pull replications that started from `/_changes?since=0`, i.e. a
-        checkpoint-less, from-scratch proposal. Unlike a client-observed document-transfer count, this
-        is unaffected by the puller already holding an identical revision for every proposed document,
-        so it can distinguish a genuine incremental continuation (no increment) from a redundant full
-        resync that happens not to transfer anything new (an increment) -- the two look identical from
-        the transferred-document count alone.
+        Gets this node's count of pull replications that started from scratch (since=0) for the given database. It
+        shows a needless full resync even when the puller already holds every document and so transfers nothing.
 
         :param db_name: The database to read the stat for
         """
@@ -2736,15 +2731,10 @@ class SyncGateway(_SyncGatewayBase):
 
     async def get_push_propose_change_count(self, db_name: str) -> int:
         """
-        Gets this node's cbl_replication_push propose_change_count expvar for the given database: a cumulative count of
-        the documents proposed to this node in changes/proposeChanges messages, including ones it already holds. Push
-        has no counterpart to num_pull_repl_since_zero, so this is the push-side checkpoint signal: a pusher that lost
-        its checkpoint proposes every local document again, while an incremental push with nothing new proposes none. A
-        client-observed transfer count cannot tell those apart when the node already holds every document.
+        Gets this node's count of documents proposed to it by pushers for the given database, including ones it already
+        holds. It shows a pusher that lost its checkpoint, which proposes everything again but writes nothing new.
 
-        .. note:: The stat belongs to the passive replication endpoint, which also serves the passive side of an ISGR
-            link, so the active side's push leg raises it too. The active side of a link keeps separate ISGR stats, so
-            its own count covers CBL clients only.
+        .. note:: ISGR pushes into its passive side through the same endpoint, so the count there includes ISGR's.
 
         :param db_name: The database to read the stat for
         """
@@ -2752,6 +2742,20 @@ class SyncGateway(_SyncGatewayBase):
         assert isinstance(resp_data, dict)
         expvars = cast(dict, resp_data)
         return expvars["syncgateway"]["per_db"][db_name]["cbl_replication_push"]["propose_change_count"]
+
+    async def get_isgr_connect_attempts(self, db_name: str, replication_id: str) -> int:
+        """
+        Gets how many times this node, the replication's active side, has connected the given ISGR replication. An
+        unchanged value shows the link didn't drop and reconnect in between.
+
+        :param db_name: The database the replication runs on
+        :param replication_id: The ID of the replication
+        """
+        resp_data = await self._send_request("get", "/_expvar")
+        assert isinstance(resp_data, dict)
+        expvars = cast(dict, resp_data)
+        stats = expvars["syncgateway"]["per_db"][db_name]["replications"][replication_id]
+        return stats["sgr_num_connect_attempts_pull"] + stats["sgr_num_connect_attempts_push"]
 
     async def reset_user(
         self,
