@@ -2513,8 +2513,9 @@ class SyncGateway(_SyncGatewayBase):
 
     async def get_pull_repl_since_zero_count(self, db_name: str) -> int:
         """
-        Gets this node's count of pull replications that started from scratch (since=0) for the given database. It
-        shows a needless full resync even when the puller already holds every document and so transfers nothing.
+        Gets this node's count of changes feeds that started from scratch (since=0) for the given database. It shows a
+        needless full resync even when the puller already holds every document and so transfers nothing. It is not
+        specific to CBL: ISGR's changes feeds and continuous REST `_changes` feeds add to it too.
 
         :param db_name: The database to read the stat for
         """
