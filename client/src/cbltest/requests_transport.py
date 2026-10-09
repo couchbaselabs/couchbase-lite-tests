@@ -1,7 +1,8 @@
+import asyncio
 import json
 from abc import ABC, abstractmethod
 from typing import cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
 from aiohttp import ClientResponse
@@ -14,6 +15,11 @@ from cbltest.logging import cbl_trace, cbl_warning
 from cbltest.request_types import GetRootRequest, TestServerRequest, TestServerResponse
 from cbltest.responses import _response_registry, unwrap_ws_payload
 from cbltest.websocket_router import WebSocketRouter
+
+# Per-request timeout for native WS (ws://) test server responses.  Must be well below pytest's
+# --timeout=300 so a hung Android operation fails fast and leaves enough
+# time for the reconnect logic to relaunch the app before the next test.
+_WS_REQUEST_TIMEOUT_S = 90
 
 
 class RequestTransport(ABC):
@@ -99,6 +105,7 @@ class _RequestWebSocketTransport(RequestTransport):
     def __init__(self, url: str, ws_router: WebSocketRouter) -> None:
         self.__url = url
         self.__ws_router = ws_router
+        self.__is_native_ws = urlparse(url).scheme == "ws"
 
     async def send(self, request: TestServerRequest, message_no: int) -> TestServerResponse:
         if request.payload is not None:
@@ -118,10 +125,24 @@ class _RequestWebSocketTransport(RequestTransport):
         if CBLPyTestGlobal.running_test_name is not None:
             data["ts_testName"] = CBLPyTestGlobal.running_test_name
 
+        await self.__ws_router.ensure_connected(self.__url)
+
         future = self.__ws_router.register(message_no)
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
-        resp = await future
+        # Only native WebSocket test servers (ws:// URLs, e.g. React Native) get a
+        # per-request timeout; other WebSocket transports keep waiting as before.
+        timeout = _WS_REQUEST_TIMEOUT_S if self.__is_native_ws else None
+        try:
+            resp = await asyncio.wait_for(future, timeout=timeout)
+        except TimeoutError:
+            self.__ws_router.discard_pending(message_no)
+            self.__ws_router.begin_reconnect(self.__url)
+            raise ConnectionError(
+                f"Timed out after {_WS_REQUEST_TIMEOUT_S}s waiting for "
+                f"'{request.http_name}' response from {self.__url}; "
+                "forcing reconnect to clear stuck device state"
+            )
 
         resp_version = cast(int, resp.get("ts_apiVersion", 0))
         uuid = resp.get("ts_serverID")
