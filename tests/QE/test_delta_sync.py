@@ -16,12 +16,8 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway, get_basic_auth_headers
+from cbltest.api.syncgateway import DocumentUpdateEntry, get_basic_auth_headers
 from cbltest.api.test_functions import compare_local_and_remote
-
-
-async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
-    return (await sg.get_delta_sync_stats(db_name))["deltas_sent"]
 
 
 @pytest.mark.cbl
@@ -78,8 +74,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
-        read_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -117,9 +114,10 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Verify SGW sent the update as a small delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
-        read_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_bytes_after = stats.database.doc_reads_bytes_blip
         delta_bytes = read_bytes_after - read_bytes_before
         assert delta_bytes < 0.1 * original_doc_size, (
             f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
@@ -184,8 +182,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
-        read_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -234,9 +233,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the update as a small delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
-        read_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_bytes_after = stats.database.doc_reads_bytes_blip
         delta_bytes = read_bytes_after - read_bytes_before
         assert delta_bytes < 0.1 * original_doc_size, (
             f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
@@ -294,8 +294,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
-        read_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -341,9 +342,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the update as a small delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
-        read_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_bytes_after = stats.database.doc_reads_bytes_blip
         delta_bytes = read_bytes_after - read_bytes_before
         assert delta_bytes < 0.1 * original_doc_size, (
             f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
@@ -401,8 +403,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
-        read_bytes_before, _ = await sync_gateway.bytes_transferred("travel")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
         original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
 
@@ -441,9 +444,10 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the update as a small delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
-        read_bytes_after, _ = await sync_gateway.bytes_transferred("travel")
+        read_bytes_after = stats.database.doc_reads_bytes_blip
         delta_bytes = read_bytes_after - read_bytes_before
         assert delta_bytes < 0.1 * original_doc_size, (
             f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
@@ -491,7 +495,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("posts")
+        bytes_read_before = (await sync_gateway.get_db_stats("posts")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Get existing document size for comparison")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
@@ -540,7 +544,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("posts")
+        bytes_read_after = (await sync_gateway.get_db_stats("posts")).database.doc_reads_bytes_blip
 
         self.mark_test_step("Verify delta transferred equivalent to doc size (full doc transfer).")
         updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
@@ -616,8 +620,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("short_expiry")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "short_expiry")
+        stats = await sync_gateway.get_db_stats("short_expiry")
+        read_pull_bytes_before = stats.database.doc_reads_bytes_blip
+        deltas_sent_before = stats.delta_sync.deltas_sent
 
         self.mark_test_step("Get the current document state and revision before update.")
         sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
@@ -664,8 +669,9 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("short_expiry")
-        deltas_sent = await _deltas_sent(sync_gateway, "short_expiry") - deltas_sent_before
+        stats = await sync_gateway.get_db_stats("short_expiry")
+        read_pull_bytes_after = stats.database.doc_reads_bytes_blip
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
         delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
 
@@ -720,7 +726,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
+        deltas_sent_before = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent
 
         self.mark_test_step("Verify docs are replicated correctly.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
@@ -750,7 +756,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the update as a delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
 
         await cblpytest.test_servers[0].cleanup()
@@ -799,7 +805,7 @@ class TestDeltaSync(CBLTestClass):
         original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
 
         self.mark_test_step("Record the delta sync stats before update")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "travel")
+        deltas_sent_before = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent
 
         self.mark_test_step("""
             Update docs in SGW:
@@ -834,7 +840,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the update as a delta")
-        deltas_sent = await _deltas_sent(sync_gateway, "travel") - deltas_sent_before
+        deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before
         assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
 
         self.mark_test_step("Verify document is replicated correctly.")
