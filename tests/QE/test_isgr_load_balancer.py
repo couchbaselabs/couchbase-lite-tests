@@ -15,6 +15,7 @@ from cbltest.api.syncgateway import (
     ScopeConfig,
     SyncGateway,
     UnsupportedSettings,
+    get_basic_auth_headers,
 )
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
@@ -315,7 +316,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         await _wait_for_propagation(sg1, db_name, [doc_id], link_owner=sg1)
 
         self.mark_test_step("Verify the channel-restricted user sees the doc on SG1's _changes feed")
-        async with sg1.get_user_client(user_name, user_password) as scoped_user:
+        async with sg1.get_user_client(get_basic_auth_headers(user_name, user_password)) as scoped_user:
             changes = await scoped_user.get_changes(db_name, request_plus=True)
             doc_ids = {entry.id for entry in changes.results}
             assert doc_id in doc_ids, f"Doc invisible on SG1's channel-scoped _changes feed despite no error: {doc_ids}"
