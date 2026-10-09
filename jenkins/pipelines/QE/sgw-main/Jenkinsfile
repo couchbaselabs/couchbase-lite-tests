@@ -6,7 +6,7 @@ def CBL_PRODUCT = "couchbase-lite-c"      // c_macos test-server client, passed 
 def getBuildNumber(String product, String version) {
     def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
     return sh(
-        script: "curl -s '${url}' | python3 -c 'import json,sys; s=sys.stdin.read().strip(); print(json.loads(s).get(\"BuildNumber\",\"\") if s.startswith(\"{\") else \"\")'",
+        script: "curl -s --max-time 30 '${url}' | python3 -c 'import json,sys; s=sys.stdin.read().strip(); print(json.loads(s).get(\"BuildNumber\",\"\") if s.startswith(\"{\") else \"\")'",
         returnStdout: true
     ).trim()
 }
@@ -36,7 +36,7 @@ def resolveVersionBuild(proget, String product, String param, String label, bool
 def fetchTrains(String product) {
     def url = "http://proget.build.couchbase.com:8080/api/get_trains?product=${product}"
     def raw = sh(
-        script: "curl -sf '${url}' | python3 -c 'import json,sys; print(\"\\n\".join(json.load(sys.stdin)))'",
+        script: "curl -sf --max-time 30 '${url}' | python3 -c 'import json,sys; print(\"\\n\".join(json.load(sys.stdin)))'",
         returnStdout: true
     ).trim()
     return raw ? raw.tokenize() : []

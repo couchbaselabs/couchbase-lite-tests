@@ -44,12 +44,12 @@ def resolveProgetVersion(String product, String version, String label, boolean i
     def resolved
     if (isUnix()) {
         resolved = sh(
-            script: "curl -sf '${url}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"version\",\"\"))'",
+            script: "curl -sf --max-time 30 '${url}' | python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"version\",\"\"))'",
             returnStdout: true
         ).trim()
     } else {
         resolved = powershell(script: """
-            try { (Invoke-RestMethod '${url}').version }
+            try { (Invoke-RestMethod -TimeoutSec 30 '${url}').version }
             catch { Write-Error "ProGet request failed for ${label}: ${'$'}_"; exit 1 }
         """.stripIndent(), returnStdout: true).trim()
     }
