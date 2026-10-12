@@ -142,7 +142,7 @@ class _RequestWebSocketTransport(RequestTransport):
                 f"Timed out after {_WS_REQUEST_TIMEOUT_S}s waiting for "
                 f"'{request.http_name}' response from {self.__url}; "
                 "forcing reconnect to clear stuck device state"
-            )
+            ) from None
 
         resp_version = cast(int, resp.get("ts_apiVersion", 0))
         uuid = resp.get("ts_serverID")
