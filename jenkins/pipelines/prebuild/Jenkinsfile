@@ -59,6 +59,7 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
+                    env.BUILD_BRANCH="review/rn-e2e"
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
