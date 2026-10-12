@@ -50,28 +50,27 @@ trap cleanup EXIT
 OUT_PATH_IN_CONTAINER="$STAGING_DIR_IN_CONTAINER/$FILENAME"
 STAGED_REDACTED_IN_CONTAINER="$STAGING_DIR_IN_CONTAINER/$REDACTED_FILENAME"
 
-# Bounded: a stuck GSI/indexer service is exactly the case this exists to diagnose, and
-# cbcollect_info has no timeout of its own -- a wedged node must not hang the whole run.
-# 1200s (20m): cbcollect_info on a cluster with real data volume (thousands of per-vBucket
-# couchstore dumps, stats snapshots, etc.) routinely runs well past a few minutes -- a short
-# budget here kills a collection that was simply still working, not actually stuck.
-# --kill-after=30: plain `timeout` only sends SIGTERM at the deadline, which a wedged or
-# mid-write cbcollect_info can ignore or outlive -- escalate to SIGKILL if it's still
-# running 30s later, rather than let docker exec (and this request) hang indefinitely.
+# Bounded: a stuck GSI/indexer service is exactly the case this exists to diagnose, and cbcollect_info has no timeout
+# of its own. start.sh runs this script under with-timeout.sh, which stops it at the ?timeout= the client sends
+# (_COLLECT_LOGS_TIMEOUT in couchbaseserver.py, the only place the budget is set). That kills the host's `docker exec`
+# but not cbcollect_info inside the container, so it gets the same limit there.
+CONTAINER_TIMEOUT=()
+if [[ "${QUERY_STRING:-}" =~ (^|&)timeout=([0-9]+(\.[0-9]+)?)(&|$) ]]; then
+  CONTAINER_TIMEOUT=(timeout --kill-after=1 "${BASH_REMATCH[2]}")
+fi
 # Only stderr is captured, into COLLECT_ERR; stdout is discarded. cbcollect_info logs every message to stderr,
 # including a "<task> - OK" or "Exit code N" line per task -- thousands on a loaded cluster.
-COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" timeout --kill-after=30 1200 "$CBCOLLECT_BIN" \
+COLLECT_ERR=$(sudo docker exec "$CBS_CONTAINER" "${CONTAINER_TIMEOUT[@]}" "$CBCOLLECT_BIN" \
   --log-redaction-level=partial \
   "$OUT_PATH_IN_CONTAINER" 2>&1 >/dev/null)
 COLLECT_RC=$?
-# Linux caps one argv string at 128 KiB: past that, `jq --arg` below fails to exec with exit 126 and prints nothing.
-# Keep only the tail: it holds whatever cbcollect_info logged just before exiting, such as a fatal error. Earlier
-# per-task failures can be cut off here, but the archive keeps the full log as cbcollect_info.log.
-COLLECT_ERR=$(tail -c 4096 <<<"$COLLECT_ERR")
 
 if [ "$COLLECT_RC" -ne 0 ] || ! sudo docker exec "$CBS_CONTAINER" test -s "$STAGED_REDACTED_IN_CONTAINER"; then
+  # Only a failure reports stderr; on success it is progress lines, and the archive has it all as cbcollect_info.log.
+  # Linux caps one argv string at 128 KiB: past that, `jq --arg` fails to exec with exit 126 and prints nothing.
+  # Keep only the tail: it holds whatever cbcollect_info logged just before exiting, such as a fatal error.
   # exit 0 here too -- see the comment on the container-not-found branch above.
-  jq -nc --arg err "$COLLECT_ERR" --argjson rc "$COLLECT_RC" \
+  jq -nc --arg err "$(tail -c 4096 <<<"$COLLECT_ERR")" --argjson rc "$COLLECT_RC" \
     '{error: "failed to create archive", rc: $rc, stderr: $err}'
   exit 0
 fi
@@ -81,7 +80,22 @@ fi
 # LOG_DIR also holds CBS's live logs, so it can't be wiped wholesale the way the Edge Server
 # sibling does, and clearing it any earlier would leave nothing downloadable for the whole
 # collection window.
-rm -f "$LOG_DIR"/cbcollect-*.zip
+# Prints {"removed": N, "failed": [names]}, checking each file is really gone afterwards. sudo, since the archives come
+# from `sudo docker cp` and the CBS container shares this bind-mounted directory.
+prune_old_archives() {
+  local archive removed=0 failed=()
+  for archive in "$LOG_DIR"/cbcollect-*.zip; do
+    [ -e "$archive" ] || continue # no match leaves the pattern itself
+    sudo rm -f "$archive"
+    if [ -e "$archive" ]; then
+      failed+=("$(basename "$archive")")
+    else
+      removed=$((removed + 1))
+    fi
+  done
+  jq -nc --argjson removed "$removed" '{removed: $removed, failed: $ARGS.positional}' --args "${failed[@]}"
+}
+PRUNED=$(prune_old_archives)
 
 # Publish only the finished, redacted archive -- the plain copy and anything partially
 # written never leave the container's own filesystem.
@@ -93,5 +107,5 @@ fi
 SIZE=$(stat -c%s "$OUT_PATH_ON_HOST_REDACTED" 2>/dev/null)
 jq -nc --arg file "$REDACTED_FILENAME" \
   --argjson size "${SIZE:-0}" \
-  --arg warnings "$COLLECT_ERR" \
-  '{file: $file, size: $size} + (if $warnings == "" then {} else {warnings: $warnings} end)'
+  --argjson pruned "$PRUNED" \
+  '{file: $file, size: $size, pruned: $pruned}'

@@ -46,14 +46,11 @@ function move_artifacts() {
   # into the pytest cwd when a test fails; moving them here gets them archived
   # (and later purged) by Jenkins retention. Files are named
   # "<safe_host>-sgcollectinfo-*.zip" (see SyncGateway.run_sgcollect() in
-  # cbltest). Purge zips left by earlier builds first — the workspace
-  # persists and zips have unique names, so they'd accumulate into every
-  # build's archive.
-  rm -f "$dst_dir"/*-sgcollectinfo-*.zip
+  # cbltest). Zips left by earlier builds are already gone: dst_dir is
+  # recreated empty at the top of this function.
   mv "$src_dir"/*-sgcollectinfo-*.zip "$dst_dir/" 2>/dev/null || true
-  # Same reasoning, for the CBS diagnostics downloaded by run_cbcollects() (see
+  # Same for the CBS diagnostics downloaded by run_cbcollects() (via --cbcollect-on-test-failure; see
   # CouchbaseServer.collect_logs() in cbltest). Files are named "cbcollect-<safe_host>-*.zip".
-  rm -f "$dst_dir"/cbcollect-*.zip
   mv "$src_dir"/cbcollect-*.zip "$dst_dir/" 2>/dev/null || true
 }
 

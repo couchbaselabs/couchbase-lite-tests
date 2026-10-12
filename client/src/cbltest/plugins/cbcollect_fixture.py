@@ -2,10 +2,10 @@ import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from pathlib import Path
 
+import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.couchbaseserver import CouchbaseServer
-from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_error, cbl_info
 
 
@@ -51,11 +51,12 @@ async def run_cbcollects(couchbase_servers: Sequence[CouchbaseServer], output_di
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
-async def cbcollect_session(cblpytest: CBLPyTest) -> AsyncGenerator[None]:
+async def cbcollect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None]:
     yield
-    # Collection is deferred to session end, once, rather than run inline where the timeout
-    # occurred -- the same reason sgcollect/es_collect wait for teardown.
-    if CBLPyTestGlobal.cbcollect_needed:
+    # Same condition as sgcollect_session: a test failed, or the session timed out.
+    if request.config.getoption("--cbcollect-on-test-failure") and (
+        request.session.testsfailed or request.session.shouldfail
+    ):
         servers = [cbs for cluster in cblpytest.clusters for cbs in cluster.couchbase_servers]
         try:
             await run_cbcollects(servers, Path.cwd())
@@ -69,3 +70,15 @@ async def cbcollect_session(cblpytest: CBLPyTest) -> AsyncGenerator[None]:
                 f"cbcollect: giving up, no logs collected from any node: {eg.exceptions}",
                 include_stack=False,
             )
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("CBL E2E Testing")
+    group.addoption(
+        "--cbcollect-on-test-failure",
+        action="store_true",
+        default=False,
+        help="Once at the end of the test session (a normal finish or a session timeout) -- run cbcollect_info "
+        "on every Couchbase Server node if any test failed or the session timed out, downloading the resulting "
+        "zip(s) into the current working directory",
+    )

@@ -27,7 +27,9 @@ def _redacted_echo(data: str | None) -> str:
     actually produce for the requested filename (see collect-logs.sh), not that name itself."""
     assert data is not None
     requested = json.loads(data)["filename"]
-    return json.dumps({"file": f"{requested.removesuffix('.zip')}-redacted.zip"})
+    return json.dumps(
+        {"file": f"{requested.removesuffix('.zip')}-redacted.zip", "pruned": {"removed": 0, "failed": []}}
+    )
 
 
 def stub_sidecar(
@@ -78,8 +80,8 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
     assert requested_filename.startswith("cbcollect-cbs-example-com-"), requested_filename
     assert requested_filename.endswith(".zip"), requested_filename
     assert timeout == _COLLECT_LOGS_TIMEOUT, (
-        "must outlast the shell2http endpoint's own kill-after-bounded worst case, not race "
-        "aiohttp's shorter 300s default against it"
+        "the whole collection budget, sent as ?timeout= so the host stops the script before "
+        "this client gives up, not aiohttp's shorter 300s default"
     )
     downloaded_filename = f"{requested_filename.removesuffix('.zip')}-redacted.zip"
     assert downloads == [(downloaded_filename, tmp_path / downloaded_filename)], (
@@ -89,18 +91,26 @@ async def test_collect_logs_downloads_the_archive_the_sidecar_made(
     assert archive == tmp_path / downloaded_filename
 
 
+@pytest.mark.parametrize(
+    ("pruned", "level", "message"),
+    [
+        ({"removed": 2, "failed": []}, logging.INFO, "deleted 2 old cbcollect archive(s)"),
+        ({"removed": 1, "failed": ["cbcollect-old.zip"]}, logging.WARNING, "could not delete old cbcollect archives"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_collect_logs_logs_stderr_at_info_without_failing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+async def test_collect_logs_logs_the_prune_result(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    pruned: dict[str, object],
+    level: int,
+    message: str,
 ) -> None:
     downloads = stub_download(monkeypatch)
     server = make_server()
     archive_name = "cbcollect-cbs-example-com-x-redacted.zip"
-    stub_sidecar(
-        monkeypatch,
-        server,
-        response=json.dumps({"file": archive_name, "warnings": "some component was unreachable"}),
-    )
+    stub_sidecar(monkeypatch, server, response=json.dumps({"file": archive_name, "pruned": pruned}))
 
     with caplog.at_level(logging.INFO, logger="CBL"):
         try:
@@ -109,11 +119,11 @@ async def test_collect_logs_logs_stderr_at_info_without_failing(
             await server.close()
 
     assert downloads == [(archive_name, tmp_path / archive_name)], (
-        "stderr in the response must not stop the reported archive from being downloaded"
+        "a failed prune must not stop the new archive from being downloaded"
     )
     assert archive == tmp_path / archive_name
-    records = [record for record in caplog.records if "some component was unreachable" in record.message]
-    assert records, "collect_logs must log the stderr tail the sidecar reports, not drop it"
-    assert all(record.levelno == logging.INFO for record in records), (
-        "a successful collection's stderr is mostly progress lines, so it must be logged at info, not as a warning"
+    records = [record for record in caplog.records if message in record.message]
+    assert records, "collect_logs must log what the prune did, success and failure alike"
+    assert all(record.levelno == level for record in records), (
+        "a failed prune lets the host's disk fill, so it is a warning; a clean one is info"
     )

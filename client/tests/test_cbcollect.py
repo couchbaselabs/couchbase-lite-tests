@@ -1,6 +1,5 @@
 """Tests for run_cbcollects, the best-effort multi-node collection the cbcollect_session
-fixture runs at session end when SyncGatewayCluster.create_database flagged a stuck-indexer
-timeout (see test_syncgatewaycluster.py for where that flag gets set)."""
+fixture runs at session end under --cbcollect-on-test-failure when a test failed."""
 
 import asyncio
 from pathlib import Path

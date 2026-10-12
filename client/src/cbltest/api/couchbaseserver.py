@@ -154,10 +154,10 @@ class BucketPool:
             await self.__server.wait_for_bucket_deleted(oldest)
 
 
-# The collect-logs shell2http endpoint runs `timeout --kill-after=30 1200 cbcollect_info`, which builds the archive
-# itself: it is stopped at 1200s and killed by 1230s at the latest. After that the script copies the archive out of the
-# container and prints its JSON, steps with no time limit of their own; 1260s leaves them 30s. Not wrapped in
-# with-timeout.sh, so the ?timeout= this client sends is ignored on the host.
+# The whole budget for one cbcollect, set only here. cbcollect_info on a cluster with real data volume routinely runs
+# for many minutes. The client sends it as ?timeout=, and with-timeout.sh stops collect-logs.sh at 95% of it (1197s),
+# so the host always answers before this client gives up; collect-logs.sh gives cbcollect_info the same limit inside
+# the container.
 _COLLECT_LOGS_TIMEOUT: float = 1260
 
 
@@ -1529,16 +1529,21 @@ class CouchbaseServer:
             response = await self._call_sidecar(
                 "post", "/collect-logs", data=json.dumps({"filename": filename}), timeout=_COLLECT_LOGS_TIMEOUT
             )
-            # The endpoint always exits 0 and reports failure through an "error" key in this body. A non-zero exit would
-            # make shell2http answer HTTP 500 with the script's stdout followed by "exec error: exit status N", and
-            # _call_sidecar would raise CblRemoteBadResponseError for it before this JSON could be parsed.
+            # The endpoint exits 0 and reports failure through an "error" key in this body. A non-zero exit would make
+            # shell2http answer HTTP 500 with the script's stdout followed by "exec error: exit status N", and
+            # _call_sidecar raises CblRemoteBadResponseError for it before this JSON could be parsed. That happens only
+            # when with-timeout.sh stops the script at the time limit.
             body = json.loads(response)
             if error := body.get("error"):
                 raise CblTestError(
                     f"cbcollect_info failed on {self}: {error} (rc={body.get('rc')}, stderr={body.get('stderr')})"
                 )
-            if warnings := body.get("warnings"):
-                cbl_info(f"Couchbase Server [{self.hostname}] cbcollect_info stderr (last 4 KiB): {warnings}")
+            # Old archives left on the host fill its disk across runs, so a failed prune is a warning, not an error.
+            pruned = body["pruned"]
+            if failed := pruned["failed"]:
+                cbl_warning(f"Couchbase Server [{self.hostname}] could not delete old cbcollect archives: {failed}")
+            else:
+                cbl_info(f"Couchbase Server [{self.hostname}] deleted {pruned['removed']} old cbcollect archive(s)")
 
             # --log-redaction-level makes the endpoint produce (and report back) a redacted
             # archive under a different name than the one requested -- see collect-logs.sh.
