@@ -88,6 +88,7 @@ def _ws_transport(payload: dict) -> _RequestWebSocketTransport:
     reply: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
     reply.set_result(payload)
     ws_router = MagicMock()
+    ws_router.ensure_connected = AsyncMock()
     ws_router.register.return_value = reply
     ws_router.get_websocket_for_write.return_value.send_str = AsyncMock()
     return _RequestWebSocketTransport("ws://localhost:8080", ws_router)
