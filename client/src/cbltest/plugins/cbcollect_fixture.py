@@ -50,12 +50,17 @@ async def run_cbcollects(couchbase_servers: Sequence[CouchbaseServer], output_di
     return collected
 
 
+# TEMPORARY, remove before merging: forces a collection on every run with --cbcollect-on-test-failure, so a passing
+# Jenkins run still shows whether cbcollect works end to end.
+_FORCE_CBCOLLECT = True
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def cbcollect_session(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> AsyncGenerator[None]:
     yield
     # Same condition as sgcollect_session: a test failed, or the session timed out.
     if request.config.getoption("--cbcollect-on-test-failure") and (
-        request.session.testsfailed or request.session.shouldfail
+        request.session.testsfailed or request.session.shouldfail or _FORCE_CBCOLLECT
     ):
         servers = [cbs for cluster in cblpytest.clusters for cbs in cluster.couchbase_servers]
         try:
