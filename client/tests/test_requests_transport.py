@@ -90,6 +90,7 @@ class TestRequestWebSocketTransport:
         reply: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
         reply.set_result({"ts_apiVersion": 1, "ts_serverID": "server-uuid", "ts_error": NOT_FOUND_BODY})
         ws_router = MagicMock()
+        ws_router.ensure_connected = AsyncMock()
         ws_router.register.return_value = reply
         ws_router.get_websocket_for_write.return_value.send_str = AsyncMock()
         transport = _RequestWebSocketTransport("ws://localhost:8080", ws_router)
