@@ -422,7 +422,7 @@ class _ReactNativeTestServerBase(TestServer):
 
     @property
     def product(self) -> str:
-        return "cbl-reactnative"
+        return "couchbase-lite-react-native"
 
     def _working_dir(self) -> Path:
         if self._downloaded:
@@ -457,8 +457,7 @@ class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
 
     @property
     def latestbuilds_path(self) -> str:
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_android.apk"
+        return self.artifact_path("testserver_android.apk")
 
     def build(self) -> None:
         header(f"Building React Native Android test server {self.version}")
@@ -504,8 +503,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
 
     @property
     def latestbuilds_path(self) -> str:
-        version_parts = self.version.split("-")
-        return f"{self.product}/{version_parts[0]}/{version_parts[1]}/testserver_ios.zip"
+        return self.artifact_path("testserver_ios.zip")
 
     @staticmethod
     def _ensure_cocoapods() -> str:

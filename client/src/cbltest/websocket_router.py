@@ -179,7 +179,7 @@ class WebSocketRouter:
         try:
             await wait_for(event.wait(), timeout=timeout)
         except TimeoutError:
-            raise ConnectionError(f"Device at {url} did not reconnect within {timeout:.0f} s")
+            raise ConnectionError(f"Device at {url} did not reconnect within {timeout:.0f} s") from None
 
     def get_websocket_for_write(self, url: str) -> web.WebSocketResponse:
         if not self.is_known_ws_url(url):
