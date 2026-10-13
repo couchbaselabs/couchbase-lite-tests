@@ -286,7 +286,7 @@ paths:
               * _revs: Revision history including the current revision ID as the first item.
 
             The format of the revision history is described in this document:
-            https://github.com/couchbase/couchbase-lite-core/blob/master/modules/docs/pages/replication-protocol.adoc#4-revision-ids-and-histories
+            https://github.com/couchbase/couchbase-lite-core/wiki/Replication-Protocol#3-versioning-revision-ids-histories-sequences
           content:
             application/json:
               schema:
@@ -1006,7 +1006,7 @@ components:
         Contains document's properties and the metadata.
       type: object
       additionalProperties: {}
-      example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw, 17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
+      example: {'_id': 'doc1', '_revs': '17f4ed7b51a50000@MlAW1NbbT8KcTRO8oPnpgw;17f4ed7b42a70000@ScJAVJf3TdOUanAcByIcXg', 'foo': 'bar'}
     DocumentID:
       type: object
       required: ['collection', 'id']

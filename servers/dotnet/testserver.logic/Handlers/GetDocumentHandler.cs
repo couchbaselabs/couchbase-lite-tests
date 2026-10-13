@@ -45,8 +45,13 @@ internal static partial class HandlerList
             ?? throw new JsonException($"Collection {deserializedBody.document.id} does not exist in db!");
 
         using var doc = collection.GetDocument(deserializedBody.document.id);
-        if(doc == null) {
-            await response.WriteEmptyBody(HttpStatusCode.NotFound).ConfigureAwait(false);
+        if (doc == null) {
+            await response.WriteBody(new ErrorReturnBody
+            {
+                domain = TestServerErrorDomain.TestServer,
+                code = (int)HttpStatusCode.NotFound,
+                message = $"Document '{deserializedBody.document.collection}.{deserializedBody.document.id}' not found"
+            }, HttpStatusCode.NotFound).ConfigureAwait(false);
             return;
         }
 

@@ -8,6 +8,7 @@ a real (loopback) aiohttp test server, rather than mocking the HTTP layer.
 
 import asyncio
 import inspect
+import logging
 from collections.abc import AsyncIterator
 from json import loads
 from pathlib import Path
@@ -726,6 +727,36 @@ class TestGetLastSequence:
             await sg.get_last_sequence("db")
 
 
+class TestGetDocumentRevisionHistory:
+    """get_document(revs=True) asks Sync Gateway for the revision history."""
+
+    @pytest.mark.asyncio
+    async def test_revs_reads_the_revision_history(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [
+            {
+                "status": 200,
+                "json": {"_id": "doc1", "_rev": "2-bbb", "_revisions": {"start": 2, "ids": ["bbb", "aaa"]}, "n": 2},
+            }
+        ]
+
+        doc = await sg.get_document("db", "doc1", revs=True)
+
+        assert received[0][_URL_KEY] == "/db._default._default/doc1?revs=true"
+        assert doc.revision_history == ["2-bbb", "1-aaa"]
+        assert doc.body == {"n": 2}
+
+    @pytest.mark.asyncio
+    async def test_no_revision_history_without_revs(self, sync_gateway: SyncGatewayFixture) -> None:
+        sg, specs, received = sync_gateway
+        specs[:] = [{"status": 200, "json": {"_id": "doc1", "_rev": "1-aaa"}}]
+
+        doc = await sg.get_document("db", "doc1")
+
+        assert received[0][_URL_KEY] == "/db._default._default/doc1"
+        assert doc.revision_history is None
+
+
 class TestWaitForCachingFeed:
     """update_document(wait_for_caching_feed=True) has to read the unfiltered changes feed.
 
@@ -1078,3 +1109,36 @@ class TestWaitForDocuments:
         by_id = {entry.id: entry for entry in changes.results}
         assert by_id["doc1"].removed == [], "a normal entry carries no removal"
         assert by_id["doc2"].removed == ["abc"]
+
+
+class TestFailedRequestLogging:
+    """A request that gets no usable response still leaves a record of why."""
+
+    @pytest.mark.asyncio
+    async def test_failure_writes_an_error_and_logs_it(
+        self, sync_gateway: SyncGatewayFixture, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        sg, specs, _ = sync_gateway
+        specs.append({"status": 200, "text": "not json", "content_type": "application/json"})
+
+        with caplog.at_level(logging.ERROR, logger="CBL"), pytest.raises(ValueError):
+            await sg._send_request("get", "/db/")
+
+        errors = list((tmp_path / "http_log").rglob("*_error.txt"))
+        assert len(errors) == 1
+        assert errors[0].read_text().startswith("Sync Gateway [") and " <- GET /db/ failed: " in errors[0].read_text()
+        assert [r.getMessage() for r in caplog.records] == [errors[0].read_text()]
+
+    @pytest.mark.asyncio
+    async def test_quiet_failure_writes_an_error_but_does_not_log_it(
+        self, sync_gateway: SyncGatewayFixture, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A readiness poll expects failures, so they stay out of testserver.log."""
+        sg, specs, _ = sync_gateway
+        specs.append({"status": 200, "text": "not json", "content_type": "application/json"})
+
+        with caplog.at_level(logging.DEBUG, logger="CBL"), pytest.raises(ValueError):
+            await sg._send_request("get", "/_ping", log_failure=False)
+
+        assert len(list((tmp_path / "http_log").rglob("*_error.txt"))) == 1
+        assert caplog.records == []

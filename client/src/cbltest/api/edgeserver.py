@@ -256,20 +256,27 @@ class EdgeServer:
         method: str,
         path: str,
         payload: JSONSerializable | None = None,
+        log_failure: bool = True,
     ) -> Any:
+        """
+        :param log_failure: Whether to log a request that gets no response in testserver.log.  Pass
+                            False for a poll that expects failures until the server is up; the HTTP
+                            log still records them.
+        """
         with self.__tracer.start_as_current_span("send_request", attributes={"http.method": method, "http.path": path}):
             headers = {"Content-Type": "application/json"} if payload is not None else None
             data = "" if payload is None else payload.serialize()
             writer = get_next_writer()
             writer.write_begin(f"Edge Server [{self.__hostname}] -> {method.upper()} {path}", data)
-            resp = await self.__session.request(method, path, data=data, headers=headers)
+            with writer.record_failure(f"Edge Server [{self.__hostname}] <- {method.upper()} {path}", log=log_failure):
+                resp = await self.__session.request(method, path, data=data, headers=headers)
+                if resp.content_type.startswith("application/json"):
+                    ret_val = await resp.json()
+                    data = dumps(ret_val, indent=2)
+                else:
+                    data = await resp.text()
+                    ret_val = data
 
-            if resp.content_type.startswith("application/json"):
-                ret_val = await resp.json()
-                data = dumps(ret_val, indent=2)
-            else:
-                data = await resp.text()
-                ret_val = data
             writer.write_end(
                 f"Edge Server [{self.__hostname}] <- {method.upper()} {path} {resp.status}",
                 data,
@@ -857,18 +864,53 @@ class EdgeServer:
                 return [line.decode(errors="replace").rstrip("\r\n") for line in f if needle in line]
 
     async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
-        is_idle = False
+        missing_polls = 0
         retry = 6
-        while not is_idle and retry > 0:
+        while retry > 0:
             status = await self.all_replication_status()
-            if len(status) != 0:
-                assert "error" not in status[replicator_key], f"Replication setup failure: {status}"
-                if status[replicator_key]["status"] == "Idle":
-                    is_idle = True
-                else:
-                    await asyncio.sleep(timeout)
-                    retry -= 1
-            else:
-                is_idle = True
-        if not is_idle and retry == 0:
-            raise CblTimeoutError("Timeout waiting for replicator status")
+            if len(status) <= replicator_key:
+                missing_polls += 1
+                if missing_polls == 5:
+                    raise CblEdgeServerBadResponseError(
+                        404,
+                        f"Replicator {replicator_key} is not running on {self.__hostname}",
+                        body=json.dumps(status),
+                    )
+                await asyncio.sleep(2)
+                continue
+
+            replicator = status[replicator_key]
+            if "error" in replicator:
+                error = replicator["error"]
+                code = error.get("x-litecore-code") if isinstance(error, dict) else None
+                raise CblEdgeServerBadResponseError(
+                    code if isinstance(code, int) else 500,
+                    f"Replicator {replicator_key} on {self.__hostname} failed: {replicator}",
+                    body=json.dumps(replicator),
+                )
+            if replicator["status"] == "Idle":
+                return
+
+            await asyncio.sleep(timeout)
+            retry -= 1
+
+        raise CblTimeoutError("Timeout waiting for replicator status")
+
+    async def create_session(self, db_name: str, one_time: bool | str | None = True) -> dict:
+        """
+        :param db_name: Database to mint the session for
+        :param one_time: True or False to send ``one_time=true`` / ``one_time=false``, a string
+            to send verbatim, or None to leave the query parameter off
+        :return: The response body, ``{"ok": true, "one_time_session_id": "<32 hex chars>"}``
+        """
+        with self.__tracer.start_as_current_span("create_session", attributes={"es.database.name": db_name}):
+            path = f"/{db_name}/_session"
+            if one_time is not None:
+                value = str(one_time).lower() if isinstance(one_time, bool) else one_time
+                path += f"?one_time={urllib.parse.quote(value, safe='')}"
+            resp = await self._send_request("post", path)
+            if not isinstance(resp, dict):
+                raise CblEdgeServerBadResponseError(
+                    500, f"Unexpected response type from POST {path}: {type(resp)}", body=str(resp)
+                )
+            return cast(dict, resp)

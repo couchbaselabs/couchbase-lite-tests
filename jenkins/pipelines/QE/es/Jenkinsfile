@@ -2,7 +2,8 @@ pipeline {
     agent none
     parameters {
         string(name: 'ES_VERSION', defaultValue: '1.0.1', description: 'Edge Server version')
-        string(name: 'TEST_NAME', defaultValue: 'test_crud.py', description: 'Test file to run')
+        choice(name: 'TEST_DIR', choices: ['both','QE', 'dev_e2e'], description: 'Edge Server test directory: tests/QE/edge_server, tests/dev_e2e/edge_server, or both')
+        string(name: 'TEST_NAME', defaultValue: '.', description: '"." runs all tests in TEST_DIR; anything else is passed to pytest -k (not allowed with TEST_DIR=both)')
         string(name: 'TOPOLOGY_NAME', defaultValue: 'es_sgw_topology.json', description: 'Topology file name')
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
@@ -18,8 +19,9 @@ pipeline {
                 script {
                     if (params.ES_VERSION == '') { error "ES_VERSION is required" }
                     if (params.TEST_NAME == '') { error "TEST_NAME is required" }
+                    if (params.TEST_DIR == 'both' && params.TEST_NAME != '.') { error "TEST_NAME must be '.' when TEST_DIR is 'both'" }
                     currentBuild.displayName = "ES:${params.ES_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'}"
+                    currentBuild.description = "${params.TEST_DIR}: ${params.TEST_NAME} | SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'}"
                 }
             }
         }
@@ -38,12 +40,13 @@ pipeline {
                 timeout(time: 60, unit: 'MINUTES') {
                     sh """
                         jenkins/pipelines/QE/es/test.sh \
-                            ${params.ES_VERSION} \
-                            ${params.TEST_NAME} \
-                            ${params.TOPOLOGY_NAME} \
-                            ${params.SGW_VERSION} \
-                            ${params.CBS_VERSION} \
-                            ${params.TS_DATASET_VERSION}
+                            "${params.ES_VERSION}" \
+                            "${params.TEST_NAME}" \
+                            "${params.TOPOLOGY_NAME}" \
+                            "${params.SGW_VERSION}" \
+                            "${params.CBS_VERSION}" \
+                            "${params.TS_DATASET_VERSION}" \
+                            "${params.TEST_DIR}"
                     """
                 }
                 echo "=== Edge server Tests Complete"

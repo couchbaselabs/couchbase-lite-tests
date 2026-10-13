@@ -1,6 +1,7 @@
 """Tests for the EdgeServer client and EdgeServerConfig, the config file it parses."""
 
 import json
+import logging
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -8,8 +9,11 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from aiohttp import web
+from aiohttp.test_utils import TestServer
 from cbltest.api.edgeserver import EdgeServer, EdgeServerConfig
 from cbltest.api.error import CblTestError
+from cbltest.httplog import _HttpLogWriter
 
 HOSTNAME = "es.example.com"
 AUDIT_LOG = "/home/ec2-user/audit/EdgeServerAuditLog.txt"
@@ -125,3 +129,32 @@ def test_audit_log_path_raises_without_an_audit_log(tmp_path: Path) -> None:
 
     with pytest.raises(CblTestError, match="declares no audit log"):
         _ = client.audit_log_path
+
+
+@pytest.mark.asyncio
+async def test_failure_writes_an_error_and_logs_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A request that gets no usable response still leaves a record of why."""
+    monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
+
+    async def not_json(request: web.Request) -> web.Response:
+        return web.Response(text="not json", content_type="application/json")
+
+    app = web.Application()
+    app.router.add_get("/", not_json)
+    server = TestServer(app)
+    await server.start_server()
+    config_file = write_config(tmp_path, "local.json", {"interface": f"{server.host}:{server.port}"})
+    client = EdgeServer(server.host, config_file=config_file)
+    try:
+        with caplog.at_level(logging.ERROR, logger="CBL"), pytest.raises(ValueError):
+            await client._send_request("get", "/")
+    finally:
+        await client.close()
+        await server.close()
+
+    errors = list((tmp_path / "http_log").rglob("*_error.txt"))
+    assert len(errors) == 1
+    assert errors[0].read_text().startswith(f"Edge Server [{server.host}] <- GET / failed: ")
+    assert [r.getMessage() for r in caplog.records] == [errors[0].read_text()]

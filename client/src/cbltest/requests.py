@@ -191,8 +191,8 @@ class RequestFactory:
             )
             ret_val = await transport.send(r, writer.num)
         except CblTestServerBadResponseError as e:
-            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})")
-            msg = f"{e!s}\n\n{e.response.serialize()}"
+            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})", include_stack=False)
+            msg = f"{e!s}\n\n{e.body}"
             writer.write_error(msg)
             raise
         except Exception as e:

@@ -16,6 +16,7 @@ from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.configparser import EdgeServerInfo
 from cbltest.plugins.cluster_cleanup import reset_all_edge_servers
+from cbltest.shell2http import DEFAULT_SHELL2HTTP_TIMEOUT
 
 HOSTNAME = "es.example.com"
 
@@ -32,7 +33,7 @@ def no_network() -> Iterator[None]:
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
         patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
         # Starting an Edge Server polls it until it answers, which is a real request.
-        patch("cbltest.api.edgeserver.EdgeServer.get_version", autospec=True),
+        patch("cbltest.api.edgeservermanager.EdgeServerManager._EdgeServerManager__wait_until_serving", autospec=True),
     ):
         yield
 
@@ -76,7 +77,9 @@ def stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: EdgeServerManager) ->
     """Record what a manager sends to its sidecar, so nothing reaches the network."""
     calls: list[SidecarCall] = []
 
-    async def _call_sidecar(method: str, path: str, payload: JSONSerializable | None = None) -> str:
+    async def _call_sidecar(
+        method: str, path: str, payload: JSONSerializable | None = None, timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT
+    ) -> str:
         calls.append((method, path, None if payload is None else payload.to_json()))
         return ""
 
@@ -240,7 +243,7 @@ def fake_sessions() -> Iterator[None]:
         patch("cbltest.api.edgeserver.ssl.create_default_context", autospec=True),
         patch("cbltest.api.edgeserver.TCPConnector", autospec=True),
         # Starting an Edge Server polls it until it answers, which FakeSession cannot serve.
-        patch("cbltest.api.edgeserver.EdgeServer.get_version", autospec=True),
+        patch("cbltest.api.edgeservermanager.EdgeServerManager._EdgeServerManager__wait_until_serving", autospec=True),
     ):
         yield
 

@@ -7,6 +7,7 @@ param(
 $DOWNLOAD_DIR="$PSScriptRoot\..\downloaded"
 $BUILD_DIR="$PSScriptRoot\..\build"
 $LIB_DIR="$PSScriptRoot\..\lib"
+$ASSETS_DIR="$PSScriptRoot\..\assets"
 
 # Download CBL
 & $PSScriptRoot\download_cbl.ps1 $Edition $Version $Build
@@ -29,8 +30,9 @@ try {
     # Copy libcblite
     Copy-Item "$LIB_DIR\libcblite\bin\cblite.dll" out\bin
 
-    # Copy assets
-    Copy-Item -ErrorAction Ignore -Recurse assets out\bin
+    # Copy assets. The server looks for it next to its own directory, as <executable>\..\assets.
+    New-Item -ErrorAction Ignore -ItemType Directory out\assets
+    Copy-Item -Recurse -Force "$ASSETS_DIR\*" out\assets
 } finally {
     Pop-Location
 }

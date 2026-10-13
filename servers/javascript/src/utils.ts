@@ -15,6 +15,8 @@ import { Blob } from "@couchbase/lite-js";
 
 /** Test functions can throw this to report an HTTP error status. */
 export class HTTPError extends Error {
+    readonly domain = "TESTSERVER";
+
     constructor(
         public readonly code: number,
         message?: string,

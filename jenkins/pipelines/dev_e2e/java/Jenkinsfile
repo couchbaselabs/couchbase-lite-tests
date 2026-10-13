@@ -8,6 +8,13 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild test servers (only for the checked platforms). Uncheck to skip prebuild entirely and reuse existing artifacts.')
+        booleanParam(name: 'RUN_MACOS_DESKTOP',      defaultValue: true, description: 'Run macOS Desktop tests')
+        booleanParam(name: 'RUN_WINDOWS_DESKTOP',    defaultValue: true, description: 'Run Windows Desktop tests')
+        booleanParam(name: 'RUN_LINUX_DESKTOP',      defaultValue: true, description: 'Run Linux Desktop tests')
+        booleanParam(name: 'RUN_MACOS_WEBSERVICE',   defaultValue: true, description: 'Run macOS Web Service tests')
+        booleanParam(name: 'RUN_WINDOWS_WEBSERVICE', defaultValue: true, description: 'Run Windows Web Service tests')
+        booleanParam(name: 'RUN_LINUX_WEBSERVICE',   defaultValue: true, description: 'Run Linux Web Service tests')
     }
     options {
         ansiColor('xterm')
@@ -26,28 +33,38 @@ pipeline {
         }
 
          stage('Prebuild Servers') {
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
             steps {
                 script {
-                    def platforms = [
-                        'jak_desktop', 'jak_webservice'
-                    ]
-                    def parallelBuilds = [:]
-                    for(p in platforms) {
-                        // Groovy stupidness.  Need to set a local variable here
-                        // to avoid late binding (all jobs use dotnet_macos).
-                        def platform = p
-                        parallelBuilds[platform] = {
-                            build job: 'prebuild-test-server',
-                            parameters: [
-                                string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                                string(name: 'CBL_BUILD', value: params.CBL_BUILD)
-                            ],
-                            wait: true,
-                            propagate: true
+                    // Each server flavor is prebuilt only when at least one of its
+                    // test stages is selected.
+                    def anyDesktop = params.RUN_MACOS_DESKTOP || params.RUN_WINDOWS_DESKTOP || params.RUN_LINUX_DESKTOP
+                    def anyWebService = params.RUN_MACOS_WEBSERVICE || params.RUN_WINDOWS_WEBSERVICE || params.RUN_LINUX_WEBSERVICE
+
+                    def platforms = []
+                    if (anyDesktop)    { platforms << 'jak_desktop' }
+                    if (anyWebService) { platforms << 'jak_webservice' }
+                    if (platforms.isEmpty()) {
+                        echo "No platforms selected — nothing to prebuild"
+                    } else {
+                        def parallelBuilds = [:]
+                        for(p in platforms) {
+                            // Groovy stupidness.  Need to set a local variable here
+                            // to avoid late binding (all jobs use dotnet_macos).
+                            def platform = p
+                            parallelBuilds[platform] = {
+                                build job: 'prebuild-test-server',
+                                parameters: [
+                                    string(name: 'TS_PLATFORM', value: platform),
+                                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                    string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                                ],
+                                wait: true,
+                                propagate: true
+                            }
                         }
+                        parallel parallelBuilds
                     }
-                    parallel parallelBuilds
                 }
             }
         }
@@ -59,6 +76,7 @@ pipeline {
         stage('Tests') {
             parallel {
                 stage('OSX Desktop Test') {
+                    when { beforeAgent true; expression { params.RUN_MACOS_DESKTOP } }
                     agent { label 'e2e&&macos-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'macos_desktop'
@@ -93,6 +111,7 @@ pipeline {
                 }
 
                 stage('Windows Desktop Test') {
+                    when { beforeAgent true; expression { params.RUN_WINDOWS_DESKTOP } }
                     agent { label 'e2e&&windows-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_desktop'
@@ -125,6 +144,7 @@ pipeline {
                 }
 
                 stage('Linux Desktop Test') {
+                    when { beforeAgent true; expression { params.RUN_LINUX_DESKTOP } }
                     agent { label 'e2e&&linux-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'linux_desktop'
@@ -159,6 +179,7 @@ pipeline {
                 }
 
                 stage('OSX Web Service Test') {
+                    when { beforeAgent true; expression { params.RUN_MACOS_WEBSERVICE } }
                     agent { label 'e2e&&macos-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'macos_webservice'
@@ -193,6 +214,7 @@ pipeline {
                 }
 
                 stage('Windows Web Service Test') {
+                    when { beforeAgent true; expression { params.RUN_WINDOWS_WEBSERVICE } }
                     agent { label 'e2e&&windows-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'windows_webservice'
@@ -227,6 +249,7 @@ pipeline {
                 }
 
                 stage('Linux Web Service Test') {
+                    when { beforeAgent true; expression { params.RUN_LINUX_WEBSERVICE } }
                     agent { label 'e2e&&linux-host' }
                     environment {
                         TS_ARTIFACTS_DIR = 'linux_webservice'

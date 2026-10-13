@@ -68,7 +68,7 @@ namespace TestServer
 {
     public static class TestServerErrorDomain
     {
-        public static readonly string TestServer = "TestServer";
+        public static readonly string TestServer = "TESTSERVER";
         public static readonly string CouchbaseLite = "CBL";
         public static readonly string POSIX = "POSIX";
         public static readonly string SQLite = "SQLite";

@@ -12,12 +12,16 @@
 * Apple : XCode 14.3+
 * Android : Java 17+ and Android Studio 2022.2.1+
 * Windows : Visual Studio 2017+
+* Linux : curl, a C++ toolchain and the zlib headers (`scripts/build_linux_prepare.sh` installs them on Debian and Ubuntu)
 
 ## Build and Run Test Server
 
-1. Login to Couchbase VPN. This is required to download CBL binary built by the CI system.
+1. To build against a CI build of CBL (any build number other than 0), login to Couchbase VPN. CI builds are
+   downloaded from latestbuilds.service.couchbase.com, which is only reachable from there. Build number 0 downloads
+   the public release from packages.couchbase.com and needs no VPN.
 
-2. Find you the latest successful build number. Skip this if you have already known a specific build to test.
+2. Find the latest successful CI build number. Skip this if you already know which build to test, or are using
+   build number 0. This also needs the VPN, and `jq`. Run it from the repository root:
 
    ```
    ./jenkins/pipelines/dev_e2e/main/latest_successful_build.sh c 4.0.0
@@ -26,8 +30,9 @@
 3. Build and Run
 
    From this directory (`servers/c`), use the platform build script in the `scripts` directory to build and assemble the built artifacts.
-   The build script requires CBL version and build number. When specifying the build number = 0, the script 
-   will download the public release CBL binary. The built artifacts will be located at `build/out/bin` directory.
+   The build scripts take the CBL version and build number. `build_linux.sh` takes the edition (`enterprise` or
+   `community`) before them; the macOS and iOS scripts always build Enterprise Edition. Build number 0 builds against
+   the public release, for example `./scripts/build_linux.sh enterprise 4.1.2 0`. The built artifacts will be located at `build/out/bin` directory.
 
    The server listens on port 8080 unless `--port <port>` says otherwise, and keeps its databases
    in `CBL-C-TestServer` under `/tmp` on Linux, `$TMPDIR` on macOS and the working directory on
@@ -98,8 +103,8 @@ Open the project from this directory which has the CMakeLists.txt file using CLi
 
 1. Open the c test server directory with CLion.
 
-2. When configurating CMake, add `DCBL_VERSION=<CBL Version>` option with the CBL version you are using. 
-    If using CLion, add the option to Settings > Build, Execution, Deploymenet > CMake > CMake Options
+2. When configuring CMake, add `-DCBL_VERSION=<CBL Version>` option with the CBL version you are using. 
+    If using CLion, add the option to Settings > Build, Execution, Deployment > CMake > CMake Options
 
 3. CLion will load the CMake Project and create `cmake-build-debug` directory for building.
 
@@ -138,11 +143,11 @@ ln -s ../../couchbase-lite-c-ee/couchbase-lite-core-EE couchbase-lite-core-EE
 popd
 ```
 
-4. When configurating CMake, add `-DCBL_FROM_SOURCE=ON`.
-    If using CLion, add the option to Settings > Build, Execution, Deploymenet > CMake > CMake Options
+4. When configuring CMake, add `-DCBL_FROM_SOURCE=ON`.
+    If using CLion, add the option to Settings > Build, Execution, Deployment > CMake > CMake Options
 
 ```
-mkdir build & cd build
+mkdir build && cd build
 cmake -DCBL_FROM_SOURCE=ON  ..
 make
 ```

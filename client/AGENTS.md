@@ -37,6 +37,7 @@ client/
     ├── logging.py                # cbl_info / cbl_error / cbl_warning / cbl_log_init, LogLevel
     ├── httpclient.py             # AsyncHTTPClient: wraps ClientSession so timeouts name the request; stream_download()
     ├── httplog.py                # HTTP request/response logging (get_next_writer)
+    ├── shell2http.py             # Shell2HttpClient: sidecar calls with a host-side timeout, logged to http_log/
     ├── greenboarduploader.py     # Upload test results to Greenboard
     ├── websocket_router.py       # WebSocket routing (used by JS server)
     ├── utils.py                  # General utilities

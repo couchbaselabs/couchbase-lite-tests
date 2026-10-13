@@ -25,8 +25,9 @@ environment/
 │   │
 │   ├── common/                         # Shared utilities (reuse these — don't duplicate)
 │   │   ├── docker.py                   # start_container(), remote_exec()
-│   │   ├── io.py                       # download_progress_bar, sftp_progress_bar, tar/zip/untar, get_ec2_hostname
+│   │   ├── io.py                       # download_progress_bar, sftp_progress_bar, upload_shell2http_scripts, tar/zip/untar, get_ec2_hostname
 │   │   ├── output.py                   # header()
+│   │   ├── shell2http/with-timeout.sh  # Wraps every sidecar endpoint to enforce ?timeout=
 │   │   ├── terraform.py                # get_terraform_output(), get_terraform_json()
 │   │   └── x509_certificate.py         # create_self_signed_certificate()
 │   │

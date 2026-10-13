@@ -15,6 +15,7 @@ BLD_NUM=${2}
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 BUILD_DIR="${SCRIPT_DIR}/../build"
 LIB_DIR="${SCRIPT_DIR}/../lib"
+ASSETS_DIR="${SCRIPT_DIR}/../assets"
 
 # Download CBL:
 "${SCRIPT_DIR}"/download_cbl.sh macos "enterprise" ${VERSION} ${BLD_NUM}
@@ -29,6 +30,7 @@ make -j8 install
 # Copy libcblite to
 cp "${LIB_DIR}"/libcblite/lib/libcblite*.dylib out/bin/
 
-# Copy assets folder
-cp -R assets out/bin
+# Copy assets folder. The server looks for it next to its own directory, as <executable>/../assets.
+mkdir -p out/assets
+cp -R "${ASSETS_DIR}/." out/assets/
 popd >/dev/null

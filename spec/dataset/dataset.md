@@ -607,3 +607,104 @@ function (doc, oldDoc, meta) {
   "value": "This is a test document for short_expiry dataset."
 }
 ```
+
+## 6. upgrade
+
+Documents in pre- and post-upgrade (4.x) states.
+
+The SG side is a Couchbase Server bucket backup, `dataset/couchbase-server/upgrade.zip`, restored into the
+`upgrade` bucket; it includes SG's database config and users, so `upgrade-sg.json` is empty.
+
+Revision IDs are shortened to their first 6 digest characters.
+
+### CBL Dataset
+
+| Collections         | #Docs       | Doc ID                                  |
+| :------------------ | ----------- |-----------------------------------------|
+| _default._default   | 13          | nonconflict_1 ... 6, conflict_1 ... 7   |
+
+| Doc ID        | Record | Current revision      | History    | Body                   |
+| :------------ | ------ | --------------------- | ---------- | ---------------------- |
+| nonconflict_1 | 3.x    | `2-509dc0`            | `1-e643a0` | `number: 2`            |
+| nonconflict_2 | 3.x    | `1-e643a0`            |            | `number: 1`            |
+| nonconflict_3 | 3.x    | `2-509dc0`            | `1-e643a0` | `number: 2`            |
+| nonconflict_4 | 3.x    | `2-509dc0`            | `1-e643a0` | `number: 2`            |
+| nonconflict_5 | 3.x    | `2-509dc0`            | `1-e643a0` | `number: 2`            |
+| nonconflict_6 | 4.x    | `186f172f445e0000@*`  | `2-509dc0` | `number: 3`            |
+| conflict_1    | 3.x    | `3-02d9ca`            | `2-509dc0` | `number: 3, extra: abc`|
+| conflict_2    | 3.x    | `3-02d9ca`            | `2-509dc0` | `number: 3, extra: abc`|
+| conflict_3    | 3.x    | `3-02d9ca`            | `2-509dc0` | `number: 3, extra: abc`|
+| conflict_4    | 3.x    | `3-7ea525`            | `2-509dc0` | `number: 3, extra: def`|
+| conflict_5    | 3.x    | `3-7ea525`            | `2-509dc0` | `number: 3, extra: def`|
+| conflict_6    | 4.x    | `186f172f45bf0000@*`  |            | `number: 1`            |
+| conflict_7    | 4.x    | `186f172f45c30000@*`  |            | `number: 1`            |
+
+Notes:
+
+* `<version>@*` is a version made by this database itself (`*` stands for its own source ID).
+* `nonconflict_6` is a local edit, made after the upgrade, of the legacy revision `2-509dc0`.
+* `conflict_6` and `conflict_7` were created new after the upgrade: they have no history, so they are unrelated
+  to SG's revisions of the same documents.
+
+### SG Dataset
+
+| Collections         | #Docs       | Doc ID                                  |
+| :------------------ | ----------- |-----------------------------------------|
+| _default._default   | 13          | nonconflict_1 ... 6, conflict_1 ... 7   |
+
+| Doc ID        | Current revision | History                | HLV                       | Body                   |
+| :------------ | ---------------- | ---------------------- | ------------------------- | ---------------------- |
+| nonconflict_1 | `1-e643a0`       |                        |                           | `number: 1`            |
+| nonconflict_2 | `2-36a2cf`       | `1-e643a0`             |                           | `number: 2`            |
+| nonconflict_3 | `2-509dc0`       | `1-e643a0`             |                           | `number: 2`            |
+| nonconflict_4 | `3-52ce08`       | `2-509dc0`, `1-e643a0` | `186f172f46f20000@SGW`    | `number: 3`            |
+| nonconflict_5 | `3-52ce08`       | `2-509dc0`, `1-e643a0` | `186f172f47910000@SGW`    | `number: 3`            |
+| nonconflict_6 | `2-509dc0`       | `1-e643a0`             |                           | `number: 2`            |
+| conflict_1    | `3-bca2d8`       | `2-509dc0`, `1-e643a0` |                           | `number: 3, extra: def`|
+| conflict_2    | `3-bca2d8`       | `2-509dc0`, `1-e643a0` |                           | `number: 3, extra: def`|
+| conflict_3    | `3-bca2d8`       | `2-509dc0`, `1-e643a0` | `186f172f48920000@SGW`    | `number: 3, extra: def`|
+| conflict_4    | `3-68483a`       | `2-509dc0`, `1-e643a0` |                           | `number: 3, extra: abc`|
+| conflict_5    | `3-68483a`       | `2-509dc0`, `1-e643a0` | `186f172f49230000@SGW`    | `number: 3, extra: abc`|
+| conflict_6    | `3-cbdaef`       | `2-509dc0`, `1-e643a0` |                           | `number: 3`            |
+| conflict_7    | `3-cbdaef`       | `2-509dc0`, `1-e643a0` |                           | `number: 3`            |
+
+An HLV marks a revision written by SG 4.x after the upgrade; documents without one have legacy revisions only.
+`SGW` stands for SG's source ID, `acn9cPAR/bXfOzkcyX4SKA`.
+
+### SG Config
+
+ | Config      | Value             |
+ | ----------- | ------------------|
+ | Database    | upgrade           |
+ | Bucket      | upgrade           |
+ | Port        | 4984 / 4985       |
+ | Collections | _default._default |
+
+#### Sync Function
+
+```js
+function foo(doc, oldDoc, meta) {
+  if (doc._deleted) {
+    channel(oldDoc.channels)
+  } else {
+    channel(doc.channels)
+  }
+}
+```
+
+#### Users
+
+| Username | Password  | admin_channels |
+| :------- | --------- |----------------|
+| user1    | pass      | ["*"]          |
+
+### Sample Docs
+
+```JSON
+{
+  "_id": "conflict_1",
+  "channels": ["numbers"],
+  "number": 3,
+  "extra": "abc"
+}
+```

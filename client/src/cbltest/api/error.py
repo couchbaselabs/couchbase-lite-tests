@@ -10,29 +10,6 @@ class CblTestError(Exception):
         super().__init__(*args)
 
 
-class CblTestServerBadResponseError(Exception):
-    """A bad HTTP code was returned from the test server"""
-
-    @property
-    def code(self) -> int:
-        """Gets the code that the test server returned"""
-        return self.__code
-
-    @property
-    def response(self) -> TestServerResponse:
-        """Gets the body of the response that had the bad status"""
-        return self.__response
-
-    def __init__(self, code: int, response: TestServerResponse, message: str) -> None:
-        self.__code = code
-        self.__response = response
-        self.__message = message
-        super().__init__(message)
-
-    def __str__(self) -> str:
-        return self.__message
-
-
 class CblTimeoutError(TimeoutError):
     """A timeout occurred while waiting for an event"""
 
@@ -58,6 +35,22 @@ class CblRemoteBadResponseError(Exception):
         self.__code = code
         self.__body = body
         super().__init__(*args)
+
+
+class CblTestServerBadResponseError(CblRemoteBadResponseError):
+    """A bad HTTP code was returned from the test server"""
+
+    @property
+    def response(self) -> TestServerResponse:
+        """Gets the body of the response that had the bad status"""
+        return self.__response
+
+    def __init__(self, code: int, response: TestServerResponse, message: str) -> None:
+        if response.error is not None:
+            message = f"{message}: ({response.error.domain} / {response.error.code}) {response.error.message}"
+
+        self.__response = response
+        super().__init__(code, message, body=response.serialize())
 
 
 class CblSyncGatewayBadResponseError(CblRemoteBadResponseError):

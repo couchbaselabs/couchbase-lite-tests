@@ -8,7 +8,7 @@ from aiohttp import ClientResponse
 from cbltest.api.jsonserializable import JSONSerializable
 from cbltest.assertions import _assert_not_null
 from cbltest.globals import CBLPyTestGlobal
-from cbltest.responses import GetRootResponse, TestServerResponse
+from cbltest.responses import GetRootResponse, TestServerResponse, unwrap_ws_payload
 from cbltest.version import available_api_version
 
 
@@ -91,12 +91,8 @@ class GetRootRequest(TestServerRequest):
         if ws_payload is None:
             raise ValueError("Both http and ws_payload were None for GetRootRequest")
 
-        status = 200
-        error = cast(dict | None, ws_payload.get("ts_error"))
-        if error is not None:
-            status = cast(int, error.get("code", 500))
-
-        return GetRootResponse(status, uuid, ws_payload)
+        status, body = unwrap_ws_payload(ws_payload)
+        return GetRootResponse(status, uuid, body)
 
 
 class PostResetRequestMethods(ABC):

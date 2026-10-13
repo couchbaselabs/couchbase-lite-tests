@@ -34,7 +34,7 @@ import requests
 from cryptography.x509 import ExtendedKeyUsageOID
 from tqdm import tqdm
 
-from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar
+from environment.aws.common.io import LIGHT_GRAY, sftp_progress_bar, upload_shell2http_scripts
 from environment.aws.common.output import header
 from environment.aws.common.ssh import connect_ssh
 from environment.aws.common.x509_certificate import CertKeyPair, create_cert
@@ -233,8 +233,7 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
     remote_exec(ssh, "bash /tmp/configure-system.sh", "Setting up instance")
 
-    for file in (SCRIPT_DIR / "shell2http").iterdir():
-        sftp_progress_bar(sftp, file, f"/home/ec2-user/shell2http/{file.name}")
+    upload_shell2http_scripts(sftp, SCRIPT_DIR)
 
     if es_info.is_release:
         remote_exec(
@@ -306,6 +305,7 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, es_info: EsDownloadIn
     )
     remote_exec(ssh, "/home/ec2-user/caddy start", "Starting ES log fileserver")
     remote_exec_bg(ssh, "bash /home/ec2-user/shell2http/start.sh", "Starting ES management server")
+    remote_exec(ssh, "rm -f /home/ec2-user/user/users.json", "Resetting the Edge Server users file")
     remote_exec(
         ssh,
         'echo \'{"name":"admin_user","password":"password","role":"admin"}\' | bash /home/ec2-user/shell2http/add-user.sh',

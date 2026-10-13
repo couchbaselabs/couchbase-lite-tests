@@ -26,6 +26,8 @@ ANDROID_CPP_DIR="${SCRIPT_DIR}/../platforms/android/app/src/main/cpp"
 
 rm -rf "${DOWNLOAD_DIR}" 2>/dev/null
 mkdir -p "${DOWNLOAD_DIR}"
+# LIB_DIR holds nothing tracked, so it is absent in a fresh checkout and the copies below would fail
+mkdir -p "${LIB_DIR}"
 pushd "${DOWNLOAD_DIR}" >/dev/null
 
 if [ ${PLATFORM} = "macos" ]; then
