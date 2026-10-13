@@ -282,6 +282,7 @@ name = "couchbase-lite-tests"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "bcrypt" },
     { name = "cbltest" },
     { name = "click" },
     { name = "paramiko" },
@@ -307,6 +308,7 @@ lint = [
 
 [package.metadata]
 requires-dist = [
+    { name = "bcrypt", specifier = "==4.2.1" },
     { name = "cbltest", editable = "client" },
     { name = "click", specifier = "==8.1.8" },
     { name = "paramiko", specifier = "==3.5.0" },
