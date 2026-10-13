@@ -29,7 +29,9 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-        await self.skip_if_sgw_not(sync_gateway, ">= 4.0.0")
+        # The fix for CBG-5978 is in 4.0.9 and 4.1.3, and every release after them. A SpecifierSet can't
+        # hold two ranges, so the 4.1 patch releases without the fix are excluded one by one.
+        await self.skip_if_sgw_not(sync_gateway, ">= 4.0.9, != 4.1.0, != 4.1.1, != 4.1.2")
 
         url_by_hostname = sync_gateway.replication_url("names")
         parts = urlsplit(url_by_hostname)
