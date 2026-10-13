@@ -4,10 +4,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Kill any existing shell2http server process to avoid port conflict -- a stale process left
+# listening on :20001 (from an earlier launch attempt or a prior run on a reused host) would
+# otherwise silently keep serving its own old route table, since the bind-check below only
+# confirms *something* is listening on the port, not that *this* launch is the one that bound it.
+# On a reused host that old process would lack /collect-logs. Wait for the port only when a process was stopped.
+if pkill -x shell2http 2>/dev/null; then
+  sleep 2
+fi
+
 WRAP="$SCRIPT_DIR/with-timeout.sh"
 setsid /home/ec2-user/shell2http/shell2http -no-index -cgi -500 -port 20001 \
   /start-cbs "$WRAP $SCRIPT_DIR/start-cbs.sh" \
-  /stop-cbs "$WRAP $SCRIPT_DIR/stop-cbs.sh" >/dev/null 2>&1 &
+  /stop-cbs "$WRAP $SCRIPT_DIR/stop-cbs.sh" \
+  /collect-logs "$WRAP $SCRIPT_DIR/collect-logs.sh" >/dev/null 2>&1 &
 
 # Wait for shell2http to start
 sleep 2

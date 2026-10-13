@@ -69,6 +69,7 @@ if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header --config QE/config.json \
     --ignore=dev_e2e/test_replication_xdcr.py \
     --sgcollect-on-test-failure \
+    --cbcollect-on-test-failure \
     --dataset-version "$DATASET_VERSION" \
     -k "$TEST_FILTER" \
     --no-result-upload
@@ -76,6 +77,7 @@ else
   uv run pytest -v --no-header --config QE/config.json \
     --ignore=dev_e2e/test_replication_xdcr.py \
     --dataset-version "$DATASET_VERSION" \
-    --sgcollect-on-test-failure
+    --sgcollect-on-test-failure \
+    --cbcollect-on-test-failure
 fi
 section_end
