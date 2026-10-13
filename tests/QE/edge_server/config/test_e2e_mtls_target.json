@@ -1,7 +1,8 @@
 {
     "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
     "interface": "0.0.0.0:59840",
-    "enable_anonymous_users": true,
+    "enable_anonymous_users": false,
+    "enable_user_access_control": true,
     "https": {
         "tls_cert_path": "replaced-at-runtime",
         "tls_key_path": "replaced-at-runtime",
@@ -15,7 +16,7 @@
             "enable_client_sync": true
         }
     },
-    "users": "/home/ec2-user/user/users.json",
+    "users": "/home/ec2-user/user/e2e_mtls_users.json",
     "logging": {
         "console": false,
         "file": {
@@ -23,9 +24,7 @@
             "format": "text"
         },
         "domains": {
-            "Listener": "info",
-            "WebSocket": "verbose",
-            "WS": "verbose"
+            "Listener": "info"
         }
     }
 }

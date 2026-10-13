@@ -34,10 +34,7 @@
             "format": "text"
         },
         "domains": {
-            "Listener": "info",
-            "Replicator": "verbose",
-            "WebSocket": "verbose",
-            "WS": "verbose"
+            "Listener": "info"
         }
     }
 }

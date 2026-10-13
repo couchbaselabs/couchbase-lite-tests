@@ -1,0 +1,31 @@
+{
+    "admin_user": {
+        "password": "$2b$05$lk8pJAdZi8jSJATDO9JqDO4kW.JUU3VKGb/fEoJzjkkAla4zXfXlq",
+        "roles": [
+            "admin"
+        ]
+    },
+    "qe-framework": {
+        "roles": [
+            "admin"
+        ]
+    },
+    "es-source": {
+        "access": {
+            "db": [
+                "read",
+                "write"
+            ]
+        }
+    },
+    "es-read-only": {
+        "access": {
+            "db": [
+                "read"
+            ]
+        }
+    },
+    "es-no-access": {
+        "access": {}
+    }
+}
