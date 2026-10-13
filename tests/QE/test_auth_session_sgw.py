@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
