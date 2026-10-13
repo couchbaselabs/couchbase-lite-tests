@@ -17,7 +17,7 @@ case "$FILENAME" in
   *) FILENAME="${FILENAME}.zip" ;;
 esac
 
-CBS_CONTAINER=$(sudo docker ps -a --format '{{.Names}}' | grep -E 'cbs|couchbase' | head -1)
+CBS_CONTAINER=$(sudo docker ps --filter 'name=^cbs-e2e$' --format '{{.Names}}')
 if [ -z "$CBS_CONTAINER" ]; then
   # Always exit 0 and report failure in the JSON body instead. On a non-zero exit, shell2http (-cgi -500) answers
   # HTTP 500 with this script's stdout followed by "exec error: exit status N", and Shell2HttpClient.call() raises
