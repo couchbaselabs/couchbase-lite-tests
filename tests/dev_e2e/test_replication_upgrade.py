@@ -91,7 +91,7 @@ class TestReplicationUpgrade(CBLTestClass):
         |                  |   Rev Tree    |      HLV      |   Rev Tree    |      HLV      |
         +------------------+---------------+---------------+---------------+---------------+
         | Initial State    |     1-abc     |      none     |  2-def,1-abc  |      none     |
-        | Expected Result  |  2-def,1-abc  | Encoded 2-def |     2-def     |      none     |
+        | Expected Result  |  2-def,1-abc  |      none     |  2-def,1-abc  |      none     |
         +------------------+---------------+---------------+---------------+---------------+
         """
         db = await setup_upgrade_env(self, cblpytest, dataset_path)
@@ -337,7 +337,7 @@ class TestReplicationUpgrade(CBLTestClass):
         Pull of a document that CBL does not have and that SGW still holds with a legacy
         (pre-upgrade) revision only, followed by a post-upgrade SGW mutation of the same
         document. The first pull stores the document with its legacy revID in the 4.x record
-        format; the second pull must accept the new revision (CBL-8954).
+        format; the second pull must accept the new revision (CBL-8954). Requires CBL 4.1.3 or later.
         +------------------+-------------------------------+-------------------------------+
         |                  |             CBL               |              SGW              |
         |                  +---------------+---------------+---------------+---------------+
@@ -437,7 +437,7 @@ class TestReplicationUpgrade(CBLTestClass):
         revisions only, followed by a post-upgrade SGW mutation of one of them and a second pull
         with the checkpoint reset. SGW then sends all documents in one `changes` batch. The batch
         must be processed, only the updated document must be pulled, and the other documents must
-        be unchanged (CBL-8954: one legacy-revID record used to fail the whole batch).
+        be unchanged (CBL-8954). Requires CBL 4.1.3 or later.
         +------------------+-------------------------------+-------------------------------+
         | nonconflict_2    |             CBL               |              SGW              |
         |                  +---------------+---------------+---------------+---------------+
@@ -538,11 +538,10 @@ class TestReplicationUpgrade(CBLTestClass):
         by a post-upgrade SGW mutation of that document. The first pull transfers nothing but
         records SGW's revision on the local document, which rewrites it into the 4.x record
         format while keeping its legacy revID. The second pull must accept the new revision
-        (CBL-8954).
+        (CBL-8954). Requires CBL 4.1.3 or later.
 
         Note: the rewrite in the first pull happens only because the `upgrade` dataset has no
-        remote mark for the test's SGW URL. Cases 7 and 8 cover the same record format without
-        that dependency.
+        remote mark for the test's SGW URL.
         +------------------+-------------------------------+-------------------------------+
         |                  |             CBL               |              SGW              |
         |                  +---------------+---------------+---------------+---------------+
@@ -1187,11 +1186,11 @@ class TestReplicationUpgrade(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_6(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
-        Bidirectional replication conflict between a post-upgrade CBL mutation and
-        a pre-upgrade SGW mutation, resolved with local wins — SGW and CBL have
-        conflicting revisions, with CBL selected as the winner under the legacy
-        default conflict resolution. CBL will rewrite the local winning revision
-        as a child of the remote revision and push it to SGW.
+        Bidirectional replication conflict between a document CBL created after the
+        4.x upgrade and an unrelated pre-upgrade SGW document with the same ID,
+        resolved with the local-wins resolver — CBL's document has a version vector
+        and no revision history, and SGW's has only legacy revisions. CBL keeps its
+        version and pushes it to SGW, where it becomes a child of SGW's revision.
         +------------------+-------------------------------------+-------------------------------------+
         |                  |                    CBL              |                   SGW               |
         |                  +--------------+----------------------+--------------+----------------------+
@@ -1263,11 +1262,12 @@ class TestReplicationUpgrade(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_conflict_case_7(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         """
-        Bidirectional replication conflict between a post-upgrade CBL mutation and
-        a pre-upgrade SGW mutation, resolved with remote wins — SGW and CBL have
-        conflicting revisions, with the remote revision selected as the winner
-        under the legacy default conflict resolution. CBL will rewrite the local
-        winning revision as a child of the remote revision and push it to SGW.
+        Bidirectional replication conflict between a document CBL created after the
+        4.x upgrade and an unrelated pre-upgrade SGW document with the same ID,
+        resolved with the remote-wins resolver — CBL's document has a version vector
+        and no revision history, and SGW's has only legacy revisions. CBL takes SGW's
+        revision, so its HLV becomes the encoded legacy revision ID, and the push that
+        follows leaves SGW unchanged.
 
         +------------------+---------------------------+---------------------------+
         |                  |            CBL            |            SGW            |
@@ -1345,6 +1345,7 @@ class TestReplicationUpgrade(CBLTestClass):
         remote wins, followed by a post-upgrade SGW mutation of the same document. After the
         resolution CBL holds SGW's legacy revision, pulled with a legacy-only history, in the
         4.x record format. The second pull must accept the new revision (CBL-8954).
+        Requires CBL 4.1.3 or later.
         +------------------+-------------------------------+-------------------------------+
         |                  |             CBL               |              SGW              |
         |                  +---------------+---------------+---------------+---------------+
