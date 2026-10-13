@@ -56,7 +56,7 @@ STAGED_REDACTED_IN_CONTAINER="$STAGING_DIR_IN_CONTAINER/$REDACTED_FILENAME"
 # but not cbcollect_info inside the container, so it gets the same limit there.
 CONTAINER_TIMEOUT=()
 if [[ "${QUERY_STRING:-}" =~ (^|&)timeout=([0-9]+(\.[0-9]+)?)(&|$) ]]; then
-  CONTAINER_TIMEOUT=(timeout --kill-after=1 "${BASH_REMATCH[2]}")
+  CONTAINER_TIMEOUT=(timeout --kill-after=1 "$(awk -v t="${BASH_REMATCH[2]}" 'BEGIN { print t * 0.9 }')")
 fi
 # Only stderr is captured, into COLLECT_ERR; stdout is discarded. cbcollect_info logs every message to stderr,
 # including a "<task> - OK" or "Exit code N" line per task -- thousands on a loaded cluster.
