@@ -24,6 +24,15 @@ async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
     return (await sg.get_delta_sync_stats(db_name))["deltas_sent"]
 
 
+async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
+    # SGW publishes no delta_sync stats for a database with delta sync disabled,
+    # and such a database cannot send deltas.
+    try:
+        return await _deltas_sent(sg, db_name)
+    except KeyError:
+        return 0
+
+
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
@@ -491,7 +500,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Record the number of deltas SGW has sent")
-        deltas_sent_before = await _deltas_sent(sync_gateway, "posts")
+        deltas_sent_before = await _deltas_sent_or_zero(sync_gateway, "posts")
 
         self.mark_test_step("Get the existing document")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
@@ -540,7 +549,7 @@ class TestDeltaSync(CBLTestClass):
         )
 
         self.mark_test_step("Verify SGW sent the full document, not a delta (delta sync is disabled).")
-        deltas_sent = await _deltas_sent(sync_gateway, "posts") - deltas_sent_before
+        deltas_sent = await _deltas_sent_or_zero(sync_gateway, "posts") - deltas_sent_before
         assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
 
         await cblpytest.test_servers[0].cleanup()
