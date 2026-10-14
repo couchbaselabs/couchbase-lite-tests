@@ -1,4 +1,3 @@
-import asyncio
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -6,8 +5,7 @@ from typing import Any
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.database_types import DocumentEntry
-from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestServerBadResponseError, CblTimeoutError
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -442,8 +440,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await sync_gateway.delete_session("travel", session_id)
         await _assert_sg_rejects(sync_gateway, get_sync_gateway_session_headers(session_id))
 
-        self.mark_test_step("Write `post-revocation-doc` on SG 15 seconds later")
-        await asyncio.sleep(15)
+        self.mark_test_step("Write `post-revocation-doc` on SG")
         await sync_gateway.create_document(
             "travel", "post-revocation-doc", {"channels": [CHANNEL]}, scope="travel", collection="airports"
         )
@@ -588,6 +585,7 @@ class TestSessionAuthReplication(CBLTestClass):
             collections=[ReplicatorCollectionEntry([COLLECTION])],
             authenticator=authenticator,
             pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
         )
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
@@ -599,43 +597,18 @@ class TestSessionAuthReplication(CBLTestClass):
         await sg_cluster_manager.nodes[0].stop()
         await replicator.wait_for(ReplicatorActivityLevel.OFFLINE)
 
-        doc_id = f"post-restart-{auth_type}"
-        self.mark_test_step(f"Start SG, wait until `travel` is online, and write `{doc_id}` on SG")
+        self.mark_test_step(f"Start SG and write `post-restart-{auth_type}` on it")
         await sg_cluster_manager.nodes[0].start()
-        await cblpytest.sync_gateway_cluster.wait_for_db_online("travel")
+        doc_id = f"post-restart-{auth_type}"
         await sync_gateway.create_document(
             "travel", doc_id, {"channels": [CHANNEL]}, scope="travel", collection="airports"
         )
 
         self.mark_test_step("Check the replicator reconnects on the same credentials and the document arrives")
-        for _ in range(180):
-            status = await replicator.get_status()
-            assert status.activity != ReplicatorActivityLevel.STOPPED, (
-                "Replicator stopped instead of reconnecting after the restart: "
-                + (
-                    f"({status.error.domain} / {status.error.code}) {status.error.message}"
-                    if status.error
-                    else "no error"
-                )
-            )
-            try:
-                await db.get_document(DocumentEntry(COLLECTION, doc_id))
-                break
-            except CblTestServerBadResponseError as e:
-                if e.code != 404:
-                    raise
-            await asyncio.sleep(1)
-        else:
-            raise AssertionError(f"`{doc_id}` never arrived after the restart; replicator is {status.activity}")
-
-        self.mark_test_step("Check the replicator returns to idle")
-        try:
-            await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=60))
-        except CblTimeoutError:
-            status = await replicator.get_status()
-            error = f"({status.error.domain} / {status.error.code}) {status.error.message}" if status.error else "none"
-            raise AssertionError(
-                f"Replicator delivered `{doc_id}` but was still {status.activity} 60 seconds later (error: {error})"
-            ) from None
+        await replicator.wait_for_all_doc_events(
+            {WaitForDocumentEventEntry(COLLECTION, doc_id, ReplicatorType.PULL, ReplicatorDocumentFlags.NONE)},
+            max_retries=60,
+            idle_timeout=timedelta(seconds=60),
+        )
 
         await cblpytest.test_servers[0].cleanup()

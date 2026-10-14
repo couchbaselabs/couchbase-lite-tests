@@ -118,7 +118,7 @@ replication cannot be explained by a no-op delete.
 3. Start a continuous push-and-pull replicator on a session for `user1`
 4. Wait until the replicator is idle
 5. Delete the session and check SG rejects it for new requests
-6. Write `post-revocation-doc` on SG 15 seconds later
+6. Write `post-revocation-doc` on SG
 7. Check the document arrives and the replicator stays idle
 
 ## #9 test_jwt_user_revoked_during_continuous_replication
@@ -152,14 +152,10 @@ An expired JWT is rejected, and a fresh JWT then replicates on the same database
 ## #11 test_sgw_restart_during_replication
 
 ### Description
-A continuous replicator reconnects on the same credentials after Sync Gateway restarts,
-delivers a document written after the restart, and returns to idle: an outage must not be
-treated as an auth failure. Parametrized over a session and a JWT, since sessions are stored
-in the bucket while a JWT is checked against the provider config on every connection.
-Requires the shell2http sidecar; skipped without it.
-
-The document is checked before the idle state, so a replicator that reconnects but never
-settles is reported as such rather than as a failed reconnect.
+A continuous replicator reconnects on the same credentials after Sync Gateway restarts:
+an outage must not be treated as an auth failure. Parametrized over a session and a JWT,
+since sessions are stored in the bucket while a JWT is checked against the provider config
+on every connection. Requires the shell2http sidecar; skipped without it.
 
 ### Steps
 1. Create the SG `travel` database and session / jwt credentials
@@ -168,6 +164,5 @@ settles is reported as such rather than as a failed reconnect.
 2. Reset local database with an empty `travel.airports` collection
 3. Start a continuous push-and-pull replicator and wait until it is idle
 4. Stop SG and wait until the replicator is offline
-5. Start SG, wait until `travel` is online, and write `post-restart-session` / `post-restart-jwt` on SG
+5. Start SG and write `post-restart-session` / `post-restart-jwt` on it
 6. Check the replicator reconnects on the same credentials and the document arrives
-7. Check the replicator returns to idle

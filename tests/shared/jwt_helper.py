@@ -61,7 +61,7 @@ def generate_jwt(
     alg: str = "RS256",
     sign_with: rsa.RSAPrivateKey | None = None,
 ) -> str:
-    """Generate a signed RS256 JWT token.
+    """Generate an RS256-signed JWT, or an unsigned one with ``alg="none"``.
 
     Args:
         private_key: RSA private key for signing.
@@ -71,14 +71,17 @@ def generate_jwt(
         kid: Key ID to include in the JWT header.
         issuer: The 'iss' claim — must match the provider's configured issuer.
         audience: The 'aud' claim — must match the provider's configured client_id.
-        alg: The 'alg' header value.  Only RS256 is actually signed; pass 'none' to
-            mint an unsigned token for algorithm-confusion tests.
+        alg: The 'alg' header value: "RS256" (signed) or "none" (unsigned, for
+            algorithm-confusion tests).  Any other value raises ValueError, since the
+            header would not match how the token is signed.
         sign_with: Sign with this key instead of `private_key`, to mint a token whose
             signature will not verify against the published JWK.
 
     Returns:
         Signed JWT string.
     """
+    if alg not in ("RS256", "none"):
+        raise ValueError(f'Unsupported alg {alg!r}: only "RS256" and "none" are implemented')
     now = int(time.time())
     header = _b64url(
         json.dumps(
