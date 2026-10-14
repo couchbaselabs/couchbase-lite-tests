@@ -10,7 +10,7 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
-        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue:true, description:'Only CBL JS tests that run using edge server')
+        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: true, description: 'Run only the tests that replicate with the CBL-JS test server (those marked min_test_servers, all in tests/QE/edge_server). Needs a topology with a JS test server. TEST_NAME still narrows them with -k; TEST_DIR is ignored.')
     }
     options {
         ansiColor('xterm')
@@ -22,11 +22,15 @@ pipeline {
                 script {
                     if (params.ES_VERSION == '') { error "ES_VERSION is required" }
                     if (params.TEST_NAME == '') { error "TEST_NAME is required" }
-                    if (params.TEST_DIR == 'both' && params.TEST_NAME != '.') { error "TEST_NAME must be '.' when TEST_DIR is 'both'" }
+                    if (params.TEST_DIR == 'both' && params.TEST_NAME != '.' && !params.JS_REPLICATION_TESTS_ONLY) { error "TEST_NAME must be '.' when TEST_DIR is 'both'" }
                     if (params.TOPOLOGY_NAME.contains('_js') && !params.CBL_VERSION) { error "CBL_VERSION is required for ${params.TOPOLOGY_NAME}" }
                     if (params.CBL_VERSION && !(params.CBL_VERSION ==~ /\d+\.\d+\.\d+-\d+/)) { error "CBL_VERSION must be <version>-<build>, e.g. 1.1.0-25" }
+                    if (params.JS_REPLICATION_TESTS_ONLY && !params.TOPOLOGY_NAME.contains('_js')) {
+                        error "JS_REPLICATION_TESTS_ONLY needs a topology with a JS test server (e.g. 3es_1sgw_1js_topology.json); ${params.TOPOLOGY_NAME} has none, so every selected test would be skipped"
+                    }
+                    def scope = params.JS_REPLICATION_TESTS_ONLY ? "QE (JS replication only)" : params.TEST_DIR
                     currentBuild.displayName = "ES:${params.ES_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "${params.TEST_DIR}: ${params.TEST_NAME} | SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'} | CBL-JS: ${params.CBL_VERSION ?: 'none'}"
+                    currentBuild.description = "${scope}: ${params.TEST_NAME} | SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'} | CBL-JS: ${params.CBL_VERSION ?: 'none'}"
                 }
             }
         }
@@ -70,7 +74,8 @@ pipeline {
                                     "${params.CBS_VERSION}" \
                                     "${params.TS_DATASET_VERSION}" \
                                     "${params.TEST_DIR}" \
-                                    "${params.CBL_VERSION}"
+                                    "${params.CBL_VERSION}" \
+                                    "${params.JS_REPLICATION_TESTS_ONLY}"
                             """
                         }
                     }
