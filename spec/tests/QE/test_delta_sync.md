@@ -109,15 +109,14 @@ Verify delta sync behavior when toggling delta sync enabled/disabled. Ensures th
     * credentials: user1/pass
 15. Wait until the replicator stops.
 16. Verify docs are replicated correctly.
-17. Record the bytes transferred.
-18. Get existing document size for comparison
+17. Record the number of deltas SGW has sent.
+18. Get the existing document
 19. Update docs in SGW:
     * Modify the `name` field of the new doc.
 20. Start the same replicator again.
 21. Wait until the replicator stops.
 22. Verify the document was updated correctly in CBL
-23. Record the bytes transferred
-24. Verify delta transferred equivalent to doc size (full doc transfer).
+23. Verify SGW sent the full document, not a delta (delta sync is disabled).
 
 ## #5 test_delta_sync_within_expiry
 
@@ -137,7 +136,7 @@ Verify that after revision expiry, any document update (even a small change) res
    * continuous: false
    * credentials: user1/pass
 5. Wait until the replicator stops.
-6. Record the bytes transferred.
+6. Record the number of deltas SGW has sent.
 7. Get the current document state and revision before update.
 8. Verify old revision body is accessible before expiry through public API.
 9. Update docs in SGW:
@@ -146,12 +145,9 @@ Verify that after revision expiry, any document update (even a small change) res
 11. Verify old revision is not accessible through public API.
 12. Start the same replicator again.
 13. Wait until the replicator stops.
-14. Record the bytes transferred post expiry.
-    * SGW sent no delta.
-15. Verify:
-    * The transferred bytes are approximately equal to the full document size (>3000 bytes)
-    * This indicates SGW correctly sent the full document after revision expiry
-    * The small change forced a full document transfer due to expired revision
+14. Verify:
+    * SGW sent the full document, not a delta, because the old revision expired
+    * CBL has the updated document
 
 ## #6 test_delta_sync_with_no_deltas
 

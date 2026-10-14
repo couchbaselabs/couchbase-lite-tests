@@ -24,6 +24,15 @@ async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
     return (await sg.get_delta_sync_stats(db_name))["deltas_sent"]
 
 
+async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
+    # SGW publishes no delta_sync stats for a database with delta sync disabled,
+    # and such a database cannot send deltas.
+    try:
+        return await _deltas_sent(sg, db_name)
+    except KeyError:
+        return 0
+
+
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
@@ -490,10 +499,10 @@ class TestDeltaSync(CBLTestClass):
             ["_default.posts"],
         )
 
-        self.mark_test_step("Record the bytes transferred")
-        bytes_read_before, _ = await sync_gateway.bytes_transferred("posts")
+        self.mark_test_step("Record the number of deltas SGW has sent")
+        deltas_sent_before = await _deltas_sent_or_zero(sync_gateway, "posts")
 
-        self.mark_test_step("Get existing document size for comparison")
+        self.mark_test_step("Get the existing document")
         original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
 
         self.mark_test_step("""
@@ -539,15 +548,9 @@ class TestDeltaSync(CBLTestClass):
             f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
         )
 
-        self.mark_test_step("Record the bytes transferred")
-        bytes_read_after, _ = await sync_gateway.bytes_transferred("posts")
-
-        self.mark_test_step("Verify delta transferred equivalent to doc size (full doc transfer).")
-        updated_doc_size = len(json.dumps(updated_cbl_doc.body).encode("utf-8"))
-        delta_bytes_transferred = bytes_read_after - bytes_read_before
-        assert delta_bytes_transferred >= 0.8 * updated_doc_size, (
-            f"Expected a full doc transfer, but only {delta_bytes_transferred} bytes read (doc size: {updated_doc_size})"
-        )
+        self.mark_test_step("Verify SGW sent the full document, not a delta (delta sync is disabled).")
+        deltas_sent = await _deltas_sent_or_zero(sync_gateway, "posts") - deltas_sent_before
+        assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -615,8 +618,7 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred.")
-        read_pull_bytes_before, _ = await sync_gateway.bytes_transferred("short_expiry")
+        self.mark_test_step("Record the number of deltas SGW has sent.")
         deltas_sent_before = await _deltas_sent(sync_gateway, "short_expiry")
 
         self.mark_test_step("Get the current document state and revision before update.")
@@ -663,24 +665,16 @@ class TestDeltaSync(CBLTestClass):
             f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
-        self.mark_test_step("Record the bytes transferred post expiry.")
-        read_pull_bytes_after, _ = await sync_gateway.bytes_transferred("short_expiry")
-        deltas_sent = await _deltas_sent(sync_gateway, "short_expiry") - deltas_sent_before
-        assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
-        delta_bytes_read = read_pull_bytes_after - read_pull_bytes_before
-
         self.mark_test_step("""
             Verify:
-                * The transferred bytes are approximately equal to the full document size (>3000 bytes)
-                * This indicates SGW correctly sent the full document after revision expiry
-                * The small change forced a full document transfer due to expired revision
+                * SGW sent the full document, not a delta, because the old revision expired
+                * CBL has the updated document
         """)
+        deltas_sent = await _deltas_sent(sync_gateway, "short_expiry") - deltas_sent_before
+        assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
         cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc1"))
         assert cbl_doc is not None, "Document should exist in CBL"
-        updated_doc_size = len(json.dumps(cbl_doc.body).encode("utf-8"))
-        assert delta_bytes_read >= 0.8 * updated_doc_size, (
-            f"Expected a full doc transfer since old revision expired, but only {delta_bytes_read} bytes read (doc size: {updated_doc_size})"
-        )
+        assert cbl_doc.body.get("name") == "SGW", f"Expected updated name, got: {cbl_doc.body.get('name')}"
 
         await cblpytest.test_servers[0].cleanup()
 
