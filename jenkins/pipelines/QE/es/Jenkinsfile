@@ -4,10 +4,13 @@ pipeline {
         string(name: 'ES_VERSION', defaultValue: '1.0.1', description: 'Edge Server version')
         choice(name: 'TEST_DIR', choices: ['both','QE', 'dev_e2e'], description: 'Edge Server test directory: tests/QE/edge_server, tests/dev_e2e/edge_server, or both')
         string(name: 'TEST_NAME', defaultValue: '.', description: '"." runs all tests in TEST_DIR; anything else is passed to pytest -k (not allowed with TEST_DIR=both)')
-        string(name: 'TOPOLOGY_NAME', defaultValue: 'es_sgw_topology.json', description: 'Topology file name')
+        string(name: 'TOPOLOGY_NAME', defaultValue: 'es_sgw_topology.json', description: 'Topology file name. 3es_1sgw_1js_topology.json also runs a CBL-JS test server on the Jenkins agent (localhost), and needs CBL_VERSION.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version-build for a topology with a JS test server (e.g. 1.1.0-25). Leave empty for topologies without test servers.')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the JS test server for CBL_VERSION. Uncheck to reuse existing artifacts.')
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
+        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue:true, description:'Only CBL JS tests that run using edge server')
     }
     options {
         ansiColor('xterm')
@@ -20,8 +23,26 @@ pipeline {
                     if (params.ES_VERSION == '') { error "ES_VERSION is required" }
                     if (params.TEST_NAME == '') { error "TEST_NAME is required" }
                     if (params.TEST_DIR == 'both' && params.TEST_NAME != '.') { error "TEST_NAME must be '.' when TEST_DIR is 'both'" }
+                    if (params.TOPOLOGY_NAME.contains('_js') && !params.CBL_VERSION) { error "CBL_VERSION is required for ${params.TOPOLOGY_NAME}" }
+                    if (params.CBL_VERSION && !(params.CBL_VERSION ==~ /\d+\.\d+\.\d+-\d+/)) { error "CBL_VERSION must be <version>-<build>, e.g. 1.1.0-25" }
                     currentBuild.displayName = "ES:${params.ES_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "${params.TEST_DIR}: ${params.TEST_NAME} | SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'}"
+                    currentBuild.description = "${params.TEST_DIR}: ${params.TEST_NAME} | SGW: ${params.SGW_VERSION ?: 'none'} | CBS: ${params.CBS_VERSION ?: 'none'} | CBL-JS: ${params.CBL_VERSION ?: 'none'}"
+                }
+            }
+        }
+        stage('Prebuild JS Test Server') {
+            when { beforeAgent true; expression { params.CBL_VERSION && params.RUN_PREBUILD } }
+            steps {
+                script {
+                    def (cblVersion, cblBuild) = params.CBL_VERSION.tokenize('-')
+                    build job: 'prebuild-test-server',
+                    parameters: [
+                        string(name: 'TS_PLATFORM', value: 'js'),
+                        string(name: 'CBL_VERSION', value: cblVersion),
+                        string(name: 'CBL_BUILD', value: cblBuild)
+                    ],
+                    wait: true,
+                    propagate: true
                 }
             }
         }
@@ -37,17 +58,28 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run Edge server Tests"
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh """
-                        jenkins/pipelines/QE/es/test.sh \
-                            "${params.ES_VERSION}" \
-                            "${params.TEST_NAME}" \
-                            "${params.TOPOLOGY_NAME}" \
-                            "${params.SGW_VERSION}" \
-                            "${params.CBS_VERSION}" \
-                            "${params.TS_DATASET_VERSION}" \
-                            "${params.TEST_DIR}"
-                    """
+                script {
+                    def runTests = {
+                        timeout(time: 60, unit: 'MINUTES') {
+                            sh """
+                                jenkins/pipelines/QE/es/test.sh \
+                                    "${params.ES_VERSION}" \
+                                    "${params.TEST_NAME}" \
+                                    "${params.TOPOLOGY_NAME}" \
+                                    "${params.SGW_VERSION}" \
+                                    "${params.CBS_VERSION}" \
+                                    "${params.TS_DATASET_VERSION}" \
+                                    "${params.TEST_DIR}" \
+                                    "${params.CBL_VERSION}"
+                            """
+                        }
+                    }
+                    // The JS test server runs on this agent at localhost:5173, so only one such run per agent.
+                    if (params.CBL_VERSION) {
+                        lock("${env.NODE_NAME}-js-test-server") { runTests() }
+                    } else {
+                        runTests()
+                    }
                 }
                 echo "=== Edge server Tests Complete"
             }

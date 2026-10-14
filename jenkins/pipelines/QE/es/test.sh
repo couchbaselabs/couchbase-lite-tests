@@ -9,7 +9,8 @@ TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
 SGW_VERSION="${4:-}"
 CBS_VERSION="${5:-}"
 DATASET_VERSION="${6:-4.0}"
-TEST_DIR="${7:-QE}" # QE | dev_e2e | both
+TEST_DIR="${7:-QE}"  # QE | dev_e2e | both
+CBL_VERSION="${8:-}" # version-build for the topology's test servers (e.g. the localhost JS test server)
 TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
 
 if [ -z "$SGW_VERSION" ]; then
@@ -45,7 +46,7 @@ if [ "$TEST_NAME" != "." ]; then
 fi
 
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}" --cbl-version "${CBL_VERSION:-}"
 
 export COLUMNS=200
 TEST_RESULT=0
