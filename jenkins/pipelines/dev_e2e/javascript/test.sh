@@ -36,6 +36,11 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "This script only supports macOS"
+  exit 1
+fi
+
 echo "Setup backend..."
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
 
