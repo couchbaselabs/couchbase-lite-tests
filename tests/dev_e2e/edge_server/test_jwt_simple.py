@@ -86,11 +86,11 @@ class TestJWTSimple(CBLTestClass):
         # STEP 4: Pre-create JWT user with channel access.
         # SGW auto-registers users on first JWT auth (register=true), but the
         # auto-created user has no channel access. We pre-create with
-        # admin_channels=["*"] so it can pull all documents.
+        # admin_channels=["airlines"] so it can pull the test documents.
         # Username format: "<provider>_<sub>" = "test-provider_user1"
         # =====================================================================
         self.mark_test_step("Adding JWT user with channel access.")
-        input_data = {"travel.airlines": ["*"]}
+        input_data = {"travel.airlines": ["airlines"]}
         access_dict = sync_gateway.create_collection_access_dict(input_data)
         await sync_gateway.add_user(sg_db_name, "test-provider_user1", "pass", access_dict)
 
@@ -105,7 +105,7 @@ class TestJWTSimple(CBLTestClass):
             doc_id = f"jwt_test_airline_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"JWT Test Airline {i}",
             }
