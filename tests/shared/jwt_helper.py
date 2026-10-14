@@ -2,6 +2,7 @@ import base64
 import json
 import time
 
+from cbltest.api.syncgateway import JWK, LocalJWT
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
@@ -19,9 +20,6 @@ def generate_rsa_keypair() -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
     return private_key, private_key.public_key()
 
 
-from cbltest.api.syncgateway import JWK
-
-
 def public_key_to_jwk(public_key: rsa.RSAPublicKey, kid: str = "test-key-1") -> JWK:
     """Convert RSA public key to JWK format for SGW OIDC config."""
     numbers = public_key.public_numbers()
@@ -34,6 +32,22 @@ def public_key_to_jwk(public_key: rsa.RSAPublicKey, kid: str = "test-key-1") -> 
         alg="RS256",
         use="sig",
         kid=kid,
+    )
+
+
+def local_jwt_provider(
+    keys: list[JWK],
+    issuer: str = "test-issuer",
+    audience: str = "edge-server",
+    register: bool = True,
+) -> LocalJWT:
+    """Build an RS256 `local_jwt` provider for a SGW database config that trusts the given keys."""
+    return LocalJWT(
+        issuer=issuer,
+        client_id=audience,
+        register=register,
+        algorithms=["RS256"],
+        keys=keys,
     )
 
 

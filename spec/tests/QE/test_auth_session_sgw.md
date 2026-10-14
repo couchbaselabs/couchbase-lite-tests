@@ -55,9 +55,9 @@ each session's identity decides what it receives.
 One-shot replication succeeds on a JWT validated by a `local_jwt` provider.
 
 ### Steps
-1. Reset SG and load `travel` dataset
-2. Configure a `local_jwt` provider and create the user its tokens map to
-3. Reset local database and load `travel` dataset
+1. Create an empty SG `travel` database with a `local_jwt` provider and its user
+2. Reset local database with an empty `travel.airports` collection
+3. Write `jwt-doc` on SG
 4. Start a pull replicator with a valid JWT
 5. Wait until the replicator stops and check there is no error
 6. Check that all documents are replicated correctly
@@ -69,11 +69,10 @@ A JWT that is wrong in exactly one way is rejected. Parametrized over: expired, 
 issuer, signed with an unpublished key, unsigned (`alg: none`), and not a JWT at all.
 
 ### Steps
-1. Reset SG and load `travel` dataset
-2. Configure a `local_jwt` provider and create the user its tokens map to
-3. Reset local database and load `travel` dataset
-4. Start a pull replicator with a JWT that is wrong in exactly one way
-5. Check the replicator stops with an auth error
+1. Create an empty SG `travel` database with a `local_jwt` provider and its user
+2. Reset local database with an empty `travel.airports` collection
+3. Start a pull replicator with a JWT that is wrong in exactly one way
+4. Check the replicator stops with an auth error
 
 ## #6 test_anonymous_replication_rejected
 
@@ -90,12 +89,12 @@ A replicator with no authenticator is rejected when the GUEST user is disabled.
 ## #7 test_guest_replication_allowed
 
 ### Description
-A replicator with no authenticator syncs when the GUEST user is enabled. The positive
-counterpart to #6.
+A replicator with no authenticator syncs when the GUEST user is enabled, and receives only
+the documents in the GUEST user's channel. The positive counterpart to #6.
 
 ### Steps
 1. Reset SG and load `travel` dataset
-2. Enable the GUEST user with access to `travel.airports`
+2. Enable the GUEST user with access to the `United States` channel
 3. Reset local database and load `travel` dataset
 4. Start a replicator
    * endpoint: `/travel`
@@ -104,7 +103,7 @@ counterpart to #6.
    * continuous: false
    * credentials: none
 5. Wait until the replicator stops and check there is no error
-6. Check that all documents are replicated correctly
+6. Check `db1` holds exactly the `travel.airports` documents SG serves to the GUEST user
 
 ## #8 test_session_revoked_during_continuous_replication
 
@@ -130,13 +129,12 @@ replication. A signed JWT cannot be revoked, so deleting the user is the only wa
 withdraw access before the token expires.
 
 ### Steps
-1. Reset SG and load `travel` dataset
-2. Configure a `local_jwt` provider and create the user its tokens map to
-3. Reset local database and load `travel` dataset
-4. Start a continuous push-and-pull replicator with a valid JWT
-5. Wait until the replicator is idle
-6. Delete the user the JWT maps to and write `post-jwt-revocation-doc` on SG
-7. Check the document never reaches the deleted user
+1. Create an empty SG `travel` database with a `local_jwt` provider and its user
+2. Reset local database with an empty `travel.airports` collection
+3. Start a continuous push-and-pull replicator with a valid JWT
+4. Wait until the replicator is idle
+5. Delete the user the JWT maps to and write `post-jwt-revocation-doc` on SG
+6. Check the replicator stops on an auth error and the document never arrives
 
 ## #10 test_expired_jwt_then_fresh_token
 
@@ -144,27 +142,32 @@ withdraw access before the token expires.
 An expired JWT is rejected, and a fresh JWT then replicates on the same database.
 
 ### Steps
-1. Reset SG and load `travel` dataset
-2. Configure a `local_jwt` provider and create the user its tokens map to
-3. Reset local database and load `travel` dataset
-4. Start a continuous push-and-pull replicator with an expired JWT
-5. Check the replicator stops with an auth error
-6. Start a new continuous push-and-pull replicator with a fresh JWT
-7. Wait until the replicator is idle and check there is no error
+1. Create an empty SG `travel` database with a `local_jwt` provider and its user
+2. Reset local database with an empty `travel.airports` collection
+3. Start a one-shot push-and-pull replicator with an expired JWT
+4. Check the replicator stops with an auth error
+5. Start a new continuous push-and-pull replicator with a fresh JWT
+6. Wait until the replicator is idle and check there is no error
 
 ## #11 test_sgw_restart_during_replication
 
 ### Description
-A continuous replicator reconnects on the same credentials after Sync Gateway restarts:
-an outage must not be treated as an auth failure. Parametrized over a session and a JWT,
-since sessions are stored in the bucket while a JWT is checked against the provider config
-on every connection. Requires the shell2http sidecar; skipped without it.
+A continuous replicator reconnects on the same credentials after Sync Gateway restarts,
+delivers a document written after the restart, and returns to idle: an outage must not be
+treated as an auth failure. Parametrized over a session and a JWT, since sessions are stored
+in the bucket while a JWT is checked against the provider config on every connection.
+Requires the shell2http sidecar; skipped without it.
+
+The document is checked before the idle state, so a replicator that reconnects but never
+settles is reported as such rather than as a failed reconnect.
 
 ### Steps
-1. Reset SG and load `travel` dataset
-2. Create session / jwt credentials
-3. Reset local database and load `travel` dataset
-4. Start a continuous push-and-pull replicator and wait until it is idle
-5. Stop SG and wait until the replicator is offline
-6. Start SG and write `post-restart-session` / `post-restart-jwt` on it
-7. Check the replicator reconnects on the same credentials and the document arrives
+1. Create the SG `travel` database and session / jwt credentials
+   * session: load the `travel` dataset and create a session for `user1`
+   * jwt: create an empty `travel` database with a `local_jwt` provider and its user
+2. Reset local database with an empty `travel.airports` collection
+3. Start a continuous push-and-pull replicator and wait until it is idle
+4. Stop SG and wait until the replicator is offline
+5. Start SG, wait until `travel` is online, and write `post-restart-session` / `post-restart-jwt` on SG
+6. Check the replicator reconnects on the same credentials and the document arrives
+7. Check the replicator returns to idle

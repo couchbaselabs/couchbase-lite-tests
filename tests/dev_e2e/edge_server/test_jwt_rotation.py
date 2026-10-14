@@ -4,9 +4,9 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.syncgateway import DatabaseConfig, LocalJWT, ScopeConfig
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
-from shared.jwt_helper import generate_jwt, generate_rsa_keypair, public_key_to_jwk
+from shared.jwt_helper import generate_jwt, generate_rsa_keypair, local_jwt_provider, public_key_to_jwk
 
 SCRIPT_DIR = str(Path(__file__).parent)
 JWT_FILE = "/home/ec2-user/cert/jwt.txt"
@@ -67,15 +67,7 @@ class TestJWTReplication(CBLTestClass):
                 )
             },
             num_index_replicas=0,
-            local_jwt={
-                "test-provider": LocalJWT(
-                    issuer="test-issuer",
-                    client_id="edge-server",
-                    register=True,
-                    algorithms=["RS256"],
-                    keys=[jwk],
-                )
-            },
+            local_jwt={"test-provider": local_jwt_provider([jwk])},
         )
         await cloud.create_database("travel", payload)
 
@@ -169,15 +161,7 @@ class TestJWTReplication(CBLTestClass):
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
-            local_jwt={
-                "test-provider": LocalJWT(
-                    issuer="test-issuer",
-                    client_id="edge-server",
-                    register=True,
-                    algorithms=["RS256"],
-                    keys=[jwk_a, jwk_b],
-                )
-            },
+            local_jwt={"test-provider": local_jwt_provider([jwk_a, jwk_b])},
         )
         await cloud.create_database("travel", payload)
 
@@ -299,13 +283,7 @@ class TestJWTReplication(CBLTestClass):
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
             local_jwt={
-                "test-provider": LocalJWT(
-                    issuer="test-issuer",
-                    client_id="edge-server",
-                    register=True,
-                    algorithms=["RS256"],
-                    keys=[jwk],  # Only valid key registered
-                )
+                "test-provider": local_jwt_provider([jwk])  # Only valid key registered
             },
         )
         await cloud.create_database("travel", payload)
@@ -424,15 +402,7 @@ class TestJWTReplication(CBLTestClass):
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
-            local_jwt={
-                "test-provider": LocalJWT(
-                    issuer="test-issuer",
-                    client_id="edge-server",
-                    register=True,
-                    algorithms=["RS256"],
-                    keys=[jwk],
-                )
-            },
+            local_jwt={"test-provider": local_jwt_provider([jwk])},
         )
         await cloud.create_database("travel", payload)
 
@@ -560,15 +530,7 @@ class TestJWTReplication(CBLTestClass):
             bucket="travel",
             scopes={"travel": ScopeConfig(collections={"airlines": {"sync": "function(doc){channel(doc.channels);}"}})},
             num_index_replicas=0,
-            local_jwt={
-                "test-provider": LocalJWT(
-                    issuer="test-issuer",
-                    client_id="edge-server",
-                    register=True,
-                    algorithms=["RS256"],
-                    keys=[jwk_a, jwk_c],
-                )
-            },
+            local_jwt={"test-provider": local_jwt_provider([jwk_a, jwk_c])},
         )
         await cloud.create_database("travel", payload)
 
