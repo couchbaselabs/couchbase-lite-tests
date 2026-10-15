@@ -64,7 +64,7 @@ pipeline {
                 echo "=== Run Edge server Tests"
                 script {
                     def runTests = {
-                        timeout(time: 60, unit: 'MINUTES') {
+                        timeout(time: 90, unit: 'MINUTES') {
                             sh """
                                 jenkins/pipelines/QE/es/test.sh \
                                     "${params.ES_VERSION}" \
@@ -98,7 +98,8 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/es/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/es/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/edge_server/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/edge_server/http_log/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== Edge server Test Teardown Complete"
                 }
             }
