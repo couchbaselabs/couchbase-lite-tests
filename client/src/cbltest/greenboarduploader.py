@@ -1,6 +1,7 @@
 import json
 import os
-from collections.abc import Generator
+import re
+from collections.abc import Container, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -10,8 +11,9 @@ import pytest
 from _pytest.reports import TestReport
 from couchbase.auth import PasswordAuthenticator
 from couchbase.cluster import Cluster
+from couchbase.collection import Collection
 from couchbase.options import ClusterOptions
-from junitparser import JUnitXml
+from junitparser import Error, Failure, JUnitXml
 from pydantic import BaseModel, ConfigDict, Field
 
 from cbltest.api.syncgateway import CouchbaseVersion
@@ -55,6 +57,113 @@ def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
         total_fail += failures
         total_error += errors
     return total_pass, total_fail, total_error
+
+
+# Greenboard stores one entry per failed/errored test so the UI can show them without Jenkins (which prunes builds).
+MAX_FAILURES = 100
+MAX_MESSAGE_BYTES = 500
+MAX_TRACE_BYTES = 8 * 1024
+# Marker on the run doc (absent on old docs) saying its ``K::tests`` and ``K::failures`` sibling docs exist, so the
+# frontend never issues a KV get that would 404.
+DETAILS_SCHEMA = 1
+
+# Per-test outcomes stored in the ``K::tests`` doc. ``skip`` (which includes xfail) is in neither passCount nor
+# failCount; ``notrun`` is only known on the in-process path.
+PASS, FAIL, ERROR, SKIP, NOTRUN = "pass", "fail", "error", "skip", "notrun"
+_OUTCOME_RANK = {PASS: 0, SKIP: 1, FAIL: 2, ERROR: 3}  # when a test reports several outcomes the worst one wins
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+_AUTH_RE = re.compile(r"(?i)(authorization['\"]?\s*[:=]\s*['\"]?)(?:(?:basic|bearer)\s+)?[^\s'\",]+")
+_SECRET_RE = re.compile(
+    r"(?i)\b([\w-]*(?:password|passwd|pwd|secret|token|api[_-]?key)[\w-]*)(['\"]?\s*[:=]\s*['\"]?)[^\s'\",&}]+"
+)
+_URL_CREDS_RE = re.compile(r"(://[^/\s:@]+:)[^@\s/]+@")
+
+
+def sanitize_text(text: str) -> str:
+    """Strip ANSI colour codes and redact credentials from failure text before it is uploaded.
+
+    Best effort only: the patterns catch the common shapes (``password=...``, ``Authorization: ...``,
+    ``user:pass@host``, ``token=...``) but cannot recognise a secret that has no such label, so this is a safety net,
+    not a guarantee.
+    """
+    text = _ANSI_RE.sub("", text)
+    text = _AUTH_RE.sub(r"\1[REDACTED]", text)
+    text = _SECRET_RE.sub(r"\1\2[REDACTED]", text)
+    return _URL_CREDS_RE.sub(r"\1[REDACTED]@", text)
+
+
+def _head(text: str, max_bytes: int) -> str:
+    """Keep the start of ``text`` within ``max_bytes`` of UTF-8, cutting on a character boundary."""
+    return text.encode()[:max_bytes].decode(errors="ignore")
+
+
+def _tail(text: str, max_bytes: int) -> str:
+    """Keep the end of ``text`` within ``max_bytes`` of UTF-8 (the error is at the bottom of a traceback)."""
+    return text.encode()[-max_bytes:].decode(errors="ignore")
+
+
+def make_failure_entry(
+    test: str, kind: str, phase: str | None, message: str | None, trace: str | None
+) -> dict[str, Any]:
+    """Build one ``failures`` entry. ``trace`` is omitted when absent or empty, never ``""``."""
+    lines = sanitize_text(message or "").strip().splitlines()
+    entry: dict[str, Any] = {
+        "test": test,
+        "kind": kind,
+        "phase": phase,
+        "message": _head(lines[0] if lines else "", MAX_MESSAGE_BYTES),
+    }
+    clean_trace = _tail(sanitize_text(trace or "").strip(), MAX_TRACE_BYTES)
+    if clean_trace:
+        entry["trace"] = clean_trace
+    return entry
+
+
+def _junit_nodeid(classname: str, name: str) -> str:
+    """Rebuild a pytest node id from a JUnit ``classname``/``name``.
+
+    JUnit gives ``tests.QE.test_x.TestX`` + ``test_y[p]``, not the path, so the module is taken to be the first dotted
+    segment starting with ``test_``; anything before it is the directory path and anything after is classes.
+    """
+    parts = classname.split(".") if classname else []
+    module_idx = next((i for i, part in enumerate(parts) if part.startswith("test_")), None)
+    if module_idx is None:
+        return f"{classname}::{name}" if classname else name
+    path = "/".join(parts[: module_idx + 1]) + ".py"
+    return "::".join([path, *parts[module_idx + 1 :], name])
+
+
+def outcomes_from_junit_xml(xml_path: Path) -> tuple[dict[str, str], list[dict[str, Any]]]:
+    """Return ``(tests, failures)`` for a JUnit XML file: every test's outcome keyed by node id, and a ``failures``
+    entry for every ``<failure>`` (kind ``failure``) and ``<error>`` (kind ``error``). Built from the same XML
+    :py:func:`count_from_junit_xml` counts, so the two cannot diverge.
+
+    JUnit does not record which phase raised, so ``phase`` is ``"call"`` for a failure and ``None`` for an error. Tests
+    that never ran are not in the XML, so there are no ``notrun`` outcomes here.
+    """
+    tests: dict[str, str] = {}
+    failures: list[dict[str, Any]] = []
+    for suite in JUnitXml.fromfile(str(xml_path)):
+        for case in suite:
+            nodeid = _junit_nodeid(case.classname or "", case.name or "")
+            outcome = PASS
+            for result in case.result:
+                if isinstance(result, Failure):
+                    outcome = _worse(outcome, FAIL)
+                    failures.append(make_failure_entry(nodeid, "failure", "call", result.message, result.text))
+                elif isinstance(result, Error):
+                    outcome = _worse(outcome, ERROR)
+                    failures.append(make_failure_entry(nodeid, "error", None, result.message, result.text))
+                else:
+                    outcome = _worse(outcome, SKIP)
+            tests[nodeid] = outcome
+    return tests, failures
+
+
+def _worse(a: str, b: str) -> str:
+    """The more severe of two outcomes."""
+    return a if _OUTCOME_RANK[a] >= _OUTCOME_RANK[b] else b
 
 
 def resolve_job_url() -> str:
@@ -129,6 +238,8 @@ class RunResult(BaseModel):
     job_url: str = Field(alias="jobUrl")  # Jenkins BUILD_URL, or "local" off-CI
     incomplete: bool = False  # True if the session was cut short before every collected test ran
     collected: int = 0  # Planned test count (session.testscollected); 0 means unknown/not supplied
+    skip_count: int = Field(0, alias="skipCount")  # tests skipped or xfailed; missing on old docs means unknown
+    cbs_version: str = Field("n/a", alias="cbsVersion")  # "x.y.z-build", "rosmar" (no CBS) or "n/a" (none/unknown)
 
 
 class GreenboardUploader:
@@ -165,28 +276,14 @@ class GreenboardUploader:
         self.__test_ran = False
         self.__has_sgw_marker = False
         self.__has_es_marker = False
-        self.__items_finished = 0
-
-    def pytest_runtest_logfinish(self) -> None:
-        # Fires once per item after its full setup/call/teardown protocol
-        # completes, whatever the outcome (pass/fail/skip/error). An item
-        # whose protocol was cut short by a SIGINT/SIGTERM (converted by
-        # sigterm_handler.py) or a pytest-timeout session-timeout never
-        # reaches this hook, and neither does any item still uncollected-
-        # but-unreached when the session stops early — so comparing this
-        # count against ``session.testscollected`` is what the greenboard
-        # fixture uses to detect a truncated ("incomplete") run.
-        self.__items_finished += 1
-
-    @property
-    def items_finished(self) -> int:
-        """Number of collected items that finished their full runtest protocol."""
-        return self.__items_finished
+        self.__failures: list[dict[str, Any]] = []
+        self.__tests: dict[str, str] = {}
 
     @pytest.hookimpl(hookwrapper=True, tryfirst=True)
     def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo[None]) -> Generator[None, Any]:
         outcome = yield
         report: TestReport = outcome.get_result()
+        self.__record_outcome(report)
         if report.when != "call":
             if report.failed:
                 self.__overall_fail = True
@@ -210,6 +307,29 @@ class GreenboardUploader:
             self.__pass_count += 1
         elif report.failed:
             self.__fail_count += 1
+            # Same latch as the counter above, so this list always matches the in-process failCount.
+            reprcrash = getattr(report.longrepr, "reprcrash", None)
+            self.__failures.append(
+                make_failure_entry(
+                    report.nodeid,
+                    "failure",
+                    report.when,
+                    reprcrash.message if reprcrash is not None else str(report.longrepr or ""),
+                    report.longreprtext,
+                )
+            )
+
+    def __record_outcome(self, report: TestReport) -> None:
+        """Fold one setup/call/teardown report into the test's outcome for the ``tests`` doc."""
+        if report.failed:
+            outcome = FAIL if report.when == "call" else ERROR
+        elif report.skipped:
+            outcome = SKIP
+        elif report.when == "call":
+            outcome = PASS
+        else:
+            return  # a passing setup/teardown says nothing: the call report decides
+        self.__tests[report.nodeid] = _worse(outcome, self.__tests.get(report.nodeid, PASS))
 
     def has_sgw_marker(self) -> bool:
         """
@@ -235,6 +355,11 @@ class GreenboardUploader:
         fail_count: int | None = None,
         incomplete: bool = False,
         collected: int = 0,
+        cbs_version: str = "n/a",
+        tests: dict[str, str] | None = None,
+        failures: list[dict[str, Any]] | None = None,
+        collected_ids: Sequence[str] | None = None,
+        finished_ids: Container[str] | None = None,
     ) -> None:
         """
         Uploads the results using the specified platform and version.  The reason that they
@@ -253,12 +378,25 @@ class GreenboardUploader:
             semantics as ``pass_count``.
         :param incomplete: Whether the pytest session was cut short (e.g. a
             Jenkins timeout) before every collected test ran. Computed by
-            the greenboard fixture from :py:attr:`items_finished` vs.
+            the greenboard fixture from the items that finished their runtest protocol vs.
             ``session.testscollected``.
         :param collected: The planned test count (``session.testscollected``).
             0 means unknown/not supplied. Lets the frontend show real
             coverage (e.g. "29/42") for a clean-incomplete run, where
             pass/fail counts alone always read as 100%.
+
+        :param cbs_version: The Couchbase Server version string (``"x.y.z-build"``), ``"rosmar"`` or ``"n/a"``.
+        :param tests: Every test's outcome keyed by node id. When ``None`` (default), uses the in-process outcomes built
+            by :py:meth:`pytest_runtest_makereport`.
+        :param failures: The failed/errored test entries. Same default as ``tests``. A caller that supplies its own
+            counts must supply the matching ``tests`` and ``failures``, as :py:meth:`upload_from_junit_file` does, so
+            they can never disagree.
+        :param collected_ids: The node ids of every collected test. Ignored when ``tests`` is supplied (a JUnit XML
+            cannot name the tests that never ran).
+        :param finished_ids: The node ids of the tests that finished their runtest protocol. With ``collected_ids``,
+            a collected test with no recorded outcome is ``skip`` if it finished (only a skip raised before the
+            fixtures set up, i.e. before this uploader was registered, leaves no outcome) and ``notrun`` otherwise,
+            when ``incomplete``.
 
         A setup/teardown failure skips the upload unless *both* counts are
         supplied: the in-process counter stops tallying at the failure, so
@@ -270,6 +408,16 @@ class GreenboardUploader:
 
         resolved_pass = pass_count if pass_count is not None else self.__pass_count
         resolved_fail = fail_count if fail_count is not None else self.__fail_count
+        all_failures = failures if failures is not None else self.__failures
+        all_tests = dict(tests if tests is not None else self.__tests)
+        if tests is None:
+            for nodeid in collected_ids or ():
+                if nodeid in all_tests:
+                    continue
+                if nodeid in (finished_ids or ()):
+                    all_tests[nodeid] = SKIP
+                elif incomplete:
+                    all_tests[nodeid] = NOTRUN
 
         parsed_version = "0.0.0"
         parsed_build = 0
@@ -325,7 +473,12 @@ class GreenboardUploader:
                 jobUrl=resolve_job_url(),
                 incomplete=incomplete,
                 collected=collected,
-            )
+                skipCount=sum(1 for outcome in all_tests.values() if outcome == SKIP),
+                cbsVersion=cbs_version,
+            ),
+            all_tests,
+            all_failures[:MAX_FAILURES],
+            len(all_failures) > MAX_FAILURES,
         )
 
     def upload_from_junit_file(
@@ -339,6 +492,9 @@ class GreenboardUploader:
         *,
         incomplete: bool = False,
         collected: int = 0,
+        cbs_version: str = "n/a",
+        collected_ids: Sequence[str] | None = None,
+        finished_ids: Container[str] | None = None,
     ) -> None:
         """
         Upload one greenboard doc whose pass/fail counts come from a JUnit
@@ -349,6 +505,9 @@ class GreenboardUploader:
             :py:meth:`upload`.
         :param collected: The planned test count. Passed through verbatim to
             :py:meth:`upload`.
+        :param cbs_version: Passed through verbatim to :py:meth:`upload`.
+        :param collected_ids: Passed through to :py:meth:`upload`, which only uses it on the no-XML fall-back.
+        :param finished_ids: Same as ``collected_ids``.
 
         Policy:
         - If ``junit_output`` doesn't exist, fall back to the in-process
@@ -377,7 +536,18 @@ class GreenboardUploader:
         if not junit_output.is_file():
             # Pytest didn't write an XML for this session; use the in-process
             # counter populated by pytest_runtest_makereport instead.
-            self.upload(platform, os_name, version, sgw_version, es_version, incomplete=incomplete, collected=collected)
+            self.upload(
+                platform,
+                os_name,
+                version,
+                sgw_version,
+                es_version,
+                incomplete=incomplete,
+                collected=collected,
+                cbs_version=cbs_version,
+                collected_ids=collected_ids,
+                finished_ids=finished_ids,
+            )
             return
 
         junit_pass, junit_fail, junit_error = count_from_junit_xml(junit_output)
@@ -388,6 +558,7 @@ class GreenboardUploader:
             cbl_info(f"Greenboard: all {junit_error} tests errored before running (harness failure); skipping upload")
             return
 
+        tests, failures = outcomes_from_junit_xml(junit_output)
         self.upload(
             platform,
             os_name,
@@ -398,6 +569,9 @@ class GreenboardUploader:
             fail_count=junit_fail + junit_error,
             incomplete=incomplete,
             collected=collected,
+            cbs_version=cbs_version,
+            tests=tests,
+            failures=failures,
         )
 
     def record_upgrade_step(
@@ -565,11 +739,36 @@ class GreenboardUploader:
             f"failedAt={failed_at}"
         )
 
-    def _upload_document(self, test_run: RunResult) -> None:
-        self._upsert(test_run.model_dump(by_alias=True))
+    def _upload_document(
+        self, test_run: RunResult, tests: dict[str, str], failures: list[dict[str, Any]], failures_truncated: bool
+    ) -> None:
+        """Write the run doc ``K`` plus its heavy per-test siblings ``K::tests`` and ``K::failures``.
+
+        The siblings go first and the run doc last, so a crash part-way leaves harmless orphan siblings rather than a
+        run doc claiming ``details`` whose siblings are missing. If a sibling write fails the run doc is still written,
+        without ``details``, and the frontend treats that run's test data as unknown.
+        """
+        key = str(uuid4())
+        doc = test_run.model_dump(by_alias=True)
+        collection = self._collection()
+        try:
+            collection.upsert(f"{key}::tests", {"runId": key, "tests": tests})
+            collection.upsert(
+                f"{key}::failures", {"runId": key, "failures": failures, "failuresTruncated": failures_truncated}
+            )
+            doc["details"] = DETAILS_SCHEMA
+        except Exception as e:
+            cbl_warning(f"Could not write per-test greenboard docs for {key}; uploading the run doc without them: {e}")
+        self._stamp(doc)
+        collection.upsert(key, doc)
 
     def _upsert(self, doc: dict) -> None:
         """Add timestamp fields and write one document to the greenboard bucket."""
+        self._stamp(doc)
+        self._collection().upsert(str(uuid4()), doc)
+
+    @staticmethod
+    def _stamp(doc: dict) -> None:
         now = datetime.now(UTC)
         unix_timestamp = (now - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
 
@@ -577,9 +776,10 @@ class GreenboardUploader:
         doc["uploaded"] = unix_timestamp
         doc["date"] = now.strftime("%Y-%m-%d")
 
+    def _collection(self) -> Collection:
         auth = PasswordAuthenticator(self.__username, self.__password)
         opts = ClusterOptions(auth)
         cluster = Cluster(self.__url, opts)
         cluster.wait_until_ready(timedelta(seconds=10))
 
-        cluster.bucket("greenboard").default_collection().upsert(str(uuid4()), doc)
+        return cluster.bucket("greenboard").default_collection()

@@ -25,11 +25,52 @@ class _PendingRunResult:
     library_version: str
     sgw_version: CouchbaseVersion | None
     es_version: CouchbaseVersion | None
+    cbs_version: str
     xmlpath: str | None
 
 
+class FinishedItems:
+    """The node ids of the items that finished their full setup/call/teardown protocol, whatever the outcome.
+
+    An item cut short by a SIGINT/SIGTERM (converted by sigterm_handler.py), a pytest-timeout session-timeout or
+    ``--maxfail`` never reaches ``pytest_runtest_logfinish``, and neither does any item the session stopped before
+    reaching, so comparing this against ``session.testscollected`` is how a truncated ("incomplete") run is detected.
+
+    Registered from ``pytest_configure``, not from the ``greenboard`` fixture: that session fixture is only set up by
+    the first test that is not skipped, and a skip raised in ``pytest_runtest_setup`` (required_topology, cbse_filter,
+    ``@pytest.mark.skip``) precedes fixture setup, so a tracker registered there would miss every leading skip and flag
+    a complete run incomplete.
+    """
+
+    def __init__(self) -> None:
+        self.nodeids: set[str] = set()
+
+    def pytest_runtest_logfinish(self, nodeid: str) -> None:
+        self.nodeids.add(nodeid)
+
+
+_finished_key: Final[pytest.StashKey[FinishedItems]] = pytest.StashKey()
 _uploader_key: Final[pytest.StashKey[GreenboardUploader]] = pytest.StashKey()
 _pending_key: Final[pytest.StashKey[_PendingRunResult]] = pytest.StashKey()
+
+
+async def resolve_cbs_version(cblpytest: CBLPyTest) -> str:
+    """The Couchbase Server version for the greenboard doc: ``"rosmar"`` when Sync Gateway runs on rosmar (no CBS
+    involved), else the first CBS node's ``x.y.z-build``, else ``"n/a"`` (no CBS, or the lookup failed). Never raises,
+    so it cannot block the upload."""
+    if len(cblpytest.sync_gateways) > 0:
+        try:
+            if await cblpytest.sync_gateways[0].using_rosmar:
+                return "rosmar"
+        except Exception as e:
+            cbl_warning(f"Could not determine whether SGW uses rosmar for greenboard doc: {e}")
+    if len(cblpytest.couchbase_servers) == 0:
+        return "n/a"
+    try:
+        return await cblpytest.couchbase_servers[0].get_version()
+    except Exception as e:
+        cbl_warning(f"Could not fetch CBS version for greenboard doc: {e}")
+        return "n/a"
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -77,7 +118,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
 
     if upgrade_versions_str:
         # Upgrade job: record this iteration to a state file. The aggregate batch doc is uploaded once at the end by
-        # jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py. Doesn't touch items_finished, so no need to defer
+        # jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py. Doesn't read the finished items, so no need to defer
         # this to sessionfinish.
         results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
         # The SGW node under upgrade may be mid-restart during rolling phases; record the iteration anyway
@@ -141,6 +182,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
             library_version=library_version,
             sgw_version=sgw_version,
             es_version=es_version,
+            cbs_version=await resolve_cbs_version(cblpytest),
             xmlpath=pytestconfig.option.xmlpath,
         )
 
@@ -150,7 +192,7 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
     """Upload the pending RunResult (if any) and unregister the uploader.
 
     ``pytest_sessionfinish`` runs after every item's logfinish, including the last, so it's the first point an
-    accurate items_finished vs testscollected comparison is possible. ``trylast=True`` further guarantees this runs
+    accurate finished-items vs testscollected comparison is possible. ``trylast=True`` further guarantees this runs
     after (a) pytest's own catch-all session-fixture teardown (``_pytest.runner.pytest_sessionfinish``, default
     priority -- what actually invokes the fixture's teardown in a SIGTERM/SIGINT/ session-timeout-interrupted run,
     since the per-item chain never reaches ``nextitem=None`` there) and (b) the junitxml plugin (also default priority)
@@ -164,7 +206,9 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
         if pending is None:
             return
         collected = session.testscollected
-        incomplete = uploader.items_finished < collected
+        finished_ids = session.config.stash[_finished_key].nodeids
+        incomplete = len(finished_ids) < collected
+        collected_ids = [item.nodeid for item in session.items]
         if pending.xmlpath:
             uploader.upload_from_junit_file(
                 Path(pending.xmlpath),
@@ -175,6 +219,9 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 pending.es_version,
                 incomplete=incomplete,
                 collected=collected,
+                cbs_version=pending.cbs_version,
+                collected_ids=collected_ids,
+                finished_ids=finished_ids,
             )
         else:
             # No --junitxml (pytest_configure defaults it, but that hook doesn't fire for synthetic Configs in unit
@@ -187,6 +234,9 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 pending.es_version,
                 incomplete=incomplete,
                 collected=collected,
+                cbs_version=pending.cbs_version,
+                collected_ids=collected_ids,
+                finished_ids=finished_ids,
             )
     finally:
         session.config.pluginmanager.unregister(uploader)
@@ -219,6 +269,14 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+def track_finished_items(config: pytest.Config) -> FinishedItems:
+    """Register (and stash) the tracker that ``pytest_sessionfinish`` reads."""
+    tracker = FinishedItems()
+    config.stash[_finished_key] = tracker
+    config.pluginmanager.register(tracker)
+    return tracker
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Default ``--junitxml=junit_result.xml`` so pytest_sessionfinish can read pass/fail counts from the XML.
 
@@ -228,3 +286,4 @@ def pytest_configure(config: pytest.Config) -> None:
     """
     if not getattr(config.option, "xmlpath", None):
         config.option.xmlpath = "junit_result.xml"
+    track_finished_items(config)
