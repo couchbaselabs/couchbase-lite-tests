@@ -2,6 +2,7 @@ import base64
 import json
 import time
 
+from cbltest.api.syncgateway import JWK, LocalJWT
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
@@ -19,9 +20,6 @@ def generate_rsa_keypair() -> tuple[rsa.RSAPrivateKey, rsa.RSAPublicKey]:
     return private_key, private_key.public_key()
 
 
-from cbltest.api.syncgateway import JWK
-
-
 def public_key_to_jwk(public_key: rsa.RSAPublicKey, kid: str = "test-key-1") -> JWK:
     """Convert RSA public key to JWK format for SGW OIDC config."""
     numbers = public_key.public_numbers()
@@ -37,24 +35,57 @@ def public_key_to_jwk(public_key: rsa.RSAPublicKey, kid: str = "test-key-1") -> 
     )
 
 
+def local_jwt_provider(
+    keys: list[JWK],
+    issuer: str = "test-issuer",
+    audience: str = "edge-server",
+    register: bool = True,
+) -> LocalJWT:
+    """Build an RS256 `local_jwt` provider for a SGW database config that trusts the given keys."""
+    return LocalJWT(
+        issuer=issuer,
+        client_id=audience,
+        register=register,
+        algorithms=["RS256"],
+        keys=keys,
+    )
+
+
 def generate_jwt(
-    private_key: rsa.RSAPrivateKey, subject: str = "edge", expires_in: int = 300, kid: str = "test-key-1"
+    private_key: rsa.RSAPrivateKey,
+    subject: str = "edge",
+    expires_in: int = 300,
+    kid: str = "test-key-1",
+    issuer: str = "test-issuer",
+    audience: str = "edge-server",
+    alg: str = "RS256",
+    sign_with: rsa.RSAPrivateKey | None = None,
 ) -> str:
-    """Generate a signed RS256 JWT token.
+    """Generate an RS256-signed JWT, or an unsigned one with ``alg="none"``.
 
     Args:
         private_key: RSA private key for signing.
         subject: The 'sub' claim — maps to the SGW username.
-        expires_in: Token validity in seconds.
+        expires_in: Token validity in seconds.  Pass a negative value to mint an
+            already-expired token.
         kid: Key ID to include in the JWT header.
+        issuer: The 'iss' claim — must match the provider's configured issuer.
+        audience: The 'aud' claim — must match the provider's configured client_id.
+        alg: The 'alg' header value: "RS256" (signed) or "none" (unsigned, for
+            algorithm-confusion tests).  Any other value raises ValueError, since the
+            header would not match how the token is signed.
+        sign_with: Sign with this key instead of `private_key`, to mint a token whose
+            signature will not verify against the published JWK.
 
     Returns:
         Signed JWT string.
     """
+    if alg not in ("RS256", "none"):
+        raise ValueError(f'Unsupported alg {alg!r}: only "RS256" and "none" are implemented')
     now = int(time.time())
     header = _b64url(
         json.dumps(
-            {"alg": "RS256", "typ": "JWT", "kid": kid},
+            {"alg": alg, "typ": "JWT", "kid": kid},
             separators=(",", ":"),
         ).encode()
     )
@@ -62,15 +93,18 @@ def generate_jwt(
         json.dumps(
             {
                 "sub": subject,
-                "iss": "test-issuer",
-                "aud": "edge-server",
+                "iss": issuer,
+                "aud": audience,
                 "iat": now,
                 "exp": now + expires_in,
             },
             separators=(",", ":"),
         ).encode()
     )
-    sig = _b64url(private_key.sign(f"{header}.{payload}".encode(), padding.PKCS1v15(), hashes.SHA256()))
+    if alg == "none":
+        return f"{header}.{payload}."
+    signing_key = sign_with if sign_with is not None else private_key
+    sig = _b64url(signing_key.sign(f"{header}.{payload}".encode(), padding.PKCS1v15(), hashes.SHA256()))
     return f"{header}.{payload}.{sig}"
 
 
