@@ -11,20 +11,21 @@ One-shot replication succeeds on a session ID, for each replicator type.
 ### Steps
 1. Reset SG and load `travel` dataset
 2. Reset local database and load `travel` dataset
-3. Create a session for `user1`
-4. Start a replicator
+3. Write `session-doc` to the local `travel.airports` collection
+4. Create a session for `user1`
+5. Start a replicator
    * endpoint: `/travel`
    * collections: `travel.airports`
    * type: push / pull / pushAndPull
    * continuous: false
    * credentials: session for `user1`
-5. Wait until the replicator stops and check there is no error
-6. Check that all documents are replicated correctly
+6. Wait until the replicator stops and check there is no error
+7. Check that all documents are replicated correctly
 
 ## #2 test_replicate_with_invalid_session
 
 ### Description
-A well-formed session ID that Sync Gateway never issued is rejected.
+A session ID that Sync Gateway never issued is rejected.
 
 ### Steps
 1. Reset SG and load `travel` dataset
@@ -146,8 +147,9 @@ An expired JWT is rejected, and a fresh JWT then replicates on the same database
 2. Reset local database with an empty `travel.airports` collection
 3. Start a one-shot push-and-pull replicator with an expired JWT
 4. Check the replicator stops with an auth error
-5. Start a new continuous push-and-pull replicator with a fresh JWT
-6. Wait until the replicator is idle and check there is no error
+5. Write `jwt-doc` on SG
+6. Start a new continuous push-and-pull replicator with a fresh JWT
+7. Check the replicator pulls `jwt-doc`
 
 ## #11 test_sgw_restart_during_replication
 

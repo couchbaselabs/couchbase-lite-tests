@@ -121,6 +121,10 @@ class TestSessionAuthReplication(CBLTestClass):
         self.mark_test_step("Reset local database and load `travel` dataset")
         db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel"))[0]
 
+        self.mark_test_step("Write `session-doc` to the local `travel.airports` collection")
+        async with db.batch_updater() as b:
+            b.upsert_document(COLLECTION, "session-doc", new_properties=[{"channels": [CHANNEL]}])
+
         self.mark_test_step("Create a session for `user1`")
         session_id = await sync_gateway.create_session("travel", "user1")
 
@@ -528,6 +532,16 @@ class TestSessionAuthReplication(CBLTestClass):
         self.mark_test_step("Check the replicator stops with an auth error")
         await _assert_auth_rejected(expired, sync_gateway, {"Authorization": f"Bearer {expired_token}"})
 
+        self.mark_test_step("Write `jwt-doc` on SG")
+        await sync_gateway.create_document(
+            "travel",
+            "jwt-doc",
+            {"channels": [CHANNEL]},
+            scope="travel",
+            collection="airports",
+            wait_for_caching_feed=True,
+        )
+
         self.mark_test_step("Start a new continuous push-and-pull replicator with a fresh JWT")
         fresh = Replicator(
             db,
@@ -537,13 +551,13 @@ class TestSessionAuthReplication(CBLTestClass):
             collections=[ReplicatorCollectionEntry([COLLECTION])],
             authenticator=ReplicatorBearerAuthenticator(_mint_jwt(private_key)),
             pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
         )
         await fresh.start()
 
-        self.mark_test_step("Wait until the replicator is idle and check there is no error")
-        status = await fresh.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        self.mark_test_step("Check the replicator pulls `jwt-doc`")
+        await fresh.wait_for_all_doc_events(
+            {WaitForDocumentEventEntry(COLLECTION, "jwt-doc", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE)}
         )
 
         await cblpytest.test_servers[0].cleanup()
