@@ -10,7 +10,7 @@ pipeline {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'CBS_VERSION', defaultValue: '', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
-        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: true, description: 'Run only the tests that replicate with the CBL-JS test server (those marked min_test_servers, all in tests/QE/edge_server). Needs a topology with a JS test server. TEST_NAME still narrows them with -k; TEST_DIR is ignored.')
+        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: false, description: 'Run only the tests that replicate with the CBL-JS test server (those marked min_test_servers, all in tests/QE/edge_server). Needs a topology with a JS test server. TEST_NAME still narrows them with -k; TEST_DIR is ignored.')
     }
     options {
         ansiColor('xterm')
@@ -23,9 +23,9 @@ pipeline {
                     if (params.ES_VERSION == '') { error "ES_VERSION is required" }
                     if (params.TEST_NAME == '') { error "TEST_NAME is required" }
                     if (params.TEST_DIR == 'both' && params.TEST_NAME != '.' && !params.JS_REPLICATION_TESTS_ONLY) { error "TEST_NAME must be '.' when TEST_DIR is 'both'" }
-                    if (params.TOPOLOGY_NAME.contains('_js') && !params.CBL_VERSION) { error "CBL_VERSION is required for ${params.TOPOLOGY_NAME}" }
+                    if (params.TOPOLOGY_NAME.contains('js_topology') && !params.CBL_VERSION) { error "CBL_VERSION is required for ${params.TOPOLOGY_NAME}" }
                     if (params.CBL_VERSION && !(params.CBL_VERSION ==~ /\d+\.\d+\.\d+-\d+/)) { error "CBL_VERSION must be <version>-<build>, e.g. 1.1.0-25" }
-                    if (params.JS_REPLICATION_TESTS_ONLY && !params.TOPOLOGY_NAME.contains('_js')) {
+                    if (params.JS_REPLICATION_TESTS_ONLY && !params.TOPOLOGY_NAME.contains('js_topology')) {
                         error "JS_REPLICATION_TESTS_ONLY needs a topology with a JS test server (e.g. 3es_1sgw_1js_topology.json); ${params.TOPOLOGY_NAME} has none, so every selected test would be skipped"
                     }
                     def scope = params.JS_REPLICATION_TESTS_ONLY ? "QE (JS replication only)" : params.TEST_DIR
@@ -88,8 +88,7 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/QE/es/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/edge_server/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/QE/edge_server/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/QE/edge_server/es/**, tests/dev_e2e/edge_server/es/**', fingerprint: true, allowEmptyArchive: true
                     echo "=== Edge server Test Teardown Complete"
                 }
             }
