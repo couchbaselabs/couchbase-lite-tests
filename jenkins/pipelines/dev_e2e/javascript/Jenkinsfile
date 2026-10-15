@@ -41,6 +41,9 @@ pipeline {
         }
         stage('Run Test') {
             agent { label 'e2e&&macos-host' }
+            environment {
+                TS_ARTIFACTS_DIR = 'js'
+            }
             steps {
                 lock("${env.NODE_NAME}") {
                     timeout(time: 60, unit: 'MINUTES') {
@@ -50,12 +53,13 @@ pipeline {
             }
             post { 
                 always {
+                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
                     echo "Teardown JavaScript Test"
                     timeout(time: 5, unit: 'MINUTES') {
                         sh 'jenkins/pipelines/dev_e2e/javascript/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/js/**', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

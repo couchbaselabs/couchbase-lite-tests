@@ -24,6 +24,7 @@ def make_server(nodes: list[dict[str, Any]], monkeypatch: pytest.MonkeyPatch) ->
     with (
         patch("cbltest.api.couchbaseserver.Cluster", autospec=True),
         patch("cbltest.api.couchbaseserver.AsyncHTTPClient", autospec=True),
+        patch("cbltest.api.caddy.AsyncHTTPClient", autospec=True),
         patch("cbltest.api.couchbaseserver.Shell2HttpClient", autospec=True),
     ):
         server = CouchbaseServer("cbs.example.com", "user", "pass")

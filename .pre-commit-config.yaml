@@ -24,6 +24,12 @@ repos:
         language: unsupported
         entry: uv run python scripts/check_topology_markers.py
         files: ^tests/(dev_e2e|QE)/.*test_.*\.py$
+      - id: pytest-collect
+        name: pytest collect (tests/)
+        language: unsupported
+        entry: uv run pytest --collect-only -qq -p no:cacheprovider --config client/tests/empty_config.json tests
+        files: ^(tests|client/src)/.*\.py$
+        pass_filenames: false
       - id: javascript
         name: biome + tsc + eslint (servers/javascript)
         language: unsupported

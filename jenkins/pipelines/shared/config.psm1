@@ -43,6 +43,22 @@ function Move-Artifacts {
     if (Test-Path "$SRC_DIR\http_log") {
         Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
     }
+
+    # SGW diagnostics downloaded by run_sgcollects() (via --sgcollect-on-test-failure) into
+    # the test dir when a test fails; moving them here gets them archived (and later purged)
+    # by Jenkins retention. Files are named "<safe_host>-sgcollectinfo-*.zip" (see
+    # SyncGateway.run_sgcollect() in cbltest). Purge zips left by earlier builds first -- the
+    # workspace persists and zips have unique names, so they'd accumulate into every build's
+    # archive. Mirrors config.sh's Bash implementation.
+    Get-ChildItem -Path $DST_DIR -Filter "*-sgcollectinfo-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
+    Get-ChildItem -Path $SRC_DIR -Filter "*-sgcollectinfo-*.zip" -ErrorAction SilentlyContinue |
+        Move-Item -Destination $DST_DIR -Force
+
+    # CBS diagnostics downloaded by run_cbcollects() (see CouchbaseServer.collect_logs() in
+    # cbltest). Files are named "cbcollect-<safe_host>-*.zip". Same reasoning as above.
+    Get-ChildItem -Path $DST_DIR -Filter "cbcollect-*.zip" -ErrorAction SilentlyContinue | Remove-Item -Force
+    Get-ChildItem -Path $SRC_DIR -Filter "cbcollect-*.zip" -ErrorAction SilentlyContinue |
+        Move-Item -Destination $DST_DIR -Force
 }
 
 function Find-Dir {
