@@ -46,8 +46,6 @@ if [ "$TEST_NAME" != "." ]; then
   PYTEST_FILTER=(-k "$TEST_NAME")
 fi
 
-# JS-only runs the tests that need a CBL test server, which are all marked min_test_servers.
-# Only tests/QE/edge_server has any, so dev_e2e (where pytest would select nothing) is skipped.
 if [ "$JS_ONLY" = "true" ]; then
   SUITE_DIRS=("$QE_TESTS_DIR/edge_server")
   PYTEST_FILTER+=(-m min_test_servers)
@@ -59,8 +57,6 @@ uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW
 export COLUMNS=200
 TEST_RESULT=0
 
-# Each directory runs as its own pytest session against the same backend.
-# A failure in one does not stop the next; the script fails if any failed.
 for suite_dir in "${SUITE_DIRS[@]}"; do
   echo "RUNNING COORDINATED TEST ($suite_dir, TEST_NAME=$TEST_NAME, JS_ONLY=$JS_ONLY)"
   pushd "$suite_dir" >/dev/null

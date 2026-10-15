@@ -62,29 +62,19 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run Edge server Tests"
-                script {
-                    def runTests = {
-                        timeout(time: 90, unit: 'MINUTES') {
-                            sh """
-                                jenkins/pipelines/QE/es/test.sh \
-                                    "${params.ES_VERSION}" \
-                                    "${params.TEST_NAME}" \
-                                    "${params.TOPOLOGY_NAME}" \
-                                    "${params.SGW_VERSION}" \
-                                    "${params.CBS_VERSION}" \
-                                    "${params.TS_DATASET_VERSION}" \
-                                    "${params.TEST_DIR}" \
-                                    "${params.CBL_VERSION}" \
-                                    "${params.JS_REPLICATION_TESTS_ONLY}"
-                            """
-                        }
-                    }
-                    // The JS test server runs on this agent at localhost:5173, so only one such run per agent.
-                    if (params.CBL_VERSION) {
-                        lock("${env.NODE_NAME}-js-test-server") { runTests() }
-                    } else {
-                        runTests()
-                    }
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh """
+                        jenkins/pipelines/QE/es/test.sh \
+                            "${params.ES_VERSION}" \
+                            "${params.TEST_NAME}" \
+                            "${params.TOPOLOGY_NAME}" \
+                            "${params.SGW_VERSION}" \
+                            "${params.CBS_VERSION}" \
+                            "${params.TS_DATASET_VERSION}" \
+                            "${params.TEST_DIR}" \
+                            "${params.CBL_VERSION}" \
+                            "${params.JS_REPLICATION_TESTS_ONLY}"
+                    """
                 }
                 echo "=== Edge server Tests Complete"
             }
