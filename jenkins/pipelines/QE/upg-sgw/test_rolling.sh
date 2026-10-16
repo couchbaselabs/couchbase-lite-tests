@@ -3,44 +3,6 @@
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
-# Aggregated greenboard upload: per-iteration results are written to this
-# file by the greenboard pytest fixture, and a single batch document is
-# uploaded on script exit (success or failure).
-export SGW_UPGRADE_RESULTS_FILE="${SGW_UPGRADE_RESULTS_FILE:-/tmp/sgw_upgrade_results.json}"
-rm -f "$SGW_UPGRADE_RESULTS_FILE"
-
-function upload_batch_results() {
-  local exit_code=$?
-  echo ">>> EXIT trap: greenboard batch upload (script exit=$exit_code)"
-  if [ ! -f "$SGW_UPGRADE_RESULTS_FILE" ]; then
-    echo ">>> No upgrade results file at $SGW_UPGRADE_RESULTS_FILE; skipping batch upload"
-    return $exit_code
-  fi
-  if [ -z "${QE_TESTS_DIR:-}" ] || [ -z "${SCRIPT_DIR:-}" ]; then
-    echo ">>> Paths not initialized (QE_TESTS_DIR/SCRIPT_DIR); skipping batch upload"
-    return $exit_code
-  fi
-  echo ">>> Recorded iterations (${SGW_UPGRADE_RESULTS_FILE}):"
-  cat "$SGW_UPGRADE_RESULTS_FILE" || true
-  echo ""
-  echo ">>> Uploading aggregated greenboard batch result..."
-  pushd "$QE_TESTS_DIR" >/dev/null || return $exit_code
-  set +e
-  uv run "$SCRIPT_DIR/upload_greenboard_batch.py" \
-    --config config.json \
-    --results-file "$SGW_UPGRADE_RESULTS_FILE"
-  upload_rc=$?
-  set -e
-  if [ $upload_rc -ne 0 ]; then
-    echo ">>> ERROR: greenboard batch upload failed with exit code $upload_rc"
-  else
-    echo ">>> Greenboard batch upload completed."
-  fi
-  popd >/dev/null || true
-  return $exit_code
-}
-trap upload_batch_results EXIT
-
 function usage() {
   echo "Usage: $0 <cbl_version> <sgw_version_1> [<sgw_version_2> ... <sgw_version_N>] [--setup-only]"
   echo "  <cbl_version>: The Couchbase Lite version to test against."
@@ -72,12 +34,6 @@ TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
 CONFIG_FILE="$QE_TESTS_DIR/config.json"
 
-# Compute comma-separated upgrade path for greenboard
-UPGRADE_VERSIONS=$(
-  IFS=,
-  echo "${SGW_VERSIONS[*]}"
-)
-
 # Store the rolling topology template for reuse
 TOPOLOGY_ROLLING_TEMPLATE="$SCRIPT_DIR/topology_rolling.json"
 
@@ -100,7 +56,7 @@ function rolling_upgrade_to_version() {
 
     pushd $QE_TESTS_DIR >/dev/null
     uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
-      --upgrade-versions "$UPGRADE_VERSIONS" \
+      --no-result-upload \
       --sgcollect-on-test-failure \
       test_rolling_upgrade_sgw.py
     popd >/dev/null
@@ -157,7 +113,7 @@ function rolling_upgrade_to_version() {
 
       pushd $QE_TESTS_DIR >/dev/null
       uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
-        --upgrade-versions "$UPGRADE_VERSIONS" \
+        --no-result-upload \
         --sgcollect-on-test-failure \
         test_rolling_upgrade_sgw.py
       popd >/dev/null
@@ -173,7 +129,7 @@ function rolling_upgrade_to_version() {
 
     pushd $QE_TESTS_DIR >/dev/null
     uv run pytest -s -v --no-header -W ignore::DeprecationWarning --config config.json -m upg_sgw \
-      --upgrade-versions "$UPGRADE_VERSIONS" \
+      --no-result-upload \
       --sgcollect-on-test-failure \
       test_rolling_upgrade_sgw.py
     popd >/dev/null

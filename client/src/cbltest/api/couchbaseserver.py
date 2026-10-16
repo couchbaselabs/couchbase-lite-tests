@@ -2,6 +2,7 @@ import asyncio
 import json
 import os
 import platform
+import re
 import subprocess
 import tempfile
 import time
@@ -159,6 +160,14 @@ class BucketPool:
 # so the host always answers before this client gives up; collect-logs.sh gives cbcollect_info the same limit inside
 # the container.
 _COLLECT_LOGS_TIMEOUT: float = 1260
+
+
+def parse_cbs_version(implementation_version: str) -> str:
+    """Reduce a ``/pools`` ``implementationVersion`` (e.g. ``7.6.4-5146-enterprise``) to ``7.6.4-5146``."""
+    match = re.match(r"\d+\.\d+\.\d+-\d+", implementation_version)
+    if match is None:
+        raise CblTestError(f"Unrecognised Couchbase Server version '{implementation_version}'")
+    return match.group()
 
 
 class CouchbaseServer:
@@ -593,6 +602,16 @@ class CouchbaseServer:
         """
         async with await self.__session.get(f"/pools/default/buckets/{bucket_name}/scopes") as resp:
             return resp.status == 200
+
+    async def get_version(self) -> str:
+        """
+        Returns the version of this node as ``x.y.z-build`` (e.g. ``7.6.4-5146``), with the edition suffix
+        (``-enterprise``/``-community``) that ``implementationVersion`` carries stripped.
+
+        :raises CblTestError: If the node reports no recognisable version
+        """
+        info = await self.__send_request("get", "/pools")
+        return parse_cbs_version(info.get("implementationVersion", "") if isinstance(info, dict) else "")
 
     async def get_bucket_names(self) -> list[str]:
         """

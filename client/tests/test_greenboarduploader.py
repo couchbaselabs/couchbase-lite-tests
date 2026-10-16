@@ -2,11 +2,12 @@
 
 import inspect
 import json
-from collections.abc import AsyncGenerator, Callable, Sequence
+from collections.abc import AsyncGenerator, Callable, Container, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import asyncstdlib
 import pluggy._result
@@ -14,13 +15,25 @@ import pytest
 from _pytest.reports import TestReport
 from cbltest import CBLPyTest
 from cbltest.api import testserver
+from cbltest.api.couchbaseserver import CouchbaseServer, parse_cbs_version
 from cbltest.api.edgeserver import EdgeServer, EdgeServerVersion
 from cbltest.api.edgeservermanager import EdgeServerManager
+from cbltest.api.error import CblTestError
 from cbltest.api.syncgateway import CouchbaseVersion, SyncGateway, SyncGatewayVersion
 from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import (
+    DETAILS_SCHEMA,
+    ERROR,
+    FAIL,
+    MAX_FAILURES,
+    MAX_MESSAGE_BYTES,
+    MAX_TRACE_BYTES,
+    NOTRUN,
+    PASS,
+    SKIP,
     GreenboardUploader,
     RunResult,
+    outcomes_from_junit_xml,
     resolve_branch,
     resolve_job_url,
 )
@@ -68,9 +81,9 @@ def _clear_branch_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("BRANCH_NAME", raising=False)
 
 
-def make_report(when: Literal["setup", "call", "teardown"], *, passed: bool = True) -> TestReport:
+def make_report(when: Literal["setup", "call", "teardown"], *, passed: bool = True, nodeid: str = "") -> TestReport:
     return TestReport(
-        nodeid="",
+        nodeid=nodeid,
         location=("", 0, ""),
         keywords={},
         outcome="passed" if passed else "failed",
@@ -105,23 +118,41 @@ def make_uploader() -> GreenboardUploader:
     return GreenboardUploader("couchbase://localhost", "user", "pass")
 
 
-def drive_finished_item(uploader: GreenboardUploader, report: TestReport, item: MagicMock | None = None) -> None:
-    """Simulate one item completing its whole runtest protocol: makereport
-    tallying plus logfinish. A truncated run should call ``drive_hook``
-    alone, skipping logfinish."""
-    drive_hook(uploader, report, item)
-    uploader.pytest_runtest_logfinish()
+def finish_item(config: pytest.Config, nodeid: str) -> None:
+    """Simulate pytest's ``pytest_runtest_logfinish`` for one item completing its whole runtest protocol. A truncated
+    run simply never calls this for the cut-short item."""
+    config.stash[greenboard_fixture._finished_key].pytest_runtest_logfinish(nodeid)
 
 
 class FakeSyncGateway(SyncGateway):
     """Test-only SyncGateway that returns a fixed version without network calls."""
 
-    def __init__(self, version_str: str) -> None:
+    def __init__(self, version_str: str, *, rosmar: bool = False, rosmar_error: bool = False) -> None:
         super().__init__("localhost", "admin", "password")
         self._version_str = version_str
+        self._rosmar = rosmar
+        self._rosmar_error = rosmar_error
 
     async def get_version(self) -> SyncGatewayVersion:
         return SyncGatewayVersion(self._version_str)
+
+    @property
+    async def using_rosmar(self) -> bool:
+        if self._rosmar_error:
+            raise CblTestError("startup config unavailable")
+        return self._rosmar
+
+
+class FakeCouchbaseServer(CouchbaseServer):
+    """Test-only CouchbaseServer that returns a fixed version (or fails), skipping the real constructor."""
+
+    def __init__(self, version: str | None = "7.6.4-5146") -> None:
+        self._version = version
+
+    async def get_version(self) -> str:
+        if self._version is None:
+            raise CblTestError("GET /pools returned 500")
+        return self._version
 
 
 class FakeEdgeServer(EdgeServer):
@@ -175,8 +206,10 @@ class FakeCBLPyTest(CBLPyTest):
         test_servers: Sequence[testserver.TestServer],
         sync_gateways: Sequence[SyncGateway],
         edge_servers: Sequence[EdgeServerManager],
+        couchbase_servers: Sequence[CouchbaseServer] = (),
     ) -> None:
         self._config = config
+        self._couchbase_servers = couchbase_servers
         self._test_servers = test_servers
         self._sync_gateways = sync_gateways
         self._edge_servers = edge_servers
@@ -197,6 +230,10 @@ class FakeCBLPyTest(CBLPyTest):
     def edge_servers(self) -> Sequence[EdgeServerManager]:
         return self._edge_servers
 
+    @property
+    def couchbase_servers(self) -> Sequence[CouchbaseServer]:
+        return self._couchbase_servers
+
 
 def _make_cblpytest(
     *,
@@ -206,6 +243,7 @@ def _make_cblpytest(
     test_servers: Sequence[testserver.TestServer] | None = None,
     sync_gateways: Sequence[SyncGateway] | None = None,
     edge_servers: Sequence[EdgeServerManager] | None = None,
+    couchbase_servers: Sequence[CouchbaseServer] | None = None,
 ) -> CBLPyTest:
     if url is not None and username is not None and password is not None:
         config = ParsedConfig(
@@ -219,7 +257,7 @@ def _make_cblpytest(
         )
     else:
         config = ParsedConfig({})
-    return FakeCBLPyTest(config, test_servers or [], sync_gateways or [], edge_servers or [])
+    return FakeCBLPyTest(config, test_servers or [], sync_gateways or [], edge_servers or [], couchbase_servers or [])
 
 
 def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") -> pytest.Config:
@@ -235,7 +273,10 @@ def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") 
     # fixture strips GIT_BRANCH/BRANCH_NAME) and exercise the skip path.
     if branch is not None:
         args += ["--branch", branch]
-    return pytest.Config.fromdictargs({}, args)
+    config = pytest.Config.fromdictargs({}, args)
+    # pytest_configure doesn't fire for a synthetic Config, so install what it would.
+    greenboard_fixture.track_finished_items(config)
+    return config
 
 
 def _make_server(
@@ -270,7 +311,7 @@ async def _run_fixture(gen: AsyncGenerator) -> None:
 def _make_session(config: pytest.Config, *, testscollected: int = 0) -> pytest.Session:
     """A ``pytest.Session`` bound to the same ``config`` used to drive the
     fixture, so they share a stash and pluginmanager. ``testscollected``
-    defaults to 0, matching ``items_finished``'s default (incomplete=False)."""
+    defaults to 0, matching the zero items finished by default (incomplete=False)."""
     session = pytest.Session.from_config(config)
     session.testscollected = testscollected
     return session
@@ -576,40 +617,31 @@ class TestGreenboardUploaderDocument:
         assert mock_upload.call_args[0][0].collected == 42
 
 
-class TestItemsFinishedTracking:
-    """``items_finished`` (driven by pytest's real ``pytest_runtest_logfinish``
-    hook) is what the greenboard fixture compares against
-    ``session.testscollected`` to detect a session cut short mid-run."""
+class TestFinishedItemsTracking:
+    """``FinishedItems`` (driven by pytest's real ``pytest_runtest_logfinish`` hook) is what the greenboard fixture
+    compares against ``session.testscollected`` to detect a session cut short mid-run."""
 
-    def test_starts_at_zero(self) -> None:
-        assert make_uploader().items_finished == 0
+    def test_starts_empty(self) -> None:
+        assert greenboard_fixture.FinishedItems().nodeids == set()
 
-    def test_increments_once_per_logfinish_call(self) -> None:
-        uploader = make_uploader()
-        uploader.pytest_runtest_logfinish()
-        uploader.pytest_runtest_logfinish()
-        assert uploader.items_finished == 2
+    def test_records_each_finished_node_id_once(self) -> None:
+        tracker = greenboard_fixture.FinishedItems()
+        tracker.pytest_runtest_logfinish("t.py::a")
+        tracker.pytest_runtest_logfinish("t.py::a")
+        tracker.pytest_runtest_logfinish("t.py::b")
+        assert tracker.nodeids == {"t.py::a", "t.py::b"}
 
-    def test_makereport_alone_does_not_increment(self) -> None:
-        """A report without a matching logfinish call (simulating an item
-        whose protocol was cut short by SIGINT/SIGTERM/session-timeout
-        before reaching completion) must not count as finished."""
-        uploader = make_uploader()
-        drive_hook(uploader, make_report("call", passed=True))
-        assert uploader.items_finished == 0
+    def test_makereport_alone_does_not_count_as_finished(self) -> None:
+        """A report without a matching logfinish (an item cut short by SIGINT/SIGTERM/session-timeout) must not count
+        as finished."""
+        config = _make_pytestconfig()
+        drive_hook(make_uploader(), make_report("call", passed=True, nodeid="t.py::a"))
+        assert config.stash[greenboard_fixture._finished_key].nodeids == set()
 
-    def test_finished_and_unfinished_items_both_tracked(self) -> None:
-        uploader = make_uploader()
-        drive_finished_item(uploader, make_report("call", passed=True))
-        drive_finished_item(uploader, make_report("call", passed=False))
-        drive_hook(uploader, make_report("call", passed=True))  # cut short, no logfinish
-        assert uploader.items_finished == 2
-
-        # pass/fail tally is unaffected: all three "call" reports count.
-        with patch.object(uploader, "_upload_document") as mock_upload:
-            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
-        doc = mock_upload.call_args[0][0]
-        assert (doc.pass_count, doc.fail_count) == (2, 1)
+    def test_configure_hook_installs_tracker_before_any_fixture(self) -> None:
+        config = pytest.Config.fromdictargs({}, ["--config", str(Path(__file__).with_name("empty_config.json"))])
+        greenboard_fixture.pytest_configure(config)
+        assert config.stash[greenboard_fixture._finished_key] in config.pluginmanager.get_plugins()
 
 
 class TestOverallFailureGuard:
@@ -798,38 +830,6 @@ class TestGreenboardFixture:
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
             drive_hook(uploader, make_report("call", passed=True), make_item(markers=["sgw"]))
-            try:
-                await gen.__anext__()
-            except StopAsyncIteration:
-                pass
-            finish_session(config)
-        assert mock_upload.call_args[0][0] == RunResult(
-            build=1,
-            version="3.2.0",
-            sgwVersion="n/a",
-            esVersion="n/a",
-            failCount=0,
-            passCount=1,
-            platform="sync-gateway",
-            os="iOS",
-            jobUrl="local",
-        )
-
-    @pytest.mark.asyncio
-    async def test_upg_sgw_marker_keeps_sync_gateway_platform(self) -> None:
-        """@pytest.mark.upg_sgw also forces platform to 'sync-gateway'."""
-        server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
-        cblpytest = _make_cblpytest(test_servers=[server])
-        config = _make_pytestconfig()
-        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config)
-            await gen.__anext__()
-            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(
-                uploader,
-                make_report("call", passed=True),
-                make_item(markers=["upg_sgw"]),
-            )
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -1098,9 +1098,10 @@ class TestGreenboardFixture:
             gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_finished_item(uploader, make_report("call", passed=True))
-            drive_finished_item(uploader, make_report("call", passed=True))
-            drive_hook(uploader, make_report("call", passed=True))  # third item cut short
+            for nodeid in ("t.py::a", "t.py::b"):
+                drive_hook(uploader, make_report("call", passed=True, nodeid=nodeid))
+                finish_item(config, nodeid)
+            drive_hook(uploader, make_report("call", passed=True, nodeid="t.py::c"))  # third item cut short
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -1121,8 +1122,9 @@ class TestGreenboardFixture:
             gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_finished_item(uploader, make_report("call", passed=True))
-            drive_finished_item(uploader, make_report("call", passed=False))
+            for nodeid, passed in (("t.py::a", True), ("t.py::b", False)):
+                drive_hook(uploader, make_report("call", passed=passed, nodeid=nodeid))
+                finish_item(config, nodeid)
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -1135,7 +1137,7 @@ class TestGreenboardFixture:
 class TestRunResultFullDocument:
     """Verify every field written to the greenboard bucket, including timestamp fields.
 
-    These tests let the real _upsert run but mock out the Couchbase Cluster and
+    These tests let the real upload run but mock out the Couchbase Cluster and
     freeze datetime.now so the uploaded / date fields are deterministic.
     """
 
@@ -1183,6 +1185,7 @@ class TestRunResultFullDocument:
                 os="iOS",
                 jobUrl="local",
             ).model_dump(by_alias=True),
+            "details": DETAILS_SCHEMA,
             "uploaded": FIXED_UNIX_TS,
             "date": "2024-03-15",
         }
@@ -1206,6 +1209,7 @@ class TestRunResultFullDocument:
                 os="n/a",
                 jobUrl="local",
             ).model_dump(by_alias=True),
+            "details": DETAILS_SCHEMA,
             "uploaded": FIXED_UNIX_TS,
             "date": "2024-03-15",
         }
@@ -1229,6 +1233,7 @@ class TestRunResultFullDocument:
                 os="n/a",
                 jobUrl="local",
             ).model_dump(by_alias=True),
+            "details": DETAILS_SCHEMA,
             "uploaded": FIXED_UNIX_TS,
             "date": "2024-03-15",
         }
@@ -1261,7 +1266,7 @@ class TestResolveJobUrl:
 
 class TestJobUrlPropagation:
     """End-to-end coverage: a real ``BUILD_URL`` reaches the uploaded doc
-    on both upload paths (standard ``upload`` and ``upload_upgrade_batch``).
+    on the standard upload path.
     """
 
     def test_build_url_propagates_to_standard_upload(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1274,30 +1279,6 @@ class TestJobUrlPropagation:
             uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
 
         assert mock_upload.call_args[0][0].job_url == build_url
-
-    def test_build_url_propagates_to_upgrade_batch(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        build_url = "https://jenkins.example.com/job/upg-sgw/789/"
-        monkeypatch.setenv("BUILD_URL", build_url)
-
-        # Minimal results file representing a clean two-step upgrade run.
-        results_file = tmp_path / "sgw_upgrade_results.json"
-        results_file.write_text(
-            '{"upgradePath": ["3.3.0", "4.0.0"], "iterations": ['
-            '{"phase": "initial", "nodeIndex": null, "upgradeFrom": "initial", '
-            '"upgradeTo": "3.3.0", "build": 100, "passCount": 5, "failCount": 0, '
-            '"failed": false}, '
-            '{"phase": "complete", "nodeIndex": null, "upgradeFrom": "3.3.0", '
-            '"upgradeTo": "4.0.0", "build": 200, "passCount": 5, "failCount": 0, '
-            '"failed": false}]}'
-        )
-
-        uploader = make_uploader()
-        with patch.object(uploader, "_upsert") as mock_upsert:
-            uploader.upload_upgrade_batch(str(results_file))
-
-        doc = mock_upsert.call_args[0][0]
-        assert doc["jobUrl"] == build_url
-        assert doc["platform"] == "sgw-upgrade"
 
 
 class TestResolveBranch:
@@ -1357,7 +1338,7 @@ class TestResolveBranch:
 class TestBranchGate:
     """The greenboard fixture uploads results only from the 'main' tests
     branch. Feature-branch and local runs carry potentially-modified tests, so
-    their results must never be published; the upgrade path stays exempt.
+    their results must never be published.
     """
 
     @pytest.mark.asyncio
@@ -1401,26 +1382,6 @@ class TestBranchGate:
             finish_session(config)
         mock_upload.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_upgrade_path_exempt_from_branch_gate(self) -> None:
-        """The upgrade path records regardless of branch. The upg-sgw pipeline
-        is deprecated and out of scope, so its per-step recording stays
-        unconditional even when the branch resolves non-main."""
-        cblpytest = _make_cblpytest(test_servers=[_make_server()])
-        # --upgrade-versions set, no --branch and GIT_BRANCH/BRANCH_NAME
-        # stripped => the branch resolves non-main, yet the upgrade path runs.
-        args = [
-            "--config",
-            str(Path(__file__).with_name("empty_config.json")),
-            "--upgrade-versions",
-            "3.3.0,4.0.0",
-        ]
-        config = pytest.Config.fromdictargs({}, args)
-        with patch("cbltest.greenboarduploader.GreenboardUploader.record_upgrade_step") as mock_record:
-            await _run_fixture(_raw_greenboard(cblpytest, config))
-            finish_session(config)
-        mock_record.assert_called_once()
-
 
 # Overrides the real `cblpytest` fixture by name to avoid real network I/O,
 # while still exercising the real greenboard_fixture module end to end.
@@ -1441,7 +1402,7 @@ from cbltest.responses import GetRootResponse
 CAPTURED_PATH = Path(__file__).parent / "captured_doc.json"
 
 
-def _fake_upload_document(self, test_run):
+def _fake_upload_document(self, test_run, *_):
     CAPTURED_PATH.write_text(json.dumps(test_run.model_dump(by_alias=True)))
 
 
@@ -1476,6 +1437,7 @@ class _FakeCBLPyTest:
         self.test_servers = [_FakeTestServer()]
         self.sync_gateways = []
         self.edge_servers = []
+        self.couchbase_servers = []
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -1574,3 +1536,496 @@ class TestRealPytestLifecycle:
         doc = json.loads(captured_path.read_text())
         # test_three never ran: 2 finished out of 3 collected.
         assert (doc["passCount"], doc["failCount"], doc["incomplete"], doc["collected"]) == (1, 1, True, 3)
+
+
+class TestCbsVersion:
+    @pytest.mark.parametrize(
+        "raw",
+        ["7.6.4-5146-enterprise", "7.6.4-5146-community", "7.6.4-5146"],
+    )
+    def test_edition_suffix_stripped(self, raw: str) -> None:
+        assert parse_cbs_version(raw) == "7.6.4-5146"
+
+    def test_unrecognised_version_raises(self) -> None:
+        with pytest.raises(CblTestError):
+            parse_cbs_version("")
+
+    @pytest.mark.asyncio
+    async def test_get_version_reads_pools(self) -> None:
+        server = CouchbaseServer.__new__(CouchbaseServer)
+        send = AsyncMock(return_value={"implementationVersion": "7.6.4-5146-enterprise"})
+        with patch.object(CouchbaseServer, "_CouchbaseServer__send_request", send):
+            assert await server.get_version() == "7.6.4-5146"
+        send.assert_awaited_once_with("get", "/pools")
+
+    async def _doc(
+        self,
+        sync_gateways: Sequence[SyncGateway] | None = None,
+        couchbase_servers: Sequence[CouchbaseServer] | None = None,
+    ) -> RunResult:
+        cblpytest = _make_cblpytest(
+            test_servers=[_make_server()], sync_gateways=sync_gateways, couchbase_servers=couchbase_servers
+        )
+        config = _make_pytestconfig()
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            await _run_fixture(_raw_greenboard(cblpytest, config))
+            finish_session(config)
+        return mock_upload.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_cbs_version_recorded(self) -> None:
+        doc = await self._doc(
+            sync_gateways=[FakeSyncGateway("3.3.3(271;abc)")], couchbase_servers=[FakeCouchbaseServer()]
+        )
+        assert doc.cbs_version == "7.6.4-5146"
+
+    @pytest.mark.asyncio
+    async def test_cbl_run_without_sgw_still_gets_cbs_version(self) -> None:
+        doc = await self._doc(couchbase_servers=[FakeCouchbaseServer()])
+        assert doc.cbs_version == "7.6.4-5146"
+
+    @pytest.mark.asyncio
+    async def test_lookup_failure_gives_na_and_still_uploads(self) -> None:
+        doc = await self._doc(couchbase_servers=[FakeCouchbaseServer(None)])
+        assert doc.cbs_version == "n/a"
+
+    @pytest.mark.asyncio
+    async def test_rosmar_wins_over_present_cbs(self) -> None:
+        doc = await self._doc(
+            sync_gateways=[FakeSyncGateway("4.0.0(350;def)", rosmar=True)], couchbase_servers=[FakeCouchbaseServer()]
+        )
+        assert doc.cbs_version == "rosmar"
+
+    @pytest.mark.asyncio
+    async def test_rosmar_check_failure_falls_back_to_cbs(self) -> None:
+        doc = await self._doc(
+            sync_gateways=[FakeSyncGateway("4.0.0(350;def)", rosmar_error=True)],
+            couchbase_servers=[FakeCouchbaseServer()],
+        )
+        assert doc.cbs_version == "7.6.4-5146"
+
+    @pytest.mark.asyncio
+    async def test_no_cbs_gives_na(self) -> None:
+        doc = await self._doc(sync_gateways=[FakeSyncGateway("3.3.3(271;abc)")])
+        assert doc.cbs_version == "n/a"
+
+
+def write_junit_cases(path: Path, cases: str, *, tests: int, failures: int, errors: int) -> Path:
+    path.write_text(
+        '<?xml version="1.0" encoding="utf-8"?><testsuites>'
+        f'<testsuite name="pytest" tests="{tests}" failures="{failures}" errors="{errors}" skipped="0">'
+        f"{cases}</testsuite></testsuites>"
+    )
+    return path
+
+
+_FAIL_CASE = (
+    '<testcase classname="tests.QE.test_db_gone.TestDbGone" name="test_x[param]">'
+    '<failure message="AssertionError: boom&#10;assert 1 == 2">Traceback\nassert 1 == 2</failure></testcase>'
+)
+_ERROR_CASE = (
+    '<testcase classname="tests.QE.test_other" name="test_y"><error message="failed on setup">tb</error></testcase>'
+)
+_PASS_CASE = '<testcase classname="tests.QE.test_other" name="test_ok"/>'
+
+
+@dataclass
+class Uploaded:
+    """The arguments the uploader handed to ``_upload_document``."""
+
+    run: RunResult
+    tests: dict[str, str]
+    failures: list[dict]
+    truncated: bool
+
+
+def uploaded(mock_upload: MagicMock) -> Uploaded:
+    return Uploaded(*mock_upload.call_args[0])
+
+
+def make_named_report(
+    nodeid: str, when: Literal["setup", "call", "teardown"], outcome: Literal["passed", "failed", "skipped"]
+) -> TestReport:
+    return TestReport(
+        nodeid=nodeid,
+        location=("", 0, ""),
+        keywords={},
+        outcome=outcome,
+        longrepr=None,
+        when=when,
+    )
+
+
+def upload_in_process(
+    uploader: GreenboardUploader,
+    *,
+    pass_count: int | None = None,
+    fail_count: int | None = None,
+    incomplete: bool = False,
+    collected_ids: Sequence[str] | None = None,
+    finished_ids: Container[str] | None = None,
+) -> Uploaded:
+    with patch.object(uploader, "_upload_document") as mock_upload:
+        uploader.upload(
+            "couchbase-lite-ios",
+            "iOS",
+            "3.2.0-b0001",
+            None,
+            None,
+            pass_count=pass_count,
+            fail_count=fail_count,
+            incomplete=incomplete,
+            collected_ids=collected_ids,
+            finished_ids=finished_ids,
+        )
+    return uploaded(mock_upload)
+
+
+def count(tests: dict[str, str], outcome: str) -> int:
+    return sum(1 for v in tests.values() if v == outcome)
+
+
+class TestFailuresList:
+    def test_junit_entries_for_failure_and_error(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(
+            tmp_path / "j.xml", _FAIL_CASE + _ERROR_CASE + _PASS_CASE, tests=3, failures=1, errors=1
+        )
+
+        up = uploaded(upload_junit(make_uploader(), xml))
+
+        assert up.failures == [
+            {
+                "test": "tests/QE/test_db_gone.py::TestDbGone::test_x[param]",
+                "kind": "failure",
+                "phase": "call",
+                "message": "AssertionError: boom",
+                "trace": "Traceback\nassert 1 == 2",
+            },
+            {
+                "test": "tests/QE/test_other.py::test_y",
+                "kind": "error",
+                "phase": None,
+                "message": "failed on setup",
+                "trace": "tb",
+            },
+        ]
+        # Option A: failCount still folds errors in, and the list matches it.
+        assert up.run.fail_count == len(up.failures) == 2
+        assert up.truncated is False
+
+    def test_junit_path_ignores_in_process_outcomes(self, tmp_path: Path) -> None:
+        """A hook-recorded failure must not leak into a JUnit-derived upload."""
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("in/process.py::test_z", "call", "failed"))
+        xml = write_junit_cases(tmp_path / "j.xml", _FAIL_CASE + _PASS_CASE, tests=2, failures=1, errors=0)
+
+        up = uploaded(upload_junit(uploader, xml))
+
+        assert [f["test"] for f in up.failures] == ["tests/QE/test_db_gone.py::TestDbGone::test_x[param]"]
+        assert "in/process.py::test_z" not in up.tests
+        assert up.run.fail_count == len(up.failures) == 1
+
+    def test_junit_path_with_setup_latch_uses_xml_outcomes(self, tmp_path: Path) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_report("setup", passed=False))
+        xml = write_junit_cases(tmp_path / "j.xml", _ERROR_CASE + _PASS_CASE, tests=2, failures=0, errors=1)
+
+        up = uploaded(upload_junit(uploader, xml))
+
+        assert [f["kind"] for f in up.failures] == ["error"]
+        assert count(up.tests, ERROR) == 1
+
+    def test_in_process_entries_match_fail_count(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_report("call", passed=True))
+        report = make_report("call", passed=False)
+        report.nodeid = "tests/QE/test_a.py::test_x"
+        drive_hook(uploader, report)
+
+        up = upload_in_process(uploader)
+
+        assert up.run.fail_count == len(up.failures) == 1
+        assert up.failures[0]["test"] == "tests/QE/test_a.py::test_x"
+        assert up.failures[0]["kind"] == "failure"
+        assert up.failures[0]["phase"] == "call"
+        assert "trace" not in up.failures[0]
+
+    def test_in_process_list_stops_at_latch(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_report("setup", passed=False))
+        drive_hook(uploader, make_report("call", passed=False))
+
+        assert upload_in_process(uploader, pass_count=0, fail_count=0).failures == []
+
+    def test_entries_capped_and_flagged(self, tmp_path: Path) -> None:
+        cases = "".join(
+            f'<testcase classname="a.test_m" name="t{i}"><failure message="m">tb</failure></testcase>'
+            for i in range(MAX_FAILURES + 5)
+        )
+        xml = write_junit_cases(tmp_path / "j.xml", cases, tests=MAX_FAILURES + 5, failures=MAX_FAILURES + 5, errors=0)
+
+        up = uploaded(upload_junit(make_uploader(), xml))
+
+        assert len(up.failures) == MAX_FAILURES
+        assert up.truncated is True
+        assert up.run.fail_count == MAX_FAILURES + 5
+        # ::tests is never capped, so it still names every failed test.
+        assert count(up.tests, FAIL) == MAX_FAILURES + 5
+
+    def test_trace_keeps_tail_on_char_boundary_and_message_is_capped(self, tmp_path: Path) -> None:
+        trace = "head-" + "é" * MAX_TRACE_BYTES + "-TAIL"
+        message = "x" * (MAX_MESSAGE_BYTES + 100)
+        cases = f'<testcase classname="a.test_m" name="t"><failure message="{message}">{trace}</failure></testcase>'
+        xml = write_junit_cases(tmp_path / "j.xml", cases, tests=1, failures=1, errors=0)
+
+        entry = uploaded(upload_junit(make_uploader(), xml)).failures[0]
+
+        assert len(entry["trace"].encode()) <= MAX_TRACE_BYTES
+        assert entry["trace"].endswith("-TAIL")
+        assert "head-" not in entry["trace"]
+        assert len(entry["message"].encode()) == MAX_MESSAGE_BYTES
+
+    def test_empty_trace_is_omitted(self, tmp_path: Path) -> None:
+        cases = '<testcase classname="a.test_m" name="t"><failure message="m"></failure></testcase>'
+        xml = write_junit_cases(tmp_path / "j.xml", cases, tests=1, failures=1, errors=0)
+
+        assert "trace" not in uploaded(upload_junit(make_uploader(), xml)).failures[0]
+
+
+class TestTestOutcomes:
+    """The ``K::tests`` doc and its invariants against passCount/failCount."""
+
+    def test_junit_outcomes_and_invariants(self, tmp_path: Path) -> None:
+        skipped = '<testcase classname="a.test_s" name="t"><skipped message="xfail"/></testcase>'
+        xml = write_junit_cases(
+            tmp_path / "j.xml", _FAIL_CASE + _ERROR_CASE + _PASS_CASE + skipped, tests=4, failures=1, errors=1
+        )
+        xml.write_text(xml.read_text().replace('skipped="0"', 'skipped="1"'))
+
+        up = uploaded(upload_junit(make_uploader(), xml))
+
+        assert up.tests == {
+            "tests/QE/test_db_gone.py::TestDbGone::test_x[param]": FAIL,
+            "tests/QE/test_other.py::test_y": ERROR,
+            "tests/QE/test_other.py::test_ok": PASS,
+            "a/test_s.py::t": SKIP,
+        }
+        assert count(up.tests, PASS) == up.run.pass_count
+        assert count(up.tests, FAIL) + count(up.tests, ERROR) == up.run.fail_count
+        assert NOTRUN not in up.tests.values()
+
+    def test_junit_test_ids_match_failure_ids(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(
+            tmp_path / "j.xml", _FAIL_CASE + _ERROR_CASE + _PASS_CASE, tests=3, failures=1, errors=1
+        )
+
+        up = uploaded(upload_junit(make_uploader(), xml))
+
+        for entry in up.failures:
+            assert up.tests[entry["test"]] == (FAIL if entry["kind"] == "failure" else ERROR)
+
+    def test_junit_never_reports_notrun_even_when_incomplete(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(tmp_path / "j.xml", _FAIL_CASE + _PASS_CASE, tests=2, failures=1, errors=0)
+        uploader = make_uploader()
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload_from_junit_file(
+                xml, "couchbase-lite-ios", "iOS", "3.2.0-b0001", None, incomplete=True, collected_ids=["x::never_ran"]
+            )
+
+        assert NOTRUN not in uploaded(mock_upload).tests.values()
+
+    def test_in_process_outcomes_and_invariants(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::a", "call", "passed"))
+        drive_hook(uploader, make_named_report("t.py::b", "call", "passed"))
+        drive_hook(uploader, make_named_report("t.py::c", "call", "failed"))
+        drive_hook(uploader, make_named_report("t.py::d", "call", "skipped"))  # includes xfail
+        drive_hook(uploader, make_named_report("t.py::e", "setup", "skipped"))  # skipped before the call phase
+
+        up = upload_in_process(uploader)
+
+        assert up.tests == {"t.py::a": PASS, "t.py::b": PASS, "t.py::c": FAIL, "t.py::d": SKIP, "t.py::e": SKIP}
+        assert count(up.tests, PASS) == up.run.pass_count == 2
+        assert count(up.tests, FAIL) == up.run.fail_count == 1
+        assert ERROR not in up.tests.values()
+        assert [f["test"] for f in up.failures] == ["t.py::c"]
+
+    def test_in_process_notrun_only_when_incomplete(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::a", "call", "passed"))
+        ids = ["t.py::a", "t.py::b", "t.py::c"]
+
+        complete = upload_in_process(uploader, incomplete=False, collected_ids=ids)
+        incomplete = upload_in_process(uploader, incomplete=True, collected_ids=ids)
+
+        assert complete.tests == {"t.py::a": PASS}
+        assert incomplete.tests == {"t.py::a": PASS, "t.py::b": NOTRUN, "t.py::c": NOTRUN}
+        assert incomplete.run.pass_count == 1  # notrun never counts
+
+    def test_skip_count_junit_includes_xfail(self, tmp_path: Path) -> None:
+        skipped = (
+            '<testcase classname="a.test_s" name="t1"><skipped message="s"/></testcase>'
+            '<testcase classname="a.test_s" name="t2"><skipped type="pytest.xfail" message="xfail"/></testcase>'
+        )
+        xml = write_junit_cases(tmp_path / "j.xml", _PASS_CASE + skipped, tests=3, failures=0, errors=0)
+        xml.write_text(xml.read_text().replace('skipped="0"', 'skipped="2"'))
+
+        up = uploaded(upload_junit(make_uploader(), xml))
+
+        assert up.run.skip_count == count(up.tests, SKIP) == 2
+        assert up.run.pass_count == 1
+
+    def test_skip_count_in_process_and_finished_but_unrecorded_is_skip(self) -> None:
+        """A test that finished with no outcome recorded can only be a skip raised before the uploader was
+        registered."""
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::ran", "call", "passed"))
+        drive_hook(uploader, make_named_report("t.py::xfailed", "call", "skipped"))
+        ids = ["t.py::early_skip", "t.py::ran", "t.py::xfailed", "t.py::never"]
+
+        up = upload_in_process(
+            uploader,
+            incomplete=True,
+            collected_ids=ids,
+            finished_ids={"t.py::early_skip", "t.py::ran", "t.py::xfailed"},
+        )
+
+        assert up.tests == {"t.py::early_skip": SKIP, "t.py::ran": PASS, "t.py::xfailed": SKIP, "t.py::never": NOTRUN}
+        assert up.run.skip_count == 2
+
+    def test_skip_count_defaults_to_zero(self) -> None:
+        assert upload_in_process(make_uploader()).run.skip_count == 0
+
+    def test_in_process_setup_error_is_recorded_as_error(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::a", "setup", "failed"))
+
+        assert upload_in_process(uploader, pass_count=0, fail_count=0).tests == {"t.py::a": ERROR}
+
+    def test_teardown_error_overrides_passed_call(self) -> None:
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::a", "call", "passed"))
+        drive_hook(uploader, make_named_report("t.py::a", "teardown", "failed"))
+
+        assert upload_in_process(uploader, pass_count=0, fail_count=0).tests == {"t.py::a": ERROR}
+
+    def test_outcomes_from_junit_xml_helper(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(tmp_path / "j.xml", _PASS_CASE, tests=1, failures=0, errors=0)
+
+        assert outcomes_from_junit_xml(xml) == ({"tests/QE/test_other.py::test_ok": PASS}, [])
+
+
+class TestSiblingDocuments:
+    """One upload writes ``K::tests`` and ``K::failures`` first and the run doc ``K`` last."""
+
+    def _real_upload(self, uploader: GreenboardUploader, collection: MagicMock) -> None:
+        mock_cluster = MagicMock(spec=Cluster)
+        mock_cluster.bucket.return_value.default_collection.return_value = collection
+        with patch("cbltest.greenboarduploader.Cluster", return_value=mock_cluster):
+            uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b0001", None, None)
+
+    def _uploader_with_one_failure(self) -> GreenboardUploader:
+        uploader = make_uploader()
+        drive_hook(uploader, make_named_report("t.py::a", "call", "passed"))
+        drive_hook(uploader, make_named_report("t.py::b", "call", "failed"))
+        return uploader
+
+    def test_three_docs_siblings_first_run_doc_last(self) -> None:
+        collection = MagicMock(spec=Collection)
+
+        self._real_upload(self._uploader_with_one_failure(), collection)
+
+        (tests_key, tests_doc), (failures_key, failures_doc), (key, run_doc) = (
+            call.args for call in collection.upsert.call_args_list
+        )
+        assert tests_key == f"{key}::tests"
+        assert failures_key == f"{key}::failures"
+        assert tests_doc == {"runId": key, "tests": {"t.py::a": PASS, "t.py::b": FAIL}}
+        assert failures_doc == {
+            "runId": key,
+            "failures": [{"test": "t.py::b", "kind": "failure", "phase": "call", "message": ""}],
+            "failuresTruncated": False,
+        }
+        assert run_doc["details"] == DETAILS_SCHEMA
+        assert "failures" not in run_doc
+        assert "failuresTruncated" not in run_doc
+        assert run_doc["passCount"] == 1
+        assert run_doc["failCount"] == 1
+
+    def test_sibling_write_failure_still_uploads_run_doc_without_details(self) -> None:
+        collection = MagicMock(spec=Collection)
+        calls: list[str] = []
+
+        def upsert(key: str, doc: dict) -> None:
+            if key.endswith("::failures"):
+                raise RuntimeError("write failed")
+            calls.append(key)
+
+        collection.upsert.side_effect = upsert
+
+        self._real_upload(self._uploader_with_one_failure(), collection)
+
+        run_key = calls[-1]
+        assert "::" not in run_key
+        assert collection.upsert.call_args[0][0] == run_key
+        assert "details" not in collection.upsert.call_args[0][1]
+
+    def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, pytester: pytest.Pytester) -> None:
+        """Regression: skips raised before fixture setup (``@pytest.mark.skip``, topology/cbse skips) used to finish
+        before the ``greenboard`` fixture registered its counter, so a run that finished cleanly read as incomplete."""
+        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester.makepyfile("""
+            import pytest
+
+
+            @pytest.mark.skip
+            def test_skip_one():
+                pass
+
+
+            @pytest.mark.skip
+            def test_skip_two():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_one():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_two():
+                pass
+        """)
+        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result.assert_outcomes(passed=2, skipped=2)
+
+        doc = json.loads((pytester.path / "captured_doc.json").read_text())
+        assert (doc["passCount"], doc["skipCount"], doc["incomplete"], doc["collected"]) == (2, 2, False, 4)
+
+    def test_real_truncation_after_leading_skip_still_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
+        """The fix must not lose true positives: a genuinely cut-short session is still incomplete."""
+        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester.makepyfile("""
+            import pytest
+
+
+            @pytest.mark.skip
+            def test_skip():
+                pass
+
+
+            @pytest.mark.asyncio
+            async def test_one():
+                assert False
+
+
+            @pytest.mark.asyncio
+            async def test_two():
+                pass
+        """)
+        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result.assert_outcomes(failed=1, skipped=1)
+
+        doc = json.loads((pytester.path / "captured_doc.json").read_text())
+        assert (doc["incomplete"], doc["collected"], doc["skipCount"]) == (True, 3, 1)
