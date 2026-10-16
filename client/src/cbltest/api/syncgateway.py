@@ -27,6 +27,7 @@ from cbltest.api.bulk_docs import analyze_bulk_docs_response
 from cbltest.api.error import CblSyncGatewayBadResponseError, CblTestError
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.sync_gateway_sequence import parse_sequence_id
+from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.assertions import _assert_not_null
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
@@ -1134,33 +1135,6 @@ class _SyncGatewayBase:
             return sgw_address
 
         return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
-
-    async def bytes_transferred(self, dataset_name: str) -> tuple[int, int]:
-        """
-        Gets the bytes transferred for a given dataset
-
-        :param dataset_name: The name of the dataset to get the bytes transferred for
-        """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        db_stats = expvars["syncgateway"]["per_db"][dataset_name]["database"]
-        doc_reads_bytes = db_stats["doc_reads_bytes_blip"]
-        doc_writes_bytes = db_stats["doc_writes_bytes_blip"]
-        return doc_reads_bytes, doc_writes_bytes
-
-    async def get_delta_sync_stats(self, dataset_name: str) -> dict:
-        """
-        Gets the ``delta_sync`` counters for a database from ``GET /_expvar``.
-
-        :param dataset_name: The name of the SGW database to inspect.
-        """
-        resp_data = await self._send_request("get", "/_expvar")
-        assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-
-        return expvars["syncgateway"]["per_db"][dataset_name]["delta_sync"]
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """
@@ -2704,18 +2678,21 @@ class SyncGateway(_SyncGatewayBase):
             retry_delay=retry_delay,
         )
 
-    async def get_import_count(self, db_name: str) -> int:
+    async def get_stats(self) -> SyncGatewayStats:
         """
-        Gets this node's shared_bucket_import import_count expvar for the given
-        database.  Each import is handled by exactly one node, so a zero here does
-        not mean the cluster imported nothing.
-
-        :param db_name: The database to read the stat for
+        Gets this node's stats from ``GET /_expvar``.
         """
         resp_data = await self._send_request("get", "/_expvar")
         assert isinstance(resp_data, dict)
-        expvars = cast(dict, resp_data)
-        return expvars["syncgateway"]["per_db"][db_name]["shared_bucket_import"]["import_count"]
+        return SyncGatewayStats.from_expvar(resp_data)
+
+    async def get_db_stats(self, db_name: str) -> SyncGatewayStats.PerDatabase:
+        """
+        Gets this node's stats for one database from ``GET /_expvar``.
+
+        :param db_name: The name of the database
+        """
+        return (await self.get_stats()).db(db_name)
 
     async def reset_user(
         self,

@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
@@ -41,7 +43,11 @@ class TestServerSetup(CBLTestClass):
         await sg_cluster_manager.restart_with_config("bootstrap-alternate")
 
         self.mark_test_step(f"Create {num_docs} documents via SDK")
-        counts_before = [await node.get_import_count(sg_db) for node in cblpytest.sync_gateways]
+        # Each import runs on exactly one node, so read every node's count
+        counts_before = [
+            stats.shared_bucket_import.import_count
+            for stats in await asyncio.gather(*(node.get_db_stats(sg_db) for node in cblpytest.sync_gateways))
+        ]
         for i in range(num_docs):
             doc_id = f"sdk_doc_{i}"
             doc_body = {
@@ -57,7 +63,10 @@ class TestServerSetup(CBLTestClass):
         assert imported_count == num_docs, f"Expected {num_docs} imported docs, got {imported_count}"
 
         self.mark_test_step("Verify at least one SGW node reports an import in expvars")
-        counts_after = [await node.get_import_count(sg_db) for node in cblpytest.sync_gateways]
+        counts_after = [
+            stats.shared_bucket_import.import_count
+            for stats in await asyncio.gather(*(node.get_db_stats(sg_db) for node in cblpytest.sync_gateways))
+        ]
         assert any(after > before for before, after in zip(counts_before, counts_after, strict=True)), (
             f"Expected at least one SGW node to report a new import, got {counts_before} -> {counts_after}"
         )
