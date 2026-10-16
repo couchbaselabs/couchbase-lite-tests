@@ -20,8 +20,8 @@ the ES config (`reconnect_on_token_change=false`, no file watching).
 1. Generate an RSA key pair and sign a JWT token (`sub=user1`, `exp=3600s`).
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering the public JWK
     (`issuer=test-issuer`, `client_id=edge-server`, `algorithms=[RS256]`, `register=true`).
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to `travel.airlines`.
-4. Insert 5 documents into CBS (`jwt_test_airline_1..5`) with `channels=["*"]`.
+3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
+4. Insert 5 documents into CBS (`jwt_test_airline_1..5`) with `channels=["airlines"]`.
 5. Wait until SGW has imported all 5 documents from CBS.
 6. Verify the JWT token authenticates against the SGW REST API (`GET /travel/` with `Authorization: Bearer <token>` returns 200).
 7. Configure and start ES with the inline JWT token in `auth.openid_token` and `reconnect_on_token_change=false`.
@@ -41,7 +41,7 @@ host (`auth.openid_token.path`), across all `travel` collections.
 1. Generate an RSA key pair and sign a JWT token (`sub=user1`, `exp=600s`).
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering the public JWK,
     with sync functions for all 5 collections (`airlines`, `airports`, `hotels`, `landmarks`, `routes`).
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to all 5 collections.
+3. Add the JWT user `test-provider_user1` with `["United States", "United Kingdom", "France"]` channel access to all 5 collections.
 4. Load the `travel` dataset into SGW.
 5. Write the JWT token to a file on the ES host (`/home/ec2-user/cert/jwt.txt`).
 6. Configure and start ES with `auth.openid_token.path` pointing at the JWT file, syncing all 5 collections.
@@ -60,7 +60,7 @@ continues uninterrupted.
 
 1. Generate two RSA key pairs (A and B) and sign Token-A (`kid=test-key-1`) and Token-B (`kid=test-key-2`), both `sub=user1`.
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering both public JWKs (A and B).
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to `travel.airlines`.
+3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
 4. Insert 5 documents into CBS (`rotation_test_1..5`).
 5. Write Token-A to the JWT file on the ES host.
 6. Configure and start ES with `auth.openid_token.path` and `reconnect_on_token_change=true`, syncing `travel.airlines`.
@@ -81,7 +81,7 @@ and the replicator permanently stops (no retry, since 401 is not transient).
 
 1. Generate an RSA key pair and sign a valid token; generate a second key pair and sign an invalid token (`kid=unknown-key`) whose key is **not** registered with SGW.
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering **only** the valid public JWK.
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to `travel.airlines`.
+3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
 4. Insert 3 documents into CBS (`disconnect_test_1..3`).
 5. Write the valid token to the JWT file and start ES with `reconnect_on_token_change=true`.
 6. Wait until replication is idle (confirming the valid token works).
@@ -102,7 +102,7 @@ does not treat the content as a valid change.
 
 1. Generate an RSA key pair and sign a valid token.
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering the public JWK.
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to `travel.airlines`.
+3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
 4. Insert 3 documents into CBS (`filedel_test_1..3`).
 5. Write the valid token to the JWT file and start ES with `reconnect_on_token_change=true`.
 6. Wait until replication is idle.
@@ -123,7 +123,7 @@ re-triggered, after which it recovers.
 
 1. Generate key pairs A, C (valid) and one invalid key. Sign Token-A (`kid=test-key-1`), Token-C (`kid=test-key-3`), and an invalid token (`kid=bad-key`), all `sub=user1`.
 2. Create the SGW `travel` database (creating its backing CBS bucket and collections) with a `local_jwt` provider registering public JWKs A and C (not the invalid key).
-3. Add the JWT user `test-provider_user1` with `["*"]` channel access to `travel.airlines`.
+3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
 4. Insert 3 documents into CBS (`cycle_test_1..3`).
 5. **Phase 1:** Write Token-A to the JWT file, start ES with `reconnect_on_token_change=true`, wait until idle, and verify at least 3 documents replicated.
 6. **Phase 2:** Overwrite the JWT file with the invalid token. Poll (up to 60s) until the replicator is removed or `Stopped`/`Offline`, confirming a permanent 401 stop.
