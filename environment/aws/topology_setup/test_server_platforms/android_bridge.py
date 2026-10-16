@@ -30,6 +30,7 @@ Functions:
 
 import platform
 import subprocess
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import ClassVar
 
@@ -73,6 +74,9 @@ class AndroidBridge(PlatformBridge):
         activity: str = "MainActivity",
         *,
         needs_permissions: bool = True,
+        launch_extras: Mapping[str, str] | None = None,
+        reverse_ports: Sequence[int] = (),
+        restart_on_run: bool = False,
     ) -> None:
         """
         Initialize the AndroidBridge with the application path, application ID, and activity name.
@@ -81,6 +85,11 @@ class AndroidBridge(PlatformBridge):
             app_path (str): The path to the application APK file.
             app_id (str): The application ID.
             activity (str): The activity name to launch.
+            needs_permissions (bool): Whether to grant the runtime permissions after install.
+            launch_extras (Mapping[str, str] | None): String extras passed to the activity on launch.
+            reverse_ports (Sequence[int]): Host ports to expose on the device with `adb reverse`
+                while the app runs, for test servers that connect back to the host.
+            restart_on_run (bool): Wake the device and force-stop any running instance before launching.
 
         Raises:
             RuntimeError: If the ADB executable is not found.
@@ -90,6 +99,9 @@ class AndroidBridge(PlatformBridge):
         self.__activity = activity
         self.__adb_location = None
         self.__needs_permissions = needs_permissions
+        self.__launch_extras = dict(launch_extras or {})
+        self.__reverse_ports = list(reverse_ports)
+        self.__restart_on_run = restart_on_run
 
         find_command = "where" if platform.system() == "Windows" else "which"
         find_adb_result = subprocess.run([find_command, "adb"], check=False, capture_output=True, text=True)
@@ -211,16 +223,21 @@ class AndroidBridge(PlatformBridge):
             location (str): The device location (e.g., device serial number).
         """
         header(f"Running {self.__app_id} on {location}")
+        adb = [str(self.__adb_location), "-s", location]
+        if self.__restart_on_run:
+            # Idle devices may be asleep, and an activity started with the screen
+            # off can end up in the background.
+            subprocess.run([*adb, "shell", "input", "keyevent", "KEYCODE_WAKEUP"], check=False)
+
+        for port in self.__reverse_ports:
+            subprocess.run([*adb, "reverse", f"tcp:{port}", f"tcp:{port}"], check=True)
+
+        start_args = ["-S"] if self.__restart_on_run else []
+        for key, value in self.__launch_extras.items():
+            start_args += ["--es", key, value]
+
         subprocess.run(
-            [
-                str(self.__adb_location),
-                "-s",
-                location,
-                "shell",
-                "am",
-                "start",
-                f"{self.__app_id}/.{self.__activity}",
-            ],
+            [*adb, "shell", "am", "start", *start_args, f"{self.__app_id}/.{self.__activity}"],
             check=True,
             capture_output=False,
         )
@@ -246,6 +263,12 @@ class AndroidBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
+        for port in self.__reverse_ports:
+            subprocess.run(
+                [str(self.__adb_location), "-s", location, "reverse", "--remove", f"tcp:{port}"],
+                check=False,
+                capture_output=True,
+            )
 
     def uninstall(self, location: str) -> None:
         """

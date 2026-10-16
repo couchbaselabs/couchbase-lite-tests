@@ -37,8 +37,11 @@ from environment.aws.lb_setup.setup_load_balancers import main as lb_main
 from environment.aws.logslurp_setup.setup_logslurp import main as logslurp_main
 from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
-from environment.aws.topology_setup.setup_topology import TopologyConfig
+from environment.aws.topology_setup.setup_topology import TopologyConfig, websocket_device_ids
 from environment.aws.topology_setup.setup_topology import main as topology_main
+from environment.aws.topology_setup.test_server_platforms.reactnative_register import (
+    WS_PORT as REACT_NATIVE_WS_PORT,
+)
 
 
 class TopologyParamType(click.ParamType):
@@ -169,11 +172,21 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
 
         if len(topology.test_servers) > 0:
             test_servers = []
-            for ts in topology.test_servers:
+            device_ids = websocket_device_ids([ts.platform for ts in topology.test_servers])
+            for ts, device_id in zip(topology.test_servers, device_ids, strict=True):
                 port = 5555 if ts.platform.startswith("dotnet") else 5173 if ts.platform == "js" else 8080
                 ts_definition = {
                     "url": f"http://{ts.ip_address}:{port}",
                 }
+
+                if ts.platform.startswith("reactnative"):
+                    # React Native test servers connect back to the pytest WebSocket router on
+                    # a fixed port. The URL only identifies the server, so it carries the
+                    # device ID that the app announces when it connects.
+                    ts_definition = {
+                        "url": f"ws://localhost:{REACT_NATIVE_WS_PORT}/{device_id}",
+                        "transport": "ws",
+                    }
 
                 if ts.dataset_version:
                     ts_definition["dataset_version"] = ts.dataset_version
