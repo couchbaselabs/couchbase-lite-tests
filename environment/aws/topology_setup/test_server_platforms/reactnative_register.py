@@ -1,6 +1,5 @@
 import json
 import os
-import platform
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +14,7 @@ from environment.aws.topology_setup.test_server import (
     TEST_SERVER_DIR,
     TestServer,
 )
+from environment.aws.topology_setup.test_server_platforms.android_bridge import AndroidBridge
 from environment.aws.topology_setup.test_server_platforms.platform_bridge import (
     PlatformBridge,
 )
@@ -23,67 +23,14 @@ RN_TEST_SERVER_DIR = TEST_SERVER_DIR / "reactnative"
 ZIP_FOLDER_NAME = "compressed"
 ZIP_DIR = RN_TEST_SERVER_DIR / ZIP_FOLDER_NAME
 
+# The test server app connects back to the pytest WebSocket router on this port.
 WS_PORT = 8765
 APP_BUNDLE_ID = "com.cbltestserver"
-DEVICE_ID = "ws0"
-
-
-def _find_adb() -> Path:
-    """Locate the adb binary."""
-    find_command = "where" if platform.system() == "Windows" else "which"
-    result = subprocess.run([find_command, "adb"], check=False, capture_output=True, text=True)
-    if result.returncode == 0:
-        return Path(result.stdout.strip())
-
-    potential_locations = [
-        "/opt/homebrew/share/android-commandlinetools/platform-tools/",
-        "C:\\Program Files (x86)\\Android\\android-sdk\\platform-tools",
-    ]
-    for loc in potential_locations:
-        for suffix in ["adb", "adb.exe"]:
-            p = Path(loc) / suffix
-            if p.exists():
-                return p
-
-    raise RuntimeError("adb not found")
-
-
-def _get_host_ip_for_android(adb: Path, location: str) -> str:
-    """Determine the host IP reachable from an Android device.
-
-    For emulators the host loopback is 10.0.2.2.  For physical USB devices
-    we pick the first non-loopback IPv4 address on the host machine.
-    """
-    result = subprocess.run(
-        [str(adb), "-s", location, "shell", "getprop", "ro.hardware"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    hw = result.stdout.strip().lower()
-    if "goldfish" in hw or "ranchu" in hw:
-        return "10.0.2.2"
-
-    import netifaces
-
-    for iface in netifaces.interfaces():
-        if iface == "lo" or iface.startswith("lo"):
-            continue
-        addrs = netifaces.ifaddresses(iface)
-        if netifaces.AF_INET in addrs:
-            ip = addrs[netifaces.AF_INET][0].get("addr", "")
-            if ip and not ip.startswith("169.254") and not ip.startswith("127."):
-                return ip
-
-    raise RuntimeError("Cannot determine host IP reachable from Android device")
 
 
 def _get_host_ip_for_ios() -> str:
-    """Determine the host IP reachable from an iOS device.
-
-    For simulators we return localhost.  For physical devices we pick the
-    first non-loopback IPv4 address.
-    """
+    """Determine the host IP that a physical iOS device can reach: the first
+    non-loopback, non-link-local IPv4 address of this machine."""
     import netifaces
 
     for iface in netifaces.interfaces():
@@ -99,157 +46,14 @@ def _get_host_ip_for_ios() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Android Bridge
-# ---------------------------------------------------------------------------
-
-
-class ReactNativeAndroidBridge(PlatformBridge):
-    def __init__(self, apk_path: str) -> None:
-        self.__apk_path = apk_path
-        self.__adb = _find_adb()
-
-    def validate(self, location: str) -> None:
-        result = subprocess.run(
-            [str(self.__adb), "-s", location, "get-state"],
-            check=False,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"Android device {location} not found!")
-
-    def install(self, location: str) -> None:
-        header(f"Installing React Native APK to {location}")
-        subprocess.run(
-            [str(self.__adb), "-s", location, "install", "-r", self.__apk_path],
-            check=True,
-            capture_output=False,
-        )
-
-    def run(self, location: str) -> None:
-        header(f"Launching React Native app on {location}")
-
-        click.echo(f"[bridge] adb -s {location}: am force-stop {APP_BUNDLE_ID}")
-        result = subprocess.run(
-            [str(self.__adb), "-s", location, "shell", "am", "force-stop", APP_BUNDLE_ID],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        click.echo(
-            f"[bridge] force-stop exit={result.returncode}"
-            + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else "")
-        )
-
-        # Ensure the device screen is on — Jenkins devices are often idle and
-        # locked; am start can silently fail or put the activity in the background
-        # on some Android versions when the screen is off.
-        click.echo(f"[bridge] adb -s {location}: input keyevent KEYCODE_WAKEUP")
-        result = subprocess.run(
-            [str(self.__adb), "-s", location, "shell", "input", "keyevent", "KEYCODE_WAKEUP"],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        click.echo(
-            f"[bridge] wakeup exit={result.returncode}"
-            + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else "")
-        )
-
-        # Tunnel the WebSocket port through the adb USB connection so the app
-        # can reach pytest on the host via 127.0.0.1 regardless of WiFi/network
-        # topology — and without Android cleartext-traffic policy issues.
-        click.echo(f"[bridge] adb -s {location}: reverse tcp:{WS_PORT} tcp:{WS_PORT}")
-        result = subprocess.run(
-            [str(self.__adb), "-s", location, "reverse", f"tcp:{WS_PORT}", f"tcp:{WS_PORT}"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        click.echo(
-            f"[bridge] adb reverse exit={result.returncode}"
-            + (f"  stderr: {result.stderr.strip()}" if result.stderr.strip() else "")
-        )
-
-        ws_url = f"ws://127.0.0.1:{WS_PORT}"
-        click.echo(f"[bridge] Auto-connect URL: {ws_url}  deviceID: {DEVICE_ID}")
-
-        am_start_cmd = [
-            str(self.__adb),
-            "-s",
-            location,
-            "shell",
-            "am",
-            "start",
-            "-n",
-            f"{APP_BUNDLE_ID}/.MainActivity",
-            "--es",
-            "deviceID",
-            DEVICE_ID,
-            "--es",
-            "wsURL",
-            ws_url,
-        ]
-        click.echo(f"[bridge] Running: {' '.join(am_start_cmd)}")
-        result = subprocess.run(am_start_cmd, check=True, capture_output=True, text=True)
-        click.echo(f"[bridge] am start exit={result.returncode}")
-        if result.stdout.strip():
-            click.echo(f"[bridge] am start stdout: {result.stdout.strip()}")
-        if result.stderr.strip():
-            click.echo(f"[bridge] am start stderr: {result.stderr.strip()}")
-
-    def stop(self, location: str) -> None:
-        header(f"Stopping React Native app on {location}")
-        subprocess.run(
-            [str(self.__adb), "-s", location, "shell", "am", "force-stop", APP_BUNDLE_ID],
-            check=True,
-            capture_output=False,
-        )
-        subprocess.run(
-            [str(self.__adb), "-s", location, "reverse", "--remove", f"tcp:{WS_PORT}"],
-            check=False,
-            capture_output=True,
-        )
-
-    def uninstall(self, location: str) -> None:
-        header(f"Uninstalling React Native app from {location}")
-        subprocess.run(
-            [str(self.__adb), "-s", location, "uninstall", APP_BUNDLE_ID],
-            check=False,
-            capture_output=False,
-        )
-
-    def _get_ip(self, location: str) -> str | None:
-        result = subprocess.run(
-            [
-                str(self.__adb),
-                "-s",
-                location,
-                "shell",
-                "ip",
-                "-f",
-                "inet",
-                "addr",
-                "show",
-                "wlan0",
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        for line in result.stdout.split("\n"):
-            if "inet" in line:
-                return line.strip().split(" ")[1].split("/")[0]
-        return None
-
-
-# ---------------------------------------------------------------------------
 # iOS Bridge
 # ---------------------------------------------------------------------------
 
 
 class ReactNativeIOSBridge(PlatformBridge):
-    def __init__(self, app_path: str) -> None:
+    def __init__(self, app_path: str, device_id: str | None) -> None:
         self.__app_path = app_path
+        self.__device_id = device_id
 
     def validate(self, location: str) -> None:
         result = subprocess.run(
@@ -286,26 +90,17 @@ class ReactNativeIOSBridge(PlatformBridge):
         )
 
     def run(self, location: str) -> None:
-        header(f"Launching React Native app on iOS device {location}")
-        subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "process",
-                "terminate",
-                "--device",
-                location,
-                "--pid",
-                "0",
-            ],
-            check=False,
-            capture_output=True,
-        )
+        if self.__device_id is None:
+            raise RuntimeError("A WebSocket device ID is required to launch the React Native test server")
 
+        # Stop any instance left over from a previous launch so the new launch
+        # starts fresh and connects back with the arguments below.
+        self.stop(location)
+
+        header(f"Launching React Native app on iOS device {location}")
         host_ip = _get_host_ip_for_ios()
         ws_url = f"ws://{host_ip}:{WS_PORT}"
-        click.echo(f"Auto-connect URL: {ws_url}  deviceID: {DEVICE_ID}")
+        click.echo(f"Auto-connect URL: {ws_url}  deviceID: {self.__device_id}")
 
         result = subprocess.run(
             [
@@ -319,7 +114,7 @@ class ReactNativeIOSBridge(PlatformBridge):
                 APP_BUNDLE_ID,
                 "--",
                 "-deviceID",
-                DEVICE_ID,
+                self.__device_id,
                 "-wsURL",
                 ws_url,
             ],
@@ -489,7 +284,18 @@ class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
             apk_path = (
                 RN_TEST_SERVER_DIR / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
             )
-        return ReactNativeAndroidBridge(str(apk_path))
+        # The app connects back to the pytest WebSocket router through an adb reverse
+        # tunnel, so it reaches the host on 127.0.0.1 regardless of the device's network.
+        device_id = kwargs.get("device_id")
+        launch_extras = {"deviceID": device_id, "wsURL": f"ws://127.0.0.1:{WS_PORT}"} if device_id else None
+        return AndroidBridge(
+            str(apk_path),
+            APP_BUNDLE_ID,
+            needs_permissions=False,
+            launch_extras=launch_extras,
+            reverse_ports=[WS_PORT],
+            restart_on_run=True,
+        )
 
 
 @TestServer.register("reactnative_ios")
@@ -648,7 +454,6 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
                 "-derivedDataPath",
                 str(working / "ios" / "build"),
                 "-allowProvisioningUpdates",
-                "DEVELOPMENT_TEAM=N2Q372V7W2",
             ],
             check=True,
             cwd=working / "ios",
@@ -674,4 +479,4 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
             app_path = (
                 RN_TEST_SERVER_DIR / "ios" / "build" / "Build" / "Products" / "Release-iphoneos" / "CblTestServer.app"
             )
-        return ReactNativeIOSBridge(str(app_path))
+        return ReactNativeIOSBridge(str(app_path), kwargs.get("device_id"))

@@ -37,11 +37,12 @@ class WebSocketRouter:
         self.__stopping = False
         await self.__runner.setup()
 
-        bind_port = 0
-        first_url = self.__server_urls[0]
-        parsed = urlparse(first_url)
-        if parsed.scheme == "ws" and parsed.port:
-            bind_port = parsed.port
+        # Native WebSocket test servers (ws:// URLs, e.g. React Native) connect back to a
+        # fixed port given in their URL. Otherwise let the OS choose one.
+        bind_port = next(
+            (urlparse(u).port or 0 for u in self.__server_urls if urlparse(u).scheme == "ws"),
+            0,
+        )
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -50,27 +51,16 @@ class WebSocketRouter:
         site = web.SockSite(self.__runner, sock)
         chosen_port = sock.getsockname()[1]
         await site.start()
-        print(f"[cbltest] WebSocket router listening on port {chosen_port}", flush=True)
         cbl_info(f"WebSocket router listening on port {chosen_port}")
 
         relaunch_script = os.environ.get("CBL_NATIVE_WS_RELAUNCH_SCRIPT")
         has_native_ws = any(urlparse(u).scheme == "ws" for u in self.__server_urls)
         if has_native_ws and not relaunch_script:
-            print(
-                "[cbltest] WARNING: native WS test server detected but "
-                "CBL_NATIVE_WS_RELAUNCH_SCRIPT is not set; "
-                "relying on the app's built-in reconnect logic",
-                flush=True,
-            )
             cbl_warning(
                 "Native WS test server detected but CBL_NATIVE_WS_RELAUNCH_SCRIPT "
                 "is not set; relying on the app's built-in reconnect logic"
             )
         if relaunch_script:
-            print(
-                f"[cbltest] Relaunching native WS app via: {relaunch_script}",
-                flush=True,
-            )
             cbl_info(f"Relaunching native WS app via: {relaunch_script}")
             proc = await asyncio.create_subprocess_exec(
                 sys.executable,
@@ -80,25 +70,15 @@ class WebSocketRouter:
             )
             stdout_bytes, stderr_bytes = await proc.communicate()
             if stdout_bytes:
-                print(
-                    f"[cbltest] relaunch stdout:\n{stdout_bytes.decode(errors='replace')}",
-                    flush=True,
-                )
+                cbl_info(f"Relaunch script output:\n{stdout_bytes.decode(errors='replace')}")
             if proc.returncode != 0:
                 err_text = stderr_bytes.decode(errors="replace")
-                print(
-                    f"[cbltest] ERROR: relaunch script failed (exit {proc.returncode}):\n{err_text}",
-                    flush=True,
-                )
                 raise RuntimeError(f"Native WS relaunch script exited with code {proc.returncode}:\n{err_text}")
-            print("[cbltest] Native WS app relaunch complete", flush=True)
             cbl_info("Native WS app relaunch complete")
 
-        ws_index = 0
-        for url in self.__server_urls:
+        for ws_index, url in enumerate(self.__server_urls):
             local_ip = self._lookup_ip(url)
             cbl_info(f"Connecting to test server at {url}...")
-            print(f"[cbltest] Waiting for test server to connect at {url}…", flush=True)
             params = {
                 "tdkURL": f"ws://{local_ip}:{chosen_port}/",
                 "autostart": "true",
@@ -115,18 +95,12 @@ class WebSocketRouter:
             try:
                 await self._wait_for_connection(timeout)
             except TimeoutError:
-                elapsed = time.monotonic() - t0
-                print(
-                    f"[cbltest] TIMEOUT: no connection from {url} after {elapsed:.1f}s (limit={timeout}s)",
-                    flush=True,
-                )
+                cbl_error(f"No connection from {url} after {time.monotonic() - t0:.1f}s (limit {timeout}s)")
                 raise
-            elapsed = time.monotonic() - t0
-            print(f"[cbltest] Test server connected at {url} (took {elapsed:.1f}s)", flush=True)
-            cbl_info(f"Connected to test server at {url}!")
+            cbl_info(f"Connected to test server at {url} (took {time.monotonic() - t0:.1f}s)")
 
     async def _wait_for_connection(self, timeout: float) -> None:
-        """Acquire the connection semaphore, printing a heartbeat every 10 s."""
+        """Acquire the connection semaphore, logging a heartbeat every 10 s."""
         deadline = time.monotonic() + timeout
         while True:
             remaining = deadline - time.monotonic()
@@ -138,10 +112,9 @@ class WebSocketRouter:
                 return
             except TimeoutError:
                 elapsed = timeout - (deadline - time.monotonic())
-                print(
-                    f"[cbltest] … still waiting for app to connect "
-                    f"({elapsed:.0f}s elapsed, {timeout - elapsed:.0f}s remaining)",
-                    flush=True,
+                cbl_info(
+                    f"Still waiting for test server to connect ({elapsed:.0f}s elapsed, "
+                    f"{timeout - elapsed:.0f}s remaining)"
                 )
 
     async def stop(self) -> None:
@@ -172,10 +145,7 @@ class WebSocketRouter:
         event = self.__connected_events.get(url)
         if event is None or event.is_set():
             return
-        print(
-            f"[cbltest] Waiting up to {timeout:.0f} s for device to reconnect at {url}…",
-            flush=True,
-        )
+        cbl_info(f"Waiting up to {timeout:.0f}s for test server to reconnect at {url}")
         try:
             await wait_for(event.wait(), timeout=timeout)
         except TimeoutError:
@@ -229,10 +199,6 @@ class WebSocketRouter:
         # (especially: we must not clear the connected event after a
         # successful reconnect has already set it).
         if current_url is not None and not self.__stopping and self.__connections.get(current_url) is ws:
-            print(
-                f"[cbltest] WebSocket connection from {current_url} dropped",
-                flush=True,
-            )
             cbl_warning(f"WebSocket connection from {current_url} dropped")
 
             del self.__connections[current_url]
@@ -262,11 +228,7 @@ class WebSocketRouter:
         self.__connected_events[url].clear()
 
         ws = self.__connections.pop(url, None)
-        print(
-            f"[cbltest] begin_reconnect: marked {url} disconnected, scheduling WS close + relaunch",
-            flush=True,
-        )
-        cbl_warning(f"Request timeout on {url} beginning reconnect")
+        cbl_warning(f"Request timeout on {url}; closing the connection and relaunching the test server")
 
         self._fail_pending_futures(url)
 
@@ -282,10 +244,7 @@ class WebSocketRouter:
     def _fail_pending_futures(self, url: str) -> None:
         pending_ids = list(self.__pending.keys())
         if pending_ids:
-            print(
-                f"[cbltest] Failing {len(pending_ids)} in-flight request(s) for {url}",
-                flush=True,
-            )
+            cbl_warning(f"Failing {len(pending_ids)} in-flight request(s) for {url}")
         for ts_id in pending_ids:
             fut = self.__pending.pop(ts_id)
             if not fut.done():
@@ -312,10 +271,6 @@ class WebSocketRouter:
             if self.__connected_events[url].is_set():
                 return
 
-            print(
-                f"[cbltest] Reconnecting {url}: running relaunch script…",
-                flush=True,
-            )
             cbl_info(f"Reconnecting {url}: running relaunch script")
             try:
                 proc = await asyncio.create_subprocess_exec(
@@ -326,33 +281,18 @@ class WebSocketRouter:
                 )
                 stdout_bytes, stderr_bytes = await proc.communicate()
                 if stdout_bytes:
-                    print(
-                        f"[cbltest] relaunch stdout:\n{stdout_bytes.decode(errors='replace')}",
-                        flush=True,
-                    )
+                    cbl_info(f"Relaunch script output:\n{stdout_bytes.decode(errors='replace')}")
                 if proc.returncode != 0:
                     err_text = stderr_bytes.decode(errors="replace")
-                    print(
-                        f"[cbltest] ERROR: relaunch failed (exit {proc.returncode}):\n{err_text}",
-                        flush=True,
-                    )
+                    cbl_error(f"Relaunch script failed (exit {proc.returncode}):\n{err_text}", include_stack=False)
                     return
 
-                print(
-                    "[cbltest] App relaunched; waiting up to 90 s for reconnect…",
-                    flush=True,
-                )
+                cbl_info(f"Test server relaunched; waiting up to 90s for it to reconnect at {url}")
                 await wait_for(self.__connected_events[url].wait(), timeout=90)
-                print(f"[cbltest] Device reconnected at {url}", flush=True)
-                cbl_info(f"Device reconnected at {url}")
+                cbl_info(f"Test server reconnected at {url}")
             except TimeoutError:
-                print(
-                    "[cbltest] ERROR: device did not reconnect within 90 s after relaunch",
-                    flush=True,
-                )
-                cbl_error(f"Device at {url} did not reconnect within 90 s after relaunch")
+                cbl_error(f"Test server at {url} did not reconnect within 90s after relaunch")
             except Exception as exc:
-                print(f"[cbltest] ERROR during reconnect: {exc}", flush=True)
                 cbl_error(f"Error during reconnect for {url}: {exc}")
 
     def _lookup_ip(self, remote_url: str) -> str:

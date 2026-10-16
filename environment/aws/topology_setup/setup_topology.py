@@ -381,6 +381,35 @@ class LoadBalancerConfig:
         self.__upstreams = upstreams
 
 
+def connects_back_over_websocket(platform: str) -> bool:
+    """
+    Whether test servers of this platform connect back to the pytest WebSocket
+    router, instead of serving HTTP that the TDK connects to.
+    """
+    return platform == "js" or platform.startswith("reactnative")
+
+
+def websocket_device_ids(platforms: list[str]) -> list[str | None]:
+    """
+    The WebSocket device ID for each test server, in topology order, or None for
+    a test server that serves HTTP.
+
+    The pytest WebSocket router identifies the Nth WebSocket test server in the
+    TDK config by the device ID "ws<N>", so a test server that connects back must
+    announce the ID that matches its position.
+    """
+    device_ids: list[str | None] = []
+    ws_index = 0
+    for platform in platforms:
+        if connects_back_over_websocket(platform):
+            device_ids.append(f"ws{ws_index}")
+            ws_index += 1
+        else:
+            device_ids.append(None)
+
+    return device_ids
+
+
 class TestServerInput:
     """
     A class to parse and store input configuration for a test server.
@@ -715,7 +744,8 @@ class TopologyConfig:
         """
         Run the test servers based on their configurations.
         """
-        for test_server_input in self.__test_server_inputs:
+        device_ids = websocket_device_ids([ts.platform for ts in self.__test_server_inputs])
+        for test_server_input, device_id in zip(self.__test_server_inputs, device_ids, strict=True):
             test_server = TestServer.create(test_server_input.platform, test_server_input.cbl_version)
 
             if test_server_input.download:
@@ -723,25 +753,18 @@ class TopologyConfig:
             else:
                 test_server.build()
 
-            bridge = test_server.create_bridge()
+            bridge = test_server.create_bridge(device_id=device_id)
             bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
 
-            if test_server_input.platform.startswith("reactnative"):
-                # React Native test servers connect back to the pytest WebSocket
-                # server, so there is no HTTP endpoint to poll here.
-                click.echo(f"Launched {test_server_input.platform} on {test_server_input.location}")
+            if connects_back_over_websocket(test_server_input.platform):
+                # JS and React Native test servers connect back to the pytest WebSocket
+                # router once the tests start, so there is no endpoint to poll here.
+                click.secho(f"Skipping connection check for {test_server_input.platform}...", fg="yellow")
                 continue
 
             port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
-
-            if test_server_input.platform == "js":
-                """Javascript is not just a simple launch, it involves a reverse connection
-                initiation which is too complicated to set up here just to test.  So skip
-                the connection check"""
-                click.secho("Skipping connection check for js...", fg="yellow")
-                return
 
             ip = bridge.get_ip(test_server_input.location, fallback=test_server_input.ip_hint)
 
@@ -769,7 +792,8 @@ class TopologyConfig:
         calls this (via CBL_NATIVE_WS_RELAUNCH_SCRIPT) once the port is bound.
         """
         TestServer.initialize()
-        for test_server_input in self.__test_server_inputs:
+        device_ids = websocket_device_ids([ts.platform for ts in self.__test_server_inputs])
+        for test_server_input, device_id in zip(self.__test_server_inputs, device_ids, strict=True):
             if not test_server_input.platform.startswith("reactnative"):
                 continue
 
@@ -778,7 +802,7 @@ class TopologyConfig:
                 # Uses the cached download if it is already present
                 test_server.download()
 
-            bridge = test_server.create_bridge()
+            bridge = test_server.create_bridge(device_id=device_id)
             bridge.validate(test_server_input.location)
             bridge.run(test_server_input.location)
             click.echo(f"Relaunched {test_server_input.platform} on {test_server_input.location}")
