@@ -11,6 +11,12 @@
     "clusters": [
         {
             "server_count": 2
+        },
+        {
+            "server_count": 1
+        },
+        {
+            "server_count": 1
         }
     ],
     "sync_gateways": [
@@ -22,11 +28,20 @@
         },
         {
             "cluster": 0
+        },
+        {
+            "cluster": 1
+        },
+        {
+            "cluster": 2
         }
     ],
     "load_balancers": [
         {
             "sync_gateways": [0, 1, 2]
+        },
+        {
+            "sync_gateways": [3, 4]
         }
     ],
     "logslurp": true
