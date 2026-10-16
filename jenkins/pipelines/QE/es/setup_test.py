@@ -28,10 +28,12 @@ def generate_topology(
     topology_out: Path,
     sgw_version: str | None = None,
     cbs_version: str | None = None,
+    cbl_version: str | None = None,
     tag: str = "es",
 ) -> None:
     """
-    Generate a topology JSON without injecting implicit CBS/SGW defaults.
+    Generate a topology JSON without injecting implicit CBS/SGW defaults.  A topology with test
+    servers (such as the localhost JS test server) needs `cbl_version`, the CBL version to run.
     """
 
     with topology_in.open() as f:
@@ -49,6 +51,12 @@ def generate_topology(
     if cbs:
         for cb in cbs:
             cb["version"] = cbs_version
+    test_servers = topology.get("test_servers")
+    if test_servers:
+        if not cbl_version:
+            raise click.UsageError(f"{topology_in.name} has test servers, so --cbl-version is required")
+        for ts in test_servers:
+            ts["cbl_version"] = cbl_version
 
     topology_out.parent.mkdir(parents=True, exist_ok=True)
     with topology_out.open("w") as f:
@@ -66,12 +74,14 @@ def generate_topology(
 )
 @click.option("--sgw-version", default=None, help="Provision Sync Gateway (omit for latest release)")
 @click.option("--cbs-version", default=None, help="Provision Couchbase Server (omit for latest release)")
+@click.option("--cbl-version", default=None, help="CBL version-build for the topology's test servers, e.g. 1.1.0-25")
 @click.option("--config-file", default="config.json", help="Backend config file")
 def main(
     es_version: str,
     topology_file: Path,
     sgw_version: str | None,
     cbs_version: str | None,
+    cbl_version: str | None,
     config_file: str,
 ) -> None:
     topology_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
@@ -89,6 +99,7 @@ def main(
     click.echo(f"Topology File       : {topology_file}")
     click.echo(f"SGW Version         : {sgw_version}")
     click.echo(f"CBS Version         : {cbs_version}")
+    click.echo(f"CBL Version         : {cbl_version or '(no test servers)'}")
     click.echo()
     generate_topology(
         es_version=es_version,
@@ -96,6 +107,7 @@ def main(
         topology_out=topology_out,
         sgw_version=sgw_version,
         cbs_version=cbs_version,
+        cbl_version=cbl_version,
     )
 
     topology_obj = TopologyConfig(str(topology_out))
