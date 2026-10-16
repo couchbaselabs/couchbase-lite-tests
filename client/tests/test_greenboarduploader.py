@@ -36,7 +36,6 @@ from cbltest.greenboarduploader import (
     outcomes_from_junit_xml,
     resolve_branch,
     resolve_job_url,
-    sanitize_text,
 )
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
@@ -849,38 +848,6 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_upg_sgw_marker_keeps_sync_gateway_platform(self) -> None:
-        """@pytest.mark.upg_sgw also forces platform to 'sync-gateway'."""
-        server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
-        cblpytest = _make_cblpytest(test_servers=[server])
-        config = _make_pytestconfig()
-        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config)
-            await gen.__anext__()
-            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(
-                uploader,
-                make_report("call", passed=True),
-                make_item(markers=["upg_sgw"]),
-            )
-            try:
-                await gen.__anext__()
-            except StopAsyncIteration:
-                pass
-            finish_session(config)
-        assert mock_upload.call_args[0][0] == RunResult(
-            build=1,
-            version="3.2.0",
-            sgwVersion="n/a",
-            esVersion="n/a",
-            failCount=0,
-            passCount=1,
-            platform="sync-gateway",
-            os="iOS",
-            jobUrl="local",
-        )
-
-    @pytest.mark.asyncio
     async def test_os_name_defaults_to_na_without_system_name(self) -> None:
         """If the device dict has no 'systemName' key, os stays 'n/a'."""
         server = FakeTestServer(
@@ -1170,7 +1137,7 @@ class TestGreenboardFixture:
 class TestRunResultFullDocument:
     """Verify every field written to the greenboard bucket, including timestamp fields.
 
-    These tests let the real _upsert run but mock out the Couchbase Cluster and
+    These tests let the real upload run but mock out the Couchbase Cluster and
     freeze datetime.now so the uploaded / date fields are deterministic.
     """
 
@@ -1299,7 +1266,7 @@ class TestResolveJobUrl:
 
 class TestJobUrlPropagation:
     """End-to-end coverage: a real ``BUILD_URL`` reaches the uploaded doc
-    on both upload paths (standard ``upload`` and ``upload_upgrade_batch``).
+    on the standard upload path.
     """
 
     def test_build_url_propagates_to_standard_upload(self, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1312,30 +1279,6 @@ class TestJobUrlPropagation:
             uploader.upload("couchbase-lite-ios", "iOS", "3.2.0-b1234", None, None)
 
         assert mock_upload.call_args[0][0].job_url == build_url
-
-    def test_build_url_propagates_to_upgrade_batch(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-        build_url = "https://jenkins.example.com/job/upg-sgw/789/"
-        monkeypatch.setenv("BUILD_URL", build_url)
-
-        # Minimal results file representing a clean two-step upgrade run.
-        results_file = tmp_path / "sgw_upgrade_results.json"
-        results_file.write_text(
-            '{"upgradePath": ["3.3.0", "4.0.0"], "iterations": ['
-            '{"phase": "initial", "nodeIndex": null, "upgradeFrom": "initial", '
-            '"upgradeTo": "3.3.0", "build": 100, "passCount": 5, "failCount": 0, '
-            '"failed": false}, '
-            '{"phase": "complete", "nodeIndex": null, "upgradeFrom": "3.3.0", '
-            '"upgradeTo": "4.0.0", "build": 200, "passCount": 5, "failCount": 0, '
-            '"failed": false}]}'
-        )
-
-        uploader = make_uploader()
-        with patch.object(uploader, "_upsert") as mock_upsert:
-            uploader.upload_upgrade_batch(str(results_file))
-
-        doc = mock_upsert.call_args[0][0]
-        assert doc["jobUrl"] == build_url
-        assert doc["platform"] == "sgw-upgrade"
 
 
 class TestResolveBranch:
@@ -1395,7 +1338,7 @@ class TestResolveBranch:
 class TestBranchGate:
     """The greenboard fixture uploads results only from the 'main' tests
     branch. Feature-branch and local runs carry potentially-modified tests, so
-    their results must never be published; the upgrade path stays exempt.
+    their results must never be published.
     """
 
     @pytest.mark.asyncio
@@ -1438,26 +1381,6 @@ class TestBranchGate:
             await _run_fixture(_raw_greenboard(cblpytest, config))
             finish_session(config)
         mock_upload.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_upgrade_path_exempt_from_branch_gate(self) -> None:
-        """The upgrade path records regardless of branch. The upg-sgw pipeline
-        is deprecated and out of scope, so its per-step recording stays
-        unconditional even when the branch resolves non-main."""
-        cblpytest = _make_cblpytest(test_servers=[_make_server()])
-        # --upgrade-versions set, no --branch and GIT_BRANCH/BRANCH_NAME
-        # stripped => the branch resolves non-main, yet the upgrade path runs.
-        args = [
-            "--config",
-            str(Path(__file__).with_name("empty_config.json")),
-            "--upgrade-versions",
-            "3.3.0,4.0.0",
-        ]
-        config = pytest.Config.fromdictargs({}, args)
-        with patch("cbltest.greenboarduploader.GreenboardUploader.record_upgrade_step") as mock_record:
-            await _run_fixture(_raw_greenboard(cblpytest, config))
-            finish_session(config)
-        mock_record.assert_called_once()
 
 
 # Overrides the real `cblpytest` fixture by name to avoid real network I/O,
@@ -1687,31 +1610,6 @@ class TestCbsVersion:
         assert doc.cbs_version == "n/a"
 
 
-class TestSanitizeText:
-    def test_ansi_stripped(self) -> None:
-        assert sanitize_text("\x1b[31mE\x1b[0m   assert 1 == 2") == "E   assert 1 == 2"
-
-    @pytest.mark.parametrize(
-        "text, secret",
-        [
-            ("connect password=hunter2 failed", "hunter2"),
-            ("{'password': 'hunter2'}", "hunter2"),
-            ('{"admin_password": "hunter2"}', "hunter2"),
-            ("Authorization: Basic aHVudGVyMg==", "aHVudGVyMg=="),
-            ("headers={'Authorization': 'Bearer abc.def'}", "abc.def"),
-            ("GET http://admin:hunter2@host:4985/db", "hunter2"),
-            ("api_key=hunter2", "hunter2"),
-        ],
-    )
-    def test_secrets_redacted(self, text: str, secret: str) -> None:
-        out = sanitize_text(text)
-        assert secret not in out
-        assert "[REDACTED]" in out
-
-    def test_plain_text_untouched(self) -> None:
-        assert sanitize_text("AssertionError: assert 1 == 2") == "AssertionError: assert 1 == 2"
-
-
 def write_junit_cases(path: Path, cases: str, *, tests: int, failures: int, errors: int) -> Path:
     path.write_text(
         '<?xml version="1.0" encoding="utf-8"?><testsuites>'
@@ -1893,18 +1791,6 @@ class TestFailuresList:
 
         assert "trace" not in uploaded(upload_junit(make_uploader(), xml)).failures[0]
 
-    def test_secrets_scrubbed_in_message_and_trace(self, tmp_path: Path) -> None:
-        cases = (
-            '<testcase classname="a.test_m" name="t"><failure message="bad password=hunter2">'
-            "GET http://admin:hunter2@host/db</failure></testcase>"
-        )
-        xml = write_junit_cases(tmp_path / "j.xml", cases, tests=1, failures=1, errors=0)
-
-        entry = uploaded(upload_junit(make_uploader(), xml)).failures[0]
-
-        assert "hunter2" not in entry["message"]
-        assert "hunter2" not in entry["trace"]
-
 
 class TestTestOutcomes:
     """The ``K::tests`` doc and its invariants against passCount/failCount."""
@@ -2083,19 +1969,6 @@ class TestSiblingDocuments:
         assert "::" not in run_key
         assert collection.upsert.call_args[0][0] == run_key
         assert "details" not in collection.upsert.call_args[0][1]
-
-    def test_run_doc_has_no_details_when_never_called_for_upgrade_batch(self, tmp_path: Path) -> None:
-        results_file = tmp_path / "r.json"
-        results_file.write_text(
-            '{"upgradePath": ["3.3.0"], "iterations": [{"phase": "initial", "nodeIndex": null, '
-            '"upgradeFrom": "initial", "upgradeTo": "3.3.0", "build": 1, "passCount": 1, "failCount": 0, '
-            '"failed": false}]}'
-        )
-        uploader = make_uploader()
-        with patch.object(uploader, "_upsert") as mock_upsert:
-            uploader.upload_upgrade_batch(str(results_file))
-
-        assert "details" not in mock_upsert.call_args[0][0]
 
     def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, pytester: pytest.Pytester) -> None:
         """Regression: skips raised before fixture setup (``@pytest.mark.skip``, topology/cbse skips) used to finish

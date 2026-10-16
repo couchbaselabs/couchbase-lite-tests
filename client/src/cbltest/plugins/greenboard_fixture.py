@@ -1,4 +1,3 @@
-import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import Path
@@ -93,16 +92,14 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
 
     # Only results produced from the 'main' tests branch are allowed
     # into greenboard.
-    upgrade_versions_str = pytestconfig.getoption("--upgrade-versions")
-    if not upgrade_versions_str:
-        branch = resolve_branch(pytestconfig.getoption("--branch"))
-        if branch != "main":
-            cbl_info(
-                "Greenboard upload skipped: results are uploaded only from "
-                f"the 'main' tests branch (resolved branch: {branch or 'local'})"
-            )
-            yield
-            return
+    branch = resolve_branch(pytestconfig.getoption("--branch"))
+    if branch != "main":
+        cbl_info(
+            "Greenboard upload skipped: results are uploaded only from "
+            f"the 'main' tests branch (resolved branch: {branch or 'local'})"
+        )
+        yield
+        return
 
     uploader = GreenboardUploader(
         cblpytest.config.greenboard_url,
@@ -116,75 +113,52 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
 
     yield
 
-    if upgrade_versions_str:
-        # Upgrade job: record this iteration to a state file. The aggregate batch doc is uploaded once at the end by
-        # jenkins/pipelines/QE/upg-sgw/upload_greenboard_batch.py. Doesn't read the finished items, so no need to defer
-        # this to sessionfinish.
-        results_file = os.environ.get("SGW_UPGRADE_RESULTS_FILE", "/tmp/sgw_upgrade_results.json")
-        # The SGW node under upgrade may be mid-restart during rolling phases; record the iteration anyway
-        # (as a failure) rather than dropping it silently.
-        sgw_version: CouchbaseVersion | None = None
-        if len(cblpytest.sync_gateways) > 0:
-            try:
-                sgw_version = await cblpytest.sync_gateways[0].get_version()
-            except Exception as e:
-                cbl_warning(
-                    f"Could not fetch SGW version for upgrade record: {e}; recording iteration with sgw_version=None"
-                )
-        uploader.record_upgrade_step(
-            results_file,
-            sgw_version,
-            upgrade_versions_str,
-            os.environ.get("SGW_UPGRADE_PHASE"),
-            os.environ.get("SGW_UPGRADED_NODE_INDEX"),
+    sgw_version: CouchbaseVersion | None = None
+    es_version: CouchbaseVersion | None = None
+    test_platform: str = "sync-gateway"
+    os_name: str = "n/a"
+    library_version: str = "n/a"
+    if len(cblpytest.test_servers) > 0:
+        test_server_info = await cblpytest.test_servers[0].info
+        # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
+        # test server.
+        library_version = test_server_info.library_version
+        if not uploader.has_sgw_marker():
+            test_platform = test_server_info.cbl
+        if "systemName" in test_server_info.device:
+            os_name = test_server_info.device["systemName"]
+    if len(cblpytest.sync_gateways) > 0:
+        try:
+            sgw_version = await cblpytest.sync_gateways[0].get_version()
+        except Exception as e:
+            cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
+    # A mixed run keeps the test server's platform, so its CBL results are not filed under edge-server.
+    if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
+        if len(cblpytest.test_servers) == 0:
+            test_platform = EDGE_SERVER_PLATFORM
+        try:
+            es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
+        except Exception as e:
+            cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
+    # Edge-Server-only, no min_edge_servers marker: no CBL or SGW version to key the doc on. Skip rather than file
+    # it under sync-gateway.
+    if test_platform == "sync-gateway" and len(cblpytest.sync_gateways) == 0 and len(cblpytest.test_servers) == 0:
+        cbl_warning(
+            "Greenboard upload skipped: only Edge Servers are configured but no test "
+            "carried the min_edge_servers marker, so the run has no platform to file under"
         )
-    else:
-        sgw_version: CouchbaseVersion | None = None
-        es_version: CouchbaseVersion | None = None
-        test_platform: str = "sync-gateway"
-        os_name: str = "n/a"
-        library_version: str = "n/a"
-        if len(cblpytest.test_servers) > 0:
-            test_server_info = await cblpytest.test_servers[0].info
-            # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
-            # test server.
-            library_version = test_server_info.library_version
-            if not uploader.has_sgw_marker():
-                test_platform = test_server_info.cbl
-            if "systemName" in test_server_info.device:
-                os_name = test_server_info.device["systemName"]
-        if len(cblpytest.sync_gateways) > 0:
-            try:
-                sgw_version = await cblpytest.sync_gateways[0].get_version()
-            except Exception as e:
-                cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
-        # A mixed run keeps the test server's platform, so its CBL results are not filed under edge-server.
-        if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
-            if len(cblpytest.test_servers) == 0:
-                test_platform = EDGE_SERVER_PLATFORM
-            try:
-                es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
-            except Exception as e:
-                cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
-        # Edge-Server-only, no min_edge_servers marker: no CBL or SGW version to key the doc on. Skip rather than file
-        # it under sync-gateway.
-        if test_platform == "sync-gateway" and len(cblpytest.sync_gateways) == 0 and len(cblpytest.test_servers) == 0:
-            cbl_warning(
-                "Greenboard upload skipped: only Edge Servers are configured but no test "
-                "carried the min_edge_servers marker, so the run has no platform to file under"
-            )
-            return
+        return
 
-        # Upload itself is deferred to pytest_sessionfinish -- see its docstring.
-        pytestconfig.stash[_pending_key] = _PendingRunResult(
-            test_platform=test_platform,
-            os_name=os_name,
-            library_version=library_version,
-            sgw_version=sgw_version,
-            es_version=es_version,
-            cbs_version=await resolve_cbs_version(cblpytest),
-            xmlpath=pytestconfig.option.xmlpath,
-        )
+    # Upload itself is deferred to pytest_sessionfinish -- see its docstring.
+    pytestconfig.stash[_pending_key] = _PendingRunResult(
+        test_platform=test_platform,
+        os_name=os_name,
+        library_version=library_version,
+        sgw_version=sgw_version,
+        es_version=es_version,
+        cbs_version=await resolve_cbs_version(cblpytest),
+        xmlpath=pytestconfig.option.xmlpath,
+    )
 
 
 @pytest.hookimpl(trylast=True)
@@ -248,14 +222,6 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--no-result-upload",
         action="store_true",
         help="Don't upload results to greenboard",
-    )
-    group.addoption(
-        "--upgrade-versions",
-        type=str,
-        default=None,
-        help="Comma-separated ordered SGW version list for upgrade jobs "
-        "(e.g. '3.3.0,4.0.1,4.1.0'). First is the baseline, rest are upgrade "
-        "targets. Triggers sgw-upgrade platform upload.",
     )
     group.addoption(
         "--branch",

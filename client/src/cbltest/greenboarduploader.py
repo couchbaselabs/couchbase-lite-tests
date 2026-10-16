@@ -1,6 +1,4 @@
-import json
 import os
-import re
 from collections.abc import Container, Generator, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -72,26 +70,6 @@ DETAILS_SCHEMA = 1
 PASS, FAIL, ERROR, SKIP, NOTRUN = "pass", "fail", "error", "skip", "notrun"
 _OUTCOME_RANK = {PASS: 0, SKIP: 1, FAIL: 2, ERROR: 3}  # when a test reports several outcomes the worst one wins
 
-_ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
-_AUTH_RE = re.compile(r"(?i)(authorization['\"]?\s*[:=]\s*['\"]?)(?:(?:basic|bearer)\s+)?[^\s'\",]+")
-_SECRET_RE = re.compile(
-    r"(?i)\b([\w-]*(?:password|passwd|pwd|secret|token|api[_-]?key)[\w-]*)(['\"]?\s*[:=]\s*['\"]?)[^\s'\",&}]+"
-)
-_URL_CREDS_RE = re.compile(r"(://[^/\s:@]+:)[^@\s/]+@")
-
-
-def sanitize_text(text: str) -> str:
-    """Strip ANSI colour codes and redact credentials from failure text before it is uploaded.
-
-    Best effort only: the patterns catch the common shapes (``password=...``, ``Authorization: ...``,
-    ``user:pass@host``, ``token=...``) but cannot recognise a secret that has no such label, so this is a safety net,
-    not a guarantee.
-    """
-    text = _ANSI_RE.sub("", text)
-    text = _AUTH_RE.sub(r"\1[REDACTED]", text)
-    text = _SECRET_RE.sub(r"\1\2[REDACTED]", text)
-    return _URL_CREDS_RE.sub(r"\1[REDACTED]@", text)
-
 
 def _head(text: str, max_bytes: int) -> str:
     """Keep the start of ``text`` within ``max_bytes`` of UTF-8, cutting on a character boundary."""
@@ -107,14 +85,14 @@ def make_failure_entry(
     test: str, kind: str, phase: str | None, message: str | None, trace: str | None
 ) -> dict[str, Any]:
     """Build one ``failures`` entry. ``trace`` is omitted when absent or empty, never ``""``."""
-    lines = sanitize_text(message or "").strip().splitlines()
+    lines = (message or "").strip().splitlines()
     entry: dict[str, Any] = {
         "test": test,
         "kind": kind,
         "phase": phase,
         "message": _head(lines[0] if lines else "", MAX_MESSAGE_BYTES),
     }
-    clean_trace = _tail(sanitize_text(trace or "").strip(), MAX_TRACE_BYTES)
+    clean_trace = _tail((trace or "").strip(), MAX_TRACE_BYTES)
     if clean_trace:
         entry["trace"] = clean_trace
     return entry
@@ -177,13 +155,6 @@ def resolve_job_url() -> str:
     ``BUILD_URL`` set and there are no persisted Jenkins logs to link
     to; those records carry the literal ``"local"`` so the UI can
     render them without dangling at a dead URL.
-
-    Resolved at upload time (not at uploader construction) because the
-    upgrade-batch path runs from a separate Python process invoked by
-    the wrapper shell script — the same Jenkins env is still present
-    there since it's the same job, and reading env on each call keeps
-    a single source of truth without threading the value through
-    constructors.
     """
     return os.environ.get("BUILD_URL") or "local"
 
@@ -246,7 +217,7 @@ class GreenboardUploader:
     """
     Uploads test-run results to a greenboard couchbase bucket.
 
-    Three entry points, each for a different upload-time context:
+    Two entry points, each for a different upload-time context:
 
     - :py:meth:`upload` — in-process pytest fixture path. Pass/fail counts
       come from :py:meth:`pytest_runtest_makereport` tallying ``TestReport``
@@ -257,10 +228,6 @@ class GreenboardUploader:
       absent. Decouples count-collection from in-process pytest hooks
       (needed for pipelines whose pytest invocations are orchestrated
       from a shell script).
-    - :py:meth:`record_upgrade_step` + :py:meth:`upload_upgrade_batch` —
-      legacy upgrade-job path. Each pytest session appends to a JSON
-      state file; the wrapper script invokes ``upload_upgrade_batch`` at
-      the end to emit one aggregate ``platform="sgw-upgrade"`` doc.
     """
 
     def __init__(self, url: str, username: str, password: str) -> None:
@@ -273,7 +240,6 @@ class GreenboardUploader:
         self.__fail_count = 0
         self.__pass_count = 0
         self.__overall_fail = False
-        self.__test_ran = False
         self.__has_sgw_marker = False
         self.__has_es_marker = False
         self.__failures: list[dict[str, Any]] = []
@@ -289,13 +255,9 @@ class GreenboardUploader:
                 self.__overall_fail = True
             return
 
-        # Used by record_upgrade_step to skip iterations where pytest
-        # collected zero tests (and no setup crash occurred).
-        self.__test_ran = True
-
         # Above the short-circuit: tests that still run after the latch must
         # set this, or an SGW run gets filed under the CBL platform.
-        if item.get_closest_marker("sgw") or item.get_closest_marker("upg_sgw"):
+        if item.get_closest_marker("sgw"):
             self.__has_sgw_marker = True
         if item.get_closest_marker("min_edge_servers"):
             self.__has_es_marker = True
@@ -333,7 +295,7 @@ class GreenboardUploader:
 
     def has_sgw_marker(self) -> bool:
         """
-        Returns True if any test in the session has @pytest.mark.sgw or @pytest.mark.upg_sgw marker
+        Returns True if any test in the session has @pytest.mark.sgw marker
         """
         return self.__has_sgw_marker
 
@@ -574,171 +536,6 @@ class GreenboardUploader:
             failures=failures,
         )
 
-    def record_upgrade_step(
-        self,
-        results_file: str,
-        sgw_version: CouchbaseVersion | None,
-        upgrade_versions_str: str,
-        phase: str | None,
-        node_index: str | None,
-    ) -> None:
-        """Append this iteration's result to a JSON state file.
-
-        The aggregated batch document is uploaded later (once per upgrade
-        run) by ``upload_upgrade_batch``. Failed iterations are recorded
-        too so the UI can surface where in the upgrade sequence the
-        failure occurred.
-
-        :param results_file: Path to the JSON state file to append to
-        :param sgw_version: Current SGW version (target of this step)
-        :param upgrade_versions_str: Comma-separated ordered version list
-        :param phase: SGW_UPGRADE_PHASE env value (e.g. "initial",
-            "rolling_node_0", "complete")
-        :param node_index: SGW_UPGRADED_NODE_INDEX env value, if any
-        """
-        upgrade_path = [v.strip() for v in upgrade_versions_str.split(",") if v.strip()]
-
-        # No tests collected AND no setup crash means nothing was ever
-        # attempted (e.g. wrong marker filter). Don't record an iteration
-        # — the chart shouldn't show a row for a run that never executed.
-        if not self.__test_ran and not self.__overall_fail:
-            cbl_info(f"No tests ran for phase={phase!r}; skipping iteration record (no upload contribution)")
-            return
-
-        # Resolve the destination version of this iteration. Live SGW is
-        # primary; on get_version() failure the caller passes None and we
-        # fall back to the shell-exported step target so the dot still
-        # maps to the right node on the chart. Last-resort is the planned
-        # final target.
-        target_build = 0
-        if sgw_version is not None and sgw_version.version:
-            current_version = sgw_version.version
-            target_build = sgw_version.build_number
-        else:
-            current_version = os.environ.get("SGW_VERSION_UNDER_TEST") or (
-                upgrade_path[-1] if upgrade_path else "0.0.0"
-            )
-
-        upgrade_from = "initial"
-        for i, v in enumerate(upgrade_path):
-            if v == current_version and i > 0:
-                upgrade_from = upgrade_path[i - 1]
-                break
-
-        # Any deviation from "tests ran and all passed" is a failure.
-        # Includes: a test failed (call phase) or setup/teardown crashed
-        # (overall_fail). Zero-collected was already short-circuited above.
-        had_test_failures = self.__fail_count > 0
-        setup_failure = self.__overall_fail
-        failed = had_test_failures or setup_failure
-
-        # Surface non-test-call failures as at least one failed count so
-        # the top-level batch doc's failCount is correctly 1, not 0.
-        fail_count = self.__fail_count
-        if failed and fail_count == 0:
-            fail_count = 1
-
-        iteration = {
-            "phase": phase,
-            "nodeIndex": int(node_index) if node_index is not None else None,
-            "upgradeFrom": upgrade_from,
-            "upgradeTo": current_version,
-            "build": target_build,
-            "passCount": self.__pass_count,
-            "failCount": fail_count,
-            "failed": failed,
-        }
-
-        path = Path(results_file)
-        if path.exists():
-            try:
-                state = json.loads(path.read_text())
-            except (json.JSONDecodeError, OSError) as e:
-                cbl_warning(f"Could not read existing results file {path}: {e}")
-                state = {}
-        else:
-            state = {}
-
-        state.setdefault("upgradePath", upgrade_path)
-        state.setdefault("iterations", []).append(iteration)
-        path.write_text(json.dumps(state, indent=2))
-        cbl_info(
-            f"Upgrade step recorded ({phase}): {upgrade_from} → {current_version} "
-            f"(pass={self.__pass_count}, fail={self.__fail_count})"
-        )
-
-    def upload_upgrade_batch(self, results_file: str) -> None:
-        """Upload one aggregate document for the whole upgrade run.
-
-        Reads the iterations recorded by ``record_upgrade_step`` and emits
-        a single greenboard doc summarising the run. If any iteration
-        failed, ``failedAt`` points at the first failed iteration so the
-        UI can show where in the sequence the run broke.
-        """
-        path = Path(results_file)
-        if not path.exists():
-            cbl_warning(f"No upgrade results file at {path}; nothing to upload")
-            return
-
-        try:
-            state = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError) as e:
-            cbl_warning(f"Could not parse upgrade results file {path}: {e}")
-            return
-
-        iterations = state.get("iterations", [])
-        if not iterations:
-            cbl_warning(f"Upgrade results file {path} has no iterations; skipping upload")
-            return
-
-        upgrade_path = state.get("upgradePath", [])
-        # version is always the planned final target so the UI's
-        # "filter by target version" picks up this run even when execution
-        # stopped early at an intermediate version.
-        target_version = upgrade_path[-1] if upgrade_path else iterations[-1].get("upgradeTo", "0.0.0")
-
-        failed_at = None
-        for i in iterations:
-            if i.get("failed"):
-                failed_at = {
-                    "phase": i.get("phase"),
-                    "upgradeFrom": i.get("upgradeFrom"),
-                    "upgradeTo": i.get("upgradeTo"),
-                    "nodeIndex": i.get("nodeIndex"),
-                }
-                break
-
-        # One upgrade batch == one upgrade test from the UI's POV. Bars are
-        # built by the UI by aggregating across past runs that share
-        # (version, upgradePath); per-run pass/fail is therefore 1/0.
-        if failed_at is None:
-            pass_count, fail_count = 1, 0
-            target_build = iterations[-1].get("build", 0)
-        else:
-            pass_count, fail_count = 0, 1
-            # The planned target build was never reached; per-iteration
-            # `build` fields preserve what was actually running at each step.
-            target_build = 0
-
-        self._upsert(
-            {
-                "build": target_build,
-                "version": target_version,
-                "upgradePath": upgrade_path,
-                "iterations": iterations,
-                "passCount": pass_count,
-                "failCount": fail_count,
-                "failedAt": failed_at,
-                "platform": "sgw-upgrade",
-                "jobUrl": resolve_job_url(),
-            }
-        )
-        cbl_info(
-            f"Upgrade batch uploaded: path={'->'.join(upgrade_path)} "
-            f"target={target_version} pass={pass_count} fail={fail_count} "
-            f"failedAt={failed_at}"
-        )
-
     def _upload_document(
         self, test_run: RunResult, tests: dict[str, str], failures: list[dict[str, Any]], failures_truncated: bool
     ) -> None:
@@ -761,11 +558,6 @@ class GreenboardUploader:
             cbl_warning(f"Could not write per-test greenboard docs for {key}; uploading the run doc without them: {e}")
         self._stamp(doc)
         collection.upsert(key, doc)
-
-    def _upsert(self, doc: dict) -> None:
-        """Add timestamp fields and write one document to the greenboard bucket."""
-        self._stamp(doc)
-        self._collection().upsert(str(uuid4()), doc)
 
     @staticmethod
     def _stamp(doc: dict) -> None:
