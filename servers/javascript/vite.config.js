@@ -60,7 +60,18 @@ function serveFixtures(mounts) {
                         const ext = file.slice(file.lastIndexOf("."));
                         res.setHeader("Content-Type", kMimeTypes[ext] ?? "application/octet-stream");
                         res.setHeader("Content-Length", info.size);
-                        createReadStream(file).pipe(res);
+                        const stream = createReadStream(file);
+                        // Without these the dev server dies on a mid-read failure: pipe()
+                        // re-emits the error with no listener attached, which is fatal.
+                        stream.on("error", () => {
+                            if (res.headersSent) res.destroy();
+                            else {
+                                res.statusCode = 500;
+                                res.end("Read Error");
+                            }
+                        });
+                        res.on("close", () => stream.destroy());
+                        stream.pipe(res);
                     },
                     () => {
                         res.statusCode = 404;
