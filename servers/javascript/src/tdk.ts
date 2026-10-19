@@ -367,15 +367,15 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async #loadDataset(dbName: string, datasetName: string) {
         const url = tdk.kDatasetBaseURL + datasetName + "/";
 
-        const fetchRelative = async (suffix: string): Promise<string> => {
-            const response = await this.#fetchWithRetry(url + suffix);
-            if (response.status !== 200)
-                throw new HTTPError(
-                    502,
-                    `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
-                );
-            return await response.text();
-        };
+        const fetchRelative = async (suffix: string): Promise<string> =>
+            this.#fetchWithRetry(url + suffix, async (response) => {
+                if (response.status !== 200)
+                    throw new HTTPError(
+                        502,
+                        `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
+                    );
+                return await response.text();
+            });
 
         this.#logger.info`Loading database ${dbName} from dataset ${datasetName} at ${url} ...`;
         const config = JSON.parse(await fetchRelative("index.json")) as tdk.DatasetIndex;
@@ -454,21 +454,25 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return new cbl.NewBlob(contents, type);
     }
 
-    /** Fetches `url`, retrying transient failures.
+    /** Fetches `url` and reads its body via `consume`, retrying transient failures.
      *
      *  Dataset and blob fixtures are fetched over the network, so a single dropped
-     *  connection or 5xx would otherwise fail the test outright.  Responses below
-     *  500 are returned as-is for the caller to interpret: a 404 is deterministic
-     *  and retrying it only wastes time.
+     *  connection or 5xx would otherwise fail the test outright.  `consume` runs inside
+     *  the retry so that a connection lost partway through the body is retried too, and
+     *  so the per-attempt timeout covers the whole transfer rather than just the headers.
+     *  A response the caller considers final -- a 404, say -- is signalled by throwing
+     *  HTTPError from `consume`, which is passed straight through: retrying a
+     *  deterministic answer only wastes time.
      */
-    async #fetchWithRetry(url: string | URL): Promise<Response> {
+    async #fetchWithRetry<T>(url: string | URL, consume: (response: Response) => Promise<T>): Promise<T> {
         let lastError: unknown;
         for (let attempt = 1; attempt <= kFetchAttempts; attempt++) {
             try {
                 const response = await fetch(url, { signal: AbortSignal.timeout(kFetchTimeoutMs) });
-                if (response.status < 500) return response;
+                if (response.status < 500) return await consume(response);
                 lastError = new Error(`${response.status} ${response.statusText}`);
             } catch (error) {
+                if (error instanceof HTTPError) throw error;
                 lastError = error;
             }
             if (attempt < kFetchAttempts) {
@@ -486,20 +490,21 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
         // kBlobBaseURL may be relative (local fixtures), which new URL() rejects as a base.
         const absURL = new URL(blobURL, new URL(tdk.kBlobBaseURL, location.href));
-        const response = await this.#fetchWithRetry(absURL);
-        if (response.status !== 200) {
-            let status = 502;
-            if (response.status === 404) {
-                status = 400;
-            }
+        return this.#fetchWithRetry(absURL, async (response) => {
+            if (response.status !== 200) {
+                let status = 502;
+                if (response.status === 404) {
+                    status = 400;
+                }
 
-            throw new HTTPError(
-                status,
-                `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
-            );
-        }
-        const data = await response.arrayBuffer();
-        return new Uint8Array(data);
+                throw new HTTPError(
+                    status,
+                    `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
+                );
+            }
+            const data = await response.arrayBuffer();
+            return new Uint8Array(data);
+        });
     }
 
     readonly #databases = new Map<string, cbl.Database>();
