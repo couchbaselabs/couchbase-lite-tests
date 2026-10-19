@@ -484,7 +484,8 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     }
 
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
-        const absURL = new URL(blobURL, tdk.kBlobBaseURL);
+        // kBlobBaseURL may be relative (local fixtures), which new URL() rejects as a base.
+        const absURL = new URL(blobURL, new URL(tdk.kBlobBaseURL, location.href));
         const response = await this.#fetchWithRetry(absURL);
         if (response.status !== 200) {
             let status = 502;
