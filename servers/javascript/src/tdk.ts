@@ -39,6 +39,13 @@ interface CollectionUpdates {
     onConflict?: cbl.ConflictHandler;
 }
 
+/** How many times to attempt a dataset/blob fetch before giving up. */
+const kFetchAttempts = 3;
+/** Per-attempt fetch timeout, generous enough for the largest (50 MB) blob. */
+const kFetchTimeoutMs = 60_000;
+/** Base delay between fetch attempts; multiplied by the attempt number. */
+const kFetchRetryDelayMs = 1_000;
+
 export const APIVersion = 1;
 
 /** Implementation of the TDK API, as a delegate object for TestServer. */
@@ -361,7 +368,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const url = tdk.kDatasetBaseURL + datasetName + "/";
 
         const fetchRelative = async (suffix: string): Promise<string> => {
-            const response = await fetch(url + suffix);
+            const response = await this.#fetchWithRetry(url + suffix);
             if (response.status !== 200)
                 throw new HTTPError(
                     502,
@@ -447,9 +454,38 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return new cbl.NewBlob(contents, type);
     }
 
+    /** Fetches `url`, retrying transient failures.
+     *
+     *  Dataset and blob fixtures are fetched over the network, so a single dropped
+     *  connection or 5xx would otherwise fail the test outright.  Responses below
+     *  500 are returned as-is for the caller to interpret: a 404 is deterministic
+     *  and retrying it only wastes time.
+     */
+    async #fetchWithRetry(url: string | URL): Promise<Response> {
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= kFetchAttempts; attempt++) {
+            try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(kFetchTimeoutMs) });
+                if (response.status < 500) return response;
+                lastError = new Error(`${response.status} ${response.statusText}`);
+            } catch (error) {
+                lastError = error;
+            }
+            if (attempt < kFetchAttempts) {
+                this.#logger
+                    .warn`Fetch of ${String(url)} failed (attempt ${attempt} of ${kFetchAttempts}): ${String(lastError)}; retrying ...`;
+                await new Promise((resolve) => setTimeout(resolve, kFetchRetryDelayMs * attempt));
+            }
+        }
+        throw new HTTPError(
+            502,
+            `Unable to fetch <${String(url)}> after ${kFetchAttempts} attempts: ${String(lastError)}`,
+        );
+    }
+
     async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
         const absURL = new URL(blobURL, tdk.kBlobBaseURL);
-        const response = await fetch(absURL);
+        const response = await this.#fetchWithRetry(absURL);
         if (response.status !== 200) {
             let status = 502;
             if (response.status === 404) {
