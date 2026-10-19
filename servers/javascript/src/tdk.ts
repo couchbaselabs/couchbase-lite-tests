@@ -39,6 +39,16 @@ interface CollectionUpdates {
     onConflict?: cbl.ConflictHandler;
 }
 
+/** Statuses worth another attempt: server errors, plus the two "come back later" codes.
+ *
+ *  403 is deliberately absent.  GitHub uses it for some secondary rate limits, but it is
+ *  also the ordinary answer for a file you may not read, and retrying that would triple
+ *  the cost of every genuine permission error.
+ */
+function isRetryableStatus(status: number): boolean {
+    return status >= 500 || status === 408 || status === 429;
+}
+
 /** How many times to attempt a dataset/blob fetch before giving up. */
 const kFetchAttempts = 3;
 /** Per-attempt fetch timeout, generous enough for the largest (50 MB) blob. */
@@ -469,7 +479,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         for (let attempt = 1; attempt <= kFetchAttempts; attempt++) {
             try {
                 const response = await fetch(url, { signal: AbortSignal.timeout(kFetchTimeoutMs) });
-                if (response.status < 500) return await consume(response);
+                if (!isRetryableStatus(response.status)) return await consume(response);
                 lastError = new Error(`${response.status} ${response.statusText}`);
             } catch (error) {
                 if (error instanceof HTTPError) throw error;
