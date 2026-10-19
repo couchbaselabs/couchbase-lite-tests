@@ -1,6 +1,6 @@
 /// <reference types="vitest/config" />
 /// <reference types="@vitest/browser/providers/playwright" />
-import { createReadStream, existsSync } from "node:fs";
+import { closeSync, createReadStream, existsSync, openSync, readdirSync, readSync } from "node:fs";
 import { stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,6 +30,28 @@ function findFixtureRoot(start) {
         const parent = dirname(dir);
         if (parent === dir) return undefined;
         dir = parent;
+    }
+}
+
+/** True if `dir` holds real blob content rather than unfetched Git LFS pointers.
+ *
+ *  Blobs are LFS-tracked (see .gitattributes); a clone made without LFS leaves ~130 byte
+ *  text stubs in their place, which would otherwise be served as though they were the
+ *  images themselves.  Datasets are plain text and never need this check.
+ */
+function hasRealBlobs(dir) {
+    let fd;
+    try {
+        const names = readdirSync(dir).filter((name) => !name.startsWith("."));
+        if (names.length === 0) return false;
+        fd = openSync(join(dir, names[0]), "r");
+        const header = Buffer.alloc(64);
+        const read = readSync(fd, header, 0, header.length, 0);
+        return !header.subarray(0, read).toString("utf8").startsWith("version https://git-lfs.github.com/spec/v1");
+    } catch {
+        return false;
+    } finally {
+        if (fd !== undefined) closeSync(fd);
     }
 }
 
@@ -92,13 +114,18 @@ if (fixtureRoot) {
     // Vite exposes VITE_-prefixed process.env entries on import.meta.env.  ??= so an
     // explicitly supplied URL still wins over the local checkout.
     process.env.VITE_DATASET_BASE_URL ??= datasetBaseURL;
-    process.env.VITE_BLOB_BASE_URL ??= blobBaseURL;
-    plugins.push(
-        serveFixtures([
-            { prefix: datasetBaseURL, dir: join(fixtureRoot, "dbs", "js") },
-            { prefix: blobBaseURL, dir: join(fixtureRoot, "blobs") },
-        ]),
-    );
+    const mounts = [{ prefix: datasetBaseURL, dir: join(fixtureRoot, "dbs", "js") }];
+
+    const blobDir = join(fixtureRoot, "blobs");
+    if (hasRealBlobs(blobDir)) {
+        process.env.VITE_BLOB_BASE_URL ??= blobBaseURL;
+        mounts.push({ prefix: blobBaseURL, dir: blobDir });
+    } else {
+        console.warn(
+            "[tdk] dataset/server/blobs holds Git LFS pointers; run `git lfs pull`. Fetching blobs from GitHub.",
+        );
+    }
+    plugins.push(serveFixtures(mounts));
 } else {
     console.warn("[tdk] No local dataset/server tree found; falling back to the GitHub fixture URLs.");
 }
