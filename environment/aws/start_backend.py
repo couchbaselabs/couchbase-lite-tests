@@ -19,6 +19,7 @@ import json
 import subprocess
 import sys
 from enum import Flag, auto
+from io import StringIO
 from pathlib import Path
 from typing import IO, Any, cast
 
@@ -317,8 +318,13 @@ def main(
         click.secho("Skipping test server install and run...", fg="yellow")
 
     if tdk_config_out is not None:
+        # Render before opening the output file.  open(..., "w") truncates, so writing
+        # directly into a path that resolves to tdk_config_in would destroy the input
+        # before write_config could read it.
+        rendered = StringIO()
+        write_config(tdk_config_in, topology, rendered)
         with open(tdk_config_out, "w") as fout:
-            write_config(tdk_config_in, topology, fout)
+            fout.write(rendered.getvalue())
     else:
         write_config(tdk_config_in, topology, sys.stdout)
 
