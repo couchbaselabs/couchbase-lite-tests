@@ -20,18 +20,19 @@ Test replication behavior while Sync Gateway connectivity is interrupted mid-wor
 
 ## test_3_edge_with_sync
 
-Test multi-edge synchronization and recovery with chained replications.
+Test multi-edge synchronization and recovery with three Edge Servers replicating with each other.
 
 1. Configure Edge Server 1 with the `travel` dataset.
-2. Configure Edge Server 2 to replicate from Edge Server 1.
-3. Configure Edge Server 3 to replicate from Edge Server 2.
-4. Reconfigure Edge Server 1 to replicate from Edge Server 3 (loop).
+2. Configure Edge Server 2 with the `travel` dataset and no replication.
+3. Configure Edge Server 3 to replicate with Edge Server 2.
+4. Reconfigure Edge Server 1 to replicate with Edge Servers 2 and 3.
 5. Delete all documents in `travel.hotels` on Edge Server 1.
-6. Verify `travel.hotels` is empty on Edge Servers 1, 2, and 3.
+6. Wait for replication to become idle and verify `travel.hotels` is empty on Edge Servers 1, 2, and 3.
 7. Create 1,000 documents in `travel.hotels` on Edge Server 1 and wait for idle.
 8. Verify document counts match across Edge Servers 1, 2, and 3.
 9. Kill Edge Server 1, update documents via Edge Servers 2/3, and verify replication.
-10. Kill Edge Servers 1 and 3, update documents via Edge Server 2, and verify replication.
+10. Wait for Edge Server 1's replications to become idle after its restart.
+11. Kill Edge Servers 1 and 3, update documents via Edge Server 2, and verify replication.
 
 ## test_edge_server_offline_sync_and_recovery
 
