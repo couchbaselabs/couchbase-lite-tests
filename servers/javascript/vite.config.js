@@ -4,7 +4,7 @@ import { closeSync, createReadStream, existsSync, openSync, readdirSync, readSyn
 import { stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
 const kServerRoot = dirname(fileURLToPath(import.meta.url));
 
@@ -105,33 +105,44 @@ function serveFixtures(mounts) {
     };
 }
 
-const fixtureRoot = findFixtureRoot(kServerRoot);
-const plugins = [];
-const datasetBaseURL = "/datasets/";
-const blobBaseURL = "/blobs/";
+const kLocalDatasetBaseURL = "/datasets/";
+const kLocalBlobBaseURL = "/blobs/";
 
-if (fixtureRoot) {
-    // Vite exposes VITE_-prefixed process.env entries on import.meta.env.  ??= so an
-    // explicitly supplied URL still wins over the local checkout.
-    process.env.VITE_DATASET_BASE_URL ??= datasetBaseURL;
-    const mounts = [{ prefix: datasetBaseURL, dir: join(fixtureRoot, "dbs", "js") }];
-
-    const blobDir = join(fixtureRoot, "blobs");
-    if (hasRealBlobs(blobDir)) {
-        process.env.VITE_BLOB_BASE_URL ??= blobBaseURL;
-        mounts.push({ prefix: blobBaseURL, dir: blobDir });
-    } else {
-        console.warn(
-            "[tdk] dataset/server/blobs holds Git LFS pointers; run `git lfs pull`. Fetching blobs from GitHub.",
-        );
+/** Points the fixture URLs at the local checkout, unless they are already configured. */
+function localFixturePlugins(mode) {
+    const fixtureRoot = findFixtureRoot(kServerRoot);
+    if (!fixtureRoot) {
+        console.warn("[tdk] No local dataset/server tree found; falling back to the GitHub fixture URLs.");
+        return [];
     }
-    plugins.push(serveFixtures(mounts));
-} else {
-    console.warn("[tdk] No local dataset/server tree found; falling back to the GitHub fixture URLs.");
+
+    // Vite loads .env* files after this runs and lets process.env win over them, so read
+    // them here too: otherwise setting VITE_*_BASE_URL in a .env file would be ignored.
+    const configured = { ...loadEnv(mode, kServerRoot, "VITE_"), ...process.env };
+    const mounts = [];
+
+    if (!configured.VITE_DATASET_BASE_URL) {
+        process.env.VITE_DATASET_BASE_URL = kLocalDatasetBaseURL;
+        mounts.push({ prefix: kLocalDatasetBaseURL, dir: join(fixtureRoot, "dbs", "js") });
+    }
+
+    if (!configured.VITE_BLOB_BASE_URL) {
+        const blobDir = join(fixtureRoot, "blobs");
+        if (hasRealBlobs(blobDir)) {
+            process.env.VITE_BLOB_BASE_URL = kLocalBlobBaseURL;
+            mounts.push({ prefix: kLocalBlobBaseURL, dir: blobDir });
+        } else {
+            console.warn(
+                "[tdk] dataset/server/blobs holds Git LFS pointers; run `git lfs pull`. Fetching blobs from GitHub.",
+            );
+        }
+    }
+
+    return mounts.length > 0 ? [serveFixtures(mounts)] : [];
 }
 
-export default defineConfig({
-    plugins,
+export default defineConfig(({ mode }) => ({
+    plugins: localFixturePlugins(mode),
     test: {
         // https://vitest.dev/config/
         include: ["src/**/*.test.ts"],
@@ -146,4 +157,4 @@ export default defineConfig({
             provider: "playwright",
         },
     },
-});
+}));
