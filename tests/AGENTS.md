@@ -184,6 +184,8 @@ Located in `dataset/sg/`. Each has a `-sg.json` (data) and `-sg-config.json` (SG
 - **No docstrings or inline step descriptions on test methods** — the matching `spec/tests/**.md` file is the source of truth for the test flow; `mark_test_step()` text mirrors its numbered steps. Helper functions still need docstrings.
 - **Platform-agnostic** — must work on every test server (C, .NET, iOS, JVM, JS). Use `self.skip_if_not_platform()` for platform-specific behavior.
 - **Version gates** — use `self.skip_if_cbl_not(server, ">= 3.3.0")` / `self.skip_if_sgw_not(sg, ">= 4.0.0")` rather than runtime checks.
+- **Never put a document in the `*` channel** — not through a `channels` property, nor a sync function. Sync Gateway already gives every document to `*`, so use a named channel.
+- **Prefer named channels for user access** — unless the test checks `*` access, do not grant `*` to a user. Grant the channels that the test documents use.
 - **Check the spec first** — every new/modified test must align with `spec/tests/`. Add or update the spec before changing the code.
 - **No markdown sidecars for code changes** — do not create `ENHANCEMENT_*.md`, `IMPLEMENTATION_*.md`, etc. PR descriptions cover motivation; the spec covers behavior.
 

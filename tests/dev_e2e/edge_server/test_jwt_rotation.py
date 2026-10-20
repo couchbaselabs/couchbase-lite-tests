@@ -72,12 +72,13 @@ class TestJWTReplication(CBLTestClass):
         await cloud.create_database("travel", payload)
 
         # Create user1 with channel access to all travel collections
+        countries = ["United States", "United Kingdom", "France"]
         collection_access_input = {
-            "travel.airlines": ["*"],
-            "travel.routes": ["*"],
-            "travel.airports": ["*"],
-            "travel.landmarks": ["*"],
-            "travel.hotels": ["*"],
+            "travel.airlines": countries,
+            "travel.routes": countries,
+            "travel.airports": countries,
+            "travel.landmarks": countries,
+            "travel.hotels": countries,
         }
         access_dict = sgw.create_collection_access_dict(collection_access_input)
         await sgw.add_user("travel", "test-provider_user1", "pass", access_dict)
@@ -166,7 +167,7 @@ class TestJWTReplication(CBLTestClass):
         await cloud.create_database("travel", payload)
 
         # Create JWT user with channel access
-        collection_access_input = {"travel.airlines": ["*"]}
+        collection_access_input = {"travel.airlines": ["airlines"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
         await sgw.add_user("travel", "test-provider_user1", "pass", access_dict)
 
@@ -176,7 +177,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"rotation_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"Rotation Airline {i}",
             }
@@ -220,7 +221,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"rotation_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"Rotation Airline {i}",
             }
@@ -288,7 +289,7 @@ class TestJWTReplication(CBLTestClass):
         )
         await cloud.create_database("travel", payload)
 
-        collection_access_input = {"travel.airlines": ["*"]}
+        collection_access_input = {"travel.airlines": ["airlines"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
         await sgw.add_user("travel", "test-provider_user1", "pass", access_dict)
 
@@ -297,7 +298,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"disconnect_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"Disconnect Airline {i}",
             }
@@ -406,7 +407,7 @@ class TestJWTReplication(CBLTestClass):
         )
         await cloud.create_database("travel", payload)
 
-        collection_access_input = {"travel.airlines": ["*"]}
+        collection_access_input = {"travel.airlines": ["airlines"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
         await sgw.add_user("travel", "test-provider_user1", "pass", access_dict)
 
@@ -415,7 +416,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"filedel_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"FileDel Airline {i}",
             }
@@ -534,7 +535,7 @@ class TestJWTReplication(CBLTestClass):
         )
         await cloud.create_database("travel", payload)
 
-        collection_access_input = {"travel.airlines": ["*"]}
+        collection_access_input = {"travel.airlines": ["airlines"]}
         access_dict = sgw.create_collection_access_dict(collection_access_input)
         await sgw.add_user("travel", "test-provider_user1", "pass", access_dict)
 
@@ -544,7 +545,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"cycle_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"Cycle Airline {i}",
             }
@@ -615,7 +616,7 @@ class TestJWTReplication(CBLTestClass):
             doc_id = f"cycle_test_{i}"
             doc = {
                 "id": doc_id,
-                "channels": ["*"],
+                "channels": ["airlines"],
                 "type": "airline",
                 "name": f"Cycle Airline {i}",
             }
