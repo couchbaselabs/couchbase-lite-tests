@@ -17,7 +17,6 @@ SCRIPT_DIR = str(Path(__file__).parent)
 
 @pytest.mark.min_edge_servers(1)
 @pytest.mark.min_sync_gateways(1)
-@pytest.mark.min_edge_servers(3)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
@@ -141,13 +140,12 @@ class TestEdgeServerChaos(CBLTestClass):
             db_name="travel",
             config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
         )
-        self.mark_test_step("Configure Edge Server2 with ES1 replication URL")
-        source_db = edge_server1.replication_url("travel")
+        self.mark_test_step("Configure Edge Server2 with travel dataset")
         config_path = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
         config = await read_json_file(config_path)
-        config["replications"][0]["source"] = source_db
+        es2_config = {key: value for key, value in config.items() if key != "replications"}
         config_path = str(tmp_path / "es2_config.json")
-        await write_json_file(config_path, config)
+        await write_json_file(config_path, es2_config)
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Configure Edge Server3 with ES2 replication URL")
@@ -157,9 +155,12 @@ class TestEdgeServerChaos(CBLTestClass):
         await write_json_file(config_path, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path)
 
-        self.mark_test_step("Configure Edge Server1 with ES3 replication URL")
-        source_db = edge_server3.replication_url("travel")
-        config["replications"][0]["source"] = source_db
+        self.mark_test_step("Configure Edge Server1 with ES2 and ES3 replication URLs")
+        replication = config["replications"][0]
+        config["replications"] = [
+            {**replication, "source": edge_server2.replication_url("travel")},
+            {**replication, "source": edge_server3.replication_url("travel")},
+        ]
         config_path = str(tmp_path / "es1_config.json")
         await write_json_file(config_path, config)
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
@@ -172,6 +173,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server1.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
         self.mark_test_step("Verify document deleted")
+        await edge_server1.wait_for_idle(replicator_key=0)
+        await edge_server1.wait_for_idle(replicator_key=1)
+        await edge_server3.wait_for_idle()
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
         edge2_docs = await edge_server2.get_all_documents("travel", collection="travel.hotels")
         edge3_docs = await edge_server3.get_all_documents("travel", collection="travel.hotels")
@@ -186,8 +190,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server1.bulk_doc_op(bulk_ops, db_name="travel", collection="travel.hotels")
 
         self.mark_test_step("Verify document created")
-        await edge_server1.wait_for_idle()
-        await edge_server2.wait_for_idle()
+        await edge_server1.wait_for_idle(replicator_key=0)
+        await edge_server1.wait_for_idle(replicator_key=1)
+        await edge_server3.wait_for_idle()
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
         edge2_docs = await edge_server2.get_all_documents("travel", collection="travel.hotels")
         edge3_docs = await edge_server3.get_all_documents("travel", collection="travel.hotels")
@@ -204,6 +209,8 @@ class TestEdgeServerChaos(CBLTestClass):
             edge3_docs.revmap,
             docs_list,
         )
+        await edge_server1.wait_for_idle(replicator_key=0)
+        await edge_server1.wait_for_idle(replicator_key=1)
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
 
         self.mark_test_step("killing edge_server1,edge_server3  ")
@@ -215,6 +222,7 @@ class TestEdgeServerChaos(CBLTestClass):
             docs_list,
         )
 
+    @pytest.mark.min_edge_servers(3)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_server_offline_sync_and_recovery(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
@@ -277,7 +285,6 @@ class TestEdgeServerChaos(CBLTestClass):
 
         self.mark_test_step("Restart Edge Server 3 and wait for it to come online")
         await cblpytest.edge_servers[2].start_server()
-        await asyncio.sleep(100)
 
         self.mark_test_step("Create 10,000 documents in `travel.hotels` on Edge Server 3")
         docgen = JSONGenerator(seed=10, size=10000)
