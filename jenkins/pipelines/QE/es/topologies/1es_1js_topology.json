@@ -1,0 +1,17 @@
+{
+    "$schema": "./../../../../../environment/aws/topology_setup/topology_schema.json",
+    "edge_servers": [
+        {
+            "version": "{{version}}"
+        }
+    ],
+    "test_servers": [
+        {
+            "platform": "js",
+            "cbl_version": "{{version}}",
+            "location": "localhost",
+            "download": true
+        }
+    ],
+    "logslurp": true
+}

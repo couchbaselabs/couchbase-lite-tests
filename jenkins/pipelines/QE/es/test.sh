@@ -9,7 +9,9 @@ TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
 SGW_VERSION="${4:-}"
 CBS_VERSION="${5:-}"
 DATASET_VERSION="${6:-4.0}"
-TEST_DIR="${7:-QE}" # QE | dev_e2e | both
+TEST_DIR="${7:-QE}"   # QE | dev_e2e | both
+CBL_VERSION="${8:-}"  # version-build for the topology's test servers (e.g. the localhost JS test server)
+JS_ONLY="${9:-false}" # true: run only the tests that replicate with a CBL test server
 TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
 
 if [ -z "$SGW_VERSION" ]; then
@@ -44,16 +46,19 @@ if [ "$TEST_NAME" != "." ]; then
   PYTEST_FILTER=(-k "$TEST_NAME")
 fi
 
+if [ "$JS_ONLY" = "true" ]; then
+  SUITE_DIRS=("$QE_TESTS_DIR/edge_server")
+  PYTEST_FILTER+=(-m min_test_servers)
+fi
+
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}"
+uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}" --cbl-version "${CBL_VERSION:-}"
 
 export COLUMNS=200
 TEST_RESULT=0
 
-# Each directory runs as its own pytest session against the same backend.
-# A failure in one does not stop the next; the script fails if any failed.
 for suite_dir in "${SUITE_DIRS[@]}"; do
-  echo "RUNNING COORDINATED TEST ($suite_dir, TEST_NAME=$TEST_NAME)"
+  echo "RUNNING COORDINATED TEST ($suite_dir, TEST_NAME=$TEST_NAME, JS_ONLY=$JS_ONLY)"
   pushd "$suite_dir" >/dev/null
 
   if uv run pytest -v --no-header -W ignore::DeprecationWarning --config "$QE_TESTS_DIR/config.json" --dataset-version "$DATASET_VERSION" ${PYTEST_FILTER[@]+"${PYTEST_FILTER[@]}"} .; then
