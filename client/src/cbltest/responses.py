@@ -26,10 +26,15 @@ def register_response(request_type: type, version: int | list[int]) -> Callable[
 
 
 def unwrap_ws_payload(ws_payload: dict) -> tuple[int, dict]:
-    """Gets the status and body of a WebSocket response, which wraps any error in ts_error"""
+    """
+    Gets the status and body of a WebSocket response, which wraps any error in ts_error.
+    The WebSocket servers mix their ts_* metadata (the equivalent of the HTTP headers
+    the other servers send) into the body, so it is stripped here.  This means that
+    ts_ is a reserved prefix that test documents must not use.
+    """
     error = cast(dict | None, ws_payload.get("ts_error"))
     if error is None:
-        return 200, ws_payload
+        return 200, {k: v for k, v in ws_payload.items() if not k.startswith("ts_")}
 
     return cast(int, error.get("code", 500)), error
 

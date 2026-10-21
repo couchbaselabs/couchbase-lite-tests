@@ -84,15 +84,30 @@ class TestRequestHttpTransport:
         )
 
 
+def _ws_transport(payload: dict) -> _RequestWebSocketTransport:
+    reply: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
+    reply.set_result(payload)
+    ws_router = MagicMock()
+    ws_router.register.return_value = reply
+    ws_router.get_websocket_for_write.return_value.send_str = AsyncMock()
+    return _RequestWebSocketTransport("ws://localhost:8080", ws_router)
+
+
 class TestRequestWebSocketTransport:
     @pytest.mark.asyncio
+    async def test_response_body_excludes_ts_metadata(self) -> None:
+        transport = _ws_transport(
+            {"ts_id": 1, "ts_apiVersion": 1, "ts_serverID": "server-uuid", "_id": "doc1", "name": "value"}
+        )
+
+        response = await transport.send(_FakeGetDocumentRequest(), 1)
+
+        assert response.uuid == "server-uuid"
+        assert response.to_json() == {"_id": "doc1", "name": "value"}
+
+    @pytest.mark.asyncio
     async def test_bad_response_reads_ts_error(self) -> None:
-        reply: asyncio.Future[dict] = asyncio.get_running_loop().create_future()
-        reply.set_result({"ts_apiVersion": 1, "ts_serverID": "server-uuid", "ts_error": NOT_FOUND_BODY})
-        ws_router = MagicMock()
-        ws_router.register.return_value = reply
-        ws_router.get_websocket_for_write.return_value.send_str = AsyncMock()
-        transport = _RequestWebSocketTransport("ws://localhost:8080", ws_router)
+        transport = _ws_transport({"ts_apiVersion": 1, "ts_serverID": "server-uuid", "ts_error": NOT_FOUND_BODY})
 
         with pytest.raises(CblTestServerBadResponseError) as exc_info:
             await transport.send(_FakeGetDocumentRequest(), 1)

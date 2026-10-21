@@ -164,6 +164,7 @@ CLI options added by `cblpytest_fixture`:
 - **Imports**: `ruff` import sort (`I` rules); relative imports inside `cbltest`.
 - **No breaking changes** to plugin contracts or public API classes without a version bump.
 - v1 and v2 must coexist; version negotiation happens once per session.
+- **WebSocket responses arrive with `ts_*` metadata mixed into the body.** `unwrap_ws_payload` (`responses.py`) strips it, so response classes never see `ts_*` keys and must not filter them again. Test servers built from `release/X.Y` branches send the same shape, so keep this stripping.
 
 ## Commands
 
