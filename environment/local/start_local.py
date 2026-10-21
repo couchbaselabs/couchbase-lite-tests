@@ -223,6 +223,11 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     help="Build the test server from source rather than downloading it. Takes a release version (e.g., 4.0.3) "
     "or a numbered build (e.g., 4.0.3-12).",
 )
+@click.option(
+    "--cbl-version",
+    help="Couchbase Lite version of the prebuilt test server to download: a release prefix (3.4) for its "
+    "latest release, or an exact build (3.4.2-2). Defaults to the latest release.",
+)
 @click.option("--repo-path", help="Path to an existing sync_gateway repo to build from.")
 @click.option(
     "--git-tag",
@@ -295,6 +300,7 @@ def main(
     start_cbs: bool,
     platform: str,
     build_testserver: str | None,
+    cbl_version: str | None,
     repo_path: str | None,
     git_tag: str | None,
     admin_user: str,
@@ -324,6 +330,9 @@ def main(
 
     if not server:
         raise click.UsageError("--server is required unless --stop-sync-gateway or --stop-testserver is set.")
+
+    if build_testserver and cbl_version:
+        raise click.UsageError("--build-testserver and --cbl-version cannot be combined.")
 
     platform_key = get_cbl_platform(platform)
 
@@ -384,7 +393,9 @@ def main(
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if not skip_testserver:
-            futures.append(executor.submit(run_test_server, platform_key, LOCAL_PLATFORMS[platform], build_testserver))
+            futures.append(
+                executor.submit(run_test_server, platform_key, LOCAL_PLATFORMS[platform], build_testserver, cbl_version)
+            )
         if not skip_sync_gateway_build:
             assert repo_dir is not None
             futures.append(executor.submit(build_sync_gateway, repo_dir))
@@ -442,7 +453,9 @@ def _test_server_port_answered(port: int) -> bool:
         return False
 
 
-def run_test_server(platform_key: str, product: str, build_testserver: str | None) -> None:
+def run_test_server(
+    platform_key: str, product: str, build_testserver: str | None, cbl_version_prefix: str | None
+) -> None:
     """Stop any test server left from a previous run, then download/build and run a new one."""
     port = listen_port(platform_key)
     # A server left running holds the port the new one needs, so the new one dies inside its own log
@@ -466,8 +479,11 @@ def run_test_server(platform_key: str, product: str, build_testserver: str | Non
         # A bare version is a release, which the test server marks with build number 0.
         cbl_version = build_testserver if "-" in build_testserver else f"{build_testserver}-0"
         download = False
+    elif cbl_version_prefix and "-" in cbl_version_prefix:
+        cbl_version = cbl_version_prefix
+        download = True
     else:
-        cbl_version = resolve_latest_version(product)
+        cbl_version = resolve_latest_version(product, cbl_version_prefix)
         download = True
 
     config = {

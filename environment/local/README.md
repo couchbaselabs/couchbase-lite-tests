@@ -151,6 +151,41 @@ record at all — a topology naming no Sync Gateway silently skips every test th
 The record is only as current as the last run left it: `--stop-sync-gateway` clears it, but an
 instance that dies on its own stays on it, and the tests then fail on connection rather than skip.
 
+## Edge Server
+
+`start_edge_server.py` runs Edge Server in a Docker container, together with the Caddy file server
+(port 20000) and the shell2http sidecar (port 20001) that an AWS Edge Server host has. The container
+keeps the AWS layout under `/home/ec2-user`, so test configs that name those paths work unchanged.
+
+```bash
+uv run environment/local/start_local.py --server rosmar --git-tag main
+uv run environment/local/start_edge_server.py --version 1.1.1-3
+cd tests/QE
+uv run pytest --config ../../environment/local/edge_server/topology_config.json edge_server
+```
+
+The script does these steps:
+
+1. Downloads the Edge Server RPM for the CPU of this machine into `environment/aws/es_setup/`.
+2. Mints a CA, a client identity in `~/.cbl_certs`, and a server certificate for `localhost`.
+3. Builds the `cbl-tests-edge-server` image and replaces any container of the same name.
+4. Writes `edge_server/topology_config.json`: the config `start_local.py` last wrote, plus the Edge Server.
+
+A version without a build number (`1.1.1`) is looked up on proget, which needs the VPN.
+Use `--base-config` to add the Edge Server to a different config.
+Use `--stop` to remove the container.
+
+Test configs point Edge Server at Sync Gateway on `localhost`, which inside the container is the
+container itself. The container forwards the public port of each Sync Gateway in the base config to
+the host, so these replications reach the host Sync Gateway.
+
+Limits:
+
+- One Edge Server only. The test framework expects ports 20000 and 20001 on each Edge Server host,
+  so a second container cannot share `localhost`.
+- `set_firewall_rules` adds its rules inside the container. A rule that names a Sync Gateway IP
+  does not match, because the forwarded traffic leaves the container from `localhost`.
+
 ## Running the individual steps
 
 `build_sync_gateway.py` and `run_sync_gateway.py` have been folded into `start_local.py`.
@@ -191,8 +226,15 @@ By default this runs the C test server. Pass `--platform` to run a different one
 
 The generated topology config names the port of that platform, also with `--skip-testserver`.
 
-By default this downloads the latest released test server for the platform. To build it from
-source instead, pass `--build-testserver` with a release version or a numbered build:
+By default this downloads the latest released test server for the platform. To download an
+older one, pass `--cbl-version` with a release prefix (`3.4`) or an exact build (`3.4.2-2`):
+
+```bash
+uv run environment/local/start_local.py --server rosmar --git-tag main --cbl-version 3.4
+```
+
+To build it from source instead, pass `--build-testserver` with a release version or a numbered
+build:
 
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --build-testserver 4.0.3
