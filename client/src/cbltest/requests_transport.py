@@ -2,7 +2,7 @@ import json
 from abc import ABC, abstractmethod
 from asyncio import wait_for
 from typing import cast
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from uuid import uuid4
 
 from aiohttp import ClientResponse
@@ -100,6 +100,7 @@ class _RequestWebSocketTransport(RequestTransport):
     def __init__(self, url: str, ws_router: WebSocketRouter) -> None:
         self.__url = url
         self.__ws_router = ws_router
+        self.__is_native_ws = urlparse(url).scheme == "ws"
 
     async def send(self, request: TestServerRequest, message_no: int) -> TestServerResponse:
         if request.payload is not None:
@@ -119,6 +120,8 @@ class _RequestWebSocketTransport(RequestTransport):
         if CBLPyTestGlobal.running_test_name is not None:
             data["ts_testName"] = CBLPyTestGlobal.running_test_name
 
+        await self.__ws_router.ensure_connected(self.__url)
+
         future = self.__ws_router.register(message_no)
         ws_conn = self.__ws_router.get_websocket_for_write(self.__url)
         await ws_conn.send_str(json.dumps(data))
@@ -126,6 +129,10 @@ class _RequestWebSocketTransport(RequestTransport):
             resp = await wait_for(future, timeout=120)
         except TimeoutError:
             self.__ws_router.unregister(message_no)
+            if self.__is_native_ws:
+                # React Native test servers (ws:// URLs) can be left stuck after a timeout,
+                # so drop the connection and relaunch the app before the next request.
+                self.__ws_router.begin_reconnect(self.__url)
             raise CblTimeoutError(f"No response to {data['ts_command']} from {self.__url} after 120 seconds") from None
 
         resp_version = cast(int, resp.get("ts_apiVersion", 0))
