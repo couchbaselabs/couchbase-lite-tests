@@ -144,6 +144,10 @@ javascript/
 Build: `bun install && bun run dev` — the two steps `js_register.py` drives, so `bun` must be
 on `PATH` wherever the orchestrator runs. `npm` works for hand runs.
 **Note:** JS uses **WebSocket** instead of HTTP. The framework handles this via `client/src/cbltest/websocket_router.py`. A `Hello` handshake message replaces HTTP headers for API version + server ID.
+The same applies to `reactnative/`. Per-message metadata travels as top-level `ts_*` fields mixed into the
+request/response payload, and the client strips every `ts_*` key from responses (`unwrap_ws_payload` in
+`client/src/cbltest/responses.py`). **`ts_` is therefore a reserved prefix:** test documents must never use
+top-level `ts_*` properties, and handlers must never return payload keys starting with `ts_`.
 
 ## Build Script Pattern (every platform)
 

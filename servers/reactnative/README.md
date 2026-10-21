@@ -16,6 +16,10 @@ Couchbase Server + Sync Gateway (Docker)
 
 The app connects **out** to the Python client's WebSocket server (device is the WS client, Python is the WS server), sends a Hello message with its device ID, then processes commands and returns responses.
 
+### Reserved `ts_` Prefix
+
+As in `servers/javascript/`, WebSocket messages have no headers, so each request and response carries its metadata (`ts_id`, `ts_command`, `ts_serverID`, `ts_apiVersion`, `ts_error`, ...) as top-level `ts_*` fields alongside the payload. A response such as `/getDocument` spreads the document body into that same object, and the Python client strips every `ts_*` key before handing the body on. Test documents must therefore never use top-level properties starting with `ts_`: they would be dropped, and `ts_id` or `ts_error` would also break request matching or error detection.
+
 ## Prerequisites
 
 - Node.js >= 18
