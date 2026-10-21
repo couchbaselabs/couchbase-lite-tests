@@ -335,5 +335,5 @@ class TestISGRLoadBalancer(CBLTestClass):
         await replicator.start()
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert status.error is None, f"Pull from SG1 failed: {status.error}"
-        pulled = {update.document_id for update in replicator.document_updates}
+        pulled = {update.document_id for update in replicator.document_updates if update.error is None}
         assert doc_id in pulled, f"Expected the pull from SG1 to transfer {doc_id}, got {pulled}"
