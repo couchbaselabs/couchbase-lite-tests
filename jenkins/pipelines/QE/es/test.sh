@@ -61,7 +61,9 @@ for suite_dir in "${SUITE_DIRS[@]}"; do
   echo "RUNNING COORDINATED TEST ($suite_dir, TEST_NAME=$TEST_NAME, JS_ONLY=$JS_ONLY)"
   pushd "$suite_dir" >/dev/null
 
-  if uv run pytest -v --no-header -W ignore::DeprecationWarning --config "$QE_TESTS_DIR/config.json" --dataset-version "$DATASET_VERSION" ${PYTEST_FILTER[@]+"${PYTEST_FILTER[@]}"} .; then
+  # --es-collect: when a test fails, collect logs from every Edge Server node into this
+  # directory (es-collect-<host>-<timestamp>.tar.gz); teardown's move_artifacts archives them.
+  if uv run pytest -v --no-header -W ignore::DeprecationWarning --config "$QE_TESTS_DIR/config.json" --dataset-version "$DATASET_VERSION" --es-collect ${PYTEST_FILTER[@]+"${PYTEST_FILTER[@]}"} .; then
     echo "========== PYTEST OUTPUT END =========="
     echo ""
     echo "🎉 COORDINATED TEST PASSED! ($suite_dir)"
