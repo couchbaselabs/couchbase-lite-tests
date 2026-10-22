@@ -16,7 +16,12 @@
   },
   "api": {
     "admin_interface_authentication": false,
-    "metrics_interface_authentication": false
+    "metrics_interface_authentication": false,
+    "cors": {
+      "origin": ["http://localhost:5173"],
+      "login_origin": ["http://localhost:5173"],
+      "headers": ["Authorization"]
+    }
   },
   "unsupported": {
     "rosmar_bucket_management": true
