@@ -18,10 +18,14 @@ pipeline {
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
                     if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    def reason = compat.incompatibility(params.CBL_VERSION, params.SGW_VERSION)
+                    if (reason) { error reason }
                     currentBuild.displayName = "Dotnet CBL:${params.CBL_VERSION} (#${currentBuild.number})"
                     currentBuild.description = "SGW: ${params.SGW_VERSION}"
                 }

@@ -1,5 +1,8 @@
 def SGW_PRODUCT = "sync-gateway"          // dedup key: the thing under test
 def CBL_PRODUCT = "couchbase-lite-c"      // c_macos test-server client, passed through
+// CBL 4.x cannot sync with Sync Gateway 3.x, so an auto-resolved client is swapped for
+// the latest GA build of this train on the SGW trains that need it.
+def LEGACY_CBL_TRAIN = "3"
 
 // Look up a version's build number via ProGet get_version. Returns "" when the
 // version has no published build yet (404 / non-JSON body) rather than throwing.
@@ -31,7 +34,8 @@ def resolveVersionBuild(proget, String product, String param, String label, bool
         buildNo = getBuildNumber(product, version)
     }
     if (!buildNo) { return null }  // no published build for this train yet
-    return [version: version, build: buildNo]
+    def major = version.tokenize('.')[0].toInteger()
+    return [version: version, build: buildNo, dataset: (major >= 4) ? "4.0" : "3.2"]
 }
 
 // Fetch the list of currently-supported (non-EOL) trains for a product, e.g.
@@ -53,7 +57,7 @@ pipeline {
     }
     parameters {
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or train (e.g. 4.2.0 or 4.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0). Leave blank to auto-resolve the latest GA release via ProGet (prereleases are deliberately excluded so the client stays a fixed control). The build number is resolved automatically.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0). Leave blank to auto-resolve the latest GA release via ProGet (prereleases are deliberately excluded so the client stays a fixed control); SGW 3.x trains then get the latest GA CBL 3.x client, since CBL 4.x cannot sync with SGW 3.x. An explicit version is never swapped: SGW trains it cannot sync with are skipped. The build number is resolved automatically.')
         booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the SGW test job even if this SGW version+build already ran')
     }
     options {
@@ -71,9 +75,11 @@ pipeline {
             steps {
                 script {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
 
-                    // The CBL client is shared across all SGW trains, and is pinned to the
-                    // latest GA build -- never a prerelease -- so it stays a fixed control.
+                    // The CBL client is shared across all SGW trains it can sync with, and is
+                    // pinned to the latest GA build -- never a prerelease -- so it stays a
+                    // fixed control.
                     def cbl = resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION', false)
                     // Unlike a train, the client has no fallback: without it there is
                     // nothing to run the suite with, so an unresolved CBL is fatal.
@@ -109,6 +115,8 @@ pipeline {
                     def triggered = []
                     def skipped = []
                     def failed = []
+                    // Resolved on first need, then shared by every SGW 3.x train.
+                    def legacyCbl = null
 
                     for (train in trains) {
                         def sgw
@@ -133,14 +141,39 @@ pipeline {
                             continue
                         }
 
-                        echo "Triggering 'sgw-functional' for SGW ${sgwFull} (CBL client ${cblFull})"
+                        def client = cbl
+                        def reason = compat.incompatibility(cblFull, sgwFull)
+                        if (reason) {
+                            if (params.CBL_VERSION?.trim()) {
+                                echo "SKIP: ${reason}"
+                                skipped << "${sgwFull} (incompatible with CBL ${cblFull})"
+                                continue
+                            }
+                            if (legacyCbl == null) {
+                                try {
+                                    legacyCbl = resolveVersionBuild(proget, CBL_PRODUCT, LEGACY_CBL_TRAIN, 'CBL_VERSION', false)
+                                } catch (Exception e) {
+                                    echo "WARN: Could not resolve CBL ${LEGACY_CBL_TRAIN}.x client: ${e}"
+                                }
+                            }
+                            if (legacyCbl == null) {
+                                echo "WARN: ${reason}, and no CBL ${LEGACY_CBL_TRAIN}.x client could be resolved"
+                                failed << train
+                                continue
+                            }
+                            client = legacyCbl
+                        }
+                        def clientFull = "${client.version}-${client.build}"
+
+                        echo "Triggering 'sgw-functional' for SGW ${sgwFull} (CBL client ${clientFull}, dataset ${client.dataset})"
                         build job: 'sgw-functional', parameters: [
                             string(name: "SGW_VERSION", value: sgwFull),
-                            string(name: "CBL_VERSION", value: cblFull)
+                            string(name: "CBL_VERSION", value: clientFull),
+                            string(name: "TS_DATASET_VERSION", value: client.dataset)
                         ], wait: false
 
                         buildInfo[sgw.version] = sgw.build
-                        triggered << sgwFull
+                        triggered << "${sgwFull} (CBL ${clientFull})"
                     }
 
                     // Persist dedup state once, after all trains are processed.
@@ -152,7 +185,7 @@ pipeline {
                         }
                     }
 
-                    currentBuild.displayName = "SGW ${triggered ? triggered.join(', ') : 'none'}  |  CBL ${cblFull}  (#${currentBuild.number})"
+                    currentBuild.displayName = "SGW ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
                     echo "Triggered: ${triggered}"
                     echo "Skipped:   ${skipped}"
                     echo "Failed:    ${failed}"

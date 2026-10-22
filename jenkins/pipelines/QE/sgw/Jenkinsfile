@@ -22,6 +22,9 @@ pipeline {
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
                     env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-c", params.CBL_VERSION, 'CBL_VERSION')
                     env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    def reason = compat.incompatibility(env.CBL_VERSION, env.SGW_VERSION)
+                    if (reason) { error reason }
                     env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
                     env.TS_DATASET_VERSION = params.TS_DATASET_VERSION
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"

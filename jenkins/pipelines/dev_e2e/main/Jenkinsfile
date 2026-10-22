@@ -90,8 +90,13 @@ pipeline {
                                     }
                                 }
 
+                                def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                                def reason = compat.incompatibility(version, sgwVersion)
+
                                 // Trigger Test Job:
-                                if (triggerTestJob) {
+                                if (reason) {
+                                    echo "SKIP: ${platform} ${reason}"
+                                } else if (triggerTestJob) {
                                     def jobName = "staging-e2e-test-${platform}"
                                     echo "Triggering '${jobName}' job for ${platform} v${version}-${buildNo}"
 

@@ -15,6 +15,12 @@ pipeline {
                     if (params.SGW_VERSIONS == '') { error "SGW_VERSIONS are required (atleast one)" }
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
                     env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-ios", params.CBL_VERSION, 'CBL_VERSION')
+                    // Every SGW version in the upgrade path must sync with the client.
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    for (sgwVersion in params.SGW_VERSIONS.tokenize(' ,')) {
+                        def reason = compat.incompatibility(env.CBL_VERSION, sgwVersion)
+                        if (reason) { error reason }
+                    }
                     currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${params.SGW_VERSIONS} (#${currentBuild.number})"
                 }
             }

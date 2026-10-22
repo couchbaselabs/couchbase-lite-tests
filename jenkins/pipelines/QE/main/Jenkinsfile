@@ -146,6 +146,7 @@ pipeline {
                     def selected = (params.CBL_PLATFORM == 'all') ? ALL_PLATFORMS : [params.CBL_PLATFORM]
                     def force = params.FORCE_TRIGGER
                     def sgwVersion = params.SGW_VERSION
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
 
                     // platform -> list of "<version>-<build>" actually triggered this run.
                     def triggeredByPlatform = [:]
@@ -178,6 +179,12 @@ pipeline {
                             if (!force && buildInfo[info.version] == info.build) {
                                 echo "SKIP: ${platform} v${fullVersion} (already triggered)"
                                 skipped << fullVersion
+                                continue
+                            }
+                            def reason = compat.incompatibility(fullVersion, sgwVersion)
+                            if (reason) {
+                                echo "SKIP: ${platform} ${reason}"
+                                skipped << "${fullVersion} (incompatible with SGW ${sgwVersion})"
                                 continue
                             }
 
