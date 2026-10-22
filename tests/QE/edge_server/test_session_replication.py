@@ -20,6 +20,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
+from cbltest.responses import ServerVariant
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG = str(SCRIPT_DIR / "config" / "test_session.json")
@@ -33,16 +34,16 @@ AIRLINES = "travel.airlines"
 DEFAULT = "_default._default"
 
 
-def _is_auth_rejection(error: ErrorResponseBody | None) -> bool:
+async def _is_auth_rejection(cblpytest: CBLPyTest, error: ErrorResponseBody | None) -> bool:
     """
     Whether a replicator error is the WebSocket upgrade being refused for want of credentials.
-    A browser cannot see the status of a refused upgrade, so CBL-JS reports only "Failed to connect".
+    A browser cannot see the status of a refused upgrade, so CBL JS reports -1 "Failed to connect".
     """
     if error is None:
         return False
-    if error.domain == "CBL-JS" and "Failed to connect" in error.message:
-        return True
-    return error.code in (401, 10401) or "401" in error.message or "unauthorized" in error.message.lower()
+    if (await cblpytest.test_servers[0].info).variant == ServerVariant.JS:
+        return error.code == -1 and error.message.startswith("Failed to connect")
+    return error.code == 10401
 
 
 def _describe(error: ErrorResponseBody | None) -> str:
@@ -188,7 +189,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         _, status = await _replicate(db, admin, None)
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
         assert "otf_cbl_0" not in await _es_ids(admin), "A doc was pushed without credentials"
         assert "otf_es_hotels" not in await _local_ids(db), "A doc was pulled without credentials"
 
@@ -207,7 +208,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         _, status = await _replicate(db2, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
         assert "reuse_cbl_db2" not in await _es_ids(admin), "A doc was pushed with a consumed session"
         assert "reuse_es_hotels" not in await _local_ids(db2), "A doc was pulled with a consumed session"
 
@@ -226,7 +227,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing was pulled")
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
         assert "xdb_es_hotels" not in await _local_ids(db), "A doc was pulled with another database's session"
 
         self.mark_test_step("Create a local doc, and push it to `names` with the same session")
@@ -250,7 +251,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
         assert "bad_cbl_0" not in await _es_ids(admin), "A doc was pushed with an unissued session"
         assert "bad_es_hotels" not in await _local_ids(db), "A doc was pulled with an unissued session"
 
@@ -267,7 +268,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Verify a replicator with the session is refused and nothing was pulled")
         _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
         assert "restart_es_hotels" not in await _local_ids(db), (
             "A doc was pulled with a session from before the restart"
         )
@@ -290,7 +291,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Verify a replicator on `db2` with the same session is refused")
         _, status = await _replicate(db2, admin, ReplicatorSessionAuthenticator(session_id))
-        assert _is_auth_rejection(status.error), f"Expected a refusal, got {_describe(status.error)}"
+        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
 
         self.mark_test_step("Write a doc on Edge Server, and verify the first replicator still pulls it without error")
         await admin.put_document_with_id({"origin": "es"}, "two_es_after", DB, "travel", "hotels")
@@ -314,7 +315,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         self.mark_test_step(
             "Verify the replicator is refused as pull-only (403) and none of the docs reached Edge Server"
         )
-        assert status.error is not None and status.error.code == 403, f"Expected 403, got {_describe(status.error)}"
+        assert status.error is not None and status.error.code == 10403, f"Expected 10403, got {_describe(status.error)}"
         assert not set(pushed) & await _es_ids(admin), "A read-only session wrote to Edge Server"
 
     @pytest.mark.asyncio(loop_scope="session")

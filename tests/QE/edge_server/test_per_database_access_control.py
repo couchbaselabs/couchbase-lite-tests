@@ -474,7 +474,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
 
             self.mark_test_step("Push and pull `enforced` as `ruled`: refused as pull-only, and nothing is pushed")
             status = await _cbl_sync(push_db, client.replication_url("enforced"), "ruled")
-            assert status.error is not None and status.error.code == 403, (
+            assert status.error is not None and status.error.code == 10403, (
                 f"ruled's push to enforced was not refused with 403: {status.error}"
             )
             assert "cbl_ruled_ruled_push" not in await _doc_ids(client, "enforced"), "ruled pushed to enforced"
