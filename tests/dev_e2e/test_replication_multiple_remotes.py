@@ -1,19 +1,20 @@
 import socket
-from datetime import timedelta
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
+    ReplicatorConflictResolver,
     ReplicatorType,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from packaging.version import Version
 
 
 @pytest.mark.min_test_servers(1)
@@ -28,10 +29,10 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         # locally makes CBL send three known revs in its reply to `changes`.
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-        # The fix for CBG-5978 is in 4.0.9 and 4.1.3, and every release after them. A SpecifierSet can't
-        # hold two ranges, so the 4.1 patch releases without the fix are excluded one by one.
-        await self.skip_if_sgw_not(sync_gateway, ">= 4.0.9, != 4.1.0, != 4.1.1, != 4.1.2")
+        sgw_version = Version((await sync_gateway.get_version()).version)
+        # The fix for CBG-5978 is in 4.0.9, 4.1.3, and every release after them.
+        if sgw_version < Version("4.0.9") or Version("4.1.0") <= sgw_version < Version("4.1.3"):
+            pytest.skip(f"SGW {sgw_version} lacks the fix for CBG-5978")
 
         url_by_hostname = sync_gateway.replication_url("names")
         parts = urlsplit(url_by_hostname)
@@ -40,30 +41,29 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         self.skip_if_not(ip_address != parts.hostname, "Sync Gateway is configured by IP, so no second URL exists")
         url_by_ip = parts._replace(netloc=parts.netloc.replace(parts.hostname, ip_address, 1)).geturl()
 
-        doc_id = "name_101"
+        doc_id = "doc1"
         collection = "_default._default"
 
-        async def replicate(
-            endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PULL, continuous: bool = False
-        ) -> Replicator:
+        async def replicate(endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PULL) -> None:
+            """Runs a one-shot replication through the endpoint, resolving conflicts in favour of SG."""
             replicator = Replicator(
                 db,
                 endpoint,
                 replicator_type=replicator_type,
-                continuous=continuous,
-                collections=[ReplicatorCollectionEntry([collection])],
+                collections=[
+                    ReplicatorCollectionEntry([collection], conflict_resolver=ReplicatorConflictResolver("remote-wins"))
+                ],
                 authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
                 pinned_server_cert=sync_gateway.tls_cert(),
             )
             await replicator.start()
-            return replicator
+            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+            assert status.error is None, f"Error replicating through {endpoint}: {status.error}"
 
-        async def update_on_sync_gateway(last_name: str) -> None:
-            existing = await sync_gateway.get_document("names", doc_id)
-            assert existing is not None
-            body = existing.body
-            body["name"]["last"] = last_name
-            await sync_gateway.update_documents("names", [DocumentUpdateEntry(doc_id, existing.revid, body)])
+        async def assert_local_body(expected: dict) -> None:
+            """Checks that the local copy of the test document has the given body."""
+            doc = await db.get_document(DocumentEntry(collection, doc_id))
+            assert doc.body == expected, f"Local `{doc_id}` is {doc.body}, expected {expected}"
 
         self.mark_test_step("Reset SG and load `names` dataset")
         await cloud.configure_dataset(dataset_path, "names")
@@ -72,24 +72,21 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
-        self.mark_test_step(f"Pull through {url_by_hostname}")
-        status = await (await replicate(url_by_hostname)).wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, f"Error in first pull: {status.error}"
+        self.mark_test_step(f"Create `{doc_id}` on SG, then pull it through {url_by_hostname}")
+        rev = (await sync_gateway.create_document("names", doc_id, {"write": 1}, wait_for_caching_feed=True)).revid
+        await replicate(url_by_hostname)
+        await assert_local_body({"write": 1})
 
         self.mark_test_step(f"Update `{doc_id}` on SG, then pull it through {url_by_ip}")
-        await update_on_sync_gateway("Jones")
-        status = await (await replicate(url_by_ip)).wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, f"Error in second pull: {status.error}"
+        rev = (await sync_gateway.update_document("names", doc_id, {"write": 2}, rev, wait_for_caching_feed=True)).revid
+        await replicate(url_by_ip)
+        await assert_local_body({"write": 2})
 
         self.mark_test_step(f"Update `{doc_id}` locally, and update it again on SG")
         async with db.batch_updater() as b:
-            b.upsert_document(collection, doc_id, [{"name.last": "Smith"}])
-        await update_on_sync_gateway("Brown")
+            b.upsert_document(collection, doc_id, [{"write": "local"}])
+        await sync_gateway.update_document("names", doc_id, {"write": 3}, rev, wait_for_caching_feed=True)
 
-        self.mark_test_step(
-            f"Start a continuous {replicator_type} replicator through {url_by_hostname} and wait for it to go idle"
-        )
-        replicator = await replicate(url_by_hostname, replicator_type, continuous=True)
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=30))
-        assert status.error is None, f"Error in continuous replicator: {status.error}"
-        assert status.progress.completed, f"Replicator went idle without completing: {status.progress}"
+        self.mark_test_step(f"Run a {replicator_type} replication through {url_by_hostname}")
+        await replicate(url_by_hostname, replicator_type)
+        await assert_local_body({"write": 3})

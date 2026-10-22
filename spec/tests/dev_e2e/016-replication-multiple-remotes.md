@@ -17,11 +17,14 @@ The test reaches one Sync Gateway through two URLs: one with its hostname, and o
 that the hostname resolves to. The test is skipped if Sync Gateway is configured by IP address,
 because then there is no second URL.
 
-The test runs once with each replicator type in the last step: `pull` and `pushAndPull`.
+The test runs once with each replicator type in the last step: `pull` and `pushAndPull`. Every
+replication is one-shot and uses the `remote-wins` conflict resolver, so the local edit in step 5
+conflicts with the SG edit in a predictable way. Each step checks the local document itself, not
+just that the replicator stopped, because a replicator also stops when the changes feed says it has
+caught up, which can happen before an SG write reaches the feed.
 
 Requirements:
 
-* Couchbase Lite 4.0.0 or later.
 * Sync Gateway 4.0.9 or a later 4.0 release, or 4.1.3 or later. Sync Gateway 4.1.0 to 4.1.2 do not
   have the fix, and the test is skipped on them.
 
@@ -29,24 +32,30 @@ Requirements:
 
 1. Reset SG and load `names` dataset.
 2. Reset empty local database.
-3. Pull through the hostname URL:
+3. Create `doc1` on SG with `{"write": 1}`, and wait for it to reach the changes feed. Then pull it
+   through the hostname URL, and check that the local `doc1` is `{"write": 1}`:
     * endpoint: `/names`
     * collections: `_default._default`
     * type: pull
     * continuous: false
+    * conflictResolver: `remote-wins`
     * credentials: user1/pass
-4. Update `name_101` on SG, then pull it through the IP address URL:
+4. Update `doc1` on SG to `{"write": 2}`, using the revision from step 3, and wait for it to reach
+   the changes feed. Then pull it through the IP address URL, and check that the local `doc1` is
+   `{"write": 2}`:
     * endpoint: `/names`
     * collections: `_default._default`
     * type: pull
     * continuous: false
+    * conflictResolver: `remote-wins`
     * credentials: user1/pass
-5. Update `name_101` locally, and update it again on SG.
-6. Start a continuous replicator through the hostname URL, and wait for it to go idle:
+5. Update `doc1` locally to `{"write": "local"}`. Update it on SG to `{"write": 3}`, using the
+   revision from step 4, and wait for it to reach the changes feed.
+6. Replicate through the hostname URL, and check that the replicator stops with no error and that
+   the local `doc1` is `{"write": 3}`:
     * endpoint: `/names`
     * collections: `_default._default`
     * type: pull / pushAndPull
-    * continuous: true
+    * continuous: false
+    * conflictResolver: `remote-wins`
     * credentials: user1/pass
-7. Check that the replicator goes idle in 30 seconds with no error, and that its progress is
-   complete.
