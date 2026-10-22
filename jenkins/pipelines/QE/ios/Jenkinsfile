@@ -40,18 +40,22 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'qe-mac-india' }
+            agent { label 'mob-e2e-iphone-03' }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+                KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                 TS_ARTIFACTS_DIR = 'ios'
             }
             steps {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run iOS Tests"
-                timeout(time: 60, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                // The iPhone is shared with the dev_e2e ios/c/dotnet and
+                // multipeer jobs, which take the same lock. Without it a
+                // concurrent build would install over this run's test server.
+                lock("mob-e2e-iphone-03") {
+                    timeout(time: 60, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/QE/ios/test.sh ${params.CBL_VERSION} ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                    }
                 }
                 echo "=== iOS Tests Complete"
             }
