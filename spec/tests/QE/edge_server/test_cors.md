@@ -1,65 +1,28 @@
 # CORS Tests (Edge Server)
 
-## test_preflight_from_allowed_origin
-
-### Steps
-
-1. Start Edge Server with CORS allowing two origins.
-2. Send a preflight OPTIONS /travel/_all_docs from the allowed origin.
-3. Verify the preflight allows the origin, the method and the Authorization header, with the max age.
-
-## test_preflight_from_disallowed_origin
-
-### Steps
-
-1. Start Edge Server with CORS allowing two origins.
-2. Send a preflight OPTIONS /travel/_all_docs from an origin that is not allowed.
-3. Verify the response does not allow the origin.
-
-## test_request_from_allowed_origin
-
-### Steps
-
-1. Start Edge Server with CORS allowing two origins.
-2. Send GET /travel/ as the admin from the allowed origin.
-3. Verify the request succeeds and the response allows the origin.
-
-## test_request_from_disallowed_origin
-
-### Steps
-
-1. Start Edge Server with CORS allowing two origins.
-2. Send GET /travel/ as the admin from an origin that is not allowed.
-3. Verify the response does not allow the origin.
-
-## test_cors_does_not_bypass_authentication
-
-### Steps
-
-1. Start Edge Server with CORS allowing two origins.
-2. Send GET /travel/ from the allowed origin with no credentials.
-3. Verify the request is refused with 401, and the refusal allows the origin so a browser can read it.
-
-## test_wildcard_origin_allows_any_origin
-
-### Steps
-
-1. Start Edge Server with CORS allowing any origin.
-2. Send a preflight OPTIONS /travel/_all_docs from an arbitrary origin.
-3. Verify the preflight allows the origin.
-
-## test_cors_is_off_without_config
-
-### Steps
-
-1. Start Edge Server with no `cors` block.
-2. Send a preflight and a GET /travel/ as the admin from an origin.
-3. Verify neither response allows the origin.
-
 ## test_cbl_js_replication_needs_cors
 
+### Description
+
+Test that a CBL-JS replicator in a browser can pull from Edge Server only when Edge Server's CORS configuration
+allows the browser's origin.
+
+| Case | `cors.origin` | Expected                                                                                                    |
+|---|---|-------------------------------------------------------------------------------------------------------------|
+| `test_server_origin` | `["http://localhost:5173"]`, the test server's origin | The pull succeeds                                                                                           |
+| `wildcard_origin` | `["*"]`, any origin | The pull fails: authentication requires explicit origins                                                                                            |
+| `other_origin_only` | `["https://app.example.com"]`, an origin that is not the test server's | The pull fails: CORS is configured, but not for this origin, which is the most likely configuration mistake |
+| `cors_off` | no `cors` block | The pull fails: Edge Server sends no CORS headers, so the browser blocks every response                     |
+
+Every case uses the same `headers` (`Authorization`, `Content-Type`) and `max_age` (600), so the origin list is the
+only difference. The replicator authenticates with basic auth, so the `Authorization` header must be allowed. It is
+limited to the one seeded document, so the pull is quick and only the test's own document is checked.
+
+When CORS does not allow the origin, the browser blocks Edge Server's responses before CBL-JS sees them, so the
+replicator stops with an error and pulls nothing; the test does not depend on the error's code or wording.
+
 ### Steps
 
-1. Start Edge Server with or without CORS for the test server's origin, and seed a doc.
+1. Start Edge Server with the case's CORS origins, and seed a doc in `travel.hotels`.
 2. Pull the seed doc from the browser as the admin.
-3. Verify the pull succeeds with CORS, and fails with nothing pulled without it.
+3. Verify the pull succeeds only when CORS allows the test server's origin.
