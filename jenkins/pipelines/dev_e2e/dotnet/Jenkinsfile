@@ -25,7 +25,7 @@ pipeline {
                     if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
                     if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
                     currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                    currentBuild.description = "SGW: ${params.SGW_VERSION}, DS: ${params.TS_DATASET_VERSION}"
                 }
             }
         }
