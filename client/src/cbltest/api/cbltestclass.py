@@ -55,17 +55,20 @@ class CBLTestClass:
         if not condition:
             self.skip(reason)
 
-    async def skip_if_not_platform(self, server: TestServer, allow_platforms: ServerVariant) -> None:
+    async def skip_if_not_platform(
+        self, server: TestServer, allow_platforms: ServerVariant, reason: str | None = None
+    ) -> None:
         """
         Skips the test if the current platform does not match the specified platform.
 
-        :param platform: The platform to check against.
+        :param allow_platforms: The platforms that can run the test.
+        :param reason: Why the other platforms cannot run the test, added to the skip message.
         """
         variant = (await server.info).variant
-        self.skip_if_not(
-            variant in allow_platforms,
-            f"{variant} is not in the platforms {allow_platforms}",
-        )
+        message = f"{variant} is not in the platforms {allow_platforms}"
+        if reason:
+            message += f": {reason}"
+        self.skip_if_not(variant in allow_platforms, message)
 
     async def skip_if_cbl_not(self, server: TestServer, constraint: str, reason: str | None = None) -> None:
         """
