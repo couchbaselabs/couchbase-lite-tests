@@ -970,6 +970,7 @@ class TestGreenboardFixture:
             platform="edge-server",
             os="n/a",
             jobUrl="local",
+            datasetVersion="3.x",
         )
 
     @pytest.mark.asyncio
@@ -2157,13 +2158,13 @@ class TestDatasetAndCblVersion:
         assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("n/a", "n/a", "n/a")
 
     @pytest.mark.asyncio
-    async def test_edge_server_run_alone_is_na(self) -> None:
+    async def test_edge_server_run_alone_uses_3x_dataset(self) -> None:
         doc = await self._fixture_doc(
             edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))], markers=["min_edge_servers"]
         )
 
         assert doc.platform == "edge-server"
-        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("n/a", "n/a", "n/a")
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("3.x", "n/a", "n/a")
 
     @pytest.mark.asyncio
     async def test_edge_server_run_with_test_server_carries_both(self) -> None:

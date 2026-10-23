@@ -10,6 +10,9 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
+# Edge Server only runs on the 3.x datasets and has no dataset version of its own to report.
+EDGE_SERVER_DATASET_VERSION: Final[str] = "3.x"
+
 # Automatic fixture that uploads results to greenboard, if configured in config.json and --no-result-upload isn't set.
 # The actual RunResult upload is deferred to pytest_sessionfinish() below, not done in the fixture's own teardown.
 
@@ -142,6 +145,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
     if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
         if len(cblpytest.test_servers) == 0:
             test_platform = EDGE_SERVER_PLATFORM
+            dataset_version = EDGE_SERVER_DATASET_VERSION
         try:
             es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
         except Exception as e:
