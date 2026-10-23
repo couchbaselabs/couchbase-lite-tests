@@ -144,6 +144,21 @@ def _worse(a: str, b: str) -> str:
     return a if _OUTCOME_RANK[a] >= _OUTCOME_RANK[b] else b
 
 
+def format_cbl_version(version: str | None) -> str:
+    """Return a CBL library version (e.g. ``3.2.0-b0136``) as ``"x.y.z-build"`` (``3.2.0-136``), like ``sgwVersion``.
+    ``"n/a"`` when no test server supplied a version; an unparseable build leaves the raw string.
+    """
+    if not version or version == "n/a":
+        return "n/a"
+    components = version.split("-")
+    if len(components) < 2:
+        return version
+    try:
+        return f"{components[0]}-{int(components[1].lstrip('b'))}"
+    except ValueError:
+        return version
+
+
 def resolve_job_url() -> str:
     """Return the Jenkins build URL for the current run, or ``"local"`` off-CI.
 
@@ -210,6 +225,9 @@ class RunResult(BaseModel):
     incomplete: bool = False  # True if the session was cut short before every collected test ran
     collected: int = 0  # Planned test count (session.testscollected); 0 means unknown/not supplied
     skip_count: int = Field(0, alias="skipCount")  # tests skipped or xfailed; missing on old docs means unknown
+    dataset_version: str = Field("n/a", alias="datasetVersion")  # dataset version the test server used, or "n/a"
+    cbl_platform: str = Field("n/a", alias="cblPlatform")  # CBL platform of the test server, or "n/a"
+    cbl_version: str = Field("n/a", alias="cblVersion")  # CBL library "x.y.z-build" from the test server, or "n/a"
     cbs_version: str = Field("n/a", alias="cbsVersion")  # "x.y.z-build", "rosmar" (no CBS) or "n/a" (none/unknown)
 
 
@@ -318,6 +336,8 @@ class GreenboardUploader:
         incomplete: bool = False,
         collected: int = 0,
         cbs_version: str = "n/a",
+        dataset_version: str = "n/a",
+        cbl_platform: str = "n/a",
         tests: dict[str, str] | None = None,
         failures: list[dict[str, Any]] | None = None,
         collected_ids: Sequence[str] | None = None,
@@ -347,6 +367,9 @@ class GreenboardUploader:
             coverage (e.g. "29/42") for a clean-incomplete run, where
             pass/fail counts alone always read as 100%.
 
+        :param dataset_version: The dataset version the test server used, or ``"n/a"`` when no test server was used.
+        :param cbl_platform: The CBL platform of the test server (e.g. ``couchbase-lite-c``), or ``"n/a"`` when no test
+            server was used. Unlike ``platform`` it is set even when the run is filed under another component.
         :param cbs_version: The Couchbase Server version string (``"x.y.z-build"``), ``"rosmar"`` or ``"n/a"``.
         :param tests: Every test's outcome keyed by node id. When ``None`` (default), uses the in-process outcomes built
             by :py:meth:`pytest_runtest_makereport`.
@@ -437,6 +460,9 @@ class GreenboardUploader:
                 collected=collected,
                 skipCount=sum(1 for outcome in all_tests.values() if outcome == SKIP),
                 cbsVersion=cbs_version,
+                datasetVersion=dataset_version,
+                cblPlatform=cbl_platform,
+                cblVersion=format_cbl_version(version),
             ),
             all_tests,
             all_failures[:MAX_FAILURES],
@@ -455,6 +481,8 @@ class GreenboardUploader:
         incomplete: bool = False,
         collected: int = 0,
         cbs_version: str = "n/a",
+        dataset_version: str = "n/a",
+        cbl_platform: str = "n/a",
         collected_ids: Sequence[str] | None = None,
         finished_ids: Container[str] | None = None,
     ) -> None:
@@ -468,6 +496,8 @@ class GreenboardUploader:
         :param collected: The planned test count. Passed through verbatim to
             :py:meth:`upload`.
         :param cbs_version: Passed through verbatim to :py:meth:`upload`.
+        :param dataset_version: Passed through verbatim to :py:meth:`upload`.
+        :param cbl_platform: Passed through verbatim to :py:meth:`upload`.
         :param collected_ids: Passed through to :py:meth:`upload`, which only uses it on the no-XML fall-back.
         :param finished_ids: Same as ``collected_ids``.
 
@@ -507,6 +537,8 @@ class GreenboardUploader:
                 incomplete=incomplete,
                 collected=collected,
                 cbs_version=cbs_version,
+                dataset_version=dataset_version,
+                cbl_platform=cbl_platform,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
@@ -532,6 +564,8 @@ class GreenboardUploader:
             incomplete=incomplete,
             collected=collected,
             cbs_version=cbs_version,
+            dataset_version=dataset_version,
+            cbl_platform=cbl_platform,
             tests=tests,
             failures=failures,
         )

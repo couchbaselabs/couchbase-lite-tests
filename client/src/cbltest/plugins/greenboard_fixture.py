@@ -25,6 +25,8 @@ class _PendingRunResult:
     sgw_version: CouchbaseVersion | None
     es_version: CouchbaseVersion | None
     cbs_version: str
+    dataset_version: str
+    cbl_platform: str
     xmlpath: str | None
 
 
@@ -118,13 +120,17 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
     test_platform: str = "sync-gateway"
     os_name: str = "n/a"
     library_version: str = "n/a"
+    dataset_version: str = "n/a"
+    cbl_platform: str = "n/a"
     if len(cblpytest.test_servers) > 0:
         test_server_info = await cblpytest.test_servers[0].info
         # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
         # test server.
         library_version = test_server_info.library_version
+        dataset_version = cblpytest.test_servers[0].dataset_version
+        cbl_platform = test_server_info.cbl
         if not uploader.has_sgw_marker():
-            test_platform = test_server_info.cbl
+            test_platform = cbl_platform
         if "systemName" in test_server_info.device:
             os_name = test_server_info.device["systemName"]
     if len(cblpytest.sync_gateways) > 0:
@@ -157,6 +163,8 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
         sgw_version=sgw_version,
         es_version=es_version,
         cbs_version=await resolve_cbs_version(cblpytest),
+        dataset_version=dataset_version,
+        cbl_platform=cbl_platform,
         xmlpath=pytestconfig.option.xmlpath,
     )
 
@@ -194,6 +202,8 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 incomplete=incomplete,
                 collected=collected,
                 cbs_version=pending.cbs_version,
+                dataset_version=pending.dataset_version,
+                cbl_platform=pending.cbl_platform,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
@@ -209,6 +219,8 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 incomplete=incomplete,
                 collected=collected,
                 cbs_version=pending.cbs_version,
+                dataset_version=pending.dataset_version,
+                cbl_platform=pending.cbl_platform,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
