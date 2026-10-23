@@ -72,7 +72,6 @@ echo $! >logcat.pid
 
 echo "Run tests..."
 pushd $QE_TESTS_DIR >/dev/null
-adb shell input keyevent KEYCODE_WAKEUP
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
     --config config.json \
