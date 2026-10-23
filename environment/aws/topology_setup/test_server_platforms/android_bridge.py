@@ -203,6 +203,21 @@ class AndroidBridge(PlatformBridge):
                 message = (result.stderr or result.stdout).strip()
                 click.echo(f"  skipped {permission} ({message})")
 
+    def __wake_device(self, location: str) -> None:
+        """
+        Wake the screen and dismiss the keyguard so the test server is
+        launched into the foreground.
+
+        Args:
+            location (str): The device location (e.g., device serial number).
+        """
+        for command in (["input", "keyevent", "KEYCODE_WAKEUP"], ["wm", "dismiss-keyguard"]):
+            subprocess.run(
+                [str(self.__adb_location), "-s", location, "shell", *command],
+                check=False,
+                capture_output=True,
+            )
+
     def run(self, location: str) -> None:
         """
         Run the application on the specified device.
@@ -211,6 +226,7 @@ class AndroidBridge(PlatformBridge):
             location (str): The device location (e.g., device serial number).
         """
         header(f"Running {self.__app_id} on {location}")
+        self.__wake_device(location)
         subprocess.run(
             [
                 str(self.__adb_location),

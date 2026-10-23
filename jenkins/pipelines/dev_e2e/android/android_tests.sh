@@ -60,9 +60,6 @@ pushd $DEV_E2E_TESTS_DIR >/dev/null
 rm -rf http_log testserver.log
 
 echo "Run the tests"
-# To re-enable this, this script needs to become aware of the
-# serial number of the device, which is not currently passed
-#adb shell input keyevent KEYCODE_WAKEUP
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
 else
