@@ -7,6 +7,13 @@
     "password": "password",
     "config_update_frequency": "200ms"
   },
+  "api": {
+    "cors": {
+      "origin": ["http://localhost:5173"],
+      "login_origin": ["http://localhost:5173"],
+      "headers": ["Authorization"]
+    }
+  },
   "logging": {
     "console": {
       "enabled": true,
