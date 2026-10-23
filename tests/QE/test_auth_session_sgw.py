@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway, get_sync_gateway_session_headers
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 from cbltest.responses import ServerVariant
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
@@ -83,19 +84,26 @@ async def _assert_sg_rejects(sync_gateway: SyncGateway, headers: dict[str, str])
         assert exc_info.value.code == 401, f"Expected SG to answer 401, got {exc_info.value.code}"
 
 
-async def _assert_auth_rejected(replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str]) -> None:
+async def _refused_upgrade_code(test_server: TestServer) -> int:
     """
-    Asserts the replicator stopped with an error, and that SG itself rejects the same credential.
+    The error code for SG refusing the WebSocket upgrade itself, as it does for a session or no credentials.
+    A browser cannot see the status of a refused upgrade, so CBL JS reports -1 "Failed to connect".
+    """
+    return -1 if (await test_server.info).variant == ServerVariant.JS else 10401
 
-    A browser gets no status from a refused WebSocket upgrade, so CBL JS can report -1 instead of
-    401. On its own -1 could be any failure (a certificate mismatch, an unreachable SG), so the
-    direct request shows it was the credential that SG refused.
+
+async def _assert_auth_rejected(
+    replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str], expected_code: int = 10401
+) -> None:
+    """
+    Asserts the replicator stopped with `expected_code`, and that SG itself rejects the same credential.
     """
     status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     assert status.error is not None, "Replicator stopped without an error; expected an auth rejection"
-    assert status.error.code in (401, -1), (
-        f"Expected 401 or -1, got ({status.error.domain} / {status.error.code}) {status.error.message}"
-    )
+    error = f"({status.error.domain} / {status.error.code}) {status.error.message}"
+    assert status.error.code == expected_code, f"Expected {expected_code}, got {error}"
+    if expected_code == -1:
+        assert status.error.message.startswith("Failed to connect"), f"Expected a refused connection, got {error}"
     await _assert_sg_rejects(sync_gateway, headers)
 
 
@@ -182,7 +190,12 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(replicator, sync_gateway, get_sync_gateway_session_headers(session_id))
+        await _assert_auth_rejected(
+            replicator,
+            sync_gateway,
+            get_sync_gateway_session_headers(session_id),
+            await _refused_upgrade_code(cblpytest.test_servers[0]),
+        )
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -346,7 +359,9 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(replicator, sync_gateway, {})
+        await _assert_auth_rejected(
+            replicator, sync_gateway, {}, await _refused_upgrade_code(cblpytest.test_servers[0])
+        )
 
         await cblpytest.test_servers[0].cleanup()
 

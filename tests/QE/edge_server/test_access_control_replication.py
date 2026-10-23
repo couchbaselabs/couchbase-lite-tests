@@ -120,7 +120,7 @@ class TestAccessControlReplication(CBLTestClass):
         self.mark_test_step(
             "Verify the replicator is refused as pull-only (403), and none of the docs reached Edge Server"
         )
-        assert status.error is not None and status.error.code == 403, f"Expected a pull-only 403, got {status.error}"
+        assert status.error is not None and status.error.code == 10403, f"Expected a pull-only 403, got {status.error}"
         assert not set(pushed) & await _es_ids(admin, HOTELS), "A read-only user wrote to Edge Server"
 
     @pytest.mark.asyncio(loop_scope="session")

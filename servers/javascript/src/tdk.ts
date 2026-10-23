@@ -14,7 +14,7 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, docToJSON, HTTPError, normalizeCollectionID } from "./utils";
+import { check, docToJSON, errorInfo, HTTPError, normalizeCollectionID } from "./utils";
 import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
@@ -247,7 +247,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
                         documentID: doc.docID,
                         isPush: direction === "push",
                         flags: flags,
-                        error: this.#mkErrorInfo(doc.error),
+                        error: errorInfo(doc.error),
                     });
                 }
             };
@@ -288,7 +288,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             activity: status.status?.toUpperCase() ?? "CONNECTING",
             progress: { completed: status.status === "stopped" },
             documents: documents,
-            error: this.#mkErrorInfo(info.error),
+            error: errorInfo(info.error ?? status.error),
         };
     }
 
@@ -333,15 +333,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     }
 
     //-------- Internals:
-
-    #mkErrorInfo(error: Error | undefined): tdk.ErrorInfo | undefined {
-        let code = -1;
-        if (error instanceof cbl.ReplicatorError) {
-            code = error.code ?? -1;
-        }
-
-        return error ? { domain: "CBL-JS", code: code, message: error.message } : undefined;
-    }
 
     #getDatabase(name: string): cbl.Database {
         const db = this.#databases.get(name);
