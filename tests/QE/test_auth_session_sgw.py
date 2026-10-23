@@ -119,8 +119,6 @@ class TestSessionAuthReplication(CBLTestClass):
     async def test_replicate_with_session_auth(
         self, cblpytest: CBLPyTest, dataset_path: Path, replicator_type: ReplicatorType
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -167,8 +165,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_invalid_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -201,8 +197,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_concurrent_session_identities(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -334,8 +328,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_anonymous_replication_rejected(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -367,8 +359,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_guest_replication_allowed(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -425,8 +415,6 @@ class TestSessionAuthReplication(CBLTestClass):
     async def test_session_revoked_during_continuous_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -587,7 +575,8 @@ class TestSessionAuthReplication(CBLTestClass):
         sg_cluster_manager: SyncGatewayClusterManager,
         auth_type: str,
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        if auth_type == "jwt":
+            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
         self.skip_if_not(
             sg_cluster_manager.has_shell2http_sidecar,
             "shell2http sidecar is not reachable on every Sync Gateway host",
