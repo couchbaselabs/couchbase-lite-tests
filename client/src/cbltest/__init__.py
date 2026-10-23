@@ -140,8 +140,8 @@ class CBLPyTest:
             if not cluster.couchbase_servers and not await cluster.sync_gateways[0].using_rosmar:
                 raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
 
-        await ret_val.request_factory.start()
         cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
+        await ret_val.request_factory.start()
 
         await ret_val.resolve_api_version()
         for ts_index, ts in enumerate(ret_val.test_servers):

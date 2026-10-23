@@ -16,6 +16,7 @@ venv
 testserver.log
 session.log
 http_log
+browser_log
 .terraform
 servers/downloaded
 .version

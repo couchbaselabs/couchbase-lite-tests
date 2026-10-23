@@ -10,8 +10,8 @@ over **WebSocket** rather than HTTP (handled on the client side by
 - [`bun`](https://bun.sh) on `PATH`. The orchestrator installs and starts the server with
   `bun`, so that is the supported path. `npm` works for hand runs.
 - Node.js. `bun run dev` starts `vite` in a `node` child process.
-- A desktop browser. The test server runs in a browser tab, so a run needs a desktop
-  session. It never runs on a remote host.
+- Playwright's Chromium. The test server runs in a browser tab, which the Python client
+  opens in headless Chromium. Install it once with `uv run playwright install chromium`.
 - Couchbase Lite is an npm dependency (`@couchbase/lite-js`).
 
 ## Build and Run
@@ -25,7 +25,8 @@ bun run dev
 browser. On connecting, the server exchanges an initial `Hello` WebSocket
 message in place of the HTTP API-version / server-ID headers the other platforms
 use. Vite writes its output to `server.log` in this directory; the test server's
-own logs go to the browser JavaScript console.
+own logs go to the browser JavaScript console, which the Python client writes to
+`browser_log/<device>.log` in the pytest working directory.
 
 ## Reserved `ts_` Prefix
 
