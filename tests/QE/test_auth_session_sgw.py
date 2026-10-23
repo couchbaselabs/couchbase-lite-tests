@@ -564,7 +564,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("auth_type", ["session", "jwt"])
-    @pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/CBL-9117")
     async def test_sgw_restart_during_replication(
         self,
         cblpytest: CBLPyTest,
@@ -573,6 +572,11 @@ class TestSessionAuthReplication(CBLTestClass):
         auth_type: str,
     ) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self.skip_if_cbl_js_not(
+            cblpytest.test_servers[0],
+            ">= 1.1.0",
+            reason="needs the CBL-9117 fix, which keeps a continuous replicator pushing after a reconnect",
+        )
         self.skip_if_not(
             sg_cluster_manager.has_shell2http_sidecar,
             "shell2http sidecar is not reachable on every Sync Gateway host",

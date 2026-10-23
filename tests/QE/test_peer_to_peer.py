@@ -77,6 +77,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -164,6 +165,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -246,6 +248,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -323,6 +326,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -413,6 +417,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         self.mark_test_step("Create 3 dbs and sdd 10 docs each to Device-1")
@@ -517,6 +522,7 @@ class TestPeerToPeer(CBLTestClass):
     ) -> None:
         for ts in cblpytest.test_servers:
             await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_platform(ts, ServerVariant.ALL & ~ServerVariant.JS)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)

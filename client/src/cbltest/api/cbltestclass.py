@@ -67,26 +67,48 @@ class CBLTestClass:
             f"{variant} is not in the platforms {allow_platforms}",
         )
 
-    async def skip_if_cbl_not(self, server: TestServer, constraint: str) -> None:
+    async def skip_if_cbl_not(self, server: TestServer, constraint: str, reason: str | None = None) -> None:
         """
         Skips the test if the CBL version does not match the specified comparison operation and value.
+        CBL JS is not checked, because its versions (1.x) do not follow the other platforms.
 
         :param constraint: A string representing the comparison operation and version, e.g., ">= 3.3.0".
+        :param reason: Why the test needs this version, added to the skip message.
         """
-        version_str = (await server.info).library_version.split("-")[0]
-        version = Version(version_str)
-        spec = SpecifierSet(constraint)
-        self.skip_if_not(version in spec, f"CBL {version_str} not {constraint}")
+        if (await server.info).variant == ServerVariant.JS:
+            return
 
-    async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str) -> None:
+        await self._skip_if_cbl_version_not(server, constraint, reason)
+
+    async def skip_if_cbl_js_not(self, server: TestServer, constraint: str, reason: str | None = None) -> None:
+        """
+        Skips the test if the server is CBL JS and its version does not match the specified comparison
+        operation and value. Other platforms are not affected.
+
+        :param constraint: A string representing the comparison operation and version, e.g., ">= 1.1.0".
+        :param reason: Why the test needs this version, added to the skip message.
+        """
+        if (await server.info).variant != ServerVariant.JS:
+            return
+
+        await self._skip_if_cbl_version_not(server, constraint, reason)
+
+    async def _skip_if_cbl_version_not(self, server: TestServer, constraint: str, reason: str | None) -> None:
+        version_str = (await server.info).library_version.split("-")[0]
+        self._skip_if_version_not("CBL", version_str, constraint, reason)
+
+    def _skip_if_version_not(self, label: str, version_str: str, constraint: str, reason: str | None) -> None:
+        message = f"{label} {version_str} not {constraint}"
+        if reason:
+            message += f": {reason}"
+        self.skip_if_not(Version(version_str) in SpecifierSet(constraint), message)
+
+    async def skip_if_sgw_not(self, sg: SyncGateway, constraint: str, reason: str | None = None) -> None:
         """
         Skips the test if the SGW version does not match the specified comparison operation and value.
 
         :param sg: The SyncGateway instance to check version for.
         :param constraint: A string representing the comparison operation and version, e.g., ">= 4.0.0".
+        :param reason: Why the test needs this version, added to the skip message.
         """
-        sgw_version_obj = await sg.get_version()
-        version_str = sgw_version_obj.version
-        version = Version(version_str)
-        spec = SpecifierSet(constraint)
-        self.skip_if_not(version in spec, f"SGW {version_str} not {constraint}")
+        self._skip_if_version_not("SGW", (await sg.get_version()).version, constraint, reason)

@@ -20,6 +20,7 @@ from cbltest.api.syncgateway import RemoteDocument, SyncGateway
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.logging import cbl_info
 from cbltest.plugins.cluster_cleanup import perform_cleanup
+from cbltest.responses import ServerVariant
 
 
 class DocSnapshot:
@@ -83,6 +84,7 @@ async def setup_upgrade_env(
     empty_local_db: bool = False,
 ) -> Database:
     await test_case.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+    await test_case.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
     dataset_ver = cblpytest.test_servers[0].dataset_version
     test_case.skip_if_not(dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver}).")
