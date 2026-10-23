@@ -17,7 +17,9 @@ The test reaches one Sync Gateway through two URLs: one with its hostname, and o
 that the hostname resolves to. The test is skipped if Sync Gateway is configured by IP address,
 because then there is no second URL.
 
-The test runs once with each replicator type in the last step: `pull` and `pushAndPull`. Every
+The test runs once with each replicator type in the last step: `pull` and `pushAndPull`. Steps 3
+and 4 always pull: pushing through each URL there changes what Couchbase Lite records for each
+remote, and the later reply to `changes` no longer has three known revs. Every
 replication is one-shot and uses the `remote-wins` conflict resolver, so the local edit in step 5
 conflicts with the SG edit in a predictable way. Each step checks the local document itself, not
 just that the replicator stopped, because a replicator also stops when the changes feed says it has

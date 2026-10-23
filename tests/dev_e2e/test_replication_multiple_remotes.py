@@ -14,6 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
     ReplicatorType,
 )
+from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
 
@@ -30,26 +31,27 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
         sgw_version = Version((await sync_gateway.get_version()).version)
-        # The fix for CBG-5978 is in 4.0.9, 4.1.3, and every release after them.
-        if sgw_version < Version("4.0.9") or Version("4.1.0") <= sgw_version < Version("4.1.3"):
-            pytest.skip(f"SGW {sgw_version} lacks the fix for CBG-5978")
+        self.skip_if_not(
+            sgw_version in SpecifierSet(">=4.0.9,!=4.1.0,!=4.1.1,!=4.1.2"),
+            f"SGW {sgw_version} lacks the fix for CBG-5978",
+        )
 
         url_by_hostname = sync_gateway.replication_url("names")
         parts = urlsplit(url_by_hostname)
         assert parts.hostname is not None
         ip_address = socket.gethostbyname(parts.hostname)
         self.skip_if_not(ip_address != parts.hostname, "Sync Gateway is configured by IP, so no second URL exists")
-        url_by_ip = parts._replace(netloc=parts.netloc.replace(parts.hostname, ip_address, 1)).geturl()
+        url_by_ip = parts._replace(netloc=f"{ip_address}:{parts.port}" if parts.port else ip_address).geturl()
 
         doc_id = "doc1"
         collection = "_default._default"
 
-        async def replicate(endpoint: str, replicator_type: ReplicatorType = ReplicatorType.PULL) -> None:
+        async def replicate(endpoint: str, replication_type: ReplicatorType = ReplicatorType.PULL) -> None:
             """Runs a one-shot replication through the endpoint, resolving conflicts in favour of SG."""
             replicator = Replicator(
                 db,
                 endpoint,
-                replicator_type=replicator_type,
+                replicator_type=replication_type,
                 collections=[
                     ReplicatorCollectionEntry([collection], conflict_resolver=ReplicatorConflictResolver("remote-wins"))
                 ],
