@@ -9,7 +9,9 @@ Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
 
 uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
 
-$pytestArgs = @('-v', '--no-header', '--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', '-m', 'min_test_servers', '--dataset-version', $DatasetVersion)
+# The full suite already runs on desktop. Basic replication is enough to check that
+# the CBL jars and native libraries load and work inside the web container:
+$pytestArgs = @('-v', '--no-header', '--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', 'test_basic_replication.py', '-m', 'min_test_servers', '--dataset-version', $DatasetVersion)
 if ($TestFilter) {
     $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }

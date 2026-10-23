@@ -43,9 +43,11 @@ done
 
 uv run $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
 
+# The full suite already runs on desktop. Basic replication is enough to check that
+# the CBL jars and native libraries load and work inside the web container:
 pushd $DEV_E2E_TESTS_DIR
 if [ -n "$test_filter" ]; then
-  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$dataset_version" -k "$test_filter" --no-result-upload
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json test_basic_replication.py -m min_test_servers --dataset-version "$dataset_version" -k "$test_filter" --no-result-upload
 else
-  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$dataset_version"
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json test_basic_replication.py -m min_test_servers --dataset-version "$dataset_version"
 fi
