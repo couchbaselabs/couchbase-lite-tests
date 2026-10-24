@@ -82,7 +82,7 @@ async def setup_upgrade_env(
     reset_expired_ttl: bool = False,
     empty_local_db: bool = False,
 ) -> Database:
-    await test_case.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+    await test_case.skip_if_not_supports_version_vectors(cblpytest.test_servers[0])
 
     dataset_ver = cblpytest.test_servers[0].dataset_version
     test_case.skip_if_not(dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver}).")

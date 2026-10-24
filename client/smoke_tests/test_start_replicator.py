@@ -1,7 +1,6 @@
-from types import FunctionType
-
 import pytest
 from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.api.replicator import Replicator
@@ -10,15 +9,9 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
 )
-from cbltest.globals import CBLPyTestGlobal
 
 
-class TestStartReplicator:
-    def setup_method(self, method: FunctionType) -> None:
-        # If writing a new test do not forget this step or the test server
-        # will not be informed about the currently running test
-        CBLPyTestGlobal.running_test_name = method.__name__
-
+class TestStartReplicator(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_invalid_database(self, cblpytest: CBLPyTest) -> None:
         repl = Replicator(Database(cblpytest.request_factory, 0, "fake"), "ws://localhost:4984/db")
@@ -47,6 +40,7 @@ class TestStartReplicator:
         ],
     )
     async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: dict | None) -> None:
+        await self.skip_if_not_supports_custom_conflict_resolver(cblpytest.test_servers[0])
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 
