@@ -89,10 +89,10 @@ def main(
     config_in = SCRIPT_DIR / config_file
     config_out = SCRIPT_DIR.parents[3] / "tests" / "QE" / "config.json"
 
-    if sgw_version is None or len(sgw_version) == 0:
-        sgw_version = resolve_latest_version("sync-gateway")
-    if cbs_version is None or len(cbs_version) == 0:
-        cbs_version = resolve_latest_version("couchbase-server")
+    if not sgw_version or len(sgw_version.split(".")) < 3:
+        sgw_version = resolve_latest_version("sync-gateway", sgw_version or None)
+    if not cbs_version or len(cbs_version.split(".")) < 3:
+        cbs_version = resolve_latest_version("couchbase-server", cbs_version or None)
 
     click.secho("🚀 Backend setup", fg="blue", bold=True)
     click.echo(f"Edge Server Version : {es_version}")
