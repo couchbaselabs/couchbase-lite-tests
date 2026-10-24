@@ -123,7 +123,7 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
     test_platform: str = "sync-gateway"
     os_name: str = "n/a"
     library_version: str = "n/a"
-    dataset_version: str = "3.x" if len(cblpytest.edge_servers) > 0 else "n/a"
+    dataset_version: str = "n/a"
     cbl_platform: str = "n/a"
     if len(cblpytest.test_servers) > 0:
         test_server_info = await cblpytest.test_servers[0].info
