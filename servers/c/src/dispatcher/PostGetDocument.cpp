@@ -23,7 +23,9 @@ int Dispatcher::handlePOSTGetDocument(Request &request, Session *session) {
     CBLError error{};
     auto doc = CBLCollection_GetDocument(col, FLS(docID), &error);
     checkCBLError(error);
-    checkNotNull(doc, str::concat("Document '", colName, ".", docID, "' not found"));
+    if (!doc) {
+        throw ClientError(str::concat("Document '", colName, ".", docID, "' not found"), HTTPStatus::NotFound);
+    }
     AUTO_RELEASE(doc);
 
     auto props = CBLDocument_Properties(doc);

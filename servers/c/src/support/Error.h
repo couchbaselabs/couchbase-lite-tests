@@ -2,13 +2,30 @@
 
 #include "CBLHeader.h"
 #include CBL_HEADER(CBLBase.h)
+#include "HTTPStatus.h"
 
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <utility>
 
 namespace ts::support::error {
+    // An error caused by the client's request; responded to with the given status.
+    class ClientError : public std::exception {
+    public:
+        explicit ClientError(std::string message, HTTPStatus status = HTTPStatus::BadRequest)
+                : _message(std::move(message)), _status(status) {}
+
+        [[nodiscard]] const char *what() const noexcept override { return _message.c_str(); }
+
+        [[nodiscard]] HTTPStatus status() const { return _status; }
+
+    private:
+        std::string _message;
+        HTTPStatus _status;
+    };
+
     class CBLException : public std::exception {
     public:
         explicit CBLException(const CBLError &error);

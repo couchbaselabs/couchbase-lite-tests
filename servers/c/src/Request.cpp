@@ -11,13 +11,10 @@
 using namespace nlohmann;
 using namespace std;
 using namespace ts::log;
+using namespace ts::support;
 using namespace ts::support::error;
 
 namespace ts {
-    constexpr const int kSuccessStatusCode = 200;
-    constexpr const int kRequestErrorStatusCode = 400;
-    constexpr const int kServerErrorStatusCode = 500;
-
     Request::Request(mg_connection *conn, const Dispatcher *dispatcher) {
         const mg_request_info *info = mg_get_request_info(conn);
         _method = info->request_method;
@@ -58,35 +55,34 @@ namespace ts {
     }
 
     int Request::respondWithOK() const {
-        return respond(kSuccessStatusCode);
+        return respond(HTTPStatus::OK);
     }
 
     int Request::respondWithJSON(const json &json) const {
         auto jsonBody = json.dump();
-        return respond(kSuccessStatusCode, jsonBody);
+        return respond(HTTPStatus::OK, jsonBody);
+    }
+
+    int Request::respondWithError(HTTPStatus status, const char *message) const {
+        nlohmann::json json = json::object();
+        json["domain"] = "TESTSERVER";
+        json["code"] = static_cast<int>(status);
+        json["message"] = message;
+        auto jsonBody = json.dump();
+        return respond(status, jsonBody);
     }
 
     int Request::respondWithRequestError(const char *message) const {
-        nlohmann::json json = json::object();
-        json["domain"] = "TESTSERVER";
-        json["code"] = kRequestErrorStatusCode;
-        json["message"] = message;
-        auto jsonBody = json.dump();
-        return respond(kRequestErrorStatusCode, jsonBody);
+        return respondWithError(HTTPStatus::BadRequest, message);
     }
 
     int Request::respondWithServerError(const char *message) const {
-        nlohmann::json json = json::object();
-        json["domain"] = "TESTSERVER";
-        json["code"] = kServerErrorStatusCode;
-        json["message"] = message;
-        auto jsonBody = json.dump();
-        return respond(kServerErrorStatusCode, jsonBody);
+        return respondWithError(HTTPStatus::InternalServerError, message);
     }
 
     int Request::respondWithCBLError(const CBLException &exception) const {
         auto json = exception.json();
-        return respond(kRequestErrorStatusCode, json.dump());
+        return respond(HTTPStatus::BadRequest, json.dump());
     }
 
     void Request::addCommonResponseHeaders() const {
@@ -100,8 +96,9 @@ namespace ts {
         mg_response_header_add(_conn, "Pragma", "no-cache", -1);
     }
 
-    int Request::respond(int status, const optional <string> &json) const {
-        mg_response_header_start(_conn, status);
+    int Request::respond(HTTPStatus status, const optional <string> &json) const {
+        auto code = static_cast<int>(status);
+        mg_response_header_start(_conn, code);
         addCommonResponseHeaders();
         if (json) {
             mg_response_header_add(_conn, "Content-Type", "application/json", -1);
@@ -115,16 +112,16 @@ namespace ts {
             mg_write(_conn, json->c_str(), json->size());
         }
 
-        if (status == kSuccessStatusCode) {
-            Log::log(LogLevel::info, "Response %s : OK (%d)", name().c_str(), status);
+        if (status == HTTPStatus::OK) {
+            Log::log(LogLevel::info, "Response %s : OK (%d)", name().c_str(), code);
         } else {
             if (json) {
-                Log::log(LogLevel::info, "Response %s : Error (%d) : %s", name().c_str(), status,
+                Log::log(LogLevel::info, "Response %s : Error (%d) : %s", name().c_str(), code,
                          json->c_str());
             } else {
-                Log::log(LogLevel::info, "Response %s : Error (%d)", name().c_str(), status);
+                Log::log(LogLevel::info, "Response %s : Error (%d)", name().c_str(), code);
             }
         }
-        return status;
+        return code;
     }
 }

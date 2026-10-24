@@ -433,6 +433,7 @@
 		4076E71E2A9EAD04003DD799 /* Precondition.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Precondition.h; sourceTree = "<group>"; };
 		4076E71F2A9EAD04003DD799 /* Dispatcher.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Dispatcher.cpp; sourceTree = "<group>"; };
 		4076E7202A9EAD04003DD799 /* Request.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Request.h; sourceTree = "<group>"; };
+		4092BDA7306C6A0F0023960A /* HTTPStatus.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = HTTPStatus.h; sourceTree = "<group>"; };
 		409F45282DFA659C00BB7851 /* FileDownloader.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FileDownloader.h; sourceTree = "<group>"; };
 		409F45292DFA659C00BB7851 /* FileDownloader+Apple.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = "FileDownloader+Apple.mm"; sourceTree = "<group>"; };
 		40CAB0142CE410B8001CA3F1 /* Log.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = Log.h; sourceTree = "<group>"; };
@@ -885,6 +886,7 @@
 				409F45292DFA659C00BB7851 /* FileDownloader+Apple.mm */,
 				4076E71B2A9EAD04003DD799 /* Files.h */,
 				4076E71C2A9EAD04003DD799 /* Files+Apple.mm */,
+				4092BDA7306C6A0F0023960A /* HTTPStatus.h */,
 				4076E7172A9EAD04003DD799 /* JSON.h */,
 				4076E71E2A9EAD04003DD799 /* Precondition.h */,
 				4076E71A2A9EAD04003DD799 /* StringUtil.cpp */,
