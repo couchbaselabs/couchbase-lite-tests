@@ -2,7 +2,7 @@
 # Build the Android test server, deploy it, and run the tests
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
-set -euo pipefail
+set -eu # No pipefail because piping yes always "fails" with SIGPIPE
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
