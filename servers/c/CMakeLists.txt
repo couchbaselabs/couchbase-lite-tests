@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.11)
 cmake_policy(VERSION 3.11)
 cmake_policy(SET CMP0077 NEW)
 
-set(CMAKE_OSX_DEPLOYMENT_TARGET "10.15")
+# Must be a cache variable: with policy VERSION 3.11, project() replaces a plain set() with an empty cache entry (CMP0126).
+set(CMAKE_OSX_DEPLOYMENT_TARGET "13.0" CACHE STRING "Minimum macOS version")
 set(CMAKE_OSX_ARCHITECTURES x86_64 arm64)
 
 project(TestServer)
