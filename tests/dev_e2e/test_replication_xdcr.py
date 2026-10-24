@@ -68,7 +68,7 @@ class TestReplicationXdcr(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+        await self.skip_if_not_supports_version_vectors(cblpytest.test_servers[0])
         # These tests pin the replicator to one Sync Gateway with an X-Backend header,
         # which the JS test server cannot send due to limitations of Websocket library.
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
@@ -208,7 +208,7 @@ class TestReplicationXdcr(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
+        await self.skip_if_not_supports_version_vectors(cblpytest.test_servers[0])
         # These tests pin the replicator to one Sync Gateway with an X-Backend header,
         # which the JS test server cannot send due to limitations of Websocket library.
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
