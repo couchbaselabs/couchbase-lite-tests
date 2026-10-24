@@ -33,6 +33,7 @@ from cbltest.greenboarduploader import (
     SKIP,
     GreenboardUploader,
     RunResult,
+    format_cbl_version,
     outcomes_from_junit_xml,
     resolve_branch,
     resolve_job_url,
@@ -370,6 +371,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1234",
         )
 
     def test_document_platform_and_os(self) -> None:
@@ -389,6 +391,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-net",
             os="Android",
             jobUrl="local",
+            cblVersion="3.2.0-50",
         )
 
     def test_version_and_build_parsed_from_version_string(self) -> None:
@@ -408,6 +411,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.1-136",
         )
 
     def test_sgw_version_field_with_sgw(self) -> None:
@@ -428,6 +432,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
         )
 
     def test_sgw_platform_uses_sgw_version_for_build(self) -> None:
@@ -467,6 +472,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
         )
 
     def test_es_version_field_with_es(self) -> None:
@@ -488,6 +494,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
         )
 
     def test_es_platform_uses_es_version_for_build(self) -> None:
@@ -548,6 +555,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
             incomplete=True,
         )
 
@@ -596,6 +604,7 @@ class TestGreenboardUploaderDocument:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
             collected=42,
         )
 
@@ -817,6 +826,9 @@ class TestGreenboardFixture:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
+            datasetVersion="1",
+            cblPlatform="couchbase-lite-ios",
         )
 
     @pytest.mark.asyncio
@@ -845,6 +857,9 @@ class TestGreenboardFixture:
             platform="sync-gateway",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
+            datasetVersion="1",
+            cblPlatform="couchbase-lite-ios",
         )
 
     @pytest.mark.asyncio
@@ -877,6 +892,9 @@ class TestGreenboardFixture:
             platform="couchbase-lite-ios",
             os="n/a",
             jobUrl="local",
+            cblVersion="3.2.0-1",
+            datasetVersion="1",
+            cblPlatform="couchbase-lite-ios",
         )
 
     @pytest.mark.asyncio
@@ -899,6 +917,9 @@ class TestGreenboardFixture:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
+            datasetVersion="1",
+            cblPlatform="couchbase-lite-ios",
         )
 
     @pytest.mark.asyncio
@@ -949,6 +970,7 @@ class TestGreenboardFixture:
             platform="edge-server",
             os="n/a",
             jobUrl="local",
+            datasetVersion="3.x",
         )
 
     @pytest.mark.asyncio
@@ -972,6 +994,9 @@ class TestGreenboardFixture:
             platform="couchbase-lite-ios",
             os="iOS",
             jobUrl="local",
+            cblVersion="3.2.0-1",
+            datasetVersion="1",
+            cblPlatform="couchbase-lite-ios",
         )
 
     @pytest.mark.asyncio
@@ -1184,6 +1209,7 @@ class TestRunResultFullDocument:
                 platform="couchbase-lite-ios",
                 os="iOS",
                 jobUrl="local",
+                cblVersion="3.2.0-1234",
             ).model_dump(by_alias=True),
             "details": DETAILS_SCHEMA,
             "uploaded": FIXED_UNIX_TS,
@@ -1664,6 +1690,8 @@ def upload_in_process(
     incomplete: bool = False,
     collected_ids: Sequence[str] | None = None,
     finished_ids: Container[str] | None = None,
+    dataset_version: str = "n/a",
+    cbl_platform: str = "n/a",
 ) -> Uploaded:
     with patch.object(uploader, "_upload_document") as mock_upload:
         uploader.upload(
@@ -1677,6 +1705,8 @@ def upload_in_process(
             incomplete=incomplete,
             collected_ids=collected_ids,
             finished_ids=finished_ids,
+            dataset_version=dataset_version,
+            cbl_platform=cbl_platform,
         )
     return uploaded(mock_upload)
 
@@ -2029,3 +2059,120 @@ class TestSiblingDocuments:
 
         doc = json.loads((pytester.path / "captured_doc.json").read_text())
         assert (doc["incomplete"], doc["collected"], doc["skipCount"]) == (True, 3, 1)
+
+
+class TestDatasetAndCblVersion:
+    """``datasetVersion`` (every run) and ``cblVersion`` (the test server's CBL library, so SGW and Edge Server runs
+    show what drove them)."""
+
+    @pytest.mark.parametrize(
+        "raw, expected",
+        [
+            ("3.2.0-b0136", "3.2.0-136"),
+            ("3.2.0-1234", "3.2.0-1234"),
+            ("3.2.0", "3.2.0"),
+            ("3.2.0-bogus", "3.2.0-bogus"),
+            ("n/a", "n/a"),
+            ("", "n/a"),
+            (None, "n/a"),
+        ],
+    )
+    def test_format_cbl_version(self, raw: str | None, expected: str) -> None:
+        assert format_cbl_version(raw) == expected
+
+    def test_upload_writes_dataset_and_cbl_version(self) -> None:
+        up = upload_in_process(make_uploader(), dataset_version="4.0", cbl_platform="couchbase-lite-c")
+
+        assert up.run.dataset_version == "4.0"
+        assert up.run.cbl_platform == "couchbase-lite-c"
+        assert up.run.cbl_version == "3.2.0-1"
+
+    def test_defaults_are_na(self) -> None:
+        uploader = make_uploader()
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload("sync-gateway", "n/a", None, None, None)
+
+        run = uploaded(mock_upload).run
+        assert (run.dataset_version, run.cbl_version, run.cbl_platform) == ("n/a", "n/a", "n/a")
+
+    def test_junit_path_passes_dataset_version(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(tmp_path / "j.xml", _FAIL_CASE + _PASS_CASE, tests=2, failures=1, errors=0)
+        uploader = make_uploader()
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload_from_junit_file(
+                xml, "sync-gateway", "n/a", "3.2.0-b0001", None, dataset_version="4.0", cbl_platform="couchbase-lite-c"
+            )
+
+        run = uploaded(mock_upload).run
+        assert (run.dataset_version, run.cbl_version, run.cbl_platform) == ("4.0", "3.2.0-1", "couchbase-lite-c")
+
+    async def _fixture_doc(
+        self,
+        *,
+        test_servers: Sequence[testserver.TestServer] = (),
+        sync_gateways: Sequence[SyncGateway] = (),
+        edge_servers: Sequence[EdgeServerManager] = (),
+        markers: list[str] | None = None,
+    ) -> RunResult:
+        cblpytest = _make_cblpytest(test_servers=test_servers, sync_gateways=sync_gateways, edge_servers=edge_servers)
+        config = _make_pytestconfig()
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            gen = _raw_greenboard(cblpytest, config)
+            await gen.__anext__()
+            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
+            drive_hook(uploader, make_report("call", passed=True), make_item(markers=markers))
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+            finish_session(config)
+        return uploaded(mock_upload).run
+
+    @pytest.mark.asyncio
+    async def test_cbl_run(self) -> None:
+        doc = await self._fixture_doc(test_servers=[_make_server(library_version="3.2.0-b0136")])
+
+        assert (doc.platform, doc.dataset_version, doc.cbl_version, doc.cbl_platform) == (
+            "couchbase-lite-ios",
+            "1",
+            "3.2.0-136",
+            "couchbase-lite-ios",
+        )
+
+    @pytest.mark.asyncio
+    async def test_sgw_run_driven_by_a_test_server_carries_its_cbl_version(self) -> None:
+        doc = await self._fixture_doc(
+            test_servers=[_make_server(library_version="3.2.0-b0136")],
+            sync_gateways=[FakeSyncGateway("4.0.0(350;def)")],
+            markers=["sgw"],
+        )
+
+        # Filed under sync-gateway, but cblPlatform still names the CBL client that drove it.
+        assert doc.platform == "sync-gateway"
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("1", "3.2.0-136", "couchbase-lite-ios")
+
+    @pytest.mark.asyncio
+    async def test_sgw_run_without_test_server_is_na(self) -> None:
+        doc = await self._fixture_doc(sync_gateways=[FakeSyncGateway("4.0.0(350;def)")])
+
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("n/a", "n/a", "n/a")
+
+    @pytest.mark.asyncio
+    async def test_edge_server_run_alone_uses_3x_dataset(self) -> None:
+        doc = await self._fixture_doc(
+            edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))], markers=["min_edge_servers"]
+        )
+
+        assert doc.platform == "edge-server"
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("3.x", "n/a", "n/a")
+
+    @pytest.mark.asyncio
+    async def test_edge_server_run_with_test_server_carries_both(self) -> None:
+        doc = await self._fixture_doc(
+            test_servers=[_make_server(library_version="3.2.0-b0136")],
+            edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))],
+            markers=["min_edge_servers"],
+        )
+
+        # A mixed run keeps the test server's platform, so this is a CBL run that also used an Edge Server.
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("1", "3.2.0-136", "couchbase-lite-ios")
