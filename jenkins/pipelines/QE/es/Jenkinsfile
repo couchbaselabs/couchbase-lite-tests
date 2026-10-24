@@ -38,8 +38,8 @@ pipeline {
         string(name: 'TOPOLOGY_NAME', defaultValue: '3es_1sgw_1js_topology.json', description: 'Topology file name. 3es_1sgw_1js_topology.json also runs a CBL-JS test server on the Jenkins agent (localhost).')
         string(name: 'CBL_VERSION', defaultValue: '1.0.3', description: 'CBL-JS version-build, version or train for a topology with a JS test server (e.g. 1.1.0-25). Leave blank for the newest build. Ignored for topologies without test servers.')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the JS test server for CBL_VERSION. Uncheck to reuse existing artifacts.')
-        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway version (leave empty to skip SGW/CBS provisioning)')
-        string(name: 'CBS_VERSION', defaultValue: '8', description: 'Couchbase Server version (leave empty to skip SGW/CBS provisioning)')
+        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway version, or a line such as 4 or 4.0 for its latest release. Leave empty for the latest release.')
+        string(name: 'CBS_VERSION', defaultValue: '8', description: 'Couchbase Server version, or a line such as 8 or 8.0 for its latest release. Leave empty for the latest release.')
         string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
         booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: false, description: 'Run only the tests that replicate with the CBL-JS test server (those marked min_test_servers, all in tests/QE/edge_server). Needs a topology with a JS test server. TEST_NAME still narrows them with -k; TEST_DIR is ignored.')
     }
