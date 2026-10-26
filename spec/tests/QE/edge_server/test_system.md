@@ -115,14 +115,14 @@ Test that 4 concurrent async client coroutines can independently perform create,
 Test that 4 concurrent async client coroutines continue to operate correctly while a dedicated `chaos_controller` coroutine kills and restarts the Edge Server at random intervals (every 5–20 minutes, with a 1-minute down window), verifying document count consistency after each restart and at the end of the 6-hour run.
 
 **Steps:**
-1. **Setup:** Same as `test_system_one_client_l` step 1. Set `NUM_CLIENTS = 4`. Initialise `shared = {"edge_server_down": False, "outages": 0, "paused": False, "active": 0}`, an `asyncio.Condition` that guards `paused` and `active`, and `recent_docs = []`.
+1. **Setup:** Same as `test_system_one_client_l` step 1. Set `NUM_CLIENTS = 4`. Initialise `shared = {"edge_server_down": False, "outages": 0, "paused": False, "active": 0}`, an `asyncio.Condition` that guards `paused` and `active`, `recent_docs = []`, and `interrupted = {}`.
 2. Define `chaos_controller()` as an async coroutine that loops until 6 hours have elapsed. Each iteration:
    * `await asyncio.sleep(random.uniform(300, 1200))` — random quiet period of 5–20 minutes
    * Exit if 6-hour window has expired
    * *Triggering chaos: killing Edge Server.* — set `shared["edge_server_down"] = True` and increment `shared["outages"]`, then kill ES at once. Workers are not paused, so ES can go down partway through a worker's step.
    * `await asyncio.sleep(60)` — keep ES down for ~1 minute
    * *Restarting Edge Server after chaos window.* — start ES; set `shared["edge_server_down"] = False`
-   * Set `paused` so that no worker starts a new cycle, and wait until `active` (the number of cycles in progress) is 0. Then *Verifying doc counts match after Edge Server restart.* — poll (up to 60s) until SG and ES doc counts are equal. Clear `paused` to resume the workers.
+   * Set `paused` so that no worker starts a new cycle, and wait until `active` (the number of cycles in progress) is 0. Then *Verifying doc counts match after Edge Server restart.* — poll (up to 60s) until SG and ES doc counts are equal. For each doc in `interrupted`, *Revalidating {doc_id}, interrupted by the outage.* — poll (up to 60s) until SG and ES hold the same body, or both lack the doc, and that state is one the cycle wrote. Clear `interrupted`, then clear `paused` to resume the workers.
 3. Define `fire_read_burst(doc_id)` as an async helper. If `shared["edge_server_down"]`, return immediately. Otherwise:
    * *Firing {NUM_CLIENTS} concurrent reads of {doc_id} on Edge Server.* — issue `NUM_CLIENTS` concurrent `get_document` calls via `asyncio.gather(return_exceptions=True)`; for each non-exception result assert it is not None
 4. Define `client_worker(client_id)` as an async coroutine. Each worker initialises `doc_counter = 1` and loops until 6 hours have elapsed.
@@ -153,7 +153,7 @@ Test that 4 concurrent async client coroutines continue to operate correctly whi
      * *[Client {client_id}] Deleting {doc_id} on Sync Gateway.* — DELETE using `rev_id`
      * *[Client {client_id}] Verifying {doc_id} deleted on Edge Server.* — wait until `db` shows it as deleted
 8. Sleep a random 1–5 seconds (jitter) before the next cycle, so that the workers do not run in lockstep or flood Sync Gateway while ES is down.
-9. If the cycle started with Edge Server up and any step raises after `shared["outages"]` changed during the cycle, log *[Client {client_id}] Abandoned {doc_id}: Edge Server went down mid-cycle.* and go on to the next cycle. Any other error fails the test.
+9. Before each write, the cycle records the state it writes: the body, or absent for a delete. The list starts with absent, since a create can fail before it lands. If the cycle started with Edge Server up and any step raises after `shared["outages"]` changed during the cycle, log *[Client {client_id}] {doc_id} interrupted by an Edge Server outage, revalidating later.*, add the doc and its recorded states to `interrupted`, and go on to the next cycle. The next post-restart check (step 2) revalidates it. Any other error fails the test.
 10. Increment `doc_counter`; repeat from step 5.
 11. Launch all 4 `client_worker` coroutines and `chaos_controller` concurrently in an `asyncio.TaskGroup` (5 total tasks); all run for the full 6-hour window, and a failure in one cancels the rest.
 12. **Final reconciliation:**
