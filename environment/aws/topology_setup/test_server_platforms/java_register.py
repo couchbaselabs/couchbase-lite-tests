@@ -18,16 +18,14 @@ Functions:
         Create a bridge for the Java test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
-    platform(self) -> str:
-        Get the platform name.
     uncompress_package(self, path: Path) -> None:
         Uncompress the Java test server package.
 """
 
 import os
-import platform
 import shutil
 import subprocess
+import sys
 import zipfile
 from abc import abstractmethod
 from pathlib import Path
@@ -50,7 +48,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 
 class JavaBridge(PlatformBridge):
     def _download_support_libs(self, cbl_version: str, variant: str) -> None:
-        if platform.system() != "Linux":
+        if sys.platform != "linux":
             return
 
         supportlib_dir = JAK_TEST_SERVER_DIR / variant / "supportlib"
@@ -83,7 +81,7 @@ class JavaBridge(PlatformBridge):
             raise
 
     def _ensure_support_libs_in_path(self, variant: str) -> None:
-        if platform.system() != "Linux":
+        if sys.platform != "linux":
             return
 
         supportlib_dir = (JAK_TEST_SERVER_DIR / variant / "supportlib").resolve()
@@ -127,7 +125,7 @@ class JarBridge(JavaBridge):
 
         self._ensure_support_libs_in_path("desktop")
         args = ["java", "-jar", self.__jar_path, "server"]
-        if platform.system() != "Windows":
+        if sys.platform != "win32":
             args.insert(0, "nohup")
 
         info_dir = JAK_TEST_SERVER_DIR / "desktop"
@@ -159,7 +157,7 @@ class JettyBridge(JavaBridge):
 
         self.__cbl_version = cbl_version
         self.__gradle_path = JAK_TEST_SERVER_DIR / "webservice" / "gradlew"
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             self.__gradle_path = self.__gradle_path.with_suffix(".bat")
 
     def install(self, location: str) -> None:
@@ -193,7 +191,7 @@ class JettyBridge(JavaBridge):
             f"-PcblVersion={self.__cbl_version}",
             "-PdatasetVersion=3.2",
         ]
-        if platform.system() != "Windows":
+        if sys.platform != "win32":
             args.insert(0, "nohup")
 
         info_dir = JAK_TEST_SERVER_DIR / "webservice"
@@ -246,7 +244,7 @@ class JAKTestServer(TestServer):
         Build the JAK test server.
         """
         gradle_path = JAK_TEST_SERVER_DIR / self.test_server_path / "gradlew"
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             gradle_path = gradle_path.with_suffix(".bat")
 
         args = [
@@ -255,13 +253,13 @@ class JAKTestServer(TestServer):
             f"-PcblVersion={self.version}",
             "-PdatasetVersion=3.2",
         ]
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             args.append("--no-daemon")
 
         subprocess.run(args, cwd=gradle_path.parent, check=True)
 
 
-@TestServer.register("jak_android")
+@TestServer.register
 class JAKTestServer_Android(JAKTestServer):
     """
     A class for managing JAK test servers on Android.
@@ -269,6 +267,8 @@ class JAKTestServer_Android(JAKTestServer):
     Attributes:
         version (str): The version of the test server.
     """
+
+    platform = "jak_android"
 
     def __init__(self, version: str) -> None:
         super().__init__(version, "assembleRelease")
@@ -280,16 +280,6 @@ class JAKTestServer_Android(JAKTestServer):
     @property
     def product(self) -> str:
         return "couchbase-lite-android"
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "jak_android"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -367,10 +357,6 @@ class JAKTestServer_NonAndroid(JAKTestServer):
             self._server_version = f.read().strip()
 
     @property
-    def platform(self) -> str:
-        return f"jak_{self.__jar_name.lower()}"
-
-    @property
     def product(self) -> str:
         return "couchbase-lite-java"
 
@@ -422,8 +408,10 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         click.secho(f"No uncompressing needed for {self.__jar_name} server package", fg="yellow")
 
 
-@TestServer.register("jak_desktop")
+@TestServer.register
 class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
+    platform = "jak_desktop"
+
     def __init__(self, version: str) -> None:
         super().__init__(version, "Desktop")
 
@@ -443,8 +431,10 @@ class JAKTestServer_Desktop(JAKTestServer_NonAndroid):
         return JarBridge(jar_path, self.version)
 
 
-@TestServer.register("jak_webservice")
+@TestServer.register
 class JAKTestServer_WebService(JAKTestServer_NonAndroid):
+    platform = "jak_webservice"
+
     def __init__(self, version: str) -> None:
         super().__init__(version, "WebService")
 

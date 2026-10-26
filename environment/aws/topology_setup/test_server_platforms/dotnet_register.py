@@ -19,8 +19,6 @@ Functions:
         Create a bridge for the .NET test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
-    platform(self) -> str:
-        Get the platform name.
     publish(self) -> bool:
         Determine if the test server should be published.  Some platforms don't have the necessary artifacts otherwise.
     rid(self) -> str:
@@ -76,9 +74,6 @@ class DotnetTestServer(TestServer):
     Attributes:
         version (str): The version of the test server.
     """
-
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
 
     @property
     @abstractmethod
@@ -167,9 +162,6 @@ class DotnetTestServerCli(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
     @property
     @abstractmethod
     def rid(self) -> str:
@@ -226,7 +218,7 @@ class DotnetTestServerCli(TestServer):
         subprocess.run(args, check=True, capture_output=False, env=env)
 
 
-@TestServer.register("dotnet_ios")
+@TestServer.register
 class DotnetTestServer_iOS(DotnetTestServer):
     """
     A class for managing .NET test servers on iOS.
@@ -235,18 +227,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "dotnet_ios"
+    platform = "dotnet_ios"
 
     @property
     def dotnet_framework(self) -> str:
@@ -341,7 +322,7 @@ class DotnetTestServer_iOS(DotnetTestServer):
         path.unlink()
 
 
-@TestServer.register("dotnet_android")
+@TestServer.register
 class DotnetTestServer_Android(DotnetTestServer):
     """
     A class for managing .NET test servers on Android.
@@ -350,18 +331,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "dotnet_android"
+    platform = "dotnet_android"
 
     @property
     def dotnet_framework(self) -> str:
@@ -446,7 +416,7 @@ class DotnetTestServer_Android(DotnetTestServer):
         click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
-@TestServer.register("dotnet_windows")
+@TestServer.register
 class DotnetTestServer_Windows(DotnetTestServerCli):
     """
     A class for managing .NET test servers on Windows.
@@ -455,18 +425,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "dotnet_windows"
+    platform = "dotnet_windows"
 
     @property
     def rid(self) -> str:
@@ -529,7 +488,7 @@ class DotnetTestServer_Windows(DotnetTestServerCli):
         path.unlink()
 
 
-@TestServer.register("dotnet_macos")
+@TestServer.register
 class DotnetTestServer_macOS(DotnetTestServer):
     """
     A class for managing .NET test servers on macOS.
@@ -538,18 +497,7 @@ class DotnetTestServer_macOS(DotnetTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "dotnet_macos"
+    platform = "dotnet_macos"
 
     @property
     def dotnet_framework(self) -> str:

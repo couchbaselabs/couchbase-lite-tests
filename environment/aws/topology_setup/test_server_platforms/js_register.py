@@ -136,7 +136,7 @@ class JavascriptBridge(PlatformBridge):
         return location
 
 
-@TestServer.register("js")
+@TestServer.register
 class JavascriptTestServer(TestServer):
     """
     A class for running JS servers
@@ -145,16 +145,11 @@ class JavascriptTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
+    platform = "js"
 
     @property
     def product(self) -> str:
         return "couchbase-lite-js"
-
-    @property
-    def platform(self) -> str:
-        return "js"
 
     @property
     def latestbuilds_path(self) -> str:

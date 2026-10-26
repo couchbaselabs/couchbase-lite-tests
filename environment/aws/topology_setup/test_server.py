@@ -9,8 +9,8 @@ Functions:
     initialize(cls) -> None:
         Initialize the test server registry by importing platform-specific modules.
 
-    register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
-        Register a test server subclass with a given name.
+    register(cls, subclass: T) -> T:
+        Register a test server subclass under the key it sets as its platform class attribute.
 
     create(cls, name: str, version: str) -> TestServer:
         Create an instance of a registered test server subclass.
@@ -18,8 +18,6 @@ Functions:
     version(self) -> str:
         Get the version of the test server.
 
-    platform(self) -> str:
-        Get the platform of the test server.
 
     latestbuilds_path(self) -> str:
         Get the path for the latest builds of the test server.
@@ -44,7 +42,6 @@ from __future__ import annotations
 
 import importlib
 from abc import ABC, abstractmethod
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any, ClassVar, Final
 
@@ -77,8 +74,8 @@ class TestServer(ABC):
         initialize(cls) -> None:
             Initialize the test server registry by importing platform-specific modules.
 
-        register(cls, name: str) -> Callable[[Type[TestServer]], Type[TestServer]]:
-            Register a test server subclass with a given name.
+        register(cls, subclass: T) -> T:
+            Register a test server subclass under the key it sets as its platform class attribute.
 
         create(cls, name: str, version: str) -> TestServer:
             Create an instance of a registered test server subclass.
@@ -86,8 +83,6 @@ class TestServer(ABC):
         version(self) -> str:
             Get the version of the test server.
 
-        platform(self) -> str:
-            Get the platform of the test server.
 
         latestbuilds_path(self) -> str:
             Get the path for the latest builds of the test server.
@@ -109,11 +104,16 @@ class TestServer(ABC):
     """
 
     __registry: ClassVar[dict[str, type[TestServer]]] = {}
+    # The platform key, which every registered subclass sets as a class attribute.
+    platform: ClassVar[str]
     __initialized: ClassVar[bool] = False
     __version_filename: Final[str] = ".version"
     __build_no_cache: ClassVar[dict[str, dict[str, str]]] = {}
 
     def __init__(self, version: str) -> None:
+        if not hasattr(self, "platform"):
+            raise TypeError(f"{type(self).__name__} does not set the platform class attribute")
+
         if self.product not in self.__build_no_cache:
             self.__build_no_cache[self.product] = {}
 
@@ -176,22 +176,26 @@ class TestServer(ABC):
         cls.__initialized = True
 
     @classmethod
-    def register(cls, name: str) -> Callable[[type[TestServer]], type[TestServer]]:
+    def register[T: type[TestServer]](cls, subclass: T) -> T:
         """
-        Register a test server subclass with a given name.
+        Register a test server subclass under the key it sets as its `platform` class attribute.
 
         Args:
-            name (str): The name to register the test server subclass with.
+            subclass (T): The class to register. It must set `platform` itself, so that it does not
+                report the key of a registered parent.
 
         Returns:
-            Callable[[Type[TestServer]], Type[TestServer]]: A decorator function to register the subclass.
+            T: The same class, so that this works as a class decorator.
         """
+        platform = vars(subclass).get("platform")
+        if not isinstance(platform, str):
+            raise TypeError(f"{subclass.__name__} must set its own platform class attribute to a str to be registered")
 
-        def decorator(subclass: type[TestServer]) -> type[TestServer]:
-            cls.__registry[name] = subclass
-            return subclass
+        if platform in cls.__registry:
+            raise TypeError(f"{subclass.__name__} and {cls.__registry[platform].__name__} both use platform {platform}")
 
-        return decorator
+        cls.__registry[platform] = subclass
+        return subclass
 
     @classmethod
     def create(cls, name: str, version: str) -> TestServer:
@@ -225,16 +229,6 @@ class TestServer(ABC):
             str: The version of the test server.
         """
         return self.__version
-
-    @property
-    @abstractmethod
-    def platform(self) -> str:
-        """
-        Get the platform of the test server.
-
-        Returns:
-            str: The platform of the test server.
-        """
 
     @property
     @abstractmethod

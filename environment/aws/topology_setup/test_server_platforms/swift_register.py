@@ -16,8 +16,6 @@ Functions:
         Create a bridge for the Swift test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
-    platform(self) -> str:
-        Get the platform name.
     uncompress_package(self, path: Path) -> None:
         Uncompress the Swift test server package.
 """
@@ -56,9 +54,6 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
     @property
     def product(self) -> str:
         return "couchbase-lite-ios"
@@ -91,7 +86,7 @@ class SwiftTestServer(TestServer):
         self._mark_downloaded(FRAMEWORKS_DIR)
 
 
-@TestServer.register("swift_ios")
+@TestServer.register
 class SwiftTestServer_iOS(SwiftTestServer):
     """
     A class for managing Swift test servers on iOS.
@@ -100,18 +95,7 @@ class SwiftTestServer_iOS(SwiftTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "swift_ios"
+    platform = "swift_ios"
 
     @property
     def latestbuilds_path(self) -> str:
