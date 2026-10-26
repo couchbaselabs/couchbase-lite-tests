@@ -1,5 +1,3 @@
-// Look up a version's build number via ProGet get_version. Returns "" when the
-// version has no published build yet (404 / non-JSON body) rather than throwing.
 def getBuildNumber(String product, String version) {
     def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
     return sh(
@@ -8,10 +6,6 @@ def getBuildNumber(String product, String version) {
     ).trim()
 }
 
-// A fully-qualified "<version>-<build>" param is used as-is; anything else (blank for the
-// newest build, or a version or train) is resolved to its latest build via ProGet:
-// latest_release turns a train into its newest version, then get_version gives the build.
-// Returns null when that version has no published build yet (a new train), like cbl-main.
 def resolveVersionBuild(proget, String product, String param, String label) {
     def version = proget.resolveProgetVersion(product, param, label)
     if (version.contains('-')) { return version }
@@ -19,7 +13,6 @@ def resolveVersionBuild(proget, String product, String param, String label) {
     return buildNo ? "${version}-${buildNo}" : null
 }
 
-// The currently-supported (non-EOL) trains for a product, e.g. ["1.0","1.1","1.2"].
 def fetchTrains(String product) {
     def url = "http://proget.build.couchbase.com:8080/api/get_trains?product=${product}"
     def raw = sh(
@@ -48,14 +41,11 @@ pipeline {
         timestamps()
     }
     triggers {
-        // Daily, once cbl-main and sgw-main (both 04:00 IST) have had time to run, and finished
-        // before 09:00 IST. A scheduled run triggers one test run per train with an untested build.
         cron('''TZ=Asia/Kolkata
 30 6 * * *''')
     }
     stages {
         stage('Resolve Versions') {
-            // Dedup state lives on this node's filesystem (~/.jenkins_build_info), like cbl-main.
             agent { label 'mac-mini-new' }
             environment {
                 PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -76,7 +66,6 @@ pipeline {
                         if (!cblFull) { error "CBL_VERSION: no published CBL-JS build for '${params.CBL_VERSION}'" }
                     }
 
-                    // Dedup: { "<version>": "<build>" }, like cbl-main.
                     def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/es.json"
                     def buildInfo = [:]
                     if (fileExists(buildInfoFile)) {
@@ -89,8 +78,6 @@ pipeline {
 
                     def scheduled = !currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').isEmpty()
                     if (scheduled) {
-                        // Dispatcher: trigger this job once per train whose newest build is untested,
-                        // and test nothing in this run.
                         env.SKIP_RUN = 'true'
                         def trains = fetchTrains('couchbase-edge-server')
                         if (!trains) { error "No Edge Server trains returned from ProGet get_trains" }
@@ -119,7 +106,6 @@ pipeline {
                             }
                         }
 
-                        // Prebuild the JS test server once, for every triggered run.
                         if (toTest && cblFull && params.RUN_PREBUILD) {
                             def (cblVersion, cblBuild) = cblFull.tokenize('-')
                             build job: 'prebuild-test-server', parameters: [
@@ -143,16 +129,6 @@ pipeline {
                                 string(name: 'TS_DATASET_VERSION', value: params.TS_DATASET_VERSION),
                                 booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', value: params.JS_REPLICATION_TESTS_ONLY)
                             ], wait: false
-                            def (esVersion, esBuild) = esFull.tokenize('-')
-                            buildInfo[esVersion] = esBuild
-                        }
-
-                        if (toTest) {
-                            try {
-                                writeJSON file: buildInfoFile, json: buildInfo
-                            } catch (Exception e) {
-                                error "Cannot save es.json with error: ${e}"
-                            }
                         }
 
                         currentBuild.displayName = "Scheduled: ${toTest ? toTest.join(', ') : 'nothing new'} (#${currentBuild.number})"
@@ -165,18 +141,9 @@ pipeline {
                         return
                     }
 
-                    // A test run: Build with Parameters, or a run triggered by the dispatcher above.
-                    // It always runs, and records its build so the next scheduled run skips it.
                     env.ES_FULL = resolveVersionBuild(proget, 'couchbase-edge-server', params.ES_VERSION, 'ES_VERSION')
                     if (!env.ES_FULL) { error "ES_VERSION: no published Edge Server build for '${params.ES_VERSION}'" }
                     env.CBL_FULL = cblFull
-                    def (esVersion, esBuild) = env.ES_FULL.tokenize('-')
-                    buildInfo[esVersion] = esBuild
-                    try {
-                        writeJSON file: buildInfoFile, json: buildInfo
-                    } catch (Exception e) {
-                        echo "WARN : Cannot save es.json : ${e}"
-                    }
 
                     def scope = params.JS_REPLICATION_TESTS_ONLY ? "QE (JS replication only)" : params.TEST_DIR
                     currentBuild.displayName = "ES:${env.ES_FULL} (#${currentBuild.number})"
@@ -230,8 +197,6 @@ pipeline {
                             """
                         }
                     }
-                    // The JS test server always runs on this agent at localhost:5173, and a
-                    // scheduled night can start one run per train at once, so take turns with it.
                     if (env.CBL_FULL) {
                         lock("${env.NODE_NAME}-js-test-server") { runTests() }
                     } else {
@@ -252,6 +217,31 @@ pipeline {
                     }
                     archiveArtifacts artifacts: 'tests/QE/edge_server/es/**, tests/dev_e2e/edge_server/es/**', fingerprint: true, allowEmptyArchive: true
                     echo "=== Edge server Test Teardown Complete"
+                }
+            }
+        }
+    }
+    post {
+        success {
+            script {
+                // Only a test run that passed records its build, so the next scheduled run skips it.
+                // es.json lives on mac-mini-new, whichever agent ran the tests.
+                if (env.ES_FULL && env.SKIP_RUN != 'true') {
+                    node('mac-mini-new') {
+                        def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/es.json"
+                        def buildInfo = [:]
+                        if (fileExists(buildInfoFile)) {
+                            try {
+                                buildInfo = readJSON file: buildInfoFile, returnPojo: true
+                            } catch (Exception e) {
+                                echo "WARN : Error when reading es.json : ${e}"
+                            }
+                        }
+                        def (esVersion, esBuild) = env.ES_FULL.tokenize('-')
+                        buildInfo[esVersion] = esBuild
+                        writeJSON file: buildInfoFile, json: buildInfo
+                        echo "Recorded Edge Server ${env.ES_FULL} as tested and passed"
+                    }
                 }
             }
         }
