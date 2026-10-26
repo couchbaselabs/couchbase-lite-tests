@@ -184,36 +184,29 @@ class TestJWTSimple(CBLTestClass):
         await edge_server.wait_for_idle(timeout=15)
 
         # =====================================================================
-        # STEP 10: Verify replication is working by checking doc count.
-        # The pre-loaded travel.cblite2 has 150 airline docs. After
-        # bidirectional replication with JWT auth, ES should have at least
-        # those 150 + our 5 new docs = 155 total. We poll until we see >= 155.
+        # STEP 10: Verify replication pulled the 5 docs added to SGW, alongside
+        # the 150 airline docs of the pre-loaded travel dataset.
         # =====================================================================
         self.mark_test_step("Verifying that Edge Server has replicated documents.")
-        max_wait = 30
-        poll_interval = 3
-        elapsed = 0
-        expected_min = 150  # Pre-loaded travel dataset from zip
-        final_count = 0
-        while elapsed < max_wait:
-            response = await edge_server.get_all_documents("travel", collection="travel.airlines")
-            final_count = len(response.rows)
-            if final_count >= expected_min:
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-        assert final_count >= expected_min, (
-            f"Expected >= {expected_min} docs on ES, got {final_count}. "
-            f"JWT auth replication may not have pulled new docs from SGW."
+        await edge_server.wait_for_documents(
+            "travel", [f"jwt_test_airline_{i}" for i in range(1, 6)], collection="travel.airlines"
+        )
+        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
+        assert len(response.rows) == 155, f"Expected 155 airline docs on Edge Server, got {len(response.rows)}."
+
+        # =====================================================================
+        # STEP 11: Verify replication pushed every ES doc to SGW.
+        # =====================================================================
+        self.mark_test_step("Verifying that SGW has every document on Edge Server.")
+        await sync_gateway.wait_for_documents(
+            sg_db_name, [row.id for row in response.rows], scope="travel", collection="airlines"
         )
 
         # =====================================================================
-        # STEP 11: Verify a document can be fetched from ES.
+        # STEP 12: Verify a document can be fetched from ES.
         # This confirms the database is accessible and replication populated it.
         # =====================================================================
         self.mark_test_step("Verifying document accessible on Edge Server.")
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
-        assert len(response.rows) > 0, "No documents found on Edge Server."
         first_doc_id = response.rows[0].id
         edge_doc = await edge_server.get_document("travel", collection="travel.airlines", doc_id=first_doc_id)
         assert "name" in edge_doc.body, f"Document missing 'name' field: {edge_doc.body}"

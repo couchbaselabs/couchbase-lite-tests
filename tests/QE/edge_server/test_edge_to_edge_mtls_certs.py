@@ -4,14 +4,12 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError, CblTimeoutError
 from cbltest.api.x509_certificate import CertKeyPair, create_ca_certificate, create_leaf_certificate
 from cbltest.asyncfile import read_json_file, write_json_file
-from cbltest.utils import async_retry_assert
 
 SCRIPT_DIR = str(Path(__file__).parent)
 TARGET_USERS = Path(SCRIPT_DIR) / "config" / "test_e2e_mtls_users.json"
@@ -109,14 +107,6 @@ async def _start_source(
     return await source.configure_dataset(db_name="db", config_file=config_path)
 
 
-async def _wait_for_doc(edge_server: EdgeServer, doc_id: str) -> None:
-    async def _poll() -> None:
-        ids = {row.id for row in (await edge_server.get_all_documents("db")).rows}
-        assert doc_id in ids, f"{doc_id} not on {edge_server.hostname}"
-
-    await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(60))
-
-
 @pytest.mark.min_edge_servers(2)
 class TestEdgeToEdgeMtls(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
@@ -154,11 +144,11 @@ class TestEdgeToEdgeMtls(CBLTestClass):
             await source.wait_for_idle()
 
             self.mark_test_step(f"Verify {seed_id} replicated to the source")
-            await _wait_for_doc(source, seed_id)
+            await source.wait_for_documents("db", [seed_id])
 
             self.mark_test_step(f"Create document {push_id} on the source and verify it replicates to the target")
             await source.put_document_with_id({"type": "push"}, push_id, "db")
-            await _wait_for_doc(target, push_id)
+            await target.wait_for_documents("db", [push_id])
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("rejected_client", ["no_client_cert", "untrusted_ca", "expired_client_cert"])

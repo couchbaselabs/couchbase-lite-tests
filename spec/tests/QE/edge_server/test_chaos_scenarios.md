@@ -11,12 +11,12 @@ Test replication behavior while Sync Gateway connectivity is interrupted mid-wor
 3. Configure Edge Server with the `travel` database.
 4. Wait for replication to become idle.
 5. Delete all documents in `travel.hotels` on Edge Server using a bulk delete.
-6. Verify `travel.hotels` is empty on both Edge Server and Sync Gateway.
+6. Wait until Sync Gateway shows every deleted hotel as deleted, then verify `travel.hotels` is empty on both Edge Server and Sync Gateway.
 7. Create 10,000 documents in `travel.hotels` via bulk create on Edge Server.
-8. Wait for replication to become idle and verify counts match on Edge Server and SGW.
+8. Wait for replication to become idle, wait until Sync Gateway has all 10,000 documents, and verify counts match on Edge Server and SGW.
 9. Update all documents and apply firewall deny rules to block SGW.
 10. Perform another update while SGW is blocked, then allow SGW and wait for idle.
-11. Verify document counts match and reset Edge Server firewall rules.
+11. Wait until 50 sampled documents on SGW have the content written while SGW was blocked, verify document counts match, and reset Edge Server firewall rules.
 
 ## test_3_edge_with_sync
 
@@ -30,9 +30,9 @@ Test multi-edge synchronization and recovery with three Edge Servers replicating
 6. Wait for replication to become idle and verify `travel.hotels` is empty on Edge Servers 1, 2, and 3.
 7. Create 1,000 documents in `travel.hotels` on Edge Server 1 and wait for idle.
 8. Verify document counts match across Edge Servers 1, 2, and 3.
-9. Kill Edge Server 1, update documents via Edge Servers 2/3, and verify replication.
+9. Kill Edge Server 1, update documents via Edge Servers 2/3, restart Edge Server 1, and wait until 50 sampled documents on it have the updated content.
 10. Wait for Edge Server 1's replications to become idle after its restart.
-11. Kill Edge Servers 1 and 3, update documents via Edge Server 2, and verify replication.
+11. Kill Edge Servers 1 and 3, update documents via Edge Server 2, restart them, and wait until 50 sampled documents on each have the updated content.
 
 ## test_edge_server_offline_sync_and_recovery
 
@@ -41,13 +41,13 @@ Test the offline synchronization and recovery capabilities of a chained Edge Ser
 1. Configure Edge Server 1 to replicate from Sync Gateway for the `travel` dataset.
 2. Configure Edge Server 2 to replicate from Edge Server 1.
 3. Configure Edge Server 3 to replicate from Edge Server 2.
-4. Wait for replication to become idle across all Edge Servers.
+4. Wait until Edge Server 3 holds the same revision of every `travel.hotels` document as Sync Gateway. Edge Server 3 is seeded with the same hotel IDs, so the IDs alone do not prove that the chain synced.
 5. Delete all documents in the `travel.hotels` collection on Edge Server 3 using a bulk delete.
-6. Wait for replication to become idle, then kill Edge Server 3.
+6. Wait until Edge Server 2, Edge Server 1, and Sync Gateway show the deleted documents as deleted, then kill Edge Server 3.
 7. Verify the documents are deleted in Edge Server 1, Edge Server 2, and Sync Gateway.
 8. Restart Edge Server 3 and wait for it to come online.
 9. Create 10,000 documents in `travel.hotels` via bulk create on Edge Server 3.
-10. Verify documents are created on Edge Server 3 and wait for replication to become idle.
+10. Verify documents are created on Edge Server 3 and wait until they are on Edge Server 2, Edge Server 1, and Sync Gateway.
 11. Verify the created documents propagated successfully to Edge Server 2, Edge Server 1, and Sync Gateway.
 
 ## test_edge_server_with_concurrent_rest_requests

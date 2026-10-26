@@ -1,21 +1,25 @@
 import asyncio
 import random
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
-    CblSyncGatewayBadResponseError,
 )
-from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway
+from cbltest.api.syncgateway import AllDocumentsResponse, DatabaseConfig, ScopeConfig, SyncGateway
 from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.utils import async_retry_assert
 
 SCRIPT_DIR = str(Path(__file__).parent)
+TOTAL_TEST_TIME = timedelta(minutes=360)
 
 
 def _doc_body(doc_id: str) -> dict[str, Any]:
@@ -31,6 +35,15 @@ def _updated_doc_body(doc_id: str) -> dict[str, Any]:
         **_doc_body(doc_id),
         "changed": "yes",
     }
+
+
+async def _wait_for_edge_server_to_match(
+    sync_gateway: SyncGateway, edge_server: EdgeServer, sg_db_name: str, es_db_name: str
+) -> AllDocumentsResponse:
+    """Wait until Edge Server holds every document that Sync Gateway does, and return Sync Gateway's _all_docs."""
+    sg_docs = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+    await edge_server.wait_for_documents(es_db_name, [row.id for row in sg_docs.rows])
+    return sg_docs
 
 
 @pytest.mark.min_edge_servers(1)
@@ -80,12 +93,12 @@ class TestSystem(CBLTestClass):
         config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
-        await edge_server.wait_for_idle()
 
         self.mark_test_step("Verifying that Sync Gateway has 10 documents.")
-        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        response = await sync_gateway.wait_for_document_count(sg_db_name, 10)
         assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
         self.mark_test_step("Verifying that Edge Server has 10 documents.")
+        await edge_server.wait_for_documents(es_db_name, [row.id for row in response.rows])
         response = await edge_server.get_all_documents(es_db_name)
         assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
 
@@ -93,13 +106,14 @@ class TestSystem(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_l(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + TOTAL_TEST_TIME
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
         ) = await self._setup_system_test(cblpytest, tmp_path)
+        es_since = 0
         doc_counter = 11
 
         while datetime.now(UTC) < end_time:
@@ -116,13 +130,9 @@ class TestSystem(CBLTestClass):
                 self.mark_test_step(f"Creating {doc_id} on Sync Gateway.")
                 created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
                 assert created_doc is not None, f"Failed to create document {doc_id} via Sync Gateway."
-                # Allow replication to propagate before validating (eventual consistency).
-                await asyncio.sleep(random.uniform(1, 5))
 
                 self.mark_test_step(f"Verifying {doc_id} on Edge Server.")
-                remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server."
-                assert remote_doc.id == doc_id, f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
+                remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id, doc)
 
                 rev_id = remote_doc.revid
 
@@ -134,11 +144,7 @@ class TestSystem(CBLTestClass):
                     )
                     assert updated_doc is not None, f"Failed to update document {doc_id} via Sync Gateway"
                     self.mark_test_step(f"Verifying {doc_id} update on Edge Server.")
-                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
-
-                    assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server"
-                    assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
-                    assert remote_doc.revid != rev_id, "Revision ID (_rev) missing in the document"
+                    remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id, {"changed": "yes"})
 
                     # Storing the revision ID
                     rev_id = remote_doc.revid
@@ -147,6 +153,7 @@ class TestSystem(CBLTestClass):
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
                     assert rev_id is not None, f"Document {doc_id} has no revision ID."
+                    sg_since = await sync_gateway.get_last_sequence(sg_db_name)
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -154,20 +161,14 @@ class TestSystem(CBLTestClass):
                     # Validating on Edge Server
                     with pytest.raises(CblEdgeServerBadResponseError):
                         await edge_server.get_document(es_db_name, doc_id)
-                    # Allow replication to propagate before validating (eventual consistency).
-                    await asyncio.sleep(2)
                     self.mark_test_step(f"Verifying {doc_id} deleted on Sync Gateway.")
-                    with pytest.raises(CblSyncGatewayBadResponseError):
-                        await sync_gateway.get_document(sg_db_name, doc_id)
+                    await sync_gateway.wait_for_documents(sg_db_name, [doc_id], deleted=True, since=sg_since)
             elif cycle == "edge_server":
                 self.mark_test_step(f"Creating {doc_id} on Edge Server.")
                 created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
                 assert created_doc is not None, f"Failed to create document {doc_id} via Edge Server"
-                # Allow replication to propagate before validating (eventual consistency).
-                await asyncio.sleep(5)
                 self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
-                sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
+                sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, doc)
 
                 rev_id = sg_doc.revid
 
@@ -180,8 +181,7 @@ class TestSystem(CBLTestClass):
                     assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
                     # Validate Update on Sync Gateway
                     self.mark_test_step(f"Verifying {doc_id} update on Sync Gateway.")
-                    sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert rev_id != sg_doc.revid, f"Document {doc_id} update not reflected on Sync Gateway"
+                    sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {"changed": "yes"})
                     # Storing the revision ID
                     rev_id = sg_doc.revid
 
@@ -190,36 +190,35 @@ class TestSystem(CBLTestClass):
                     assert rev_id is not None, "rev_id required for delete"
                     self.mark_test_step(f"Deleting {doc_id} on Sync Gateway.")
                     await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
-                    # Allow replication to propagate before validating (eventual consistency).
-                    await asyncio.sleep(2)
                     self.mark_test_step(f"Verifying {doc_id} deleted on Edge Server.")
-                    with pytest.raises(CblEdgeServerBadResponseError):
-                        await edge_server.get_document(es_db_name, doc_id)
+                    tombstones = await edge_server.wait_for_documents(
+                        es_db_name, [doc_id], deleted=True, since=es_since
+                    )
+                    es_since = tombstones[doc_id]["seq"]
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_one_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + TOTAL_TEST_TIME
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
         ) = await self._setup_system_test(cblpytest, tmp_path)
+        es_since = 0
         edge_server_down = False
         end = datetime.now(UTC) + timedelta(minutes=2400)
         doc_counter = 11
 
         while datetime.now(UTC) < end_time:
-            if datetime.now(UTC) > end:
+            if edge_server_down and datetime.now(UTC) > end:
                 self.mark_test_step("Restarting Edge Server after chaos window.")
                 await cblpytest.edge_servers[0].start_server()
-                # Allow edge server to stabilize after restart.
-                await asyncio.sleep(10)
                 edge_server_down = False
 
                 self.mark_test_step("Verifying doc counts match after Edge Server restart.")
-                sg_response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+                sg_response = await _wait_for_edge_server_to_match(sync_gateway, edge_server, sg_db_name, es_db_name)
                 es_response = await edge_server.get_all_documents(es_db_name)
 
                 assert len(sg_response.rows) == len(es_response.rows), (
@@ -237,8 +236,6 @@ class TestSystem(CBLTestClass):
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
                 await cblpytest.edge_servers[0].kill_server()
                 end = datetime.now(UTC) + timedelta(minutes=1)
-                # Allow time after stopping edge server before next operations.
-                await asyncio.sleep(10)
                 edge_server_down = True
 
             if cycle == "sync_gateway":
@@ -246,14 +243,10 @@ class TestSystem(CBLTestClass):
                 self.mark_test_step(f"Creating {doc_id} on Sync Gateway.")
                 created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
                 assert created_doc is not None, f"Failed to create document {doc_id} via Sync Gateway."
-                # Allow replication to propagate before validating (eventual consistency).
-                await asyncio.sleep(random.uniform(1, 5))
 
                 if not edge_server_down:
                     self.mark_test_step(f"Verifying {doc_id} on Edge Server.")
-                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                    assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server."
-                    assert remote_doc.id == doc_id, f"Document ID mismatch: expected {doc_id}, got {remote_doc.id}"
+                    await edge_server.wait_for_document_body(es_db_name, doc_id, doc)
 
                 rev_id = created_doc.revid
 
@@ -267,11 +260,7 @@ class TestSystem(CBLTestClass):
                     # Validate update on Edge Server
                     if not edge_server_down:
                         self.mark_test_step(f"Verifying {doc_id} update on Edge Server.")
-                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
-
-                        assert remote_doc is not None, f"Document {doc_id} does not exist on the edge server"
-                        assert remote_doc.id == doc_id, f"Document ID mismatch: {remote_doc.id}"
-                        assert remote_doc.revid != rev_id, "Revision ID (_rev) missing in the document"
+                        await edge_server.wait_for_document_body(es_db_name, doc_id, {"changed": "yes"})
 
                     # Storing the revision ID
                     rev_id = updated_doc.revid
@@ -280,6 +269,7 @@ class TestSystem(CBLTestClass):
                     # Delete on edge server and validate on sync gateway
                     self.mark_test_step(f"Deleting {doc_id} on Edge Server.")
                     assert rev_id is not None, f"Document {doc_id} has no revision ID."
+                    sg_since = await sync_gateway.get_last_sequence(sg_db_name)
                     delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                     assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                         f"Failed to delete document {doc_id} via Edge Server"
@@ -287,19 +277,15 @@ class TestSystem(CBLTestClass):
                     # Validating on Edge Server
                     with pytest.raises(CblEdgeServerBadResponseError):
                         await edge_server.get_document(es_db_name, doc_id)
-                    # Allow replication to propagate before validating (eventual consistency).
-                    await asyncio.sleep(2)
                     self.mark_test_step(f"Verifying {doc_id} deleted on Sync Gateway.")
-                    with pytest.raises(CblSyncGatewayBadResponseError):
-                        await sync_gateway.get_document(sg_db_name, doc_id)
+                    await sync_gateway.wait_for_documents(sg_db_name, [doc_id], deleted=True, since=sg_since)
             elif cycle == "edge_server":
                 if not edge_server_down:
                     self.mark_test_step(f"Creating {doc_id} on Edge Server.")
                     created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
                     assert created_doc is not None, f"Failed to create document {doc_id} via Edge Server"
                     self.mark_test_step(f"Verifying {doc_id} on Sync Gateway.")
-                    sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc.id == doc_id, f"Document ID mismatch: {sg_doc.id}"
+                    sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, doc)
 
                     rev_id = sg_doc.revid
 
@@ -312,8 +298,7 @@ class TestSystem(CBLTestClass):
                         assert updated_doc is not None, f"Failed to update document {doc_id} via Edge Server"
                         # Validate Update on Sync Gateway
                         self.mark_test_step(f"Verifying {doc_id} update on Sync Gateway.")
-                        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert rev_id != sg_doc.revid, f"Document {doc_id} update not reflected on Sync Gateway"
+                        sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {"changed": "yes"})
 
                         # Storing the revision ID
                         rev_id = sg_doc.revid
@@ -323,11 +308,11 @@ class TestSystem(CBLTestClass):
                         assert rev_id is not None, "rev_id required for delete"
                         self.mark_test_step(f"Deleting {doc_id} on Sync Gateway.")
                         await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
-                        # Allow replication to propagate before validating (eventual consistency).
-                        await asyncio.sleep(2)
                         self.mark_test_step(f"Verifying {doc_id} deleted on Edge Server.")
-                        with pytest.raises(CblEdgeServerBadResponseError):
-                            await edge_server.get_document(es_db_name, doc_id)
+                        tombstones = await edge_server.wait_for_documents(
+                            es_db_name, [doc_id], deleted=True, since=es_since
+                        )
+                        es_since = tombstones[doc_id]["seq"]
             doc_counter += 1
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -335,7 +320,7 @@ class TestSystem(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + TOTAL_TEST_TIME
         (
             sync_gateway,
             edge_server,
@@ -345,6 +330,7 @@ class TestSystem(CBLTestClass):
 
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
+            es_since = 0
 
             while datetime.now(UTC) < end_time:
                 doc_id = f"c{client_id}_doc_{doc_counter}"
@@ -357,14 +343,9 @@ class TestSystem(CBLTestClass):
                     self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Sync Gateway.")
                     created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
                     assert created_doc is not None, f"[Client {client_id}] Failed to create {doc_id} via Sync Gateway"
-                    await asyncio.sleep(random.uniform(1, 5))
 
                     self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Edge Server.")
-                    remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                    assert remote_doc is not None, f"[Client {client_id}] {doc_id} missing on Edge Server"
-                    assert remote_doc.id == doc_id, (
-                        f"[Client {client_id}] Doc ID mismatch: expected {doc_id}, got {remote_doc.id}"
-                    )
+                    remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id, doc)
                     rev_id = remote_doc.revid
 
                     if "update" in operations:
@@ -376,16 +357,13 @@ class TestSystem(CBLTestClass):
                             f"[Client {client_id}] Failed to update {doc_id} via Sync Gateway"
                         )
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Edge Server.")
-                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                        assert remote_doc is not None, (
-                            f"[Client {client_id}] {doc_id} missing on Edge Server after update"
-                        )
-                        assert remote_doc.revid != rev_id, f"[Client {client_id}] {doc_id} rev unchanged after update"
+                        remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id, {"changed": "yes"})
                         rev_id = remote_doc.revid
 
                     if "delete" in operations:
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
                         assert rev_id is not None, f"Document {doc_id} has no revision ID."
+                        sg_since = await sync_gateway.get_last_sequence(sg_db_name)
                         delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
                         assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
                             f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
@@ -395,19 +373,15 @@ class TestSystem(CBLTestClass):
                         )
                         with pytest.raises(CblEdgeServerBadResponseError):
                             await edge_server.get_document(es_db_name, doc_id)
-                        await asyncio.sleep(2)
-                        with pytest.raises(CblSyncGatewayBadResponseError):
-                            await sync_gateway.get_document(sg_db_name, doc_id)
+                        await sync_gateway.wait_for_documents(sg_db_name, [doc_id], deleted=True, since=sg_since)
 
                 else:  # edge_server
                     self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Edge Server.")
                     created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
                     assert created_doc is not None, f"[Client {client_id}] Failed to create {doc_id} via Edge Server"
-                    await asyncio.sleep(5)
 
                     self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
-                    sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                    assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
+                    sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, doc)
                     rev_id = sg_doc.revid
 
                     if "update" in operations:
@@ -419,24 +393,24 @@ class TestSystem(CBLTestClass):
                             f"[Client {client_id}] Failed to update {doc_id} via Edge Server"
                         )
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Sync Gateway.")
-                        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert rev_id != sg_doc.revid, (
-                            f"[Client {client_id}] {doc_id} update not reflected on Sync Gateway"
-                        )
+                        sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {"changed": "yes"})
                         rev_id = sg_doc.revid
 
                     if "delete" in operations:
                         assert rev_id is not None, f"[Client {client_id}] rev_id required for delete of {doc_id}"
                         self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Sync Gateway.")
                         await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
-                        await asyncio.sleep(2)
                         self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} deleted on Edge Server.")
-                        with pytest.raises(CblEdgeServerBadResponseError):
-                            await edge_server.get_document(es_db_name, doc_id)
+                        tombstones = await edge_server.wait_for_documents(
+                            es_db_name, [doc_id], deleted=True, since=es_since
+                        )
+                        es_since = tombstones[doc_id]["seq"]
 
                 doc_counter += 1
 
-        await asyncio.gather(*[client_worker(i) for i in range(NUM_CLIENTS)])
+        async with asyncio.TaskGroup() as tg:
+            for i in range(NUM_CLIENTS):
+                tg.create_task(client_worker(i))
 
         self.mark_test_step("Verifying final doc counts match between SG and Edge Server.")
         sg_response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
@@ -448,16 +422,45 @@ class TestSystem(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_system_multi_client_chaos(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         NUM_CLIENTS = 4
-        end_time = datetime.now(UTC) + timedelta(minutes=360)
+        end_time = datetime.now(UTC) + TOTAL_TEST_TIME
         (
             sync_gateway,
             edge_server,
             sg_db_name,
             es_db_name,
         ) = await self._setup_system_test(cblpytest, tmp_path)
+        # Per worker, since another worker's later tombstone does not bound this one's.
+        es_since: dict[int, int] = {i: 0 for i in range(NUM_CLIENTS)}
 
-        shared = {"edge_server_down": False}
+        shared = {"edge_server_down": False, "outages": 0, "paused": False, "active": 0}
+        cycle_state = asyncio.Condition()
         recent_docs: list[str] = []
+
+        @asynccontextmanager
+        async def worker_cycle() -> AsyncIterator[None]:
+            """Hold one worker cycle open, first waiting out any pause from workers_paused."""
+            async with cycle_state:
+                await cycle_state.wait_for(lambda: not shared["paused"])
+                shared["active"] += 1
+            try:
+                yield
+            finally:
+                async with cycle_state:
+                    shared["active"] -= 1
+                    cycle_state.notify_all()
+
+        @asynccontextmanager
+        async def workers_paused() -> AsyncIterator[None]:
+            """Stop new worker cycles and wait for the running ones to finish, resuming them on exit."""
+            async with cycle_state:
+                shared["paused"] = True
+                await cycle_state.wait_for(lambda: shared["active"] == 0)
+            try:
+                yield
+            finally:
+                async with cycle_state:
+                    shared["paused"] = False
+                    cycle_state.notify_all()
 
         async def chaos_controller() -> None:
             while datetime.now(UTC) < end_time:
@@ -466,27 +469,34 @@ class TestSystem(CBLTestClass):
                 if datetime.now(UTC) >= end_time:
                     break
 
+                # Flag the outage before the kill, so a worker that fails mid-step can tell why.
                 self.mark_test_step("Triggering chaos: killing Edge Server.")
-                await cblpytest.edge_servers[0].kill_server()
                 shared["edge_server_down"] = True
-                # Allow time for clients to observe the outage before next operations.
-                await asyncio.sleep(10)
+                shared["outages"] += 1
+                await cblpytest.edge_servers[0].kill_server()
 
                 # Keep edge server down for ~1 minute then restart.
                 await asyncio.sleep(60)
 
                 self.mark_test_step("Restarting Edge Server after chaos window.")
                 await cblpytest.edge_servers[0].start_server()
-                # Allow edge server to stabilize after restart.
-                await asyncio.sleep(10)
                 shared["edge_server_down"] = False
 
-                self.mark_test_step("Verifying doc counts match after Edge Server restart.")
+                async with workers_paused():
+                    self.mark_test_step("Verifying doc counts match after Edge Server restart.")
+                    await wait_for_counts_to_match()
+
+        async def wait_for_counts_to_match() -> None:
+            """Poll for up to 60s until Sync Gateway and Edge Server hold the same number of docs."""
+
+            async def _poll() -> None:
                 sg_response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
                 es_response = await edge_server.get_all_documents(es_db_name)
                 assert len(sg_response.rows) == len(es_response.rows), (
-                    "Document count mismatch between Sync Gateway and Edge Server after restart"
+                    f"Doc count mismatch: SG has {len(sg_response.rows)}, ES has {len(es_response.rows)}"
                 )
+
+            await async_retry_assert(_poll, tenacity.wait_fixed(1), tenacity.stop_after_delay(60))
 
         async def fire_read_burst(doc_id: str) -> None:
             if shared["edge_server_down"]:
@@ -498,124 +508,114 @@ class TestSystem(CBLTestClass):
                 if not isinstance(result, Exception):
                     assert result is not None
 
+        async def run_cycle(client_id: int, doc_id: str, edge_server_up: bool) -> None:
+            """Create doc_id through a random server, then maybe update and delete it, checking each step replicates."""
+            cycle = random.choice(["sync_gateway", "edge_server"])
+            operations = random.choice(["create", "create_update_delete", "create_delete"])
+            self.mark_test_step(f"[Client {client_id}] doc {doc_id} via {cycle}, ops: {operations}")
+            doc = _doc_body(doc_id)
+
+            if cycle == "sync_gateway":
+                self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Sync Gateway.")
+                created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
+                assert created_doc is not None, f"[Client {client_id}] Failed to create {doc_id} via Sync Gateway"
+
+                if edge_server_up:
+                    self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Edge Server.")
+                    await edge_server.wait_for_document_body(es_db_name, doc_id, doc)
+                    if len(recent_docs) >= 10:
+                        recent_docs.pop(0)
+                    recent_docs.append(doc_id)
+                    await fire_read_burst(doc_id)
+
+                rev_id = created_doc.revid
+
+                if "update" in operations:
+                    assert rev_id is not None, f"[Client {client_id}] rev_id required for update of {doc_id}"
+                    self.mark_test_step(f"[Client {client_id}] Updating {doc_id} on Sync Gateway.")
+                    updated_doc = await sync_gateway.update_document(
+                        sg_db_name, doc_id, _updated_doc_body(doc_id), rev_id
+                    )
+                    assert updated_doc is not None, f"[Client {client_id}] Failed to update {doc_id} via Sync Gateway"
+                    if edge_server_up:
+                        self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Edge Server.")
+                        await edge_server.wait_for_document_body(es_db_name, doc_id, {"changed": "yes"})
+                    rev_id = updated_doc.revid
+
+                if "delete" in operations and edge_server_up:
+                    self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
+                    assert rev_id is not None, f"Document {doc_id} has no revision ID."
+                    sg_since = await sync_gateway.get_last_sequence(sg_db_name)
+                    delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
+                    assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
+                        f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
+                    )
+                    with pytest.raises(CblEdgeServerBadResponseError):
+                        await edge_server.get_document(es_db_name, doc_id)
+                    self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} deleted on Sync Gateway.")
+                    await sync_gateway.wait_for_documents(sg_db_name, [doc_id], deleted=True, since=sg_since)
+
+            elif edge_server_up:
+                self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Edge Server.")
+                created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
+                assert created_doc is not None, f"[Client {client_id}] Failed to create {doc_id} via Edge Server"
+
+                self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
+                sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, doc)
+                rev_id = sg_doc.revid
+                if len(recent_docs) >= 10:
+                    recent_docs.pop(0)
+                recent_docs.append(doc_id)
+                await fire_read_burst(doc_id)
+
+                if "update" in operations:
+                    self.mark_test_step(f"[Client {client_id}] Updating {doc_id} on Edge Server.")
+                    updated_doc = await edge_server.put_document_with_id(
+                        _updated_doc_body(doc_id),
+                        doc_id,
+                        es_db_name,
+                        rev=rev_id,
+                    )
+                    assert updated_doc is not None, f"[Client {client_id}] Failed to update {doc_id} via Edge Server"
+                    self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Sync Gateway.")
+                    sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {"changed": "yes"})
+                    rev_id = sg_doc.revid
+
+                if "delete" in operations:
+                    assert rev_id is not None, f"[Client {client_id}] rev_id required for delete of {doc_id}"
+                    self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Sync Gateway.")
+                    await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
+                    self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} deleted on Edge Server.")
+                    tombstones = await edge_server.wait_for_documents(
+                        es_db_name, [doc_id], deleted=True, since=es_since[client_id]
+                    )
+                    es_since[client_id] = tombstones[doc_id]["seq"]
+
+            # Jitter, so the workers do not run in lockstep or flood Sync Gateway while Edge Server is down.
+            await asyncio.sleep(random.uniform(1, 5))
+
         async def client_worker(client_id: int) -> None:
             doc_counter = 1
-
             while datetime.now(UTC) < end_time:
                 doc_id = f"cc{client_id}_doc_{doc_counter}"
-                cycle = random.choice(["sync_gateway", "edge_server"])
-                operations = random.choice(["create", "create_update_delete", "create_delete"])
-                self.mark_test_step(f"[Client {client_id}] doc {doc_id} via {cycle}, ops: {operations}")
-                doc = _doc_body(doc_id)
-
-                if cycle == "sync_gateway":
-                    self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Sync Gateway.")
-                    created_doc = await sync_gateway.create_document(sg_db_name, doc_id, doc)
-                    assert created_doc is not None, f"[Client {client_id}] Failed to create {doc_id} via Sync Gateway"
-                    await asyncio.sleep(random.uniform(1, 5))
-
-                    if not shared["edge_server_down"]:
-                        self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Edge Server.")
-                        remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                        assert remote_doc is not None, f"[Client {client_id}] {doc_id} missing on Edge Server"
-                        assert remote_doc.id == doc_id, (
-                            f"[Client {client_id}] Doc ID mismatch: expected {doc_id}, got {remote_doc.id}"
+                async with worker_cycle():
+                    # Decided once, since Edge Server can restart mid-cycle without the docs this cycle wrote.
+                    edge_server_up = not shared["edge_server_down"]
+                    outages = shared["outages"]
+                    try:
+                        await run_cycle(client_id, doc_id, edge_server_up)
+                    except Exception:
+                        if not edge_server_up or shared["outages"] == outages:
+                            raise
+                        self.mark_test_step(
+                            f"[Client {client_id}] Abandoned {doc_id}: Edge Server went down mid-cycle."
                         )
-                        if len(recent_docs) >= 10:
-                            recent_docs.pop(0)
-                        recent_docs.append(doc_id)
-                        await fire_read_burst(doc_id)
-
-                    rev_id = created_doc.revid
-
-                    if "update" in operations:
-                        assert rev_id is not None, f"[Client {client_id}] rev_id required for update of {doc_id}"
-                        self.mark_test_step(f"[Client {client_id}] Updating {doc_id} on Sync Gateway.")
-                        updated_doc = await sync_gateway.update_document(
-                            sg_db_name, doc_id, _updated_doc_body(doc_id), rev_id
-                        )
-                        assert updated_doc is not None, (
-                            f"[Client {client_id}] Failed to update {doc_id} via Sync Gateway"
-                        )
-                        if not shared["edge_server_down"]:
-                            self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Edge Server.")
-                            remote_doc = await edge_server.get_document(es_db_name, doc_id)
-                            assert remote_doc is not None, (
-                                f"[Client {client_id}] {doc_id} missing on Edge Server after update"
-                            )
-                            assert remote_doc.revid != rev_id, (
-                                f"[Client {client_id}] {doc_id} rev unchanged after update"
-                            )
-                        rev_id = updated_doc.revid
-
-                    if "delete" in operations and not shared["edge_server_down"]:
-                        self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Edge Server.")
-                        assert rev_id is not None, f"Document {doc_id} has no revision ID."
-                        delete_resp = await edge_server.delete_document(doc_id, rev_id, es_db_name)
-                        assert isinstance(delete_resp, dict) and delete_resp.get("ok") is True, (
-                            f"[Client {client_id}] Failed to delete {doc_id} via Edge Server"
-                        )
-                        with pytest.raises(CblEdgeServerBadResponseError):
-                            await edge_server.get_document(es_db_name, doc_id)
-                        await asyncio.sleep(2)
-                        self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} deleted on Sync Gateway.")
-                        with pytest.raises(CblSyncGatewayBadResponseError):
-                            await sync_gateway.get_document(sg_db_name, doc_id)
-
-                else:  # edge_server
-                    if not shared["edge_server_down"]:
-                        self.mark_test_step(f"[Client {client_id}] Creating {doc_id} on Edge Server.")
-                        created_doc = await edge_server.put_document_with_id(doc, doc_id, es_db_name)
-                        assert created_doc is not None, (
-                            f"[Client {client_id}] Failed to create {doc_id} via Edge Server"
-                        )
-                        await asyncio.sleep(5)
-
-                        self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} on Sync Gateway.")
-                        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                        assert sg_doc.id == doc_id, f"[Client {client_id}] Doc ID mismatch: {sg_doc.id}"
-                        rev_id = sg_doc.revid
-                        if len(recent_docs) >= 10:
-                            recent_docs.pop(0)
-                        recent_docs.append(doc_id)
-                        await fire_read_burst(doc_id)
-
-                        if "update" in operations:
-                            self.mark_test_step(f"[Client {client_id}] Updating {doc_id} on Edge Server.")
-                            updated_doc = await edge_server.put_document_with_id(
-                                _updated_doc_body(doc_id),
-                                doc_id,
-                                es_db_name,
-                                rev=rev_id,
-                            )
-                            assert updated_doc is not None, (
-                                f"[Client {client_id}] Failed to update {doc_id} via Edge Server"
-                            )
-                            self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} update on Sync Gateway.")
-                            sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
-                            assert rev_id != sg_doc.revid, (
-                                f"[Client {client_id}] {doc_id} update not reflected on Sync Gateway"
-                            )
-                            rev_id = sg_doc.revid
-
-                        if "delete" in operations:
-                            assert rev_id is not None, f"[Client {client_id}] rev_id required for delete of {doc_id}"
-                            self.mark_test_step(f"[Client {client_id}] Deleting {doc_id} on Sync Gateway.")
-                            await sync_gateway.delete_document(doc_id, rev_id, sg_db_name)
-                            await asyncio.sleep(2)
-                            self.mark_test_step(f"[Client {client_id}] Verifying {doc_id} deleted on Edge Server.")
-                            with pytest.raises(CblEdgeServerBadResponseError):
-                                await edge_server.get_document(es_db_name, doc_id)
-
                 doc_counter += 1
 
-        tasks = [client_worker(i) for i in range(NUM_CLIENTS)]
-        tasks.append(chaos_controller())
-        await asyncio.gather(*tasks)
+        async with asyncio.TaskGroup() as tg:
+            for i in range(NUM_CLIENTS):
+                tg.create_task(client_worker(i))
+            tg.create_task(chaos_controller())
 
         self.mark_test_step("Verifying final doc counts match between SG and Edge Server.")
-        sg_response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
-        es_response = await edge_server.get_all_documents(es_db_name)
-        assert len(sg_response.rows) == len(es_response.rows), (
-            f"Final doc count mismatch: SG has {len(sg_response.rows)}, ES has {len(es_response.rows)}"
-        )
+        await wait_for_counts_to_match()
