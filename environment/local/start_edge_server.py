@@ -99,7 +99,7 @@ def main(version: str | None, container_name: str, base_config: pathlib.Path | N
             "host.docker.internal:host-gateway",
             "-e",
             f"HOST_FORWARD_PORTS={' '.join(str(p) for p in forward_ports)}",
-            *(arg for port in PORTS for arg in ("-p", f"{port}:{port}")),
+            *(arg for port in PORTS for arg in ("-p", f"127.0.0.1:{port}:{port}")),
             IMAGE_NAME,
         ]
     )
