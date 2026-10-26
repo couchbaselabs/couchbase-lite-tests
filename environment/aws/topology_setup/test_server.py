@@ -66,6 +66,14 @@ def listen_port(platform: str) -> int:
     return 5173 if platform == "js" else 8080
 
 
+def test_server_entry(platform: str, host: str) -> dict[str, str]:
+    """The cbltest config entry for a test server of the given platform key running on host."""
+    entry = {"url": f"http://{host}:{listen_port(platform)}"}
+    if platform == "js":
+        entry["transport"] = "ws"
+    return entry
+
+
 class TestServer(ABC):
     """
     An abstract base class for managing Couchbase Lite test servers on various platforms.
@@ -106,6 +114,10 @@ class TestServer(ABC):
     __registry: ClassVar[dict[str, type[TestServer]]] = {}
     # The platform key, which every registered subclass sets as a class attribute.
     platform: ClassVar[str]
+    # The product name, for use with gvr and latestbuilds.
+    product: ClassVar[str]
+    # Whether latestbuilds carries a package for this platform, or it can only be built from source.
+    published: ClassVar[bool] = True
     __initialized: ClassVar[bool] = False
     __version_filename: Final[str] = ".version"
     __build_no_cache: ClassVar[dict[str, dict[str, str]]] = {}
@@ -164,7 +176,7 @@ class TestServer(ABC):
         """
         Initialize the test server registry by importing platform-specific modules.
         """
-        # A direct import of one platform module also registers it, so a non-empty registry is not enough.
+        # Set only here, because importing one platform module directly registers just that module.
         if cls.__initialized:
             return
 
@@ -213,12 +225,22 @@ class TestServer(ABC):
         Raises:
             ValueError: If the test server type is unknown.
         """
+        return cls.registered(name)(version)
+
+    @classmethod
+    def registered(cls, name: str) -> type[TestServer]:
+        """
+        Get the test server subclass registered under a platform key.
+
+        Raises:
+            ValueError: If the test server type is unknown.
+        """
         cls.initialize()
 
         if name not in cls.__registry:
             raise ValueError(f"Unknown test server type: {name}. Valid names {cls.__registry.keys()}")
 
-        return cls.__registry[name](version)
+        return cls.__registry[name]
 
     @property
     def version(self) -> str:
@@ -229,16 +251,6 @@ class TestServer(ABC):
             str: The version of the test server.
         """
         return self.__version
-
-    @property
-    @abstractmethod
-    def product(self) -> str:
-        """
-        Get the product name of the test server (for use with gvr and latestbuidls)
-
-        Returns:
-            str: The product name of the test server.
-        """
 
     @property
     @abstractmethod
@@ -314,6 +326,9 @@ class TestServer(ABC):
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
+        if not self.published:
+            raise RuntimeError(f"No {self.platform} test server is published, so it must be built from source")
+
         url = f"https://latestbuilds.service.couchbase.com/builds/{self.artifact_root}/{self.latestbuilds_path}"
         header(f"Downloading {url}")
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version

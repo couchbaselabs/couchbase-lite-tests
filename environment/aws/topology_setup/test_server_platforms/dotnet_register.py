@@ -95,9 +95,7 @@ class DotnetTestServer(TestServer):
         """
         return None
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-net"
+    product = "couchbase-lite-net"
 
     @property
     @abstractmethod
@@ -172,9 +170,7 @@ class DotnetTestServerCli(TestServer):
             str: The runtime identifier.
         """
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-net"
+    product = "couchbase-lite-net"
 
     def build(self) -> None:
         """

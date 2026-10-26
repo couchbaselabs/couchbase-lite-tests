@@ -188,8 +188,51 @@ By default this runs the C test server. Pass `--platform` to run a different one
 | `dotnet`      | .NET (macOS or Windows only)    | 5555 |
 | `jak_desktop` | Java desktop                    | 8080 |
 | `js`          | JavaScript in a browser (`ws`)  | 5173 |
+| `ios`         | Swift, on an iOS device (macOS) | 8080 |
+| `ios_simulator` | Swift, on an iOS simulator (macOS) | 8080 |
 
 The generated topology config names the port of that platform, also with `--skip-testserver`.
+
+### iOS device
+
+`--platform ios` installs and runs the Swift test server on an iOS device that is connected to
+this Mac. Give the device UDID with `--ios-device` and the device IP address with
+`--ios-device-ip`. The script cannot find the IP address of the device itself.
+
+```bash
+uv run environment/local/start_local.py --server rosmar --git-tag main --platform ios \
+  --ios-device 00008110-001055002213401E --ios-device-ip 192.168.1.42
+```
+
+The device must reach Sync Gateway over the network, but cbltest uses one host name for the
+public API and the admin API of Sync Gateway. Thus the run finds the address of this Mac on the
+route to the device. It binds the Sync Gateway admin API to that address, not to 127.0.0.1, and
+names that address in the topology config.
+
+Do not use `--platform ios` on an untrusted network. Other hosts on the network can reach the
+admin API, and the rosmar configuration turns off admin authentication.
+
+A build from source (`--build-testserver`) needs Xcode and a signing identity for the device.
+`--stop-testserver --platform ios --ios-device <UDID>` also stops the app on the device.
+
+### iOS simulator
+
+`--platform ios_simulator` installs and runs the Swift test server on a booted simulator. A
+simulator uses the network of this Mac, so the test server is on `localhost:8080`, and Sync
+Gateway keeps its usual addresses.
+
+```bash
+xcrun simctl boot "iPhone 17 Pro"   # if no simulator is booted
+uv run environment/local/start_local.py --server rosmar --git-tag main --platform ios_simulator
+```
+
+- No simulator build of the test server is published, so this platform always builds from source
+  with Xcode. Without `--build-testserver`, it builds against the latest release of Couchbase Lite.
+- By default, the run uses the booted simulator. If more than one simulator is booted, give the
+  UDID of one with `--ios-device`.
+- The simulator app holds port 8080 on this Mac. Each run stops the app first, and then makes sure
+  that port 8080 is free, as for a local test server.
+- `--stop-testserver --platform ios_simulator` also stops the app on the simulator.
 
 By default this downloads the latest released test server for the platform. To build it from
 source instead, pass `--build-testserver` with a release version or a numbered build:

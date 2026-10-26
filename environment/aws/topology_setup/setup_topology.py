@@ -739,10 +739,10 @@ class TopologyConfig:
             success = False
             for _ in range(30):
                 try:
-                    requests.get(f"http://{ip}:{port}")
+                    requests.get(f"http://{ip}:{port}", timeout=15)
                     success = True
                     break
-                except requests.exceptions.ConnectionError:
+                except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
                     click.secho(
                         f"Failed to connect to test server at {ip}:{port}, retrying in 1s...",
                         fg="yellow",

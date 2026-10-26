@@ -5,6 +5,7 @@ It includes functions for building, compressing, and creating bridges for the te
 Classes:
     SwiftTestServer: A base class for Swift test servers.
     SwiftTestServer_iOS: A class for managing Swift test servers on iOS
+    SwiftTestServer_iOSSimulator: A class for managing Swift test servers on an iOS simulator
     SwiftTestServer_macOS: A class for managing Swift test servers on macOS.
 
 Functions:
@@ -23,6 +24,7 @@ Functions:
 import os
 import shutil
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -36,12 +38,15 @@ from environment.aws.topology_setup.test_server import (
 )
 
 from .ios_bridge import iOSBridge
+from .ios_simulator_bridge import iOSSimulatorBridge
 from .platform_bridge import PlatformBridge
 
 SWIFT_TEST_SERVER_DIR = TEST_SERVER_DIR / "ios"
 BUILD_DEVICE_DIR = SWIFT_TEST_SERVER_DIR / "build_device"
+BUILD_SIMULATOR_DIR = SWIFT_TEST_SERVER_DIR / "build_simulator"
 DOWNLOAD_DIR = SWIFT_TEST_SERVER_DIR / "downloaded"
 FRAMEWORKS_DIR = SWIFT_TEST_SERVER_DIR / "Frameworks"
+IOS_APP_ID = "com.couchbase.ios.testserver"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -54,9 +59,7 @@ class SwiftTestServer(TestServer):
         version (str): The version of the test server.
     """
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-ios"
+    product = "couchbase-lite-ios"
 
     def cbl_filename(self, version: str) -> str:
         return f"couchbase-lite-swift_xc_enterprise_{version}.zip"
@@ -96,6 +99,10 @@ class SwiftTestServer_iOS(SwiftTestServer):
     """
 
     platform = "swift_ios"
+    _sdk = "iphoneos"
+    _build_dir = BUILD_DEVICE_DIR
+    _package_name = "testserver_ios.zip"
+    _bridge_type: Callable[[str, str], PlatformBridge] = iOSBridge
 
     @property
     def latestbuilds_path(self) -> str:
@@ -105,7 +112,11 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path for the latest builds.
         """
-        return self.artifact_path("testserver_ios.zip")
+        return self.artifact_path(self._package_name)
+
+    @property
+    def _app_path(self) -> Path:
+        return self._build_dir / "Build" / "Products" / f"Release-{self._sdk}" / "TestServer-iOS.app"
 
     def build(self) -> None:
         self._download_cbl()
@@ -119,13 +130,18 @@ class SwiftTestServer_iOS(SwiftTestServer):
             "-scheme",
             "TestServer",
             "-sdk",
-            "iphoneos",
+            self._sdk,
             "-configuration",
             "Release",
             "-derivedDataPath",
-            str(BUILD_DEVICE_DIR),
+            str(self._build_dir),
             "-allowProvisioningUpdates",
         ]
+
+        if shutil.which("xcpretty") is None:
+            if subprocess.run(xcodebuild_cmd, env=env, cwd=SWIFT_TEST_SERVER_DIR).returncode != 0:
+                raise RuntimeError("Build failed")
+            return
 
         with subprocess.Popen(
             xcodebuild_cmd,
@@ -156,16 +172,12 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             PlatformBridge: The platform bridge.
         """
-        location = (
-            DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
+        path = (
+            DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version / "TestServer-iOS.app"
             if self._downloaded
-            else BUILD_DEVICE_DIR / "Build" / "Products" / "Release-iphoneos"
+            else self._app_path
         )
-        path = location / "TestServer-iOS.app"
-        return iOSBridge(
-            str(path),
-            "com.couchbase.ios.testserver",
-        )
+        return self._bridge_type(str(path), IOS_APP_ID)
 
     def compress_package(self) -> str:
         """
@@ -174,9 +186,9 @@ class SwiftTestServer_iOS(SwiftTestServer):
         Returns:
             str: The path to the compressed package.
         """
-        header("Compressing Swift test server for iOS")
-        publish_dir = BUILD_DEVICE_DIR / "Build" / "Products" / "Release-iphoneos" / "TestServer-iOS.app"
-        zip_path = publish_dir.parents[5] / "testserver_ios.zip"
+        header(f"Compressing Swift test server for {self._sdk}")
+        publish_dir = self._app_path
+        zip_path = publish_dir.parents[5] / self._package_name
         zip_directory(publish_dir, zip_path)
         return str(zip_path)
 
@@ -189,3 +201,20 @@ class SwiftTestServer_iOS(SwiftTestServer):
         """
         unzip_directory(path, path.parent / "TestServer-iOS.app")
         path.unlink()
+
+
+@TestServer.register
+class SwiftTestServer_iOSSimulator(SwiftTestServer_iOS):
+    """
+    A class for managing Swift test servers on an iOS simulator of this Mac.
+
+    Attributes:
+        version (str): The version of the test server.
+    """
+
+    platform = "swift_ios_simulator"
+    published = False
+    _sdk = "iphonesimulator"
+    _build_dir = BUILD_SIMULATOR_DIR
+    _package_name = "testserver_ios_simulator.zip"
+    _bridge_type = iOSSimulatorBridge

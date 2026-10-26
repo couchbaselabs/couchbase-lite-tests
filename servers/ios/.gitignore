@@ -15,5 +15,9 @@ Assets/dbs
 Assets/blobs
 
 #Build
+build_device/
+build_simulator/
+downloaded/
 Frameworks/CouchbaseLiteSwift.xcframework
+Frameworks/LICENSE.txt
 TestServer/Server/CBLVersion.swift

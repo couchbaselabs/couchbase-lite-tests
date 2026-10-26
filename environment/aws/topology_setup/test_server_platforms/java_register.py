@@ -277,9 +277,7 @@ class JAKTestServer_Android(JAKTestServer):
     def test_server_path(self) -> str:
         return "android"
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-android"
+    product = "couchbase-lite-android"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -356,9 +354,7 @@ class JAKTestServer_NonAndroid(JAKTestServer):
         with open(JAK_TEST_SERVER_DIR / "version.txt") as f:
             self._server_version = f.read().strip()
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-java"
+    product = "couchbase-lite-java"
 
     @property
     def test_server_path(self) -> str:

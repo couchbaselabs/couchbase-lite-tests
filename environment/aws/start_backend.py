@@ -39,7 +39,7 @@ from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 from environment.aws.topology_setup.setup_topology import main as topology_main
-from environment.aws.topology_setup.test_server import listen_port
+from environment.aws.topology_setup.test_server import test_server_entry
 
 
 class TopologyParamType(click.ParamType):
@@ -171,15 +171,10 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
-                ts_definition = {
-                    "url": f"http://{ts.ip_address}:{listen_port(ts.platform)}",
-                }
+                ts_definition = test_server_entry(ts.platform, ts.ip_address)
 
                 if ts.dataset_version:
                     ts_definition["dataset_version"] = ts.dataset_version
-
-                if ts.platform == "js":
-                    ts_definition["transport"] = "ws"
 
                 test_servers.append(ts_definition)
 
