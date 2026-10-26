@@ -157,32 +157,45 @@ internal static partial class HandlerList
     internal readonly record struct StartReplicatorAuthenticator
     {
         private const string BasicType = "BASIC";
+        private const string SessionType = "SESSION";
 
         // Note that System.Text.Json does not support private fields or properties
         // ReSharper disable MemberCanBePrivate.Global
         public readonly string username = "";
         public readonly string password = "";
+        public readonly string sessionID = "";
+        public readonly string? cookieName;
         // ReSharper restore MemberCanBePrivate.Global
 
         public required string type { get; init; }
 
         [JsonConstructor]
-        public StartReplicatorAuthenticator(string type, string? username = null, string? password = null)
+        public StartReplicatorAuthenticator(string type, string? username = null, string? password = null,
+            string? sessionID = null, string? cookieName = null)
         {
             this.type = type;
-            if (type != BasicType) {
-                return;
+            switch (type) {
+                case BasicType:
+                    this.username = username ?? throw new JsonException("Missing username property in auth");
+                    this.password = password ?? throw new JsonException("Missing password property in auth");
+                    break;
+                case SessionType:
+                    this.sessionID = sessionID ?? throw new JsonException("Missing sessionID property in auth");
+                    this.cookieName = cookieName;
+                    break;
             }
-
-            this.username = username ?? throw new JsonException("Missing username property in auth");
-            this.password = password ?? throw new JsonException("Missing password property in auth");
         }
 
         public Authenticator CreateAuthenticator()
         {
-            return type == BasicType
-                ? new BasicAuthenticator(username, password)
-                : throw new NotImplementedException("Non-BASIC auth not implemented");
+            return type switch
+            {
+                BasicType => new BasicAuthenticator(username, password),
+                SessionType => cookieName == null
+                    ? new SessionAuthenticator(sessionID)
+                    : new SessionAuthenticator(sessionID, cookieName),
+                _ => throw new NotImplementedException($"{type} auth not implemented")
+            };
         }
     }
 

@@ -11,6 +11,7 @@ from cbltest.api.error import CblTestError, CblTimeoutError
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorAuthenticator,
+    ReplicatorBearerAuthenticator,
     ReplicatorCollectionEntry,
     ReplicatorDocumentEntry,
     ReplicatorStatus,
@@ -23,6 +24,7 @@ from cbltest.response_types import (
     PostGetReplicatorStatusResponseMethods,
     PostStartReplicatorResponseMethods,
 )
+from cbltest.responses import ServerVariant
 from cbltest.version import VERSION
 
 
@@ -76,6 +78,17 @@ class Replicator:
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
+        if isinstance(authenticator, ReplicatorBearerAuthenticator):
+            if any(name.lower() == "authorization" for name in headers or {}):
+                raise CblTestError(
+                    "A bearer authenticator sets the Authorization header, so headers cannot also set it"
+                )
+
+            # Only CBL JS has a bearer authenticator, since a browser cannot set WebSocket headers.
+            if self.__request_factory.variant(self.__index) != ServerVariant.JS:
+                headers = (headers or {}) | {"Authorization": f"Bearer {authenticator.token}"}
+                authenticator = None
+
         self.__endpoint = endpoint
         self.__id: str = ""
         self.__document_updates: list[ReplicatorDocumentEntry] = []

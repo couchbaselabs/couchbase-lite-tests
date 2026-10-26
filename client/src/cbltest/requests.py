@@ -3,13 +3,14 @@ from __future__ import annotations
 import importlib
 import traceback
 from collections.abc import Callable
+from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from shutil import rmtree
 from typing import Any, TypeVar, cast
 from uuid import UUID, uuid4
 
-from .api.error import CblTestServerBadResponseError
+from .api.error import CblTestError, CblTestServerBadResponseError
 from .api.jsonserializable import JSONSerializable
 from .configparser import ParsedConfig, TransportType
 from .httpclient import AsyncHTTPClient
@@ -17,7 +18,7 @@ from .httplog import get_next_writer
 from .logging import cbl_error, cbl_info
 from .request_types import GetRootRequest, TestServerRequest
 from .requests_transport import RequestTransportFactory
-from .responses import TestServerResponse, _response_registry
+from .responses import ServerVariant, TestServerResponse, _response_registry
 from .websocket_router import WebSocketRouter
 
 
@@ -76,6 +77,15 @@ def register_body(request_type: TestServerRequestType, version: int | list[int])
     return deco
 
 
+@dataclass
+class _ServerInfo:
+    """A test server's URL and transport, and its variant once CBLPyTest resolves the API version"""
+
+    url: str
+    transport: TransportType
+    variant: ServerVariant | None = None
+
+
 class RequestFactory:
     """
     This class is responsible for creating requests to send to the test server in a way
@@ -99,17 +109,17 @@ class RequestFactory:
             self.__record_path.mkdir()
 
         self.__uuid = uuid4()
-        self.__server_infos: list[tuple[str, TransportType]] = []
+        self.__server_infos: list[_ServerInfo] = []
         self.__session = AsyncHTTPClient()
         ws_urls: list[str] = []
         for ts in config.test_servers:
             transport = cast(str, ts.get("transport", TransportType.HTTP.value)).lower()
             next_url = cast(str, ts.get("url"))
             if transport == TransportType.HTTP.value:
-                self.__server_infos.append((next_url, TransportType.HTTP))
+                self.__server_infos.append(_ServerInfo(next_url, TransportType.HTTP))
             else:
                 ws_urls.append(next_url)
-                self.__server_infos.append((next_url, TransportType.WS))
+                self.__server_infos.append(_ServerInfo(next_url, TransportType.WS))
 
         self.__ws_router = WebSocketRouter(ws_urls)
 
@@ -136,6 +146,18 @@ class RequestFactory:
                 raise ValueError(f"Response type for '{request_cls}' not registered for version {version}!")
 
         cbl_info(f"RequestFactory ({self.__uuid}) initialized for version {self.__version}")
+
+    def variant(self, index: int) -> ServerVariant:
+        """Gets the variant of Couchbase Lite that the test server at the given index runs"""
+        variant = self.__server_infos[index].variant
+        if variant is None:
+            raise CblTestError(f"Variant of test server {index} is not known until CBLPyTest resolves the API version")
+
+        return variant
+
+    def set_variant(self, index: int, variant: ServerVariant) -> None:
+        """Records the variant of Couchbase Lite that the test server at the given index runs"""
+        self.__server_infos[index].variant = variant
 
     @property
     def uuid(self) -> UUID:
@@ -184,19 +206,19 @@ class RequestFactory:
 
         try:
             transport = RequestTransportFactory.get_transport(
-                server_info[1],
-                server_info[0],
+                server_info.transport,
+                server_info.url,
                 session=self.__session,
                 ws_router=self.__ws_router,
             )
             ret_val = await transport.send(r, writer.num)
         except CblTestServerBadResponseError as e:
-            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})", include_stack=False)
+            cbl_error(f"Failed to send {r} to {server_info.url} ({e!s})", include_stack=False)
             msg = f"{e!s}\n\n{e.body}"
             writer.write_error(msg)
             raise
         except Exception as e:
-            cbl_error(f"Failed to send {r} to {server_info[0]} ({e!s})")
+            cbl_error(f"Failed to send {r} to {server_info.url} ({e!s})")
             writer.write_error(traceback.format_exc())
             raise
 
