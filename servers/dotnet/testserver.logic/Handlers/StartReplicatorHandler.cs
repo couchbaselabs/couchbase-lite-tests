@@ -173,8 +173,8 @@ internal static partial class HandlerList
         public StartReplicatorAuthenticator(string type, string? username = null, string? password = null,
             string? sessionID = null, string? cookieName = null)
         {
-            this.type = type;
-            switch (type) {
+            this.type = type.ToUpperInvariant();
+            switch (this.type) {
                 case BasicType:
                     this.username = username ?? throw new JsonException("Missing username property in auth");
                     this.password = password ?? throw new JsonException("Missing password property in auth");

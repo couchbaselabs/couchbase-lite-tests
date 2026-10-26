@@ -78,17 +78,6 @@ class Replicator:
         self.__database = database
         self.__index = database._index
         self.__request_factory = database._request_factory
-        if isinstance(authenticator, ReplicatorBearerAuthenticator):
-            if any(name.lower() == "authorization" for name in headers or {}):
-                raise CblTestError(
-                    "A bearer authenticator sets the Authorization header, so headers cannot also set it"
-                )
-
-            # Only CBL JS has a bearer authenticator, since a browser cannot set WebSocket headers.
-            if self.__request_factory.variant(self.__index) != ServerVariant.JS:
-                headers = (headers or {}) | {"Authorization": f"Bearer {authenticator.token}"}
-                authenticator = None
-
         self.__endpoint = endpoint
         self.__id: str = ""
         self.__document_updates: list[ReplicatorDocumentEntry] = []
@@ -129,24 +118,40 @@ class Replicator:
         """Clears the cached document updates received so far by the server"""
         self.__document_updates.clear()
 
+    def _request_auth(self) -> tuple[ReplicatorAuthenticator | None, dict[str, str] | None]:
+        """The authenticator and headers to send for the current configuration"""
+        authenticator, headers = self.authenticator, self.headers
+        # Only CBL JS has a bearer authenticator, since a browser cannot set WebSocket headers.
+        if (
+            not isinstance(authenticator, ReplicatorBearerAuthenticator)
+            or self.__request_factory.variant(self.__index) == ServerVariant.JS
+        ):
+            return authenticator, headers
+
+        if any(name.lower() == "authorization" for name in headers or {}):
+            raise CblTestError("A bearer authenticator sets the Authorization header, so headers cannot also set it")
+
+        return None, (headers or {}) | {"Authorization": f"Bearer {authenticator.token}"}
+
     async def start(self) -> None:
         """
         Sends a replicatorStart request to the remote server
         """
         with self.__tracer.start_as_current_span("start_replicator"):
+            authenticator, headers = self._request_auth()
             req = self.__request_factory.create_request(
                 TestServerRequestType.START_REPLICATOR,
                 database=self.__database.name,
                 endpoint=self.__endpoint,
                 replicatorType=self.replicator_type,
                 continuous=self.continuous,
-                authenticator=self.authenticator,
+                authenticator=authenticator,
                 enableDocumentListener=self.enable_document_listener,
                 enableAutoPurge=self.enable_auto_purge,
                 pinnedServerCert=self.pinned_server_cert,
                 reset=self.reset,
                 collections=self.collections,
-                headers=self.headers,
+                headers=headers,
             )
             resp = await self.__request_factory.send_request(self.__index, req)
             if resp.error is not None:

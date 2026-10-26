@@ -26,29 +26,36 @@ def replicator(variant: ServerVariant, **kwargs: Any) -> Replicator:
 @pytest.mark.parametrize("variant", [ServerVariant.C, ServerVariant.DOTNET, ServerVariant.IOS, ServerVariant.JVM])
 def test_bearer_becomes_authorization_header(variant: ServerVariant) -> None:
     r = replicator(variant, authenticator=ReplicatorBearerAuthenticator("tok"), headers={"X-Other": "1"})
-    assert r.authenticator is None
-    assert r.headers == {"X-Other": "1", "Authorization": "Bearer tok"}
+    assert r._request_auth() == (None, {"X-Other": "1", "Authorization": "Bearer tok"})
+    assert r.headers == {"X-Other": "1"}
 
 
 def test_js_keeps_bearer_authenticator() -> None:
     authenticator = ReplicatorBearerAuthenticator("tok")
     r = replicator(ServerVariant.JS, authenticator=authenticator)
-    assert r.authenticator is authenticator
-    assert r.headers is None
+    assert r._request_auth() == (authenticator, None)
 
 
 def test_other_authenticators_pass_through() -> None:
     authenticator = ReplicatorBasicAuthenticator("user", "pass")
     r = replicator(ServerVariant.C, authenticator=authenticator, headers={"X-Other": "1"})
-    assert r.authenticator is authenticator
-    assert r.headers == {"X-Other": "1"}
+    assert r._request_auth() == (authenticator, {"X-Other": "1"})
 
 
-@pytest.mark.parametrize("variant", [ServerVariant.C, ServerVariant.JS])
+def test_authenticator_changes_before_start_apply() -> None:
+    r = replicator(ServerVariant.C, authenticator=ReplicatorBearerAuthenticator("a"))
+    r.authenticator = ReplicatorBearerAuthenticator("b")
+    assert r._request_auth() == (None, {"Authorization": "Bearer b"})
+
+    r.authenticator = None
+    assert r._request_auth() == (None, None)
+
+
 @pytest.mark.parametrize("name", ["Authorization", "authorization"])
-def test_bearer_with_authorization_header_fails(variant: ServerVariant, name: str) -> None:
+def test_bearer_with_authorization_header_fails(name: str) -> None:
+    r = replicator(ServerVariant.C, authenticator=ReplicatorBearerAuthenticator("tok"), headers={name: "x"})
     with pytest.raises(CblTestError, match="Authorization"):
-        replicator(variant, authenticator=ReplicatorBearerAuthenticator("tok"), headers={name: "x"})
+        r._request_auth()
 
 
 @pytest.mark.asyncio
