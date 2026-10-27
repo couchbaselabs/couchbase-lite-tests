@@ -180,19 +180,21 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run Edge server Tests"
-                timeout(time: 90, unit: 'MINUTES') {
-                    sh """
-                        jenkins/pipelines/QE/es/test.sh \
-                            "${env.ES_FULL}" \
-                            "${params.TEST_NAME}" \
-                            "${params.TOPOLOGY_NAME}" \
-                            "${params.SGW_VERSION}" \
-                            "${params.CBS_VERSION}" \
-                            "${params.TS_DATASET_VERSION}" \
-                            "${params.TEST_DIR}" \
-                            "${env.CBL_FULL}" \
-                            "${params.JS_REPLICATION_TESTS_ONLY}"
-                    """
+                lock("mac-mini-new") {
+                    timeout(time: 90, unit: 'MINUTES') {
+                        sh """
+                            jenkins/pipelines/QE/es/test.sh \
+                                "${env.ES_FULL}" \
+                                "${params.TEST_NAME}" \
+                                "${params.TOPOLOGY_NAME}" \
+                                "${params.SGW_VERSION}" \
+                                "${params.CBS_VERSION}" \
+                                "${params.TS_DATASET_VERSION}" \
+                                "${params.TEST_DIR}" \
+                                "${env.CBL_FULL}" \
+                                "${params.JS_REPLICATION_TESTS_ONLY}"
+                        """
+                    }
                 }
                 echo "=== Edge server Tests Complete"
             }
