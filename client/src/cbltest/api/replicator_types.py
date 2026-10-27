@@ -203,7 +203,8 @@ class ReplicatorSessionAuthenticator(ReplicatorAuthenticator):
 class ReplicatorBearerAuthenticator(ReplicatorAuthenticator):
     """
     A class holding a bearer token -- an OIDC ``id_token`` or other JWT that the remote
-    is configured to trust.
+    is configured to trust. :class:`Replicator` sends it to every platform but CBL JS as the
+    ``Authorization`` header.
     """
 
     @property

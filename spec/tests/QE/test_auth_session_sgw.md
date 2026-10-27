@@ -1,7 +1,8 @@
 # Test Cases
 
-Authentication between CBL JS and Sync Gateway for every credential mode the CBL JS
-replicator supports: session ID, bearer token (JWT), and anonymous/GUEST.
+Authentication between CBL and Sync Gateway for each replicator credential mode: session ID,
+bearer token (JWT), and anonymous/GUEST. All tests run on every platform, except that bearer token
+tests skip on CBL .NET.
 
 ## #1 test_replicate_with_session_auth
 

@@ -215,6 +215,7 @@ class CBLPyTest:
         apiVersion = 0
         for ts_index, ts in enumerate(self.test_servers):
             root_info = await ts.info
+            self.__request_factory.set_variant(ts_index, root_info.variant)
             if apiVersion != 0 and root_info.version != apiVersion:
                 raise ValueError(
                     f"Test Server at index {ts_index} has API version "
