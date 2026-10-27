@@ -73,7 +73,8 @@ environment/
 │           ├── exe_bridge.py           # ExeBridge for desktop/CLI servers
 │           ├── macos_bridge.py
 │           ├── android_bridge.py       # ADB
-│           └── ios_bridge.py           # XHarness
+│           ├── ios_bridge.py           # XHarness / devicectl (device)
+│           └── ios_simulator_bridge.py # simctl (simulator)
 │
 ├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
 │   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
@@ -171,7 +172,7 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
 | -------------------- | ---------------------------------------------------------------- | -------------------------------------------------------- |
 | `c_register.py`      | `c_macos`, `c_linux_x86_64`, `c_windows`, `c_ios`, `c_android`   | `ExeBridge`, `iOSBridge`, `AndroidBridge`                |
 | `dotnet_register.py` | `dotnet_macos`, `dotnet_windows`, `dotnet_ios`, `dotnet_android` | `ExeBridge`, `macOSBridge`, `iOSBridge`, `AndroidBridge` |
-| `swift_register.py`  | `swift_ios`                                                      | `iOSBridge`                                              |
+| `swift_register.py`  | `swift_ios`, `swift_ios_simulator`                               | `iOSBridge`, `iOSSimulatorBridge`                        |
 | `java_register.py`   | `jak_android`, `jak_desktop`, `jak_webservice`                   | `AndroidBridge`, `ExeBridge`                             |
 | `js_register.py`     | `js`                                                             | `ExeBridge`                                              |
 
@@ -214,6 +215,8 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
 - `--stop-sync-gateway` stops every background Sync Gateway process started from this checkout (matched on executable path, so other copies are spared) and waits for their ports to free before returning; a process it is not allowed to signal is reported rather than passed over silently. A normal start stops the previous run's instances before it picks ports, so a re-run reclaims the same ones rather than climbing the range.
 - `--platform` picks the test server to run on this host: `c` (default), `dotnet` (macOS or Windows only), `jak_desktop` or `js`. The generated topology config names that platform's port (8080, or 5555 for `dotnet` and 5173 for `js`).
+- `--platform ios` (macOS only) installs the Swift test server (`swift_ios`) on a connected device: it needs `--ios-device <UDID>` and `--ios-device-ip <IP>`, since `iOSBridge` cannot discover the device IP. cbltest names one Sync Gateway host for both the public and admin APIs, so the run binds the admin API to this host's address on the route to the device (not 127.0.0.1) and writes that address into the topology config. `--skip-sync-gateway-start` refuses to carry forward instances whose recorded host differs.
+- `--platform ios_simulator` (macOS only) builds the Swift test server for the simulator (`swift_ios_simulator`, `iOSSimulatorBridge` over `xcrun simctl`) and runs it on the booted simulator, or the one `--ios-device` names. Nothing is published for it, so it always builds from source. A simulator shares the Mac's network, so everything stays on `localhost` and the app's port 8080 gets the same stop-then-check-port treatment as a local test server.
 - `--stop-testserver` stops every test server process started from this checkout, so a server from another checkout is spared. It matches a native server on its executable path under `servers/`, the Java server on its `-jar` path, and the JS dev server on its `bun run dev` or vite command and working directory. A normal start does the same before it starts a new one, then refuses to continue if anything still answers on the platform's port: a second server would fail to bind while the startup check, answered by the first, reported success and the run tested the wrong build.
 - `--skip-sync-gateway-start` carries forward the instances named in the topology config the last run wrote — a run that starts nothing cannot know how many are up — which is this checkout's own record, so several checkouts each running instances do not read each other's and no port is probed. `--stop-sync-gateway` clears that record; an instance that dies on its own stays on it. Combining it with an explicit `--sync-gateways` that disagrees is a usage error. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.

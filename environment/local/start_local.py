@@ -38,9 +38,15 @@ from environment.aws import download_tool
 from environment.aws.common.output import header
 from environment.aws.common.versions import resolve_latest_version
 from environment.aws.topology_setup import setup_topology
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, listen_port
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, listen_port, test_server_entry
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
+from environment.aws.topology_setup.test_server_platforms.ios_bridge import iOSBridge
+from environment.aws.topology_setup.test_server_platforms.ios_simulator_bridge import (
+    booted_simulator,
+    iOSSimulatorBridge,
+)
 from environment.aws.topology_setup.test_server_platforms.js_register import DEV_SERVER_PROCESS_NAMES
+from environment.aws.topology_setup.test_server_platforms.swift_register import IOS_APP_ID
 
 TOPOLOGY_CONFIG_OUTPUT = SCRIPT_DIR / "topology_config"
 SYNC_GATEWAY_BIN = SCRIPT_DIR / "sync_gateway"
@@ -60,13 +66,8 @@ NATIVE_TEST_SERVER_EXE_NAMES = frozenset({"testserver", "testserver.exe", "tests
 # The JAK server runs as a jar under java, and the JS server as a bun/node dev server in servers/.
 JAVA_PROCESS_NAMES = frozenset({"java", "java.exe"})
 TEST_SERVER_PROCESS_NAMES = NATIVE_TEST_SERVER_EXE_NAMES | JAVA_PROCESS_NAMES | DEV_SERVER_PROCESS_NAMES
-# --platform choices, mapped to the product name used to look up its latest release.
-LOCAL_PLATFORMS = {
-    "c": "couchbase-lite-c",
-    "dotnet": "couchbase-lite-net",
-    "jak_desktop": "couchbase-lite-java",
-    "js": "couchbase-lite-js",
-}
+# --platform choices. get_cbl_platform maps each to the platform key it runs on this host.
+LOCAL_PLATFORMS = ("c", "dotnet", "jak_desktop", "js", "ios", "ios_simulator")
 # Stem shared by every per-instance file, so a whole run's worth can be swept as a set.
 SG_INSTANCE_STEM = "sync_gateway_instance"
 # Matches the per-instance logs of any run, plus the single sync_gateway.log written before instances
@@ -178,11 +179,11 @@ def sync_gateway_log_name(number: int) -> str:
     return f"{sync_gateway_instance_name(number)}.log"
 
 
-def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
+def sync_gateway_api_config(ports: SyncGatewayPorts, admin_host: str = "127.0.0.1") -> dict[str, str]:
     """The Sync Gateway `api` config block pinning an instance to the given ports."""
     return {
         "public_interface": f":{ports.public}",
-        "admin_interface": f"127.0.0.1:{ports.admin}",
+        "admin_interface": f"{admin_host}:{ports.admin}",
         "metrics_interface": f"127.0.0.1:{ports.metrics}",
     }
 
@@ -214,9 +215,21 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     type=click.Choice(list(LOCAL_PLATFORMS)),
     default="c",
     show_default=True,
-    help="Which Couchbase Lite test server to run on this host: c, dotnet (macOS or Windows only), "
-    "jak_desktop or js (browser). The topology config points at this platform's port, also "
-    "with --skip-testserver.",
+    help="Which Couchbase Lite test server to run: c, dotnet (macOS or Windows only), jak_desktop, "
+    "js (browser), ios (Swift, on a device connected to this Mac) or ios_simulator (Swift, built "
+    "from source and run on a booted simulator). The topology config points at this platform's "
+    "port, also with --skip-testserver.",
+)
+@click.option(
+    "--ios-device",
+    help="UDID of the iOS device or simulator to install and run the test server on. Required with "
+    "--platform ios, unless --skip-testserver is set. With --platform ios_simulator, defaults to the "
+    "booted simulator.",
+)
+@click.option(
+    "--ios-device-ip",
+    help="IP address of the iOS device, which this script cannot discover. Required with --platform ios. "
+    "Sync Gateway then serves its admin API on this host's address toward the device, not only on 127.0.0.1.",
 )
 @click.option(
     "--build-testserver",
@@ -294,6 +307,8 @@ def main(
     connstr: str | None,
     start_cbs: bool,
     platform: str,
+    ios_device: str | None,
+    ios_device_ip: str | None,
     build_testserver: str | None,
     repo_path: str | None,
     git_tag: str | None,
@@ -307,8 +322,31 @@ def main(
     stop_sync_gateway: bool,
     stop_testserver: bool,
 ) -> None:
+    platform_key = get_cbl_platform(platform)
+
+    if platform not in ("ios", "ios_simulator") and ios_device:
+        raise click.UsageError("--ios-device is only valid with --platform ios or ios_simulator.")
+    if platform != "ios" and ios_device_ip:
+        raise click.UsageError(
+            "--ios-device-ip is only valid with --platform ios. A simulator shares this host's network."
+        )
+
+    if platform == "ios_simulator" and not ios_device and (stop_testserver or not skip_testserver):
+        try:
+            ios_device = booted_simulator()
+        except RuntimeError as e:
+            raise click.ClickException(str(e)) from e
+
     if stop_testserver:
+        if platform == "ios" and not ios_device:
+            raise click.UsageError("--stop-testserver with --platform ios requires --ios-device.")
         stop_all_test_servers()
+        if platform == "ios":
+            assert ios_device is not None
+            iOSBridge("", IOS_APP_ID).stop(ios_device)
+        elif platform == "ios_simulator":
+            assert ios_device is not None
+            iOSSimulatorBridge("", IOS_APP_ID).stop(ios_device)
 
     if stop_sync_gateway:
         if stop_all_sync_gateways():
@@ -325,7 +363,15 @@ def main(
     if not server:
         raise click.UsageError("--server is required unless --stop-sync-gateway or --stop-testserver is set.")
 
-    platform_key = get_cbl_platform(platform)
+    if platform == "ios":
+        if not ios_device_ip:
+            raise click.UsageError("--platform ios requires --ios-device-ip.")
+        if not ios_device and not skip_testserver:
+            raise click.UsageError("--platform ios requires --ios-device, unless --skip-testserver is set.")
+
+    test_server_host = ios_device_ip or "localhost"
+    # A test server off this host reaches Sync Gateway, and cbltest names one host for both its APIs.
+    sync_gateway_host = host_address_toward(ios_device_ip) if ios_device_ip else "localhost"
 
     if sync_gateways < 1:
         raise click.UsageError(f"--sync-gateways must be at least 1; got {sync_gateways}.")
@@ -384,7 +430,15 @@ def main(
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if not skip_testserver:
-            futures.append(executor.submit(run_test_server, platform_key, LOCAL_PLATFORMS[platform], build_testserver))
+            futures.append(
+                executor.submit(
+                    run_test_server,
+                    platform_key,
+                    build_testserver,
+                    ios_device,
+                    ios_device_ip,
+                )
+            )
         if not skip_sync_gateway_build:
             assert repo_dir is not None
             futures.append(executor.submit(build_sync_gateway, repo_dir))
@@ -402,12 +456,21 @@ def main(
         _validate_connstr_nodes(connstr, couchbase_servers, source="--start-cbs")
 
     if not skip_sync_gateway_start:
-        instance_ports = start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
+        instance_ports = start_sync_gateways(
+            server, connstr, admin_user, admin_password, sync_gateways, _admin_host(sync_gateway_host)
+        )
     else:
-        instance_ports = resolve_skipped_sync_gateway_ports(server, sync_gateways)
+        instance_ports = resolve_skipped_sync_gateway_ports(server, sync_gateways, sync_gateway_host)
 
     topology_config_path = resolve_topology_config(
-        server, connstr, admin_user, admin_password, instance_ports, platform_key
+        server,
+        connstr,
+        admin_user,
+        admin_password,
+        instance_ports,
+        platform_key,
+        test_server_host,
+        sync_gateway_host,
     )
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
@@ -433,6 +496,21 @@ def _validate_connstr_nodes(connstr: str, expected: int, source: str = "--connst
         )
 
 
+def host_address_toward(remote_ip: str) -> str:
+    """This host's address on the interface that routes to remote_ip. Connecting a UDP socket sends nothing."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        try:
+            s.connect((remote_ip, 9))
+        except OSError as e:
+            raise click.ClickException(f"No route from this host to {remote_ip}: {e}") from e
+        return s.getsockname()[0]
+
+
+def _admin_host(sync_gateway_host: str) -> str:
+    """The address Sync Gateway binds its admin API to, so that cbltest can reach it at sync_gateway_host."""
+    return "127.0.0.1" if sync_gateway_host == "localhost" else sync_gateway_host
+
+
 def _test_server_port_answered(port: int) -> bool:
     """Whether something already answers HTTP on the port a test server is about to be started on."""
     try:
@@ -442,9 +520,56 @@ def _test_server_port_answered(port: int) -> bool:
         return False
 
 
-def run_test_server(platform_key: str, product: str, build_testserver: str | None) -> None:
-    """Stop any test server left from a previous run, then download/build and run a new one."""
-    port = listen_port(platform_key)
+def run_test_server(
+    platform_key: str,
+    build_testserver: str | None,
+    ios_device: str | None = None,
+    ios_device_ip: str | None = None,
+) -> None:
+    """
+    Stop any test server left from a previous run, then download/build and run a new one.
+
+    An iOS test server runs on ios_device rather than this host, and installing it replaces the
+    copy already there, so the local stop and port checks do not apply to it. A simulator shares
+    this host's ports, so its app is stopped as well before the checks.
+    """
+    if platform_key == "swift_ios_simulator":
+        assert ios_device is not None
+        iOSSimulatorBridge("", IOS_APP_ID).stop(ios_device)
+    if ios_device is None or platform_key == "swift_ios_simulator":
+        _stop_local_test_server(listen_port(platform_key))
+
+    test_server_class = TestServer.registered(platform_key)
+    if build_testserver:
+        cbl_version = _release_build(build_testserver)
+        download = False
+    elif not test_server_class.published:
+        cbl_version = _release_build(resolve_latest_version(test_server_class.product))
+        download = False
+    else:
+        cbl_version = resolve_latest_version(test_server_class.product)
+        download = True
+
+    test_server: dict[str, Any] = {
+        "location": ios_device or "localhost",
+        "download": download,
+        "platform": platform_key,
+        "cbl_version": cbl_version,
+    }
+    if ios_device_ip:
+        test_server["ip_hint"] = ios_device_ip
+
+    topology_config = setup_topology.TopologyConfig(config_input={"test_servers": [test_server]})
+    topology_config.run_test_servers()
+
+
+def _release_build(version: str) -> str:
+    """A bare version is a release, which the test server marks with build number 0."""
+    return version if "-" in version else f"{version}-0"
+
+
+def _stop_local_test_server(port: int) -> None:
+    """Stop the test server a previous run started on this host, and make sure that port is free."""
     # A server left running holds the port the new one needs, so the new one dies inside its own log
     # while the startup check, answered by the old build, goes on to report a successful start.
     if not stop_all_test_servers(warn_if_none=False):
@@ -460,28 +585,6 @@ def run_test_server(platform_key: str, product: str, build_testserver: str | Non
             f"Something this script did not start is already answering on port {port}. "
             "Stop it and try again, or pass --skip-testserver to test against it as it is."
         )
-
-    TestServer.initialize()
-    if build_testserver:
-        # A bare version is a release, which the test server marks with build number 0.
-        cbl_version = build_testserver if "-" in build_testserver else f"{build_testserver}-0"
-        download = False
-    else:
-        cbl_version = resolve_latest_version(product)
-        download = True
-
-    config = {
-        "test_servers": [
-            {
-                "location": "localhost",
-                "download": download,
-                "platform": platform_key,
-                "cbl_version": cbl_version,
-            }
-        ],
-    }
-    topology_config = setup_topology.TopologyConfig(config_input=config)
-    topology_config.run_test_servers()
 
 
 def _run(cmd: list[str], step: str, cwd: str | None = None) -> None:
@@ -823,7 +926,7 @@ def sync_gateway_ports_from_topology(config_path: pathlib.Path) -> list[SyncGate
     return ports
 
 
-def resolve_skipped_sync_gateway_ports(server: str, requested: int) -> list[SyncGatewayPorts]:
+def resolve_skipped_sync_gateway_ports(server: str, requested: int, host: str) -> list[SyncGatewayPorts]:
     """
     Decide which instances to describe when --skip-sync-gateway-start started none of them.
 
@@ -848,6 +951,15 @@ def resolve_skipped_sync_gateway_ports(server: str, requested: int) -> list[Sync
             f"not restart them. Drop --skip-sync-gateway-start to start instances against {server} instead."
         )
 
+    # The admin API was bound for the host the last run named, and cbltest reaches it only there.
+    previous_host = json.loads(config_path.read_text())["sync-gateways"][0].get("hostname", "localhost")
+    if previous_host != host:
+        raise click.UsageError(
+            f"The Sync Gateway instance(s) on record in {config_path.name} serve their admin API for {previous_host}, "
+            f"but this run needs {host}, and --skip-sync-gateway-start means this run will not restart them. Drop "
+            "--skip-sync-gateway-start to restart them."
+        )
+
     explicit = click.get_current_context().get_parameter_source("sync_gateways") == ParameterSource.COMMANDLINE
     if explicit and previous != requested:
         raise click.UsageError(
@@ -860,16 +972,18 @@ def resolve_skipped_sync_gateway_ports(server: str, requested: int) -> list[Sync
     return instance_ports
 
 
-def _pin_api_ports(ports: SyncGatewayPorts) -> Callable[[dict[str, Any]], None]:
+def _pin_api_ports(ports: SyncGatewayPorts, admin_host: str) -> Callable[[dict[str, Any]], None]:
     """Return a patch pinning a config's `api` block to the given ports, keeping any other api keys."""
 
     def patch(config: dict[str, Any]) -> None:
-        config["api"] = {**config.get("api", {}), **sync_gateway_api_config(ports)}
+        config["api"] = {**config.get("api", {}), **sync_gateway_api_config(ports, admin_host)}
 
     return patch
 
 
-def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[SyncGatewayPorts]) -> list[str]:
+def sync_gateway_instance_configs(
+    base_config_path: str, instance_ports: list[SyncGatewayPorts], admin_host: str
+) -> list[str]:
     """
     Write one copy of base_config_path per instance, each pinned to that instance's ports.
 
@@ -884,7 +998,7 @@ def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[Sy
             pathlib.Path(base_config_path),
             SYNC_GATEWAY_CONFIG_DIR,
             sync_gateway_config_prefix(number),
-            _pin_api_ports(ports),
+            _pin_api_ports(ports, admin_host),
             clean_stale=False,
         )
         for number, ports in enumerate(instance_ports, start=1)
@@ -892,7 +1006,12 @@ def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[Sy
 
 
 def start_sync_gateways(
-    server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1
+    server: str,
+    connstr: str | None,
+    admin_user: str,
+    admin_password: str,
+    count: int = 1,
+    admin_host: str = "127.0.0.1",
 ) -> list[SyncGatewayPorts]:
     """
     Stop any running sync_gateway processes, start `count` new ones for the given server type, and
@@ -906,7 +1025,7 @@ def start_sync_gateways(
     stop_all_sync_gateways()
 
     instance_ports = allocate_sync_gateway_ports(count)
-    config_paths = sync_gateway_instance_configs(base_config_path, instance_ports)
+    config_paths = sync_gateway_instance_configs(base_config_path, instance_ports, admin_host)
 
     # Wipe every Sync Gateway log before launching. ExeBridge truncates the log of each instance it
     # starts anyway, so this only really matters for the logs this run has no instance for -- left
@@ -952,14 +1071,16 @@ def resolve_topology_config(
     admin_password: str,
     instance_ports: list[SyncGatewayPorts],
     platform_key: str,
+    test_server_host: str = "localhost",
+    sync_gateway_host: str = "localhost",
 ) -> pathlib.Path:
     """
     Resolve the cbltest topology config to use.
 
     Patches in a CBS connstr override if given, and expands `couchbase-servers` and `sync-gateways`
     to one entry per node/running instance, so tests marked `min_couchbase_servers(N)` or
-    `min_sync_gateways(N)` can see them all. The test server entry names the port and transport
-    of the platform being run.
+    `min_sync_gateways(N)` can see them all. The test server entry names the host, port and
+    transport of the platform being run, and every Sync Gateway entry names sync_gateway_host.
 
     Any topology config generated by an earlier run is swept first, so that the one written here is
     this directory's only record of which instances it has and where they are.
@@ -969,13 +1090,16 @@ def resolve_topology_config(
     config_path = TEST_CONFIG[server]
     override_cbs = server == "cbs" and bool(connstr)
     template_test_server = json.loads(config_path.read_text())["test-servers"][0]
-    test_server = {**template_test_server, "url": f"http://localhost:{listen_port(platform_key)}"}
-    if platform_key == "js":
-        test_server["transport"] = "ws"
+    test_server = {**template_test_server, **test_server_entry(platform_key, test_server_host)}
 
-    # The checked-in template only stands in for a single instance on the default ports with the
-    # template's own test server entry.
-    if not override_cbs and instance_ports == [port_block(0)] and test_server == template_test_server:
+    # The checked-in template only stands in for a single local instance on the default ports with
+    # the template's own test server entry.
+    if (
+        not override_cbs
+        and instance_ports == [port_block(0)]
+        and sync_gateway_host == "localhost"
+        and test_server == template_test_server
+    ):
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
@@ -995,8 +1119,11 @@ def resolve_topology_config(
                 for host in _connstr_hosts(connstr)
             ]
 
-        template = c["sync-gateways"][0]
-        c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]
+        sg_template = c["sync-gateways"][0]
+        c["sync-gateways"] = [
+            {**sg_template, "hostname": sync_gateway_host, "port": ports.public, "admin_port": ports.admin}
+            for ports in instance_ports
+        ]
         c["test-servers"] = [test_server]
 
     return pathlib.Path(
@@ -1012,6 +1139,11 @@ def get_cbl_platform(platform: str) -> str:
         return platform
 
     host = {"win32": "windows", "darwin": "macos"}.get(sys.platform)
+    if platform in ("ios", "ios_simulator"):
+        if host != "macos":
+            raise click.UsageError(f"--platform {platform} runs only on macOS.")
+        return "swift_ios" if platform == "ios" else "swift_ios_simulator"
+
     if platform == "dotnet":
         if host is None:
             raise click.UsageError("--platform dotnet runs only on macOS or Windows.")

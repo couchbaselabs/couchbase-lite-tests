@@ -129,6 +129,7 @@
                             "c_ios",
                             "c_android",
                             "swift_ios",
+                            "swift_ios_simulator",
                             "js"
                         ]
                     },

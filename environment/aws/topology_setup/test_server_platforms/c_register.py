@@ -70,9 +70,7 @@ class CTestServer(TestServer):
     def cbl_filename(self, version: str) -> str:
         pass
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-c"
+    product = "couchbase-lite-c"
 
 
 class CTestServer_Desktop(CTestServer):

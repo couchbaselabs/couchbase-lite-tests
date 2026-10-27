@@ -147,9 +147,7 @@ class JavascriptTestServer(TestServer):
 
     platform = "js"
 
-    @property
-    def product(self) -> str:
-        return "couchbase-lite-js"
+    product = "couchbase-lite-js"
 
     @property
     def latestbuilds_path(self) -> str:
