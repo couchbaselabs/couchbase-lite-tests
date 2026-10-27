@@ -6,7 +6,7 @@ from random import randint
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator_types import (
@@ -14,6 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.testserver import CouchbaseLiteFeature
 from shared.multipeer_test_helpers import build_group_transports
 
 

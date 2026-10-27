@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.api.listener import Listener
@@ -17,6 +17,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.testserver import CouchbaseLiteFeature
 from cbltest.responses import ServerVariant
 
 

@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
@@ -14,8 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
     ReplicatorType,
 )
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -31,10 +30,8 @@ class TestReplicationMultipleRemotes(CBLTestClass):
         # locally makes CBL send three known revs in its reply to `changes`.
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
-        sgw_version = Version((await sync_gateway.get_version()).version)
-        self.skip_if_not(
-            sgw_version in SpecifierSet(">=4.0.9,!=4.1.0,!=4.1.1,!=4.1.2"),
-            f"SGW {sgw_version} lacks the fix for CBG-5978",
+        await self.skip_if_sgw_not(
+            sync_gateway, ">= 4.0.9, != 4.1.0, != 4.1.1, != 4.1.2", reason="needs the CBG-5978 fix"
         )
 
         url_by_hostname = sync_gateway.replication_url("names")

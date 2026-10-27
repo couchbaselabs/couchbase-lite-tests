@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry, MaintenanceType
 from cbltest.api.replicator import (
@@ -15,6 +15,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 from cbltest.utils import assert_not_null
 
 

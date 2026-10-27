@@ -13,6 +13,7 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     ScopeConfig,
     SyncGateway,
+    SyncGatewayFeature,
     SyncGatewayUserClient,
 )
 from couchbase.exceptions import CasMismatchException, DocumentNotFoundException
@@ -121,7 +122,7 @@ class TestXattrs(CBLTestClass):
             sg_all_docs = await sg_user.wait_for_document_count(sg_db, num_docs)
             sg_created_count = len([doc for doc in sg_all_docs.rows if doc.id.startswith("sg_")])
             assert sg_created_count == num_docs, f"Expected {num_docs} SG docs, but found {sg_created_count}"
-            supports_version_vectors = await sg.supports_version_vectors()
+            supports_version_vectors = await sg.supports(SyncGatewayFeature.VERSION_VECTORS)
             original_revisions = {row.id: row.revid for row in sg_all_docs.rows}
             if supports_version_vectors:
                 original_vv = {row.id: row.cv for row in sg_all_docs.rows}
@@ -239,7 +240,7 @@ class TestXattrs(CBLTestClass):
             )
             all_doc_revisions: dict[str, str] = {row.id: row.revid for row in sg_all_docs.rows}
 
-            supports_version_vectors = await sg.supports_version_vectors()
+            supports_version_vectors = await sg.supports(SyncGatewayFeature.VERSION_VECTORS)
             all_doc_version_vectors: dict[str, str | None] = {}
             if supports_version_vectors:
                 self.mark_test_step("Store original version vectors for SG docs (optional)")

@@ -3,7 +3,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from cbltest import CBLPyTest, CouchbaseServer
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database, GetDocumentResult
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.error import CblTestServerBadResponseError
@@ -18,6 +18,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import RemoteDocument, SyncGateway
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 from cbltest.logging import cbl_info
 from cbltest.plugins.cluster_cleanup import perform_cleanup
 

@@ -2,9 +2,10 @@ import asyncio
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 class TestMultipeerReplicator(CBLTestClass):

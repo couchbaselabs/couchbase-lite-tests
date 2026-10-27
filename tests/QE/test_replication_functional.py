@@ -10,7 +10,7 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGatewayFeature
 
 
 @pytest.mark.cbl
@@ -699,7 +699,7 @@ class TestReplicationFunctional(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_default_conflict_withConflicts_withChannels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_sgw_not(cblpytest.sync_gateways[0], "<=4.0.0")
+        await self.skip_if_sgw_not_supports(cblpytest.sync_gateways[0], SyncGatewayFeature.ALLOW_CONFLICTS)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

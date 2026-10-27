@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
@@ -16,6 +16,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)

@@ -1,6 +1,6 @@
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
+from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.api.replicator import Replicator
@@ -9,6 +9,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorConflictResolver,
 )
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 class TestStartReplicator(CBLTestClass):
