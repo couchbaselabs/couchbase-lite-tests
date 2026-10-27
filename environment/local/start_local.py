@@ -38,8 +38,9 @@ from environment.aws import download_tool
 from environment.aws.common.output import header
 from environment.aws.common.versions import resolve_latest_version
 from environment.aws.topology_setup import setup_topology
-from environment.aws.topology_setup.test_server import TEST_SERVER_DIR
+from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, listen_port
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
+from environment.aws.topology_setup.test_server_platforms.js_register import DEV_SERVER_PROCESS_NAMES
 
 TOPOLOGY_CONFIG_OUTPUT = SCRIPT_DIR / "topology_config"
 SYNC_GATEWAY_BIN = SCRIPT_DIR / "sync_gateway"
@@ -54,11 +55,18 @@ TEST_CONFIG = {
     "cbs": TOPOLOGY_CONFIG_DIR / "cbs_config.json",
 }
 SYNC_GATEWAY_EXE_NAME = SYNC_GATEWAY_BIN.name
-# Every test server binary this script can start carries this name and sits somewhere under
-# servers/, which is what tells ours apart from one run out of a second checkout.
-TEST_SERVER_EXE_NAME = "testserver.exe" if sys.platform == "win32" else "testserver"
-# The port every local test server listens on, and the one the generated topology config names.
-TEST_SERVER_PORT = 8080
+# Native test server binaries: C, the macOS .NET app and the Windows .NET CLI.
+NATIVE_TEST_SERVER_EXE_NAMES = frozenset({"testserver", "testserver.exe", "testserver.cli.exe"})
+# The JAK server runs as a jar under java, and the JS server as a bun/node dev server in servers/.
+JAVA_PROCESS_NAMES = frozenset({"java", "java.exe"})
+TEST_SERVER_PROCESS_NAMES = NATIVE_TEST_SERVER_EXE_NAMES | JAVA_PROCESS_NAMES | DEV_SERVER_PROCESS_NAMES
+# --platform choices, mapped to the product name used to look up its latest release.
+LOCAL_PLATFORMS = {
+    "c": "couchbase-lite-c",
+    "dotnet": "couchbase-lite-net",
+    "jak_desktop": "couchbase-lite-java",
+    "js": "couchbase-lite-js",
+}
 # Stem shared by every per-instance file, so a whole run's worth can be swept as a set.
 SG_INSTANCE_STEM = "sync_gateway_instance"
 # Matches the per-instance logs of any run, plus the single sync_gateway.log written before instances
@@ -202,8 +210,18 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     "node count --couchbase-servers asks for.",
 )
 @click.option(
+    "--platform",
+    type=click.Choice(list(LOCAL_PLATFORMS)),
+    default="c",
+    show_default=True,
+    help="Which Couchbase Lite test server to run on this host: c, dotnet (macOS or Windows only), "
+    "jak_desktop or js (browser). The topology config points at this platform's port, also "
+    "with --skip-testserver.",
+)
+@click.option(
     "--build-testserver",
-    help="Build the test server from source rather than downloading it. Takes a version string (e.g., 4.0.3).",
+    help="Build the test server from source rather than downloading it. Takes a release version (e.g., 4.0.3) "
+    "or a numbered build (e.g., 4.0.3-12).",
 )
 @click.option("--repo-path", help="Path to an existing sync_gateway repo to build from.")
 @click.option(
@@ -275,6 +293,7 @@ def main(
     server: str,
     connstr: str | None,
     start_cbs: bool,
+    platform: str,
     build_testserver: str | None,
     repo_path: str | None,
     git_tag: str | None,
@@ -305,6 +324,8 @@ def main(
 
     if not server:
         raise click.UsageError("--server is required unless --stop-sync-gateway or --stop-testserver is set.")
+
+    platform_key = get_cbl_platform(platform)
 
     if sync_gateways < 1:
         raise click.UsageError(f"--sync-gateways must be at least 1; got {sync_gateways}.")
@@ -363,7 +384,7 @@ def main(
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         if not skip_testserver:
-            futures.append(executor.submit(run_test_server, build_testserver))
+            futures.append(executor.submit(run_test_server, platform_key, LOCAL_PLATFORMS[platform], build_testserver))
         if not skip_sync_gateway_build:
             assert repo_dir is not None
             futures.append(executor.submit(build_sync_gateway, repo_dir))
@@ -385,7 +406,9 @@ def main(
     else:
         instance_ports = resolve_skipped_sync_gateway_ports(server, sync_gateways)
 
-    topology_config_path = resolve_topology_config(server, connstr, admin_user, admin_password, instance_ports)
+    topology_config_path = resolve_topology_config(
+        server, connstr, admin_user, admin_password, instance_ports, platform_key
+    )
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
 
@@ -410,38 +433,41 @@ def _validate_connstr_nodes(connstr: str, expected: int, source: str = "--connst
         )
 
 
-def _test_server_port_answered() -> bool:
+def _test_server_port_answered(port: int) -> bool:
     """Whether something already answers HTTP on the port a test server is about to be started on."""
     try:
-        with socket.create_connection(("localhost", TEST_SERVER_PORT), timeout=2):
+        with socket.create_connection(("localhost", port), timeout=2):
             return True
     except OSError:
         return False
 
 
-def run_test_server(build_testserver: str | None) -> None:
+def run_test_server(platform_key: str, product: str, build_testserver: str | None) -> None:
     """Stop any test server left from a previous run, then download/build and run a new one."""
+    port = listen_port(platform_key)
     # A server left running holds the port the new one needs, so the new one dies inside its own log
     # while the startup check, answered by the old build, goes on to report a successful start.
     if not stop_all_test_servers(warn_if_none=False):
         raise click.ClickException(
             "A test server from a previous run could not be stopped and is still holding port "
-            f"{TEST_SERVER_PORT}. Stop it and try again."
+            f"{port}. Stop it and try again."
         )
 
     # Whatever still answers now is not ours to stop -- a test server from a second checkout, most
     # likely -- and would answer that startup check just as convincingly.
-    if _test_server_port_answered():
+    if _test_server_port_answered(port):
         raise click.ClickException(
-            f"Something this script did not start is already answering on port {TEST_SERVER_PORT}. "
+            f"Something this script did not start is already answering on port {port}. "
             "Stop it and try again, or pass --skip-testserver to test against it as it is."
         )
 
+    TestServer.initialize()
     if build_testserver:
-        cbl_version = f"{build_testserver}-0"
+        # A bare version is a release, which the test server marks with build number 0.
+        cbl_version = build_testserver if "-" in build_testserver else f"{build_testserver}-0"
         download = False
     else:
-        cbl_version = get_latest_released_cbl_c_version()
+        cbl_version = resolve_latest_version(product)
         download = True
 
     config = {
@@ -449,7 +475,7 @@ def run_test_server(build_testserver: str | None) -> None:
             {
                 "location": "localhost",
                 "download": download,
-                "platform": get_cbl_platform(),
+                "platform": platform_key,
                 "cbl_version": cbl_version,
             }
         ],
@@ -680,18 +706,36 @@ def _is_our_test_server(proc: psutil.Process) -> bool:
     Whether proc is a test server started from this checkout, rather than some other copy of it.
 
     Built and downloaded servers live at different paths under servers/, and each version has its
-    own, so the whole tree identifies ours -- not the single path this run is about to start.
-    An unreadable executable is treated as ours for the same reason as in _is_our_sync_gateway.
+    own, so the whole tree identifies ours -- not the single path this run is about to start. A
+    native server is matched on its executable, the JAK server on its `-jar` path, and the JS dev
+    server on its command line and working directory. An unreadable native executable counts as
+    ours, as in _is_our_sync_gateway, but an unreadable java or node process does not.
     """
     try:
-        return TEST_SERVER_DIR in pathlib.Path(proc.exe()).parents
-    except (psutil.NoSuchProcess, psutil.AccessDenied):
-        return True
+        name = proc.name()
+        if name in NATIVE_TEST_SERVER_EXE_NAMES:
+            try:
+                return TEST_SERVER_DIR in pathlib.Path(proc.exe()).parents
+            except psutil.AccessDenied:
+                return True
+
+        args = proc.cmdline()
+        if name in JAVA_PROCESS_NAMES:
+            jar = args[args.index("-jar") + 1] if "-jar" in args[:-1] else ""
+            return TEST_SERVER_DIR in pathlib.Path(jar).parents
+
+        # bun runs `bun run dev`, and the node child it leaves behind runs vite.
+        is_dev_server = args[1:3] == ["run", "dev"] or any(pathlib.Path(a).stem == "vite" for a in args[1:])
+        return is_dev_server and TEST_SERVER_DIR in pathlib.Path(proc.cwd()).parents
+    except (psutil.AccessDenied, psutil.NoSuchProcess):
+        return False
 
 
-def _stop_processes(exe_name: str, is_ours: Callable[[psutil.Process], bool], *, warn_if_none: bool = True) -> bool:
+def _stop_processes(
+    exe_names: frozenset[str], is_ours: Callable[[psutil.Process], bool], *, warn_if_none: bool = True
+) -> bool:
     """
-    Terminate every process named exe_name that is_ours accepts, and wait for its ports to free.
+    Terminate every process named in exe_names that is_ours accepts, and wait for its ports to free.
 
     Returns whether every process found was stopped, since one this user cannot signal keeps running.
 
@@ -704,7 +748,7 @@ def _stop_processes(exe_name: str, is_ours: Callable[[psutil.Process], bool], *,
     refused: list[psutil.Process] = []
     for proc in psutil.process_iter():
         try:
-            if proc.name() != exe_name:
+            if proc.name() not in exe_names:
                 continue
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             # The process list is a snapshot; anything that exits from under us is not our concern.
@@ -731,7 +775,7 @@ def _stop_processes(exe_name: str, is_ours: Callable[[psutil.Process], bool], *,
         )
 
     if warn_if_none and not terminated and not refused:
-        click.secho(f"Unable to find process to stop ({exe_name})", fg="yellow")
+        click.secho(f"Unable to find process to stop ({', '.join(sorted(exe_names))})", fg="yellow")
 
     _wait_for_exit(terminated)
     return not refused
@@ -740,13 +784,13 @@ def _stop_processes(exe_name: str, is_ours: Callable[[psutil.Process], bool], *,
 def stop_all_sync_gateways() -> bool:
     """Stop every sync_gateway process started from this checkout. See _stop_processes."""
     header(f"Stopping all '{SYNC_GATEWAY_EXE_NAME}' processes from {SYNC_GATEWAY_BIN}")
-    return _stop_processes(SYNC_GATEWAY_EXE_NAME, _is_our_sync_gateway)
+    return _stop_processes(frozenset({SYNC_GATEWAY_EXE_NAME}), _is_our_sync_gateway)
 
 
 def stop_all_test_servers(*, warn_if_none: bool = True) -> bool:
     """Stop every test server process started from this checkout. See _stop_processes."""
-    header(f"Stopping all '{TEST_SERVER_EXE_NAME}' processes under {TEST_SERVER_DIR}")
-    return _stop_processes(TEST_SERVER_EXE_NAME, _is_our_test_server, warn_if_none=warn_if_none)
+    header(f"Stopping all test server processes under {TEST_SERVER_DIR}")
+    return _stop_processes(TEST_SERVER_PROCESS_NAMES, _is_our_test_server, warn_if_none=warn_if_none)
 
 
 def previous_topology_config() -> pathlib.Path | None:
@@ -907,13 +951,15 @@ def resolve_topology_config(
     admin_user: str,
     admin_password: str,
     instance_ports: list[SyncGatewayPorts],
+    platform_key: str,
 ) -> pathlib.Path:
     """
     Resolve the cbltest topology config to use.
 
     Patches in a CBS connstr override if given, and expands `couchbase-servers` and `sync-gateways`
     to one entry per node/running instance, so tests marked `min_couchbase_servers(N)` or
-    `min_sync_gateways(N)` can see them all.
+    `min_sync_gateways(N)` can see them all. The test server entry names the port and transport
+    of the platform being run.
 
     Any topology config generated by an earlier run is swept first, so that the one written here is
     this directory's only record of which instances it has and where they are.
@@ -922,9 +968,14 @@ def resolve_topology_config(
 
     config_path = TEST_CONFIG[server]
     override_cbs = server == "cbs" and bool(connstr)
-    # The checked-in template already describes a single instance on the default ports, so it only
-    # stands in for one that actually landed there.
-    if not override_cbs and instance_ports == [port_block(0)]:
+    template_test_server = json.loads(config_path.read_text())["test-servers"][0]
+    test_server = {**template_test_server, "url": f"http://localhost:{listen_port(platform_key)}"}
+    if platform_key == "js":
+        test_server["transport"] = "ws"
+
+    # The checked-in template only stands in for a single instance on the default ports with the
+    # template's own test server entry.
+    if not override_cbs and instance_ports == [port_block(0)] and test_server == template_test_server:
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
@@ -946,27 +997,31 @@ def resolve_topology_config(
 
         template = c["sync-gateways"][0]
         c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]
+        c["test-servers"] = [test_server]
 
     return pathlib.Path(
         _write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, f"{server}_config_", patch, clean_stale=False)
     )
 
 
-def get_cbl_platform() -> str:
+def get_cbl_platform(platform: str) -> str:
     """
-    Return the name of the CBL platform to use.
+    Return the topology platform key that runs the given --platform on this host.
     """
-    if sys.platform == "win32":
-        return "c_windows"
-    elif sys.platform == "darwin":
-        return "c_macos"
-    elif sys.platform.startswith("linux"):
+    if platform in ("jak_desktop", "js"):
+        return platform
+
+    host = {"win32": "windows", "darwin": "macos"}.get(sys.platform)
+    if platform == "dotnet":
+        if host is None:
+            raise click.UsageError("--platform dotnet runs only on macOS or Windows.")
+        return f"dotnet_{host}"
+
+    if sys.platform.startswith("linux"):
         return "c_linux_x86_64"
-    raise Exception(f"Unsupported platform: {sys.platform}")
-
-
-def get_latest_released_cbl_c_version() -> str:
-    return resolve_latest_version("couchbase-lite-c")
+    if host is None:
+        raise click.UsageError(f"Unsupported host platform: {sys.platform}")
+    return f"c_{host}"
 
 
 if __name__ == "__main__":
