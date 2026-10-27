@@ -41,6 +41,7 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
     async def test_edge_to_edge_mtls_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("test_edge_to_edge_mtls_replication")
         source = cblpytest.edge_servers[0]
         target = cblpytest.edge_servers[1]
