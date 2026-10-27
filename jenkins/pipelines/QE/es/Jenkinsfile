@@ -180,28 +180,19 @@ pipeline {
                 // Unlock keychain:
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run Edge server Tests"
-                script {
-                    def runTests = {
-                        timeout(time: 90, unit: 'MINUTES') {
-                            sh """
-                                jenkins/pipelines/QE/es/test.sh \
-                                    "${env.ES_FULL}" \
-                                    "${params.TEST_NAME}" \
-                                    "${params.TOPOLOGY_NAME}" \
-                                    "${params.SGW_VERSION}" \
-                                    "${params.CBS_VERSION}" \
-                                    "${params.TS_DATASET_VERSION}" \
-                                    "${params.TEST_DIR}" \
-                                    "${env.CBL_FULL}" \
-                                    "${params.JS_REPLICATION_TESTS_ONLY}"
-                            """
-                        }
-                    }
-                    if (env.CBL_FULL) {
-                        lock("${env.NODE_NAME}-js-test-server") { runTests() }
-                    } else {
-                        runTests()
-                    }
+                timeout(time: 90, unit: 'MINUTES') {
+                    sh """
+                        jenkins/pipelines/QE/es/test.sh \
+                            "${env.ES_FULL}" \
+                            "${params.TEST_NAME}" \
+                            "${params.TOPOLOGY_NAME}" \
+                            "${params.SGW_VERSION}" \
+                            "${params.CBS_VERSION}" \
+                            "${params.TS_DATASET_VERSION}" \
+                            "${params.TEST_DIR}" \
+                            "${env.CBL_FULL}" \
+                            "${params.JS_REPLICATION_TESTS_ONLY}"
+                    """
                 }
                 echo "=== Edge server Tests Complete"
             }
