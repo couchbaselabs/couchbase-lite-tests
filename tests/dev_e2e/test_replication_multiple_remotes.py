@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
@@ -26,7 +26,7 @@ class TestReplicationMultipleRemotes(CBLTestClass):
     async def test_replicate_after_doc_synced_through_two_endpoints(
         self, cblpytest: CBLPyTest, dataset_path: Path, replicator_type: ReplicatorType
     ) -> None:
-        await self.skip_if_not_supports_custom_conflict_resolver(cblpytest.test_servers[0])
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         # Each endpoint URL gets its own remote ID in CBL, so a doc pulled through two URLs and then edited
         # locally makes CBL send three known revs in its reply to `changes`.
         cloud = cblpytest.clusters[0]

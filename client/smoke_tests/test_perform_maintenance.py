@@ -2,7 +2,6 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database_types import MaintenanceType
-from cbltest.responses import ServerVariant
 
 
 class TestPerformMaintenance(CBLTestClass):
@@ -18,7 +17,7 @@ class TestPerformMaintenance(CBLTestClass):
     )
     async def test_perform_maintenance_endpoint(self, cblpytest: CBLPyTest, maintenance_type: MaintenanceType) -> None:
         if maintenance_type != MaintenanceType.COMPACT:
-            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+            await self.skip_if_js(cblpytest.test_servers[0])
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names")
         db = dbs[0]

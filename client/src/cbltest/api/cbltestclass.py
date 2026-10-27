@@ -1,4 +1,6 @@
+from enum import Enum
 from types import FunctionType
+from typing import assert_never
 
 import pytest
 from packaging.specifiers import SpecifierSet
@@ -9,6 +11,23 @@ from cbltest.api.testserver import TestServer
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.logging import cbl_info, cbl_warning
 from cbltest.responses import ServerVariant
+
+
+class CouchbaseLiteFeature(Enum):
+    """CBL features that not every test server supports. Each value names the feature in skip messages."""
+
+    # LiteCore-based platforms from 4.0.0. CBL JS and CBL React Native do not support them yet.
+    VERSION_VECTORS = "version vectors"
+    # LiteCore-based platforms from 3.3.0.
+    MULTIPEER = "multipeer replication"
+    # LiteCore-based platforms from 2.8.0.
+    LEGACY_P2P = "legacy peer-to-peer replication"
+    # CBL JS does not support it.
+    DELTA_SYNC = "delta sync"
+    # The CBL JS WebSocket library cannot send them.
+    CUSTOM_REPLICATOR_HEADERS = "custom replicator headers"
+    # CBL React Native has no API for one.
+    CUSTOM_CONFLICT_RESOLVER = "custom conflict resolver"
 
 
 class CBLTestClass:
@@ -97,56 +116,49 @@ class CBLTestClass:
 
         await self._skip_if_cbl_version_not(server, constraint, reason)
 
-    async def skip_if_cbl_react_native_not(
-        self, server: TestServer, constraint: str, reason: str | None = None
-    ) -> None:
+    async def skip_if_not_supports(self, server: TestServer, *features: CouchbaseLiteFeature) -> None:
         """
-        Skips the test if the server is CBL React Native and its version does not match the specified
-        comparison operation and value. Other platforms are not affected.
+        Skips the test if the server's CBL does not support all of the given features.
 
-        :param constraint: A string representing the comparison operation and version, e.g., ">= 1.2.0".
-        :param reason: Why the test needs this version, added to the skip message.
+        :param features: The features that the test needs.
         """
-        if (await server.info).variant != ServerVariant.REACT_NATIVE:
-            return
+        for feature in features:
+            reason = f"no {feature.value}"
+            match feature:
+                case CouchbaseLiteFeature.VERSION_VECTORS:
+                    await self.skip_if_js(server, reason)
+                    await self._skip_if_react_native(server, reason)
+                    await self._skip_if_cbl_version_not(server, ">= 4.0.0", reason)
+                case CouchbaseLiteFeature.MULTIPEER:
+                    await self.skip_if_js(server, reason)
+                    await self._skip_if_react_native(server, reason)
+                    await self._skip_if_cbl_version_not(server, ">= 3.3.0", reason)
+                case CouchbaseLiteFeature.LEGACY_P2P:
+                    await self.skip_if_js(server, reason)
+                    await self._skip_if_react_native(server, reason)
+                    await self._skip_if_cbl_version_not(server, ">= 2.8.0", reason)
+                case CouchbaseLiteFeature.DELTA_SYNC | CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS:
+                    await self.skip_if_js(server, reason)
+                case CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER:
+                    await self._skip_if_react_native(server, reason)
+                case _:
+                    assert_never(feature)
 
-        await self._skip_if_cbl_version_not(server, constraint, reason)
+    async def skip_if_js(self, server: TestServer, reason: str | None = None) -> None:
+        """
+        Skips the test if the server is CBL JS.
 
-    async def skip_if_not_supports_version_vectors(self, server: TestServer) -> None:
+        :param reason: Why CBL JS cannot run the test, added to the skip message.
         """
-        Skips the test if the server's CBL does not use version vectors. CBL JS and CBL React Native
-        do not support them yet; the other platforms support them from 4.0.0.
-        """
-        await self.skip_if_not_litecore(server, "no version vectors")
-        await self._skip_if_cbl_version_not(server, ">= 4.0.0", "no version vectors")
+        await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.JS, reason)
 
-    async def skip_if_not_supports_multipeer(self, server: TestServer) -> None:
+    async def _skip_if_react_native(self, server: TestServer, reason: str | None = None) -> None:
         """
-        Skips the test if the server's CBL does not support multipeer replication. CBL JS and CBL React
-        Native do not support it; the other platforms support it from 3.3.0.
-        """
-        await self.skip_if_not_litecore(server, "no multipeer replication")
-        await self._skip_if_cbl_version_not(server, ">= 3.3.0", "no multipeer replication")
+        Skips the test if the server is CBL React Native.
 
-    async def skip_if_not_supports_custom_conflict_resolver(self, server: TestServer) -> None:
+        :param reason: Why CBL React Native cannot run the test, added to the skip message.
         """
-        Skips the test if the server's CBL cannot set a custom conflict resolver on a replicator.
-        CBL React Native has no API for one.
-        """
-        await self.skip_if_not_platform(
-            server, ServerVariant.ALL & ~ServerVariant.REACT_NATIVE, "no custom conflict resolver"
-        )
-
-    async def skip_if_not_litecore(self, server: TestServer, reason: str | None = None) -> None:
-        """
-        Skips the test if the server is CBL JS or CBL React Native, whose versions and features do not
-        follow the LiteCore-based platforms.
-
-        :param reason: Why the test needs a LiteCore-based platform, added to the skip message.
-        """
-        await self.skip_if_not_platform(
-            server, ServerVariant.ALL & ~(ServerVariant.JS | ServerVariant.REACT_NATIVE), reason
-        )
+        await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.REACT_NATIVE, reason)
 
     async def _skip_if_cbl_version_not(self, server: TestServer, constraint: str, reason: str | None) -> None:
         version_str = (await server.info).library_version.split("-")[0]

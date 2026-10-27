@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.couchbaseserver import CouchbaseServer
 from cbltest.api.database import Database
 from cbltest.api.json_generator import JSONGenerator
@@ -45,7 +45,7 @@ class TestSystemMultipeer(CBLTestClass):
         docs_per_crud: int,
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_not_supports_multipeer(ts)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
             await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=test_duration)
@@ -200,7 +200,7 @@ class TestSystemMultipeer(CBLTestClass):
     )
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport: str, doc_count: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_not_supports_multipeer(ts)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
             await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         NO_OF_DOCS = doc_count
         NUM_DEVICES = len(cblpytest.test_servers)
@@ -298,7 +298,7 @@ class TestSystemMultipeer(CBLTestClass):
         #    /                       \
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
-            await self.skip_if_not_supports_multipeer(ts)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
             await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
         DOC_COUNT = doc_count
 

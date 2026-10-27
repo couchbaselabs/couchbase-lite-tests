@@ -3,7 +3,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 
 from cbltest import CBLPyTest, CouchbaseServer
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.database import Database, GetDocumentResult
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.error import CblTestServerBadResponseError
@@ -82,7 +82,7 @@ async def setup_upgrade_env(
     reset_expired_ttl: bool = False,
     empty_local_db: bool = False,
 ) -> Database:
-    await test_case.skip_if_not_supports_version_vectors(cblpytest.test_servers[0])
+    await test_case.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.VERSION_VECTORS)
 
     dataset_ver = cblpytest.test_servers[0].dataset_version
     test_case.skip_if_not(dataset_ver == "4.0", f"Requires dataset v4.0 (current: {dataset_ver}).")

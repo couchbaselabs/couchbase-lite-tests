@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.multipeer_replicator import MultipeerReplicator
 from cbltest.api.replicator_types import ReplicatorCollectionEntry
 
@@ -10,7 +10,7 @@ from cbltest.api.replicator_types import ReplicatorCollectionEntry
 class TestMultipeerReplicator(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_start_stop_multipeer(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_supports_multipeer(cblpytest.test_servers[0])
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.MULTIPEER)
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]

@@ -1,6 +1,6 @@
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
 from cbltest.api.replicator import Replicator
@@ -40,7 +40,7 @@ class TestStartReplicator(CBLTestClass):
         ],
     )
     async def test_known_conflict_resolvers(self, cblpytest: CBLPyTest, name: str, parameters: dict | None) -> None:
-        await self.skip_if_not_supports_custom_conflict_resolver(cblpytest.test_servers[0])
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
 

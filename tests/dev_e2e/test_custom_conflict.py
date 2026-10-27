@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
-from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cbltestclass import CBLTestClass, CouchbaseLiteFeature
 from cbltest.api.database import SnapshotUpdater
 from cbltest.api.database_types import DocumentEntry
 from cbltest.api.replicator import Replicator
@@ -28,7 +28,7 @@ class TestCustomConflict(CBLTestClass):
         conflict_resolver: ReplicatorConflictResolver,
         setup_snapshot: Callable[[SnapshotUpdater], str],
     ) -> None:
-        await self.skip_if_not_supports_custom_conflict_resolver(cblpytest.test_servers[0])
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -118,7 +118,7 @@ class TestCustomConflict(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_supports_custom_conflict_resolver(cblpytest.test_servers[0])
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
