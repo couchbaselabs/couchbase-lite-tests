@@ -5,6 +5,7 @@ from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestServerBadResponseError
+from cbltest.responses import ServerVariant
 
 
 class TestUpdateDatabase(CBLTestClass):
@@ -46,7 +47,7 @@ class TestUpdateDatabase(CBLTestClass):
 
         # JS can accept negative numbers in paths to count from the end
         if "-1" in attempt:
-            await self.skip_if_js(cblpytest.test_servers[0])
+            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         if self.db is None:
             self.db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
@@ -93,7 +94,7 @@ class TestUpdateDatabase(CBLTestClass):
     async def test_good_updates(self, cblpytest: CBLPyTest, attempt: str) -> None:
         # The JS test server doesn't support escapes
         if "\\" in attempt:
-            await self.skip_if_js(cblpytest.test_servers[0])
+            await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
 
         self.mark_test_step(f"Testing good update with path: {attempt}")
         if self.db is None:

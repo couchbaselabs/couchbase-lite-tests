@@ -18,9 +18,9 @@ class CouchbaseLiteFeature(Enum):
 
     # LiteCore-based platforms from 4.0.0. CBL JS and CBL React Native do not support them yet.
     VERSION_VECTORS = "version vectors"
-    # LiteCore-based platforms from 3.3.0.
+    # CBL iOS and CBL Android from 3.3.0.
     MULTIPEER = "multipeer replication"
-    # LiteCore-based platforms from 2.8.0.
+    # LiteCore-based platforms.
     LEGACY_P2P = "legacy peer-to-peer replication"
     # CBL JS does not support it.
     DELTA_SYNC = "delta sync"
@@ -126,39 +126,23 @@ class CBLTestClass:
             reason = f"no {feature.value}"
             match feature:
                 case CouchbaseLiteFeature.VERSION_VECTORS:
-                    await self.skip_if_js(server, reason)
-                    await self._skip_if_react_native(server, reason)
+                    await self.skip_if_not_platform(
+                        server, ServerVariant.ALL & ~(ServerVariant.JS | ServerVariant.REACT_NATIVE), reason
+                    )
                     await self._skip_if_cbl_version_not(server, ">= 4.0.0", reason)
                 case CouchbaseLiteFeature.MULTIPEER:
-                    await self.skip_if_js(server, reason)
-                    await self._skip_if_react_native(server, reason)
+                    await self.skip_if_not_platform(server, ServerVariant.IOS | ServerVariant.ANDROID, reason)
                     await self._skip_if_cbl_version_not(server, ">= 3.3.0", reason)
                 case CouchbaseLiteFeature.LEGACY_P2P:
-                    await self.skip_if_js(server, reason)
-                    await self._skip_if_react_native(server, reason)
-                    await self._skip_if_cbl_version_not(server, ">= 2.8.0", reason)
+                    await self.skip_if_not_platform(
+                        server, ServerVariant.ALL & ~(ServerVariant.JS | ServerVariant.REACT_NATIVE), reason
+                    )
                 case CouchbaseLiteFeature.DELTA_SYNC | CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS:
-                    await self.skip_if_js(server, reason)
+                    await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.JS, reason)
                 case CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER:
-                    await self._skip_if_react_native(server, reason)
+                    await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.REACT_NATIVE, reason)
                 case _:
                     assert_never(feature)
-
-    async def skip_if_js(self, server: TestServer, reason: str | None = None) -> None:
-        """
-        Skips the test if the server is CBL JS.
-
-        :param reason: Why CBL JS cannot run the test, added to the skip message.
-        """
-        await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.JS, reason)
-
-    async def _skip_if_react_native(self, server: TestServer, reason: str | None = None) -> None:
-        """
-        Skips the test if the server is CBL React Native.
-
-        :param reason: Why CBL React Native cannot run the test, added to the skip message.
-        """
-        await self.skip_if_not_platform(server, ServerVariant.ALL & ~ServerVariant.REACT_NATIVE, reason)
 
     async def _skip_if_cbl_version_not(self, server: TestServer, constraint: str, reason: str | None) -> None:
         version_str = (await server.info).library_version.split("-")[0]
