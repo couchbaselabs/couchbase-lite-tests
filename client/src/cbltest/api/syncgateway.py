@@ -1727,6 +1727,46 @@ class _SyncGatewayBase:
                 cast(dict, response), db_name=db_name, doc_id=doc_id, scope=scope, collection=collection
             )
 
+    async def wait_for_document_body(
+        self,
+        db_name: str,
+        doc_id: str,
+        expected: Mapping[str, Any],
+        *,
+        scope: str = "_default",
+        collection: str = "_default",
+    ) -> RemoteDocument:
+        """
+        Retry get_document until the document body holds every key and value in expected,
+        then return the document.  Raises the last mismatch or 404 if that has not happened within 60s,
+        or any other error at once.  An expected value of None also matches a missing key.
+
+        :param db_name: The name of the Sync Gateway database to query
+        :param doc_id: The document to wait for
+        :param expected: The properties the body must hold
+        :param scope: The scope to use when querying Sync Gateway
+        :param collection: The collection to use when querying Sync Gateway
+        """
+
+        async def _poll() -> RemoteDocument:
+            doc = await self.get_document(db_name, doc_id, scope=scope, collection=collection)
+            mismatched = {k: doc.body.get(k) for k, v in expected.items() if doc.body.get(k) != v}
+            assert not mismatched, f"{doc_id} on Sync Gateway does not match {dict(expected)}: {mismatched}"
+            return doc
+
+        # A document that has not replicated yet reads as a 404.
+        retrying = tenacity.AsyncRetrying(
+            wait=tenacity.wait_fixed(1),
+            stop=tenacity.stop_after_delay(60),
+            retry=tenacity.retry_if_exception(
+                lambda e: (
+                    isinstance(e, AssertionError) or (isinstance(e, CblSyncGatewayBadResponseError) and e.code == 404)
+                )
+            ),
+            reraise=True,
+        )
+        return await retrying(_poll)
+
     async def get_last_sequence(self, db_name: str) -> int:
         """
         Gets the sequence Sync Gateway has most recently allocated in the database.

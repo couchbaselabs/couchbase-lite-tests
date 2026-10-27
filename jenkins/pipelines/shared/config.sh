@@ -42,6 +42,7 @@ function move_artifacts() {
       echo "Warning: failed to gzip session.log; leaving it uncompressed"
   fi
   mv "$src_dir/http_log" "$dst_dir/http_log" || true
+  mv "$src_dir/browser_log" "$dst_dir/browser_log" 2>/dev/null || true
   # SGW diagnostics downloaded by run_sgcollects() (via --sgcollect-on-test-failure)
   # into the pytest cwd when a test fails; moving them here gets them archived
   # (and later purged) by Jenkins retention. Files are named

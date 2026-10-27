@@ -31,7 +31,7 @@ from environment.aws.common.io import get_ec2_hostname
 from environment.aws.common.output import header
 from environment.aws.common.terraform import get_terraform_json
 from environment.aws.common.versions import resolve_latest_version
-from environment.aws.topology_setup.test_server import TestServer
+from environment.aws.topology_setup.test_server import TestServer, listen_port
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -727,22 +727,21 @@ class TopologyConfig:
             bridge.validate(test_server_input.location)
             bridge.install(test_server_input.location)
             bridge.run(test_server_input.location)
-            port = 5555 if test_server_input.platform.startswith("dotnet") else 8080
 
             if test_server_input.platform == "js":
-                """Javascript is not just a simple launch, it involves a reverse connection
-                initiation which is too complicated to set up here just to test.  So skip
-                the connection check"""
+                # The JS server connects back to the client, which is too involved to set up just for this check.
                 click.secho("Skipping connection check for js...", fg="yellow")
-                return
+                continue
 
             ip = bridge.get_ip(test_server_input.location, fallback=test_server_input.ip_hint)
+            port = listen_port(test_server_input.platform)
 
             success = False
             for _ in range(30):
                 try:
                     requests.get(f"http://{ip}:{port}")
                     success = True
+                    break
                 except requests.exceptions.ConnectionError:
                     click.secho(
                         f"Failed to connect to test server at {ip}:{port}, retrying in 1s...",

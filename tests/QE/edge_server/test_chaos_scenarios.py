@@ -1,18 +1,24 @@
-import asyncio
 import random
 import uuid
 from pathlib import Path
 from typing import Any
 
 import pytest
+import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.edgeserver import BulkDocOperation, EdgeServer
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.json_generator import JSONGenerator
 from cbltest.asyncfile import read_json_file, write_json_file
+from cbltest.utils import async_retry_assert
 
 SCRIPT_DIR = str(Path(__file__).parent)
+
+
+def _user_properties(doc: dict[str, Any]) -> dict[str, Any]:
+    """The properties of a generated document that a server returns in its body, without _id and _rev."""
+    return {key: value for key, value in doc.items() if not key.startswith("_")}
 
 
 @pytest.mark.min_edge_servers(1)
@@ -20,7 +26,7 @@ SCRIPT_DIR = str(Path(__file__).parent)
 class TestEdgeServerChaos(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_kill_sgw_mid_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
-        self.mark_test_step("test_edge_to_sgw_replication")
+        self.mark_test_step("test_kill_sgw_mid_replication")
         cloud = cblpytest.clusters[0]
         await cloud.configure_dataset(dataset_path, "travel")
         sgw = cloud.sync_gateways[0]
@@ -45,7 +51,9 @@ class TestEdgeServerChaos(CBLTestClass):
 
         await edge_server.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
         self.mark_test_step("Verify document deleted")
-        await asyncio.sleep(120)
+        await sgw.wait_for_documents(
+            "travel", hotel_docs.revmap.keys(), scope="travel", collection="hotels", deleted=True
+        )
         edge_docs = await edge_server.get_all_documents("travel", collection="travel.hotels")
         sgw_docs = await sgw.get_all_documents("travel", scope="travel", collection="hotels")
         assert len(edge_docs.rows) == len(sgw_docs.rows) == 0, (
@@ -61,6 +69,7 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server.wait_for_idle()
 
         self.mark_test_step("Verify document created")
+        await sgw.wait_for_documents("travel", docs_list.keys(), scope="travel", collection="hotels")
         edge_docs = await edge_server.get_all_documents("travel", collection="travel.hotels")
         sgw_docs = await sgw.get_all_documents("travel", scope="travel", collection="hotels")
         assert len(edge_docs.rows) == len(sgw_docs.rows) == 10000, (
@@ -88,6 +97,10 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server.wait_for_idle()
 
         self.mark_test_step("Verify document updated")
+        for doc_id in random.sample(list(update_docs.keys()), 50):
+            await sgw.wait_for_document_body(
+                "travel", doc_id, _user_properties(update_docs[doc_id]), scope="travel", collection="hotels"
+            )
         edge_docs = await edge_server.get_all_documents("travel", collection="travel.hotels")
         sgw_docs = await sgw.get_all_documents("travel", scope="travel", collection="hotels")
         assert len(edge_docs.rows) == len(sgw_docs.rows) == docgen.size, (
@@ -125,7 +138,9 @@ class TestEdgeServerChaos(CBLTestClass):
         self.mark_test_step("Edge servers started")
         for edge_server in restarted:
             for doc_id in random.sample(list(update_docs.keys()), 50):
-                await edge_server.get_document(db_name="travel", scope="travel", collection="hotels", doc_id=doc_id)
+                await edge_server.wait_for_document_body(
+                    "travel", doc_id, _user_properties(update_docs[doc_id]), scope="travel", collection="hotels"
+                )
             all_docs = await edge_server.get_all_documents(db_name="travel", scope="travel", collection="hotels")
             assert len(all_docs.rows) == docgen.size
         self.mark_test_step("Edge servers replication verified")
@@ -255,10 +270,22 @@ class TestEdgeServerChaos(CBLTestClass):
         await write_json_file(config_path2, config)
         edge_server3 = await cblpytest.edge_servers[2].configure_dataset(db_name="travel", config_file=config_path2)
 
-        self.mark_test_step("Wait for replication to become idle across all Edge Servers")
-        await edge_server1.wait_for_idle()
-        await edge_server2.wait_for_idle()
-        await edge_server3.wait_for_idle()
+        self.mark_test_step("Wait for Edge Server 3 to hold the same hotel revisions as Sync Gateway")
+
+        # Edge Server 3 is seeded with the same hotel IDs, so only matching revisions prove the chain synced.
+        async def _hotels_in_sync() -> None:
+            sgw_hotels = await sgw.get_all_documents("travel", scope="travel", collection="hotels")
+            es3_hotels = await edge_server3.get_all_documents("travel", collection="travel.hotels")
+            mismatched = {
+                doc_id
+                for doc_id in sgw_hotels.revmap.keys() | es3_hotels.revmap.keys()
+                if sgw_hotels.revmap.get(doc_id) != es3_hotels.revmap.get(doc_id)
+            }
+            assert not mismatched, (
+                f"Hotel revisions differ between Sync Gateway and Edge Server 3: {sorted(mismatched)}"
+            )
+
+        await async_retry_assert(_hotels_in_sync, tenacity.wait_fixed(1), tenacity.stop_after_delay(60))
 
         self.mark_test_step("Delete all docs in collection travel.hotels in es3")
         all_docs = await edge_server3.get_all_documents(db_name="travel", collection="travel.hotels")
@@ -267,10 +294,10 @@ class TestEdgeServerChaos(CBLTestClass):
             BulkDocOperation({"_deleted": True}, _id=doc_id, rev=rev, optype="delete") for doc_id, rev in revmap.items()
         ]
         await edge_server3.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
-        self.mark_test_step("Wait for replication to become idle and validate deletes")
-        await edge_server1.wait_for_idle()
-        await edge_server2.wait_for_idle()
-        await edge_server3.wait_for_idle()
+        self.mark_test_step("Wait for the deletes to reach Edge Server 2, Edge Server 1, and Sync Gateway")
+        await edge_server2.wait_for_documents("travel", revmap.keys(), collection="travel.hotels", deleted=True)
+        await edge_server1.wait_for_documents("travel", revmap.keys(), collection="travel.hotels", deleted=True)
+        await sgw.wait_for_documents("travel", revmap.keys(), scope="travel", collection="hotels", deleted=True)
         self.mark_test_step("Kill Edge Server 3")
         await cblpytest.edge_servers[2].kill_server()
 
@@ -292,12 +319,12 @@ class TestEdgeServerChaos(CBLTestClass):
         bulk_ops = [BulkDocOperation(body=doc, _id=id, optype="create") for id, doc in create_docs.items()]
         await edge_server3.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
-        self.mark_test_step("Verify documents are created on Edge Server 3 and wait for replication to become idle")
+        self.mark_test_step("Verify documents are created on Edge Server 3 and wait for them to replicate")
         all_docs = await edge_server3.get_all_documents(db_name="travel", collection="travel.hotels")
         assert len(all_docs.rows) == docgen.size, "Inserted document count mismatch"
-        await edge_server1.wait_for_idle()
-        await edge_server2.wait_for_idle()
-        await edge_server3.wait_for_idle()
+        await edge_server2.wait_for_documents("travel", create_docs.keys(), collection="travel.hotels")
+        await edge_server1.wait_for_documents("travel", create_docs.keys(), collection="travel.hotels")
+        await sgw.wait_for_documents("travel", create_docs.keys(), scope="travel", collection="hotels")
 
         self.mark_test_step("Verify create propagated to ES2, ES1, SGW")
         edge2_docs = await edge_server2.get_all_documents("travel", collection="travel.hotels")

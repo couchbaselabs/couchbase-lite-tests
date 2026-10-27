@@ -4,7 +4,6 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.error_types import ErrorDomain
 from cbltest.api.replicator import (
     Replicator,
     ReplicatorActivityLevel,
@@ -18,7 +17,6 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.responses import ServerVariant
 
 
 @pytest.mark.min_test_servers(1)
@@ -56,15 +54,8 @@ class TestBasicReplication(CBLTestClass):
         self.mark_test_step("Wait until the replicator is stopped")
         status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
-        self.mark_test_step("Check that the replicator's error is CBL/10404")
-        if (await cblpytest.test_servers[0].info).variant == ServerVariant.JS:
-            assert status.error is not None and status.error.code == 404
-        else:
-            assert (
-                status.error is not None
-                and status.error.code == 10404
-                and ErrorDomain.equal(status.error.domain, ErrorDomain.CBL)
-            )
+        self.mark_test_step("Check that the replicator's error is 10404")
+        assert status.error is not None and status.error.code == 10404
 
         await cblpytest.test_servers[0].cleanup()
 

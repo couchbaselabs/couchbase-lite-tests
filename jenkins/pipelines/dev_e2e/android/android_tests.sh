@@ -4,8 +4,6 @@
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -eu # No pipefail because piping yes always "fails" with SIGPIPE
 
-BUILD_TOOLS_VERSION='34.0.0'
-SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
@@ -44,9 +42,6 @@ done
 
 STATUS=0
 
-echo "Install Android SDK"
-yes | ${SDK_MGR} --channel=1 --licenses >/dev/null 2>&1
-${SDK_MGR} --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
@@ -60,9 +55,6 @@ pushd $DEV_E2E_TESTS_DIR >/dev/null
 rm -rf http_log testserver.log
 
 echo "Run the tests"
-# To re-enable this, this script needs to become aware of the
-# serial number of the device, which is not currently passed
-#adb shell input keyevent KEYCODE_WAKEUP
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
 else

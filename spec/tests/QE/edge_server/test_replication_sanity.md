@@ -27,21 +27,15 @@ Test that documents replicate correctly in both directions: Sync Gateway → Edg
    * Get all documents from Edge Server `db`; verify count is 10
 8. **PHASE 1: Sync Gateway cycle (document `doc_11`)**
    * Create document `doc_11` via Sync Gateway in `db-1` with `id`, `channels: ["public"]`, `timestamp`; verify create succeeds
-   * Wait 5 seconds
-   * Get document `doc_11` from Edge Server `db`; verify it exists and `id` is `doc_11`; capture revision ID
+   * Wait until document `doc_11` on Edge Server `db` has the body written; capture revision ID
    * Update document `doc_11` via Edge Server with body including `changed: "yes"` and the captured revision; verify update succeeds
-   * Wait 5 seconds
-   * Get document `doc_11` from Sync Gateway `db-1`; verify it exists and revision ID changed; capture new revision ID
+   * Wait until document `doc_11` on Sync Gateway `db-1` has `changed: "yes"`; capture new revision ID
    * Delete document `doc_11` via Sync Gateway using the new revision ID
-   * Wait 5 seconds
-   * Attempt to get document `doc_11` from Edge Server `db`; verify the request fails (document not found)
+   * Wait until Edge Server `db` shows `doc_11` as deleted
 9. **PHASE 2: Edge Server cycle (document `doc_12`)**
    * Create document `doc_12` via Edge Server in `db` with `id`, `channels: ["public"]`, `timestamp`; verify create succeeds
-   * Wait 5 seconds
-   * Get document `doc_12` from Sync Gateway `db-1`; verify it exists and `id` is `doc_12`; capture revision ID
+   * Wait until document `doc_12` on Sync Gateway `db-1` has the body written; capture revision ID
    * Update document `doc_12` via Sync Gateway with body including `changed: "yes"` and the captured revision; verify update succeeds
-   * Wait 5 seconds
-   * Get document `doc_12` from Edge Server `db`; verify it exists and `id` is `doc_12`; capture new revision ID
+   * Wait until document `doc_12` on Edge Server `db` has `changed: "yes"`; capture new revision ID
    * Delete document `doc_12` via Edge Server using the new revision ID; verify delete response indicates success
-   * Wait 5 seconds
-   * Attempt to get document `doc_12` from Sync Gateway `db-1`; verify the request fails (document not found)
+   * Wait until Sync Gateway `db-1` shows `doc_12` as deleted

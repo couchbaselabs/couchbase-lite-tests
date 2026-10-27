@@ -62,6 +62,13 @@ TEST_SERVER_DIR = (SCRIPT_DIR / ".." / ".." / ".." / "servers").resolve()
 DOWNLOADED_TEST_SERVER_DIR = TEST_SERVER_DIR / "downloaded"
 
 
+def listen_port(platform: str) -> int:
+    """The port the test server for the given platform key listens on."""
+    if platform.startswith("dotnet"):
+        return 5555
+    return 5173 if platform == "js" else 8080
+
+
 class TestServer(ABC):
     """
     An abstract base class for managing Couchbase Lite test servers on various platforms.
@@ -102,6 +109,7 @@ class TestServer(ABC):
     """
 
     __registry: ClassVar[dict[str, type[TestServer]]] = {}
+    __initialized: ClassVar[bool] = False
     __version_filename: Final[str] = ".version"
     __build_no_cache: ClassVar[dict[str, dict[str, str]]] = {}
 
@@ -156,13 +164,16 @@ class TestServer(ABC):
         """
         Initialize the test server registry by importing platform-specific modules.
         """
-        if len(cls.__registry) > 0:
+        # A direct import of one platform module also registers it, so a non-empty registry is not enough.
+        if cls.__initialized:
             return
 
         platforms_path = SCRIPT_DIR / "test_server_platforms"
         for platform in platforms_path.iterdir():
             if platform.is_file() and platform.stem.endswith("_register") and platform.suffix == ".py":
                 importlib.import_module(f"environment.aws.topology_setup.test_server_platforms.{platform.stem}")
+
+        cls.__initialized = True
 
     @classmethod
     def register(cls, name: str) -> Callable[[type[TestServer]], type[TestServer]]:

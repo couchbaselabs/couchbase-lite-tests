@@ -11,7 +11,8 @@
 //
 
 import type { CBLDictionary, CBLDocument, CBLValue, JSONObject, JSONValue } from "@couchbase/lite-js";
-import { Blob } from "@couchbase/lite-js";
+import { Blob, ReplicatorError } from "@couchbase/lite-js";
+import type { ErrorInfo } from "./tdkSchema";
 
 /** Test functions can throw this to report an HTTP error status. */
 export class HTTPError extends Error {
@@ -47,4 +48,29 @@ export function isDict(val: CBLValue | undefined): val is CBLDictionary {
 /** Converts a CBLDocument to a regular JSON object (i.e. Blobs are replaced by their metadata.) */
 export function docToJSON(doc: CBLDocument): JSONObject {
     return JSON.parse(JSON.stringify(doc)) as JSONObject;
+}
+
+/** Maps a CBL JS error onto the code a native test server would report for it. */
+export function errorInfo(error: Error | undefined): ErrorInfo | undefined {
+    if (!error) return undefined;
+
+    // Native platforms report an HTTP or BLIP status, or a WebSocket close code, as CBL/10000+code.
+    const code = serverCode(error);
+    return code !== undefined && code > 0
+        ? { domain: "CBL", code: code + 10000, message: error.message }
+        : { domain: "CBL-JS", code: -1, message: error.message };
+}
+
+/** The HTTP or BLIP status, or WebSocket close code, that a CBL JS error carries. */
+function serverCode(error: Error): number | undefined {
+    if (error instanceof ReplicatorError) return error.code;
+    // CBL JS does not export BLIPError or WebSocketError. A document's error is the unwrapped
+    // BLIP reply to its "rev" message, for example a 403 for a rejected push.
+    if ("blipErrorCode" in error) return error.blipErrorCode as number;
+    if (error.name === "WebSocketError") {
+        // The browser or CBL JS makes up 1000, 1005 and 1006 when the server sent no close code.
+        const code = (error as Error & { code: number }).code;
+        return [1000, 1005, 1006].includes(code) ? undefined : code;
+    }
+    return undefined;
 }

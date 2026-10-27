@@ -1,15 +1,43 @@
 import json
+import re
 import socket
-import webbrowser
 from asyncio import Future, Semaphore, wait_for
+from contextlib import AsyncExitStack
+from logging import FileHandler, Formatter, getLogger
+from pathlib import Path
 from typing import cast
 from urllib.parse import urlencode
 
 import netifaces
 from aiohttp import web
+from playwright.async_api import Browser, ConsoleMessage, async_playwright
 
 from cbltest.globals import CBLPyTestGlobal
-from cbltest.logging import cbl_error, cbl_info
+from cbltest.logging import cbl_error, cbl_info, cbl_warning
+
+
+def _format_console(msg: ConsoleMessage) -> str:
+    """Applies console.log style substitutions to LogTape output, dropping the CSS that %c consumes"""
+    args = [str(arg) for arg in msg.args]
+    # LogTape's format string always starts with %c; other first arguments may not be strings
+    if not args or not args[0].startswith("%c"):
+        return msg.text
+
+    remaining = iter(args[1:])
+
+    def substitute(match: re.Match[str]) -> str:
+        spec = match.group(1)
+        if spec == "%":
+            return "%"
+
+        value = next(remaining, None)
+        if value is None:
+            return match.group(0)
+
+        return "" if spec == "c" else value
+
+    formatted = re.sub(r"%([%csdifoO])", substitute, args[0])
+    return " ".join([formatted, *remaining])
 
 
 class WebSocketRouter:
@@ -22,6 +50,32 @@ class WebSocketRouter:
         self.__connections: dict[str, web.WebSocketResponse] = {}
         self.__runner = web.AppRunner(self.__app)
         self.__stopping = False
+        self.__browser_cleanup = AsyncExitStack()
+        self.__browser_log_path = Path("browser_log")
+
+    async def _open_tdk_page(self, browser: Browser, url: str, device: str, query: str) -> None:
+        self.__browser_log_path.mkdir(exist_ok=True)
+        handler = FileHandler(self.__browser_log_path / f"{device}.log", mode="w", encoding="utf-8")
+        handler.setFormatter(Formatter("%(asctime)s %(message)s"))
+        browser_log = getLogger(f"CBL.browser.{device}")
+        browser_log.propagate = False
+        browser_log.addHandler(handler)
+        self.__browser_cleanup.callback(handler.close)
+        self.__browser_cleanup.callback(browser_log.removeHandler, handler)
+
+        def write_log(level: str, text: str) -> None:
+            browser_log.info(f"[{level}] {text}")
+            if level in ("error", "pageerror", "crash"):
+                cbl_error(f"[{url}] {text}", include_stack=False)
+
+        # A context per device keeps each test server's browser storage separate
+        context = await browser.new_context(ignore_https_errors=True)
+        page = await context.new_page()
+        page.on("console", lambda msg: write_log(msg.type, _format_console(msg)))
+        page.on("pageerror", lambda err: write_log("pageerror", str(err)))
+        page.on("crash", lambda _: write_log("crash", "TDK page crashed"))
+        # The WebSocket connect timeout in start() decides success, not the page load
+        await page.goto(f"{url}/tdk.html?{query}", wait_until="commit")
 
     async def start(self) -> None:
         if len(self.__server_urls) == 0:
@@ -39,25 +93,40 @@ class WebSocketRouter:
         chosen_port = sock.getsockname()[1]
         await site.start()
 
-        ws_index = 0
-        for url in self.__server_urls:
-            local_ip = self._lookup_ip(url)
-            cbl_info(f"Connecting to test server at {url}...")
-            params = {
-                "tdkURL": f"ws://{local_ip}:{chosen_port}/",
-                "autostart": "true",
-                "device": f"ws{ws_index}",
-            }
-            query = urlencode(params)
-            timeout = 30
+        try:
+            browser: Browser | None = None
             if CBLPyTestGlobal.auto_start_tdk_page:
-                webbrowser.open_new_tab(f"{url}/tdk.html?{query}")
+                playwright = await self.__browser_cleanup.enter_async_context(async_playwright())
+                browser = await playwright.chromium.launch()
+                self.__browser_cleanup.push_async_callback(browser.close)
 
-            await wait_for(self.__conn_sem.acquire(), timeout=timeout)
-            cbl_info(f"Connected to test server at {url}!")
+            for ws_index, url in enumerate(self.__server_urls):
+                local_ip = self._lookup_ip(url)
+                cbl_info(f"Connecting to test server at {url}...")
+                params = {
+                    "tdkURL": f"ws://{local_ip}:{chosen_port}/",
+                    "autostart": "true",
+                    "device": f"ws{ws_index}",
+                }
+                query = urlencode(params)
+                timeout = 30
+                if browser is not None:
+                    await self._open_tdk_page(browser, url, params["device"], query)
+
+                await wait_for(self.__conn_sem.acquire(), timeout=timeout)
+                cbl_info(f"Connected to test server at {url}!")
+        except BaseException:
+            await self.stop()
+            raise
 
     async def stop(self) -> None:
         self.__stopping = True
+
+        # Close the pages first, so that they do not report the shutdown of the sockets as an error
+        try:
+            await self.__browser_cleanup.aclose()
+        except Exception as e:
+            cbl_warning(f"Failed to shut down the TDK browser ({e})")
 
         for ws in list(self.__connections.values()):
             if not ws.closed:

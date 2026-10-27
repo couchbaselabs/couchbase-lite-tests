@@ -180,19 +180,36 @@ uv run environment/local/start_local.py --stop-testserver --stop-sync-gateway
   - `--server rosmar`: uses `environment/local/sync_gateway_config/basic_sync_gateway_rosmar.json`
   - `--server cbs`: uses `environment/local/sync_gateway_config/basic_sync_gateway_cbs.json` (with `bootstrap.server` overridden by `--connstr`/`--start-cbs`, if given)
 
-By default this downloads a prebuilt test server. To build it from source
-instead, pass `--build-testserver` with a version string:
+By default this runs the C test server. Pass `--platform` to run a different one on this host:
+
+| `--platform`  | Test server                     | Port |
+|---------------|---------------------------------|------|
+| `c`           | C (default)                     | 8080 |
+| `dotnet`      | .NET (macOS or Windows only)    | 5555 |
+| `jak_desktop` | Java desktop                    | 8080 |
+| `js`          | JavaScript in a browser (`ws`)  | 5173 |
+
+The generated topology config names the port of that platform, also with `--skip-testserver`.
+
+By default this downloads the latest released test server for the platform. To build it from
+source instead, pass `--build-testserver` with a release version or a numbered build:
 
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --build-testserver 4.0.3
+uv run --group dotnet-build environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --platform dotnet --build-testserver 4.0.3-12
 ```
 
-Every run stops the test server the previous one started — matched on executable path under
-`servers/`, so a server from another checkout is left alone — before starting the new one. If
-something is still answering on port 8080 after that, the run stops with an error instead of
-starting a server that cannot bind the port: the startup check would be answered by whatever is
-already there, and the tests would then run against the wrong build. Stop it, or pass
-`--skip-testserver` to test against it deliberately.
+Every run stops the test server that the previous run started, then starts the new one. It stops
+only servers from this checkout's `servers/` directory. It finds them as follows:
+
+- A native server by its executable path.
+- The Java server by its `-jar` path.
+- The JavaScript dev server by its `bun run dev` or vite command and its working directory.
+
+Then the run checks the port of the platform. If something still answers there, the run stops
+with an error. A new server cannot bind that port, and the startup check would get its answer from
+the old server. The tests would then run against the wrong build. Stop that server, or pass
+`--skip-testserver` to test against it.
 
 ## Running Tests
 

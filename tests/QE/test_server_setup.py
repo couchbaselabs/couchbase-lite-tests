@@ -111,6 +111,4 @@ class TestServerSetup(CBLTestClass):
         doc_id = "test_cacert_auth"
         doc_body = {"type": "test", "message": "x509 ca_cert_path auth works"}
         cbs.upsert_document(bucket_name, doc_id, doc_body)
-        await sg.wait_for_documents(sg_db, [doc_id])
-        sg_doc = await sg.get_document(sg_db, doc_id)
-        assert sg_doc.body["message"] == "x509 ca_cert_path auth works"
+        await sg.wait_for_document_body(sg_db, doc_id, {"message": "x509 ca_cert_path auth works"})

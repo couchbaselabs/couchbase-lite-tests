@@ -17,7 +17,7 @@ Test that the replicator will stop with the `WebSocket 10404 NotFound` error whe
     * continuous: false
     * credentials: user1/pass
 4. Wait until the replicator is stopped.
-5. Check that the replicator's error CBL/10404 error.
+5. Check that the replicator's error is 10404.
 
 ## #2 test_push
 

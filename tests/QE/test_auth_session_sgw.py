@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig, SyncGateway, get_sync_gateway_session_headers
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import TestServer
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 from cbltest.responses import ServerVariant
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
@@ -83,19 +84,26 @@ async def _assert_sg_rejects(sync_gateway: SyncGateway, headers: dict[str, str])
         assert exc_info.value.code == 401, f"Expected SG to answer 401, got {exc_info.value.code}"
 
 
-async def _assert_auth_rejected(replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str]) -> None:
+async def _refused_upgrade_code(test_server: TestServer) -> int:
     """
-    Asserts the replicator stopped with an error, and that SG itself rejects the same credential.
+    The error code for SG refusing the WebSocket upgrade itself, as it does for a session or no credentials.
+    A browser cannot see the status of a refused upgrade, so CBL JS reports -1 "Failed to connect".
+    """
+    return -1 if (await test_server.info).variant == ServerVariant.JS else 10401
 
-    A browser gets no status from a refused WebSocket upgrade, so CBL JS can report -1 instead of
-    401. On its own -1 could be any failure (a certificate mismatch, an unreachable SG), so the
-    direct request shows it was the credential that SG refused.
+
+async def _assert_auth_rejected(
+    replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str], expected_code: int = 10401
+) -> None:
+    """
+    Asserts the replicator stopped with `expected_code`, and that SG itself rejects the same credential.
     """
     status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     assert status.error is not None, "Replicator stopped without an error; expected an auth rejection"
-    assert status.error.code in (401, -1), (
-        f"Expected 401 or -1, got ({status.error.domain} / {status.error.code}) {status.error.message}"
-    )
+    error = f"({status.error.domain} / {status.error.code}) {status.error.message}"
+    assert status.error.code == expected_code, f"Expected {expected_code}, got {error}"
+    if expected_code == -1:
+        assert status.error.message.startswith("Failed to connect"), f"Expected a refused connection, got {error}"
     await _assert_sg_rejects(sync_gateway, headers)
 
 
@@ -103,6 +111,11 @@ async def _assert_auth_rejected(replicator: Replicator, sync_gateway: SyncGatewa
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestSessionAuthReplication(CBLTestClass):
+    async def _skip_if_bearer_unsupported(self, test_server: TestServer) -> None:
+        """Skips on CBL .NET, which does not send replicator headers, so it cannot present a bearer token."""
+        variant = (await test_server.info).variant
+        self.skip_if_not(variant != ServerVariant.DOTNET, "https://jira.issues.couchbase.com/browse/CBL-9231")
+
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(
         "replicator_type",
@@ -111,8 +124,6 @@ class TestSessionAuthReplication(CBLTestClass):
     async def test_replicate_with_session_auth(
         self, cblpytest: CBLPyTest, dataset_path: Path, replicator_type: ReplicatorType
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -159,8 +170,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_invalid_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -182,14 +191,17 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(replicator, sync_gateway, get_sync_gateway_session_headers(session_id))
+        await _assert_auth_rejected(
+            replicator,
+            sync_gateway,
+            get_sync_gateway_session_headers(session_id),
+            await _refused_upgrade_code(cblpytest.test_servers[0]),
+        )
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_concurrent_session_identities(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -238,7 +250,7 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replicate_with_bearer_token(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self._skip_if_bearer_unsupported(cblpytest.test_servers[0])
 
         self.mark_test_step("Create an empty SG `travel` database with a `local_jwt` provider and its user")
         sync_gateway = cblpytest.sync_gateways[0]
@@ -293,7 +305,7 @@ class TestSessionAuthReplication(CBLTestClass):
     async def test_replicate_with_bad_bearer_token(
         self, cblpytest: CBLPyTest, overrides: dict[str, Any] | None
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self._skip_if_bearer_unsupported(cblpytest.test_servers[0])
 
         self.mark_test_step("Create an empty SG `travel` database with a `local_jwt` provider and its user")
         sync_gateway = cblpytest.sync_gateways[0]
@@ -321,8 +333,6 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_anonymous_replication_rejected(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -346,14 +356,14 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(replicator, sync_gateway, {})
+        await _assert_auth_rejected(
+            replicator, sync_gateway, {}, await _refused_upgrade_code(cblpytest.test_servers[0])
+        )
 
         await cblpytest.test_servers[0].cleanup()
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_guest_replication_allowed(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -410,8 +420,6 @@ class TestSessionAuthReplication(CBLTestClass):
     async def test_session_revoked_during_continuous_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
-
         self.mark_test_step("Reset SG and load `travel` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -463,7 +471,7 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_jwt_user_revoked_during_continuous_replication(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self._skip_if_bearer_unsupported(cblpytest.test_servers[0])
 
         self.mark_test_step("Create an empty SG `travel` database with a `local_jwt` provider and its user")
         sync_gateway = cblpytest.sync_gateways[0]
@@ -508,7 +516,7 @@ class TestSessionAuthReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_expired_jwt_then_fresh_token(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self._skip_if_bearer_unsupported(cblpytest.test_servers[0])
 
         self.mark_test_step("Create an empty SG `travel` database with a `local_jwt` provider and its user")
         sync_gateway = cblpytest.sync_gateways[0]
@@ -571,12 +579,13 @@ class TestSessionAuthReplication(CBLTestClass):
         sg_cluster_manager: SyncGatewayClusterManager,
         auth_type: str,
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
         await self.skip_if_cbl_js_not(
             cblpytest.test_servers[0],
             ">= 1.1.0",
             reason="needs the CBL-9117 fix, which keeps a continuous replicator pushing after a reconnect",
         )
+        if auth_type == "jwt":
+            await self._skip_if_bearer_unsupported(cblpytest.test_servers[0])
         self.skip_if_not(
             sg_cluster_manager.has_shell2http_sidecar,
             "shell2http sidecar is not reachable on every Sync Gateway host",

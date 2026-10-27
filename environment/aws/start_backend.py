@@ -39,6 +39,7 @@ from environment.aws.server_setup.setup_server import main as server_main
 from environment.aws.sgw_setup.setup_sgw import main as sgw_main
 from environment.aws.topology_setup.setup_topology import TopologyConfig
 from environment.aws.topology_setup.setup_topology import main as topology_main
+from environment.aws.topology_setup.test_server import listen_port
 
 
 class TopologyParamType(click.ParamType):
@@ -170,9 +171,8 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         if len(topology.test_servers) > 0:
             test_servers = []
             for ts in topology.test_servers:
-                port = 5555 if ts.platform.startswith("dotnet") else 5173 if ts.platform == "js" else 8080
                 ts_definition = {
-                    "url": f"http://{ts.ip_address}:{port}",
+                    "url": f"http://{ts.ip_address}:{listen_port(ts.platform)}",
                 }
 
                 if ts.dataset_version:

@@ -10,9 +10,9 @@ Test that adding a blob to a document on Edge Server replicates to Sync Gateway 
 2. Verify Sync Gateway and Edge Server each have 2 documents.
 3. Retrieve document `doc_2` from Edge Server to get the latest revision ID.
 4. Add blob `test.png` to the document using the revision ID.
-5. Retrieve document `doc_2` from Sync Gateway and verify `_attachments` and document body contain the blob with correct metadata.
+5. Wait until document `doc_2` on Sync Gateway has the blob that Edge Server holds, and verify `_attachments` and document body contain the blob with correct metadata.
 6. Delete blob `test.png` from the document on Edge Server using the revision ID from before the add.
-7. Retrieve document `doc_2` from Sync Gateway and verify `_attachments` is not present.
+7. Wait until document `doc_2` on Sync Gateway has no `_attachments`.
 
 ## test_empty_blob
 
@@ -32,7 +32,7 @@ Test that adding a blob to a document on Edge Server replicates to Sync Gateway 
 2. Verify Sync Gateway and Edge Server each have 2 documents.
 3. Retrieve document `doc_2` from Edge Server to get the latest revision ID.
 4. Add blob `test.png` to the document using the revision ID.
-5. Retrieve document `doc_2` from Sync Gateway and verify `_attachments` and document body contain the blob with content_type, digest, and length.
+5. Wait until document `doc_2` on Sync Gateway has the blob that Edge Server holds, and verify `_attachments` and document body contain the blob with content_type, digest, and length.
 
 ## test_blob_get_nonexistent
 
@@ -96,4 +96,4 @@ Test that a blob with a special-character name can be added on Edge Server and r
 2. Verify Sync Gateway and Edge Server each have 2 documents.
 3. Retrieve document `doc_2` from Edge Server to get the latest revision ID.
 4. Add a blob with attachment name `im@g#e$%&*().png` to the document using the revision ID.
-5. Retrieve document `doc_2` from Sync Gateway and verify `_attachments` and document body contain the blob with correct metadata.
+5. Wait until document `doc_2` on Sync Gateway has the blob that Edge Server holds, and verify `_attachments` and document body contain the blob with correct metadata.
