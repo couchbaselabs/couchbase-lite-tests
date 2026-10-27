@@ -11,7 +11,7 @@ from cbltest.asyncfile import read_binary_file, read_json_file, write_json_file
 SCRIPT_DIR = str(Path(__file__).parent)
 
 
-@pytest.mark.skip(reason="Feature not implemented")
+@pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/IDEA-2051")
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_edge_servers(1)
@@ -88,7 +88,8 @@ class TestBlobs(CBLTestClass):
         assert response is not None, "Failed to add attachment to document."
 
         self.mark_test_step("Verifying that blob is replicated to Sync Gateway.")
-        document = await sync_gateway.get_document(sg_db_name, doc_id)
+        es_blob = (await edge_server.get_document(es_db_name, doc_id)).body[attachment_name]
+        document = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {attachment_name: es_blob})
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -123,7 +124,7 @@ class TestBlobs(CBLTestClass):
         )
 
         self.mark_test_step("Verifying that blob is removed on Sync Gateway.")
-        sg_doc = await sync_gateway.get_document(sg_db_name, doc_id)
+        sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {"_attachments": None})
 
         assert "_attachments" not in sg_doc.body, "'_attachments' field is present in the document response"
 
@@ -227,7 +228,8 @@ class TestBlobs(CBLTestClass):
         assert response is not None, "Failed to add blob to document."
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
-        document = await sync_gateway.get_document(sg_db_name, doc_id)
+        es_blob = (await edge_server.get_document(es_db_name, doc_id)).body[attachment_name]
+        document = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {attachment_name: es_blob})
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"
@@ -531,7 +533,8 @@ class TestBlobs(CBLTestClass):
         assert response is not None, "Failed to add attachment to document."
 
         self.mark_test_step("Verifying that blob is present on Sync Gateway.")
-        document = await sync_gateway.get_document(sg_db_name, doc_id)
+        es_blob = (await edge_server.get_document(es_db_name, doc_id)).body[attachment_name]
+        document = await sync_gateway.wait_for_document_body(sg_db_name, doc_id, {attachment_name: es_blob})
         doc_body = document.body
 
         assert "_attachments" in doc_body, "'_attachments' field is missing in the document response"

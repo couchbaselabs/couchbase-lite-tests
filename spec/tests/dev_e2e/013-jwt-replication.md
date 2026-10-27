@@ -26,8 +26,9 @@ the ES config (`reconnect_on_token_change=false`, no file watching).
 6. Verify the JWT token authenticates against the SGW REST API (`GET /travel/` with `Authorization: Bearer <token>` returns 200).
 7. Configure and start ES with the inline JWT token in `auth.openid_token` and `reconnect_on_token_change=false`.
 8. Verify the replicator was created (`/_replicate` is non-empty), then wait until it is idle.
-9. Verify ES has replicated at least the expected documents (pre-loaded dataset + the 5 new docs).
-10. Fetch one document from ES and verify it is retrievable and has a `name` field.
+9. Wait until ES has the 5 new documents (`jwt_test_airline_1..5`), and verify it holds exactly 155 airline docs (the 150 pre-loaded plus the 5 new).
+10. Wait until SGW has every document on ES.
+11. Fetch one document from ES and verify it is retrievable and has a `name` field.
 
 ## test_replication_with_jwt_file
 
@@ -67,7 +68,7 @@ continues uninterrupted.
 7. Wait until the initial replication with Token-A is idle, and verify ES pulled at least 5 documents.
 8. Rotate the token: overwrite the JWT file with Token-B.
 9. Insert 5 more documents into CBS (`rotation_test_6..10`).
-10. Poll ES until it has at least `initial_count + 5` documents, confirming replication reconnected and continued with Token-B.
+10. Wait until ES has `rotation_test_6..10`, confirming replication reconnected and continued with Token-B.
 
 ## test_invalid_token_rotation_causes_401_stop
 
@@ -129,4 +130,4 @@ re-triggered, after which it recovers.
 6. **Phase 2:** Overwrite the JWT file with the invalid token. Poll (up to 60s) until the replicator is removed or `Stopped`/`Offline`, confirming a permanent 401 stop.
 7. Insert 3 more documents into CBS (`cycle_test_4..6`) while replication is stopped, and verify ES still has only the original document count.
 8. **Phase 3:** Write Token-C to the JWT file, then manually re-trigger replication (re-run `configure_dataset`, which calls `/_replicate`).
-9. Wait until replication is idle and verify ES now has at least `initial_count + 3` documents (recovery succeeded with Token-C).
+9. Wait until replication is idle, then wait until ES has `cycle_test_4..6` (recovery succeeded with Token-C).

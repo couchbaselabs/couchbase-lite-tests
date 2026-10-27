@@ -6,7 +6,6 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
-import tenacity
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
@@ -23,7 +22,6 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.asyncfile import read_json_file, write_json_file
-from cbltest.utils import async_retry_assert
 
 SCRIPT_DIR = str(Path(__file__).parent)
 ROOT_TRUE_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control.json"
@@ -107,16 +105,6 @@ async def _check(client: EdgeServer, who: str, keyspace: str, *, read: bool, wri
 async def _doc_ids(client: EdgeServer, db: str) -> set[str]:
     """The ids of every document in `db`."""
     return {row.id for row in (await client.get_all_documents(db)).rows}
-
-
-async def _wait_for_docs(client: EdgeServer, db: str, doc_ids: set[str]) -> None:
-    """Wait until every id in `doc_ids` is in `db`."""
-
-    async def _poll() -> None:
-        present = await _doc_ids(client, db)
-        assert doc_ids <= present, f"Not in {db}: {sorted(doc_ids - present)}"
-
-    await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(90))
 
 
 async def _cbl_doc_ids(db: Database) -> set[str]:
@@ -425,12 +413,12 @@ class TestPerDatabaseAccessControl(CBLTestClass):
                 await consumer.put_document_with_id({"by": "ruled"}, "pushed_to_exempt", "push_exempt")
 
                 self.mark_test_step("Wait for the allowed pulls: `ruled` from `enforced`, `restricted` from `exempt`")
-                await _wait_for_docs(consumer, "pull_ruled", {"seed_enforced"})
-                await _wait_for_docs(consumer, "pull_exempt", {"seed_exempt"})
+                await consumer.wait_for_documents("pull_ruled", ["seed_enforced"])
+                await consumer.wait_for_documents("pull_exempt", ["seed_exempt"])
 
                 self.mark_test_step("Wait for the allowed pushes: `writer` to `enforced`, `ruled` to `exempt`")
-                await _wait_for_docs(provider, "enforced", {"pushed_by_writer"})
-                await _wait_for_docs(provider, "exempt", {"pushed_to_exempt"})
+                await provider.wait_for_documents("enforced", ["pushed_by_writer"])
+                await provider.wait_for_documents("exempt", ["pushed_to_exempt"])
 
                 self.mark_test_step("Verify `restricted` pulled nothing from `enforced`")
                 assert "seed_enforced" not in await _doc_ids(consumer, "pull_restricted"), (

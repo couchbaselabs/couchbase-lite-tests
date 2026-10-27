@@ -64,14 +64,9 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        sgw_doc_new = await sync_gateway.get_document(
-            db_name="travel",
-            scope="travel",
-            collection="airlines",
-            doc_id="airline_10000",
+        await sync_gateway.wait_for_document_body(
+            "travel", "airline_10000", {"name": "Updated Airline"}, scope="travel", collection="airlines"
         )
-
-        assert sgw_doc_new.body["name"] == "Updated Airline", "Update not propagated"
         await asyncio.sleep(60)
         self.mark_test_step("Verify TTL document purged on Edge server and not Sync Gateway")
         sgw_doc_new = await sync_gateway.get_document(
@@ -133,14 +128,9 @@ class TestEdgeServerSync(CBLTestClass):
             update_doc, "airline_10000", "travel", collection="travel.airlines", ttl=30
         )
 
-        edge_doc = await edge_server1.get_document(
-            db_name="travel",
-            scope="travel",
-            collection="airlines",
-            doc_id="airline_10000",
+        await edge_server1.wait_for_document_body(
+            "travel", "airline_10000", {"name": "Updated Airline"}, scope="travel", collection="airlines"
         )
-        assert edge_doc is not None
-        assert edge_doc.body["name"] == "Updated Airline", "Update not propagated"
         await asyncio.sleep(60)
         self.mark_test_step("Verify TTL document purged on Edge server2 and not Edge server1")
         edge_doc = await edge_server1.get_document(

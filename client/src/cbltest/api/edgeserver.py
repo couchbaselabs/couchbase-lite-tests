@@ -4,13 +4,14 @@ import ssl
 import tempfile
 import urllib.parse
 import uuid
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urljoin
 
 import pyjson5 as json5
+import tenacity
 from aiohttp import TCPConnector
 from opentelemetry.trace import get_tracer
 from pydantic import BaseModel, ConfigDict
@@ -33,6 +34,7 @@ from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.jsonhelper import _get_typed_required
 from cbltest.logging import cbl_warning
+from cbltest.utils import async_retry_assert
 from cbltest.version import VERSION
 
 
@@ -345,6 +347,50 @@ class EdgeServer:
             assert isinstance(resp, dict)
             return AllDocumentsResponse(cast(dict, resp))
 
+    async def wait_for_documents(
+        self,
+        db_name: str,
+        doc_ids: Collection[str],
+        *,
+        scope: str = "",
+        collection: str = "",
+        deleted: bool = False,
+        since: int = 0,
+    ) -> dict[str, dict]:
+        """
+        Retry the changes feed until every doc in doc_ids has appeared in the wanted state,
+        then return the entry that matched for each.  Raises TimeoutError if they have not
+        all arrived within 60s.
+
+        Each poll resumes from the last one's `last_seq`, so a document is matched once and
+        never looked at again.  When the documents are already on the feed in another state,
+        pass `since` so that those earlier entries cannot satisfy the wait.
+
+        :param db_name: The name of the Edge Server database to query
+        :param doc_ids: The documents to wait for
+        :param scope: The scope to use when querying Edge Server
+        :param collection: The collection to use when querying Edge Server
+        :param deleted: If True, wait for each document to appear as a tombstone instead of alive
+        :param since: Start the wait from this sequence instead of the beginning of the feed
+        """
+        wanted = set(doc_ids)
+        found: dict[str, dict] = {}
+        state = "tombstoned" if deleted else "present"
+
+        async def _poll() -> dict[str, dict]:
+            nonlocal since
+            changes = await self.changes_feed(db_name, scope, collection, since=since)
+            since = changes["last_seq"]
+            for entry in changes["results"]:
+                if entry["id"] in wanted and entry.get("deleted", False) == deleted:
+                    found[entry["id"]] = entry
+
+            missing = wanted - found.keys()
+            assert not missing, f"Documents not {state} on {self.hostname} in {db_name}: {sorted(missing)}"
+            return dict(found)
+
+        return await async_retry_assert(_poll, tenacity.wait_fixed(1), tenacity.stop_after_delay(60))
+
     async def delete_document(
         self,
         doc_id: str,
@@ -397,6 +443,46 @@ class EdgeServer:
                 raise ValueError("Inappropriate response from edge server get /doc (not JSON)")
 
             return RemoteDocument(cast(dict, response))
+
+    async def wait_for_document_body(
+        self,
+        db_name: str,
+        doc_id: str,
+        expected: Mapping[str, Any],
+        *,
+        scope: str = "",
+        collection: str = "",
+    ) -> RemoteDocument:
+        """
+        Retry get_document until the document body holds every key and value in expected,
+        then return the document.  Raises the last mismatch or 404 if that has not happened within 60s,
+        or any other error at once.  An expected value of None also matches a missing key.
+
+        :param db_name: The name of the Edge Server database to query
+        :param doc_id: The document to wait for
+        :param expected: The properties the body must hold
+        :param scope: The scope to use when querying Edge Server
+        :param collection: The collection to use when querying Edge Server
+        """
+
+        async def _poll() -> RemoteDocument:
+            doc = await self.get_document(db_name, doc_id, scope=scope, collection=collection)
+            mismatched = {k: doc.body.get(k) for k, v in expected.items() if doc.body.get(k) != v}
+            assert not mismatched, f"{doc_id} on Edge Server does not match {dict(expected)}: {mismatched}"
+            return doc
+
+        # A document that has not replicated yet reads as a 404.
+        retrying = tenacity.AsyncRetrying(
+            wait=tenacity.wait_fixed(1),
+            stop=tenacity.stop_after_delay(60),
+            retry=tenacity.retry_if_exception(
+                lambda e: (
+                    isinstance(e, AssertionError) or (isinstance(e, CblEdgeServerBadResponseError) and e.code == 404)
+                )
+            ),
+            reraise=True,
+        )
+        return await retrying(_poll)
 
     async def get_all_dbs(self) -> list:
         with self.__tracer.start_as_current_span("get all database"):

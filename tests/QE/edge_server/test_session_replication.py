@@ -15,9 +15,11 @@ from cbltest.api.replicator_types import (
     ReplicatorAuthenticator,
     ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
+    ReplicatorDocumentFlags,
     ReplicatorSessionAuthenticator,
     ReplicatorStatus,
     ReplicatorType,
+    WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.responses import ServerVariant
@@ -87,6 +89,7 @@ async def _replicate(
         continuous=continuous,
         authenticator=authenticator,
         collections=[ReplicatorCollectionEntry(collections or [HOTELS])],
+        enable_document_listener=continuous,
     )
     await replicator.start()
     return replicator, await replicator.wait_for(wait_for, timeout=timedelta(seconds=60))
@@ -165,13 +168,13 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         await _write_local(db, HOTELS, ["live_cbl_after"])
 
         self.mark_test_step("Verify both docs cross while the replicator stays error-free")
-        for _ in range(10):
-            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-            assert status.error is None, f"Continuous session replication errored: {_describe(status.error)}"
-            if "live_es_after" in await _local_ids(db) and "live_cbl_after" in await _es_ids(admin):
-                break
-        assert "live_es_after" in await _local_ids(db), "The live Edge Server change was not pulled"
-        assert "live_cbl_after" in await _es_ids(admin), "The live local change was not pushed"
+        status = await replicator.wait_for_all_doc_events(
+            {
+                WaitForDocumentEventEntry(HOTELS, "live_es_after", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
+                WaitForDocumentEventEntry(HOTELS, "live_cbl_after", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
+            }
+        )
+        assert status.error is None, f"Continuous session replication errored: {_describe(status.error)}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_one_time_false_gives_no_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:

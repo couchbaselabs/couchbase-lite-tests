@@ -229,24 +229,11 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 8: Verify ES has the new docs (replication works with Token-B) ---
         self.mark_test_step("Verify replication continues with Token-B")
-        max_wait = 30
-        poll_interval = 3
-        elapsed = 0
-        final_count = 0
-        while elapsed < max_wait:
-            response = await edge_server.get_all_documents("travel", collection="travel.airlines")
-            final_count = len(response.rows)
-            if final_count >= initial_count + 5:
-                break
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-
-        assert final_count >= initial_count + 5, (
-            f"Token rotation failed: expected >= {initial_count + 5} docs after rotation, "
-            f"got {final_count}. Replication may not have reconnected with new token."
+        await edge_server.wait_for_documents(
+            "travel", [f"rotation_test_{i}" for i in range(6, 11)], collection="travel.airlines"
         )
 
-        self.mark_test_step(f"PASSED — Token rotation works: {final_count} docs after rotating to Token-B")
+        self.mark_test_step("PASSED — Token rotation works: new docs replicated after rotating to Token-B")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_invalid_token_rotation_causes_401_stop(
@@ -645,15 +632,13 @@ class TestJWTReplication(CBLTestClass):
 
         await edge_server.wait_for_idle(timeout=30)
 
-        # Verify recovery — ES should now have all docs including the 3 new ones
-        response = await edge_server.get_all_documents("travel", collection="travel.airlines")
-        final_count = len(response.rows)
-        assert final_count >= initial_count + 3, (
-            f"After recovery with Token-C and _replicate re-trigger, expected >= {initial_count + 3} docs, got {final_count}"
+        # Verify recovery — ES should now have the 3 docs written while stopped
+        await edge_server.wait_for_documents(
+            "travel", [f"cycle_test_{i}" for i in range(4, 7)], collection="travel.airlines"
         )
         self.mark_test_step(
-            f"PASSED — Valid→Invalid→Valid cycle complete: {final_count} docs. "
-            f"Phase 2: Invalid token → automatic 401 permanent stop. "
-            f"Phase 3: Valid token → manual _replicate re-trigger required "
-            f"(FileWatcher destroyed after 401)."
+            "PASSED — Valid→Invalid→Valid cycle complete. "
+            "Phase 2: Invalid token → automatic 401 permanent stop. "
+            "Phase 3: Valid token → manual _replicate re-trigger required "
+            "(FileWatcher destroyed after 401)."
         )
