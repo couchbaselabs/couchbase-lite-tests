@@ -1,0 +1,86 @@
+{
+  "api": {
+    "admin_interface": "0.0.0.0:4985",
+    "https": {
+      "tls_cert_path": "cert/sg_cert.pem",
+      "tls_key_path": "cert/sg_key.pem"
+    }
+  },
+  "bootstrap": {
+    "server": "couchbases://{{server-ip}}",
+    "ca_cert_path": "/home/ec2-user/cert/cbs-ca-cert.pem",
+    "username": "admin",
+    "password": "password",
+    "use_system_metadata_collection": true
+  },
+  "unsupported": {
+    "use_xattr_config": true,
+    "allow_dbconfig_env_vars": false,
+    "effective_user_header_name": "Request-Effective-User",
+    "audit_info_provider": {
+      "global_info_env_var_name": "GLOBAL_AUDIT_INJECT_INFO",
+      "request_info_header_name": "Request-Audit-Inject-Info"
+    }
+  },
+  "logging": {
+    "log_file_path": "/home/ec2-user/log",
+    "audit": {
+      "enabled": false,
+      "rotation": {
+        "rotated_logs_size_limit": 100,
+        "rotation_interval": "3h0m0s",
+        "max_age": 30,
+        "max_size": 100
+      }
+    },
+    "console": {
+      "enabled": true,
+      "log_level": "info",
+      "log_keys": ["Cache", "CRUD", "HTTP+", "Changes", "HTTP", "Query"],
+      "rotation": {
+        "rotated_logs_size_limit": 1024,
+        "max_age": 1,
+        "max_size": 1024
+      },
+      "file_output": "/home/ec2-user/log/console.log"
+    },
+    "error": {
+      "enabled": true,
+      "rotation": {
+        "rotated_logs_size_limit": 512,
+        "max_size": 100
+      }
+    },
+    "warn": {
+      "enabled": true,
+      "rotation": {
+        "rotated_logs_size_limit": 512,
+        "max_size": 100
+      }
+    },
+    "info": {
+      "enabled": true,
+      "rotation": {
+        "rotated_logs_size_limit": 512,
+        "max_age": 60,
+        "max_size": 100
+      }
+    },
+    "debug": {
+      "enabled": true,
+      "rotation": {
+        "rotated_logs_size_limit": 512,
+        "max_age": 60,
+        "max_size": 100
+      }
+    },
+    "stats": {
+      "enabled": true,
+      "rotation": {
+        "rotated_logs_size_limit": 512,
+        "max_age": 90,
+        "max_size": 100
+      }
+    }
+  }
+}

@@ -151,6 +151,27 @@ record at all — a topology naming no Sync Gateway silently skips every test th
 The record is only as current as the last run left it: `--stop-sync-gateway` clears it, but an
 instance that dies on its own stays on it, and the tests then fail on connection rather than skip.
 
+## Capella's free tier bootstrap config
+
+`--capella-pft-bootstrap` starts each Sync Gateway instance with the settings of the bootstrap
+config that Capella gives a free tier App Service, which the AWS environment keeps in
+`environment/aws/sgw_setup/config/bootstrap-capella-pft.json`. It is for
+`tests/dev_e2e/syncgateway/test_idle_ops.py`, which checks Sync Gateway's idle operation stats
+the way Capella's hibernation check uses them, and which runs on a local environment only when
+every instance was started like this.
+
+```bash
+uv run environment/local/start_local.py --server cbs --start-cbs --git-tag main --capella-pft-bootstrap
+```
+
+Each instance takes the config's xattr configs, its system metadata collection (only where the
+Sync Gateway build has the option, as in Capella), the default config poll rate in place of the
+200ms one, Capella's unsupported options and its logging. It keeps this environment's connection,
+credentials and ports. Console output stays in `sync_gateway_instanceN.log`, and the file logs go
+to `sync_gateway_instanceN_logs/`. The config names `GLOBAL_AUDIT_INJECT_INFO` as its audit info
+provider, so `start_local.py` sets that variable for the instances it starts. Requires
+`--server cbs`.
+
 ## Running the individual steps
 
 `build_sync_gateway.py` and `run_sync_gateway.py` have been folded into `start_local.py`.
