@@ -135,6 +135,7 @@ class TestFeatureName(CBLTestClass):
 | `@pytest.mark.sgw` | Sync Gateway feature (QE: triggers auto-cleanup) |
 | `@pytest.mark.cbl` | Couchbase Lite feature only |
 | `@pytest.mark.upg_sgw` | SGW upgrade scenarios |
+| `@pytest.mark.standalone` | Tests too long or disruptive to run with a suite: skipped unless named on the command line (`file.py` or `file.py::Class::test`), or selected with `-m standalone` |
 | `@pytest.mark.min_test_servers(N)` | Topology: ≥ N test servers |
 | `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
 | `@pytest.mark.min_couchbase_servers(N)` | Topology: ≥ N CBS |
