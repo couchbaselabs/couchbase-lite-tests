@@ -77,6 +77,7 @@ environment/
 │
 ├── local/                               # Local test server + Sync Gateway runner (no Docker/AWS)
 │   ├── start_local.py                   # Builds/starts test server + SGW (rosmar or CBS)
+│   ├── start_edge_server.py             # Edge Server + Caddy + shell2http in Docker (edge_server/)
 │   ├── sync_gateway_config/             # basic_sync_gateway_{rosmar,cbs}.json
 │   ├── topology_configs/                # rosmar_config.json, cbs_config.json (TDK config output)
 │   └── sync_gateway_clone/              # Git checkout of sync-gateway, built by start_local.py
@@ -216,6 +217,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 - `--platform` picks the test server to run on this host: `c` (default), `dotnet` (macOS or Windows only), `jak_desktop` or `js`. The generated topology config names that platform's port (8080, or 5555 for `dotnet` and 5173 for `js`).
 - `--stop-testserver` stops every test server process started from this checkout, so a server from another checkout is spared. It matches a native server on its executable path under `servers/`, the Java server on its `-jar` path, and the JS dev server on its `bun run dev` or vite command and working directory. A normal start does the same before it starts a new one, then refuses to continue if anything still answers on the platform's port: a second server would fail to bind while the startup check, answered by the first, reported success and the run tested the wrong build.
 - `--skip-sync-gateway-start` carries forward the instances named in the topology config the last run wrote — a run that starts nothing cannot know how many are up — which is this checkout's own record, so several checkouts each running instances do not read each other's and no port is probed. `--stop-sync-gateway` clears that record; an instance that dies on its own stays on it. Combining it with an explicit `--sync-gateways` that disagrees is a usage error. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
+- `start_edge_server.py --version X` runs Edge Server with its Caddy and shell2http sidecars in a Docker container (`edge_server/Dockerfile`), on the AWS ports and `/home/ec2-user` layout, and writes `edge_server/topology_config.json`: the last `start_local.py` config plus the Edge Server. The container forwards each Sync Gateway public port back to the host, since test configs name Sync Gateway as `localhost`. One Edge Server only.
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 
 ## Prerequisites (AWS)

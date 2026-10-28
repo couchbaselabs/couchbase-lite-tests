@@ -79,24 +79,24 @@ class EsDownloadInfo:
     def url(self) -> str:
         return self.__url
 
-    def _init_release(self, version: str) -> None:
+    def _init_release(self, version: str, arch: str) -> None:
         self.__version = version
         self.__build_no = 0
-        self.__local_filename = f"couchbase-edge-server-{self.__version}.x86_64.rpm"
+        self.__local_filename = f"couchbase-edge-server-{self.__version}.{arch}.rpm"
         self.__url = (
             f"https://packages.couchbase.com/releases/couchbase-edge-server/{self.__version}/{self.__local_filename}"
         )
 
-    def _init_internal(self, version: str, build_no: int) -> None:
+    def _init_internal(self, version: str, build_no: int, arch: str) -> None:
         self.__version = version
         self.__build_no = build_no
-        self.__local_filename = f"couchbase-edge-server-{self.__version}-{self.__build_no}.x86_64.rpm"
+        self.__local_filename = f"couchbase-edge-server-{self.__version}-{self.__build_no}.{arch}.rpm"
         self.__url = f"https://latestbuilds.service.couchbase.com/builds/latestbuilds/couchbase-edge-server/{self.__version}/{self.__build_no}/{self.__local_filename}"
 
-    def __init__(self, version: str) -> None:
+    def __init__(self, version: str, arch: str = "x86_64") -> None:
         if "-" in version:
             version_parts = version.split("-")
-            self._init_internal(version_parts[0], int(version_parts[1]))
+            self._init_internal(version_parts[0], int(version_parts[1]), arch)
             return
 
         url = f"http://proget.build.couchbase.com:8080/api/get_version?product=couchbase-edge-server&version={version}"
@@ -108,12 +108,12 @@ class EsDownloadInfo:
             raise ValueError("Invalid version information received from server.")
 
         if cast(bool, version_info[self.__is_release_key]):
-            self._init_release(version)
+            self._init_release(version, arch)
         else:
             if self.__build_no_key not in version_info:
                 json.dump(version_info, sys.stdout)
                 raise ValueError("Invalid version information received from server.")
-            self._init_internal(version, cast(int, version_info[self.__build_no_key]))
+            self._init_internal(version, cast(int, version_info[self.__build_no_key]), arch)
 
 
 def lookup_es_build(version: str) -> int:
@@ -135,20 +135,23 @@ def lookup_es_build(version: str) -> int:
     return cast(int, r.json()["BuildNumber"])
 
 
-def download_es_package(download_info: EsDownloadInfo) -> None:
+def download_es_package(download_info: EsDownloadInfo, include_release: bool = False) -> Path:
     """
     Download the Edge Server package if it is not a release version.
 
     Args:
         download_info (EsDownloadInfo): The download information for Edge Server.
+        include_release (bool): Download a release version too, rather than leaving it to the host.
+
+    Returns:
+        Path: Where the package is, or would be for a skipped release version.
 
     Raises:
         requests.RequestException: If the request to download the package fails.
     """
-    if download_info.is_release:
-        return
-
     local_path = SCRIPT_DIR / download_info.local_filename
+    if download_info.is_release and not include_release:
+        return local_path
 
     if not os.path.exists(local_path):
         header(f"Downloading {download_info.url} to {download_info.local_filename}")
@@ -172,6 +175,8 @@ def download_es_package(download_info: EsDownloadInfo) -> None:
             f"File {download_info.local_filename} already exists, skipping download.",
             fg="yellow",
         )
+
+    return local_path
 
 
 def remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
