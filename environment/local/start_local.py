@@ -16,6 +16,7 @@ import json
 import os
 import pathlib
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -59,6 +60,9 @@ TEST_CONFIG = {
     "cbs": TOPOLOGY_CONFIG_DIR / "cbs_config.json",
 }
 SYNC_GATEWAY_EXE_NAME = SYNC_GATEWAY_BIN.name
+# The bootstrap config Capella gives Sync Gateway in a free tier App Service. --capella-pft-bootstrap takes its
+# settings, but not the parts that belong to the AWS environment.
+CAPELLA_PFT_BOOTSTRAP = SCRIPT_DIR.parent / "aws" / "sgw_setup" / "config" / "bootstrap-capella-pft.json"
 # Native test server binaries: C, the macOS .NET app and the Windows .NET CLI.
 NATIVE_TEST_SERVER_EXE_NAMES = frozenset({"testserver", "testserver.exe", "testserver.cli.exe"})
 # The JAK server runs as a jar under java, and the JS server as a bun/node dev server in servers/.
@@ -189,6 +193,11 @@ def sync_gateway_log_name(number: int) -> str:
     return f"{sync_gateway_instance_name(number)}.log"
 
 
+def sync_gateway_file_log_dir(number: int) -> pathlib.Path:
+    """Directory the given 1-based instance writes its file logs to, when its config enables them."""
+    return SCRIPT_DIR / f"{sync_gateway_instance_name(number)}_logs"
+
+
 def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     """The Sync Gateway `api` config block pinning an instance to the given ports."""
     return {
@@ -296,6 +305,15 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     "It starts with no upstreams: each test sets its own with LoadBalancer.configure().",
 )
 @click.option(
+    "--capella-pft-bootstrap",
+    is_flag=True,
+    help="Start Sync Gateway with the settings of the bootstrap config Capella gives a free tier App Service "
+    f"({CAPELLA_PFT_BOOTSTRAP.relative_to(SCRIPT_DIR.parent.parent)}): xattr configs, the system metadata "
+    "collection where Sync Gateway has it, the default config poll rate, Capella's unsupported options and its "
+    "logging. Each instance keeps this environment's connection, credentials and ports, keeps its console output "
+    "in sync_gateway_instanceN.log, and writes its file logs to sync_gateway_instanceN_logs/. Requires --server cbs.",
+)
+@click.option(
     "--skip-testserver",
     is_flag=True,
     help="Skip downloading/building and installing/running the test server.",
@@ -336,6 +354,7 @@ def main(
     couchbase_servers: int,
     sync_gateways: int,
     load_balancer: bool,
+    capella_pft_bootstrap: bool,
     skip_testserver: bool,
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
@@ -383,6 +402,9 @@ def main(
             "--sync-gateways > 1 requires --server cbs. Each rosmar instance keeps its bucket in its "
             "own process memory, so the instances would not share any data."
         )
+
+    if capella_pft_bootstrap and server != "cbs":
+        raise click.UsageError("--capella-pft-bootstrap requires --server cbs.")
 
     if clusters > 1 and server != "cbs":
         raise click.UsageError("--clusters > 1 requires --server cbs.")
@@ -457,7 +479,9 @@ def main(
             _validate_connstr_nodes(cluster_connstr, couchbase_servers, source="--start-cbs")
 
     if not skip_sync_gateway_start:
-        instances = start_sync_gateways(server, connstrs, admin_user, admin_password, sync_gateways)
+        instances = start_sync_gateways(
+            server, connstrs, admin_user, admin_password, sync_gateways, capella_pft=capella_pft_bootstrap
+        )
     else:
         instances = resolve_skipped_sync_gateway_instances(server, len(connstrs) or 1, sync_gateways)
 
@@ -957,12 +981,46 @@ def _instance_patch(bootstrap: dict[str, str], ports: SyncGatewayPorts) -> Calla
     return patch
 
 
+def _sync_gateway_has_flag(flag: str) -> bool:
+    """Whether the Sync Gateway binary lists the given command line flag, which it has for every config option."""
+    result = subprocess.run([str(SYNC_GATEWAY_BIN), "-help"], capture_output=True, text=True)
+    return f"-{flag}" in result.stdout + result.stderr
+
+
+def _apply_capella_pft_bootstrap(log_dir: pathlib.Path) -> Callable[[dict[str, Any]], None]:
+    """
+    Return a patch giving a config the settings of CAPELLA_PFT_BOOTSTRAP, while it keeps its own connection,
+    credentials and ports. Console output stays on stdout, and file logs go to log_dir.
+    """
+    capella = json.loads(CAPELLA_PFT_BOOTSTRAP.read_text())
+    # Capella leaves the option out for a Sync Gateway that does not have it
+    use_system_metadata_collection = _sync_gateway_has_flag("bootstrap.use_system_metadata_collection")
+
+    def patch(config: dict[str, Any]) -> None:
+        bootstrap = config["bootstrap"]
+        # Capella polls for config changes at Sync Gateway's default rate
+        bootstrap.pop("config_update_frequency", None)
+        if use_system_metadata_collection:
+            bootstrap["use_system_metadata_collection"] = capella["bootstrap"]["use_system_metadata_collection"]
+        config["unsupported"] = capella["unsupported"]
+        logging = capella["logging"]
+        logging["log_file_path"] = str(log_dir)
+        del logging["console"]["file_output"]
+        config["logging"] = logging
+
+    return patch
+
+
 def sync_gateway_instance_configs(
-    server: str, bootstraps: list[dict[str, str]], instances: list[SyncGatewayInstance]
+    server: str,
+    bootstraps: list[dict[str, str]],
+    instances: list[SyncGatewayInstance],
+    *,
+    capella_pft: bool = False,
 ) -> list[str]:
     """
     Write one copy of the server's config template per instance, each pointed at the instance's
-    cluster and pinned to its ports.
+    cluster and pinned to its ports, and with capella_pft, given the settings of CAPELLA_PFT_BOOTSTRAP.
 
     Every previously generated instance config is swept first: the filenames carry the instance
     number, so a run asking for fewer instances than the last would otherwise leave the surplus
@@ -971,12 +1029,23 @@ def sync_gateway_instance_configs(
     _remove_generated(SYNC_GATEWAY_CONFIG_DIR, f"{SG_INSTANCE_STEM}*.json")
     _remove_generated(SYNC_GATEWAY_CONFIG_DIR, SYNC_GATEWAY_GENERATED_BASE_CONFIG_GLOB)
 
+    def instance_patch(number: int, instance: SyncGatewayInstance) -> Callable[[dict[str, Any]], None]:
+        patches = [_instance_patch(bootstraps[instance.cluster], instance.ports)]
+        if capella_pft:
+            patches.append(_apply_capella_pft_bootstrap(sync_gateway_file_log_dir(number)))
+
+        def patch(config: dict[str, Any]) -> None:
+            for p in patches:
+                p(config)
+
+        return patch
+
     return [
         _write_patched_json(
             SYNC_GATEWAY_CONFIG[server],
             SYNC_GATEWAY_CONFIG_DIR,
             sync_gateway_config_prefix(number),
-            _instance_patch(bootstraps[instance.cluster], instance.ports),
+            instance_patch(number, instance),
             clean_stale=False,
         )
         for number, instance in enumerate(instances, start=1)
@@ -984,7 +1053,13 @@ def sync_gateway_instance_configs(
 
 
 def start_sync_gateways(
-    server: str, connstrs: list[str], admin_user: str, admin_password: str, per_cluster: int = 1
+    server: str,
+    connstrs: list[str],
+    admin_user: str,
+    admin_password: str,
+    per_cluster: int = 1,
+    *,
+    capella_pft: bool = False,
 ) -> list[SyncGatewayInstance]:
     """
     Stop any running sync_gateway processes, start `per_cluster` new ones in each cluster (one per
@@ -1002,13 +1077,26 @@ def start_sync_gateways(
         SyncGatewayInstance(index // per_cluster, ports)
         for index, ports in enumerate(allocate_sync_gateway_ports(count))
     ]
-    config_paths = sync_gateway_instance_configs(server, bootstraps, instances)
+    config_paths = sync_gateway_instance_configs(server, bootstraps, instances, capella_pft=capella_pft)
 
     # Wipe every Sync Gateway log before launching. ExeBridge truncates the log of each instance it
     # starts anyway, so this only really matters for the logs this run has no instance for -- left
     # alone, they sit there looking current and send you reading a stale instance.
     header("Removing previous Sync Gateway logs")
     _remove_generated(SCRIPT_DIR, SG_LOG_GLOB)
+    for log_dir in SCRIPT_DIR.glob(f"{SG_INSTANCE_STEM}*_logs"):
+        shutil.rmtree(log_dir, ignore_errors=True)
+
+    if capella_pft:
+        # CAPELLA_PFT_BOOTSTRAP names this variable as its audit info provider, and Sync Gateway will not start
+        # unless it holds JSON. Capella sets it in the service's environment with these keys.
+        os.environ["GLOBAL_AUDIT_INJECT_INFO"] = json.dumps(
+            {
+                "capella_node_id": socket.gethostname(),
+                "capella_app_service_id": "cbl-tests",
+                "capella_tenant_id": "cbl-tests",
+            }
+        )
 
     for number, (config_path, (cluster, ports)) in enumerate(zip(config_paths, instances, strict=True), start=1):
         click.echo(
