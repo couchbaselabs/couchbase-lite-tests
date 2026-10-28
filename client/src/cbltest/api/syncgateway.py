@@ -2202,6 +2202,13 @@ class SyncGateway(_SyncGatewayBase):
         """The node's startup config from /_config, which cannot change without a restart (fetched once)"""
         return StartupConfigResponse.model_validate(await self._send_request("get", "/_config"))
 
+    async def get_startup_config(self) -> StartupConfigResponse:
+        """
+        Gets the node's startup config from ``GET /_config``, read fresh each time, since a restart can change it
+        """
+        with self._tracer.start_as_current_span("get_startup_config"):
+            return StartupConfigResponse.model_validate(await self._send_request("get", "/_config"))
+
     @property
     async def using_rosmar(self) -> bool:
         """Whether this Sync Gateway node uses Rosmar instead of Couchbase Server"""
