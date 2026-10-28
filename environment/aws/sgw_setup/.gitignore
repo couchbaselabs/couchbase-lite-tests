@@ -3,5 +3,6 @@ bootstrap.json
 bootstrap-alternate.json
 bootstrap-cbs-alternate.json
 bootstrap-x509-cacert-only.json
+/bootstrap-capella-pft.json
 *.rpm
 cert/*.srl
