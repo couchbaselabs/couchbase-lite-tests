@@ -53,6 +53,7 @@ dependencies = [
 [project.entry-points.pytest11]
 required_topology = "cbltest.plugins.required_topology"
 cbse_filter = "cbltest.plugins.cbse_filter"
+standalone_filter = "cbltest.plugins.standalone_filter"
 cblpytest_fixture = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
