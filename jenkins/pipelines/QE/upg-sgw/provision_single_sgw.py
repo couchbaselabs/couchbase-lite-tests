@@ -47,7 +47,7 @@ def cli_entry(sgw_index: int, topology: str) -> None:
 
     sgw_info = SgwDownloadInfo(sgw.version)
     download_sgw_package(sgw_info)
-    setup_config(sgw.cluster_hostname)
+    setup_config(sgw.cluster_hostname, sgw_info.version)
     setup_server(sgw.hostname, topo.ssh_key, sgw_info)
 
     header(f"SGW node {sgw_index} provisioned successfully")
