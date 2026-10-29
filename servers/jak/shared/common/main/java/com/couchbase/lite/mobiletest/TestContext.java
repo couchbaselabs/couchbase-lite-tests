@@ -38,6 +38,9 @@ import com.couchbase.lite.mobiletest.util.StringUtils;
 public final class TestContext {
     private static final String TAG = "CONTEXT";
 
+    private static final int DB_DIR_DELETE_MAX_RETRIES = 2;
+    private static final long DB_DIR_DELETE_RETRY_DELAY_MS = 500;
+
     private static final String KEY_COLLECTIONS = "collections";
     private static final String KEY_DATASET = "dataset";
 
@@ -327,8 +330,26 @@ public final class TestContext {
             }
         }
 
-        if (!new FileUtils().deleteRecursive(liveDbDir)) {
-            Log.err(TAG, "Failed deleting db dir on reset: " + liveDbDir);
+        deleteDbDir(liveDbDir);
+    }
+
+    // On 3.2, a replicator's own LiteCore connection to the db file may close a few ms after
+    // Database.close() returns.  Windows will not delete an open file, so retry before giving up.
+    private void deleteDbDir(@NonNull File liveDbDir) {
+        final FileUtils fileUtils = new FileUtils();
+        for (int i = 0; !fileUtils.deleteRecursive(liveDbDir); i++) {
+            if (i >= DB_DIR_DELETE_MAX_RETRIES) {
+                Log.err(TAG, "Failed deleting db dir on reset: " + liveDbDir);
+                return;
+            }
+
+            Log.p(TAG, "Failed deleting db dir on reset, retrying: " + liveDbDir);
+            try { Thread.sleep(DB_DIR_DELETE_RETRY_DELAY_MS); }
+            catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                Log.err(TAG, "Interrupted deleting db dir on reset: " + liveDbDir);
+                return;
+            }
         }
     }
 }
