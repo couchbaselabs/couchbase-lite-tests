@@ -29,7 +29,7 @@
 3. Start the target Edge Server with mTLS, with the server cert, server key and client CA as PEM.
 4. Create document `seed_<rejected_client>` on the target `db`.
 5. Start the source Edge Server replicating to the target, presenting the `rejected_client` identity.
-6. Wait for the source replicator to give up (removed, `Stopped`/`Offline`, or reporting an error).
+6. Wait until the source replication is `Stopped` with a TLS error (LiteCore `NETWORK` domain, 5): code 6 (handshake failed) with no client certificate, or code 10 (certificate rejected by the target) otherwise.
 7. Verify `seed_<rejected_client>` did not replicate to the source.
 8. Verify `seed_<rejected_client>` is still on the target.
 
@@ -43,5 +43,5 @@
 3. Start the target Edge Server with mTLS, with the server cert, server key and client CA as PEM.
 4. Create document `seed_<common_name>` on the target `db`.
 5. Start the source Edge Server replicating to the target, presenting the `common_name` certificate.
-6. Verify the source replicator is refused with 401 or 403: the TLS handshake succeeds, but the CN does not map to a user with access to the collection.
+6. Verify the source replication is `Stopped` with a 403 in the LiteCore `WEBSOCKET` domain (6): the TLS handshake succeeds, but the CN is not a registered user (`Client certificate not authorized`) or the user has no collection access (`No accessible collections for sync`).
 7. Verify `seed_<common_name>` did not replicate to the source.
