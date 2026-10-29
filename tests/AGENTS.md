@@ -113,8 +113,8 @@ class TestFeatureName(CBLTestClass):
         replicator = Replicator(db, cblpytest.sync_gateways[0].replication_url("names"), ...)
         await replicator.start()
 
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None
+        # wait_for asserts that the replicator has no error. Use wait_for_error when one is expected.
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         # Resets local CBL state. SGW/CBS buckets are handled globally by cluster_cleanup.
         await cblpytest.test_servers[0].cleanup()

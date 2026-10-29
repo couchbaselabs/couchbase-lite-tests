@@ -58,10 +58,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -109,10 +106,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(verify_description)
         await db.verify_documents(snapshot_updater)
@@ -148,10 +142,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -217,10 +208,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the name_101, name_102, and name_103 document `name.last` == 'Smith'")
         await db.verify_documents(snapshot_updater)
@@ -250,10 +238,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -304,10 +289,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(

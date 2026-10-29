@@ -74,3 +74,6 @@ class ErrorResponseBody:
         self.__domain = domain
         self.__code = code
         self.__message = message
+
+    def __str__(self) -> str:
+        return f"({self.__domain} / {self.__code}) {self.__message}"

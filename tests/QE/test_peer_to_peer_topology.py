@@ -86,15 +86,11 @@ class TestPeerToPeerTopology(CBLTestClass):
 
             self.mark_test_step(f"Wait for replication from peer {phase} to complete")
             target_activity = ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
-            for target_idx, replicator in replicators:
-                status = await replicator.wait_for(
+            for _, replicator in replicators:
+                await replicator.wait_for(
                     target_activity,
                     timeout=timedelta(seconds=300),
                     interval=timedelta(seconds=1),
-                )
-                assert status.error is None, (
-                    f"Error waiting for replicator from peer {phase} to peer {target_idx + 1}: "
-                    f"({status.error.domain} / {status.error.code}) {status.error.message}"
                 )
 
             self.mark_test_step(f"Check that all device databases have the replicated documents after phase {phase}")
@@ -173,14 +169,10 @@ class TestPeerToPeerTopology(CBLTestClass):
 
             self.mark_test_step(f"Wait for replication from peer {phase} to peer {target_peer_idx + 1} to complete")
             target_activity = ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED
-            status = await replicator.wait_for(
+            await replicator.wait_for(
                 target_activity,
                 timeout=timedelta(seconds=300),
                 interval=timedelta(seconds=1),
-            )
-            assert status.error is None, (
-                f"Error waiting for replicator from peer {phase} to peer {target_peer_idx + 1}: "
-                f"({status.error.domain} / {status.error.code}) {status.error.message}"
             )
 
             # Verify source and target have same content (not all peers yet)

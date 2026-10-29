@@ -57,10 +57,7 @@ class TestNoConflicts(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         lite_all_docs = await db.get_all_documents("_default.posts")
         assert len(lite_all_docs["_default.posts"]) == 5, (
@@ -114,14 +111,8 @@ class TestNoConflicts(CBLTestClass):
         await replicator2.start()
 
         self.mark_test_step("Wait until the replicators are idle.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify updated doc count in CBL")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -146,14 +137,8 @@ class TestNoConflicts(CBLTestClass):
         await update_cbl(db, "post_1000", [{"channels": ["group1"], "title": "CBL Update 2"}])
 
         self.mark_test_step("Wait until the replicators are idle.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify docs got replicated to SGW with CBL updates.")
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
@@ -211,10 +196,7 @@ class TestNoConflicts(CBLTestClass):
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Start a replicator between DB1 and DB3:
@@ -233,10 +215,7 @@ class TestNoConflicts(CBLTestClass):
         await repl2.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Update docs concurrently:
@@ -251,14 +230,8 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Wait until the replicators are idle")
-        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Start a replicator between DB3 and SGW:
@@ -279,10 +252,7 @@ class TestNoConflicts(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify replication was successful and document content in SGW.")
         sg_doc = await sync_gateway.get_document("posts", "post_1000", collection="posts")
@@ -361,18 +331,9 @@ class TestNoConflicts(CBLTestClass):
         await repl3.start()
 
         self.mark_test_step("Wait until the replicators are idle")
-        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl3.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl2.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl3.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify docs replicated to all 3 CBLs")
         cbl1_doc = await db1.get_document(DocumentEntry("_default.posts", "post_1000"))
@@ -409,18 +370,9 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Wait until the replicators are idle")
-        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl3.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl2.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl3.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify docs replicated to all 3 CBLs:
@@ -454,18 +406,9 @@ class TestNoConflicts(CBLTestClass):
         )
 
         self.mark_test_step("Wait until the replicators are idle")
-        status = await repl1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        status = await repl3.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl2.wait_for(ReplicatorActivityLevel.IDLE)
+        await repl3.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify docs updated through all 3 CBLs:

@@ -62,17 +62,14 @@ class TestCors(CBLTestClass):
             collections=[ReplicatorCollectionEntry(["travel.hotels"], document_ids=["cors_seed"])],
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
+        if pull_allowed:
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
+        else:
+            await replicator.wait_for_error(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
         pulled = {doc.id for doc in (await db.get_all_documents("travel.hotels"))["travel.hotels"]}
 
         self.mark_test_step("Verify the pull succeeds only when CORS allows the test server's origin")
         if pull_allowed:
-            assert status.error is None, (
-                f"Pull failed: {status.error.domain}/{status.error.code}: {status.error.message}"
-            )
             assert "cors_seed" in pulled, "The seed doc was not pulled"
         else:
-            assert status.error is not None, (
-                "A browser replicated with Edge Server although CORS does not allow its origin"
-            )
             assert "cors_seed" not in pulled, "A browser pulled a doc although CORS does not allow its origin"

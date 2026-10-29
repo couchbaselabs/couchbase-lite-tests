@@ -112,8 +112,7 @@ class TestSgwUpgrade(CBLTestClass):
             pinned_server_cert=cblpytest.sync_gateways[0].tls_cert(),
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, f"Error waiting for replicator: {status.error}"
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Add documents to SGW for this version")
         sg_docs: list[DocumentUpdateEntry] = []
@@ -133,10 +132,7 @@ class TestSgwUpgrade(CBLTestClass):
         await sg.update_documents(sg_db, sg_docs)
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
         docs_before = await sg.get_all_documents(sg_db, scope, collection, True)
         revs_before = {row.id: row.revid for row in docs_before.rows}
         print(f"Documents in SGW before replication: {revs_before}")
@@ -160,10 +156,7 @@ class TestSgwUpgrade(CBLTestClass):
         await sg.update_documents(sg_db, updated_sg_docs)
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Get the new revisions after update via changes feed")
         changes = await sg.get_changes(sg_db, scope, collection)

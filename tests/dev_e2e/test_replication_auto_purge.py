@@ -57,10 +57,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -95,10 +92,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Check the local documents:
@@ -166,10 +160,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the docs to which the user has access, are all pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -192,10 +183,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Check local documents:
@@ -236,10 +224,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Check local documents:
@@ -304,10 +289,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled.")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -447,10 +429,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled.")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -559,10 +538,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl1.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl1.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -697,10 +673,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -723,10 +696,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Check the local documents:
@@ -838,10 +808,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -859,10 +826,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Check the local documents:
@@ -931,10 +895,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -1056,10 +1017,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -1170,10 +1128,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the all the docs to which the user has access were pulled")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -1219,10 +1174,7 @@ class TestReplicationAutoPurge(CBLTestClass):
         await repl.start()
 
         self.mark_test_step("Wait until the replicator stops")
-        status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await repl.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that `post_1` no longer exists")
         snapshot_updater = SnapshotUpdater(snapshot)

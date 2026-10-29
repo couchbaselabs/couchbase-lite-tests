@@ -96,18 +96,11 @@ class TestLargeDocWorkloads(CBLTestClass):
             pinned_server_cert=sg.tls_cert(),
         )
         await push_replicator.start()
-        status = await push_replicator.wait_for(
+        await push_replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
             timedelta(seconds=10),
             timedelta(seconds=300),
         )
-        if status.error is not None:
-            print(
-                f"INFO: Replicator error (expected for 50 MB blob): "
-                f"({status.error.domain} / {status.error.code}) {status.error.message}"
-            )
-        else:
-            print("INFO: Replicator stopped without error despite 50 MB blob")
 
         self.mark_test_step("Verify SGW did NOT receive the oversized-blob document.")
         sgw_all_docs = await sg.get_all_documents(sg_db, "_default", "_default")
