@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -41,13 +40,13 @@ class TestUsersChannels(CBLTestClass):
                 f"Bulk create {total_docs} documents in {num_batches} batches of {batch_size} docs "
                 f"using round-robin across {num_sgs} SGW nodes"
             )
-            doc_ids: list[str] = []
+            doc_ids: set[str] = set()
             for batch_num in range(num_batches):
                 target_sg = sgs[batch_num % num_sgs]
                 docs: list[DocumentUpdateEntry] = []
                 for i in range(batch_size):
                     doc_id = f"doc_{batch_num}_{i}"
-                    doc_ids.append(doc_id)
+                    doc_ids.add(doc_id)
                     channel = channels[i % len(channels)]
                     docs.append(
                         DocumentUpdateEntry(
@@ -65,29 +64,8 @@ class TestUsersChannels(CBLTestClass):
                     )
                 await target_sg.update_documents(sg_db, docs, "_default", "_default")
 
-            self.mark_test_step("Wait for documents to propagate across all SGW nodes")
-            await asyncio.sleep(10)
-
-            self.mark_test_step(f"Verify user sees all {total_docs} docs via changes feed from first SGW")
-            changes = await sg_user.get_changes(sg_db)
-            user_doc_changes = [entry for entry in changes.results if entry.id in doc_ids]
-            assert len(user_doc_changes) == total_docs, (
-                f"Expected {total_docs} docs in changes feed, got {len(user_doc_changes)}"
-            )
-
-            self.mark_test_step("Verify no duplicate documents in changes feed")
-            unique_ids = {entry.id for entry in user_doc_changes}
-            assert len(unique_ids) == total_docs, (
-                f"Duplicate documents found in changes feed. Expected: {total_docs}, Got: {len(unique_ids)}"
-            )
-
-            self.mark_test_step("Verify all expected document IDs are present")
-            expected_ids = set(doc_ids)
-            actual_ids = unique_ids
-            missing_ids = expected_ids - actual_ids
-            unexpected_ids = actual_ids - expected_ids
-            assert len(missing_ids) == 0, f"Missing document IDs: {missing_ids}"
-            assert len(unexpected_ids) == 0, f"Unexpected document IDs: {unexpected_ids}"
+            self.mark_test_step(f"Wait for the user changes feed on the first SGW to show all {total_docs} docs")
+            await sg_user.wait_for_documents(sg_db, doc_ids)
 
             self.mark_test_step("Verify user can retrieve all documents via _all_docs from one SGW node")
             all_docs = await sg_user.wait_for_document_count(sg_db, total_docs)
