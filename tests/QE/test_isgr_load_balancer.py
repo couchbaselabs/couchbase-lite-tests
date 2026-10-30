@@ -17,6 +17,7 @@ from cbltest.api.syncgateway import (
     UnsupportedSettings,
     get_basic_auth_headers,
 )
+from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.responses import ServerVariant
 
@@ -90,13 +91,19 @@ async def _wait_for_propagation(
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
 
 
-async def _assert_no_isgr_reconnect(link_owner: SyncGateway, db_name: str, connects_before: int) -> None:
+def _assert_no_isgr_reconnect(snapshot: SyncGatewayStats.PerDatabase, connects_before: int) -> None:
     """Fails if the ISGR link reconnected, which can move the same counters a pinned CBL call is judged by."""
-    connects_after = await link_owner.get_isgr_connect_attempts(db_name, _ISGR_REPLICATION_ID)
+    connects_after = _connect_attempts(snapshot)
     assert connects_after == connects_before, (
-        f"ISGR link on {link_owner.hostname} reconnected {connects_after - connects_before} time(s) during the pinned"
-        " replication, so the counters read around it are unreliable"
+        f"ISGR link reconnected {connects_after - connects_before} time(s) during the pinned replication, so the "
+        f"counters read around it are unreliable"
     )
+
+
+def _connect_attempts(stats: SyncGatewayStats.PerDatabase) -> int:
+    """Counts the ISGR link's connect attempts, both directions, on its active side."""
+    link = stats.replications[_ISGR_REPLICATION_ID]
+    return link.sgr_num_connect_attempts_pull + link.sgr_num_connect_attempts_push
 
 
 async def _pinned_replication(
@@ -170,19 +177,23 @@ class TestISGRLoadBalancer(CBLTestClass):
         repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
         async def pinned_pull(pin: dict[str, str], sgw: SyncGateway, other: SyncGateway) -> tuple[int, int]:
-            """Returns (docs transferred, `sg`'s since-zero delta) of a pull pinned to `sg`; fails if it hit `other`."""
-            connects = await sg1.get_isgr_connect_attempts(db_name, _ISGR_REPLICATION_ID)
-            before = await sgw.get_pull_repl_since_zero_count(db_name)
-            other_before = await other.get_pull_repl_since_zero_count(db_name)
+            """
+            Returns (docs transferred, `sgw`'s since-zero delta) of a pull pinned to `sgw`; fails if it hit `other`.
+            """
+            connects_before = _connect_attempts(await sg1.get_db_stats(db_name))
+            before = (await sgw.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero
+            other_before = (await other.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero
             replicator = await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PULL)
-            await _assert_no_isgr_reconnect(sg1, db_name, connects)
-            other_delta = await other.get_pull_repl_since_zero_count(db_name) - other_before
+            _assert_no_isgr_reconnect(await sg1.get_db_stats(db_name), connects_before)
+            other_delta = (
+                await other.get_db_stats(db_name)
+            ).cbl_replication_pull.num_pull_repl_since_zero - other_before
             assert other_delta == 0, (
                 f"Pull pinned with {pin} moved {other.hostname}'s since-zero count by {other_delta}, so the pin"
                 f" reached {other.hostname} instead of {sgw.hostname}"
             )
             pulled = {update.document_id for update in replicator.document_updates if update.error is None}
-            return len(pulled), await sgw.get_pull_repl_since_zero_count(db_name) - before
+            return len(pulled), (await sgw.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - before
 
         self.mark_test_step("Pull pinned to SG1, then to SG2, the first contact with each")
         sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
@@ -256,22 +267,25 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         async def pinned_push(pin: dict[str, str], sgw: SyncGateway) -> int:
             """
-            Returns `sg`'s propose-count delta for one push pinned to `sg`. Only a push pinned to SG2 can prove where it
-            went, because ISGR also raises SG2's count.
+            Returns `sgw`'s propose-count delta for one push pinned to `sgw`. Only a push pinned to SG2 can prove where
+            it went, because ISGR also raises SG2's count.
             """
-            connects = await sg1.get_isgr_connect_attempts(db_name, _ISGR_REPLICATION_ID)
-            sg1_before = await sg1.get_push_propose_change_count(db_name)
-            sg2_before = await sg2.get_push_propose_change_count(db_name)
+            sg1_stats = await sg1.get_db_stats(db_name)
+            sg2_stats = await sg2.get_db_stats(db_name)
+            sg2_before = sg2_stats.cbl_replication_push.propose_change_count
+            connects = _connect_attempts(sg1_stats)
+            sg1_before = sg1_stats.cbl_replication_push.propose_change_count
             await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PUSH)
-            await _assert_no_isgr_reconnect(sg1, db_name, connects)
-            sg1_delta = await sg1.get_push_propose_change_count(db_name) - sg1_before
+            sg1_stats_after = await sg1.get_db_stats(db_name)
+            _assert_no_isgr_reconnect(sg1_stats_after, connects)
+            sg1_delta = sg1_stats_after.cbl_replication_push.propose_change_count - sg1_before
             if sgw is sg1:
                 return sg1_delta
             assert sg1_delta == 0, (
                 f"Push pinned with {pin} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin reached"
                 f" {sg1.hostname} instead of {sg2.hostname}"
             )
-            return await sg2.get_push_propose_change_count(db_name) - sg2_before
+            return (await sg2.get_db_stats(db_name)).cbl_replication_push.propose_change_count - sg2_before
 
         self.mark_test_step("Push pinned to SG1, the first contact, and wait for the docs on SG2")
         assert await pinned_push(_SG1_PIN, sg1) == 5, "Expected SG1's first-ever contact to propose all 5 local docs"
