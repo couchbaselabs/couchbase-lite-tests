@@ -9,6 +9,7 @@ import time
 import zipfile
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable, Container, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from pathlib import Path
@@ -168,6 +169,73 @@ def parse_cbs_version(implementation_version: str) -> str:
     if match is None:
         raise CblTestError(f"Unrecognised Couchbase Server version '{implementation_version}'")
     return match.group()
+
+
+_KV_CMD_COUNT_LINE = re.compile(r"^kv_cmd_duration_seconds_count\{(?P<labels>[^}]*)\} (?P<value>\S+)$", re.MULTILINE)
+_KV_OPS_LINE = re.compile(r"^kv_ops\{(?P<labels>[^}]*)\} (?P<value>\S+)$", re.MULTILINE)
+_QUERY_REQUESTS_LINE = re.compile(r"^n1ql_requests(?:\{[^}]*\})? (?P<value>\S+)$", re.MULTILINE)
+_PROMETHEUS_LABEL = re.compile(r'(\w+)="((?:[^"\\]|\\.)*)"')
+
+
+def parse_kv_command_counts(metrics: str) -> dict[tuple[str, str], int]:
+    """
+    Read the per-command counts out of a node's ``GET /metrics`` (Prometheus text) output.
+
+    The Data Service records how long each command took in the ``kv_cmd_duration_seconds``
+    histogram, so the histogram's ``_count`` series is the number of commands it has run.
+
+    :return: The count for each (bucket, opcode). A command run before its connection selected a
+        bucket has an empty bucket name.
+    """
+    counts: dict[tuple[str, str], int] = {}
+    for line in _KV_CMD_COUNT_LINE.finditer(metrics):
+        labels = dict(_PROMETHEUS_LABEL.findall(line["labels"]))
+        key = (labels["bucket"], labels["opcode"])
+        counts[key] = counts.get(key, 0) + int(float(line["value"]))
+    return counts
+
+
+def parse_kv_op_counts(metrics: str) -> dict[tuple[str, str], int]:
+    """
+    Read the ``kv_ops`` counts out of a node's ``GET /metrics`` (Prometheus text) output. This is the
+    series that Capella's idle-cluster hibernation check uses.
+
+    ``kv_ops`` folds several commands into one op, e.g. ADD and REPLACE into ``set``, and TOUCH into
+    ``get``. It leaves out some commands entirely, e.g. UNLOCK_KEY, OBSERVE, and a subdoc command that
+    fails on the whole document, such as on a CAS mismatch or a missing document.
+
+    :return: The count for each (bucket, op), summed over the ``result`` label.
+    """
+    counts: dict[tuple[str, str], int] = {}
+    for line in _KV_OPS_LINE.finditer(metrics):
+        labels = dict(_PROMETHEUS_LABEL.findall(line["labels"]))
+        key = (labels["bucket"], labels["op"])
+        counts[key] = counts.get(key, 0) + int(float(line["value"]))
+    return counts
+
+
+def parse_query_request_count(metrics: str) -> int:
+    """
+    Read the ``n1ql_requests`` count out of a node's ``GET /metrics`` (Prometheus text) output: the
+    number of requests the Query Service on the node has run, of every kind and from every client.
+
+    :return: The count, or 0 if the node does not run the Query Service
+    """
+    return sum(int(float(line["value"])) for line in _QUERY_REQUESTS_LINE.finditer(metrics))
+
+
+@dataclass(frozen=True)
+class OpCounts:
+    """What the Data and Query Services on one node have run since they started, from one read of ``GET /metrics``"""
+
+    commands: dict[tuple[str, str], int]
+    """Every command, by (bucket, opcode), as parse_kv_command_counts returns it"""
+
+    ops: dict[tuple[str, str], int]
+    """The ``kv_ops`` series, by (bucket, op), as parse_kv_op_counts returns it"""
+
+    query_requests: int
+    """The ``n1ql_requests`` count, as parse_query_request_count returns it"""
 
 
 class CouchbaseServer:
@@ -622,6 +690,20 @@ class CouchbaseServer:
         with self.__tracer.start_as_current_span("get_bucket_names"):
             buckets_data = await self.__send_request("get", "/pools/default/buckets")
             return [bucket["name"] for bucket in buckets_data]
+
+    async def get_op_counts(self) -> OpCounts:
+        """
+        Gets how many commands and ``kv_ops`` the Data Service on this node has run since it started,
+        and how many requests its Query Service has run. The counts are read live from the node, so
+        two reads with no traffic in between return the same counts. All come from one read, but the
+        node collects ``kv_ops`` a moment before the command counts, so with traffic running
+        ``kv_ops`` can be a few operations behind.
+        """
+        with self.__tracer.start_as_current_span("get_op_counts"):
+            metrics = await self.__send_request("get", "/metrics")
+            return OpCounts(
+                parse_kv_command_counts(metrics), parse_kv_op_counts(metrics), parse_query_request_count(metrics)
+            )
 
     async def _check_bucket_deleted(self, bucket_name: str) -> None:
         """Asserts that the cluster no longer reports the bucket."""
