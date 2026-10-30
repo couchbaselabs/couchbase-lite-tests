@@ -36,7 +36,9 @@ class TestCors(CBLTestClass):
     async def test_cbl_js_replication_needs_cors(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, origin: list[str] | None, pull_allowed: bool
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0], ServerVariant.JS, reason="only a browser sends CORS requests"
+        )
 
         self.mark_test_step("Start Edge Server with the case's CORS origins, and seed a doc in `travel.hotels`")
         config = json.loads(CONFIG.read_text())

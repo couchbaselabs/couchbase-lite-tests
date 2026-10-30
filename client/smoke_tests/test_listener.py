@@ -3,13 +3,13 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.listener import Listener
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 class TestListener(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_start_stop_listener(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.LEGACY_P2P)
 
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]

@@ -9,7 +9,7 @@ from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self, cast
+from typing import Any, Self, assert_never, cast
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
@@ -667,6 +667,15 @@ class SyncGatewayStatusResponse(BaseModel):
     vendor: SyncGatewayStatusVendor
 
 
+class SyncGatewayFeature(Enum):
+    """SGW features that not every version supports. Each value names the feature in skip messages."""
+
+    # SGW from 4.0.0.
+    VERSION_VECTORS = "version vectors"
+    # SGW before 4.0.0, which removed the option. It is on by default.
+    ALLOW_CONFLICTS = "allow conflicts"
+
+
 class DatabaseState(str, Enum):
     """
     The state of a Sync Gateway database.
@@ -1076,13 +1085,23 @@ class _SyncGatewayBase:
 
             return ret_val, resp
 
-    async def supports_version_vectors(self) -> bool:
-        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
-        version = await self.get_version()
-        return packaging.version.parse(version.version) >= packaging.version.parse("4.0")
+    async def supports(self, feature: SyncGatewayFeature) -> bool:
+        """Returns whether this Sync Gateway supports the given feature."""
+        version = packaging.version.parse((await self.get_version()).version)
+        match feature:
+            case SyncGatewayFeature.VERSION_VECTORS:
+                return version >= packaging.version.parse("4.0.0")
+            case SyncGatewayFeature.ALLOW_CONFLICTS:
+                return version < packaging.version.parse("4.0.0")
+            case _:
+                assert_never(feature)
 
     async def get_version(self) -> SyncGatewayVersion:
-        """Return version of Sync Gateway"""
+        """Return version of Sync Gateway (fetched once)"""
+        return await self._version
+
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def _version(self) -> SyncGatewayVersion:
         resp = await self._send_request("get", "/_status")
         assert isinstance(resp, dict)
         model = SyncGatewayStatusResponse.model_validate(resp)
@@ -1112,7 +1131,7 @@ class _SyncGatewayBase:
             packaging.version.parse(sg_version.version)
         except packaging.version.InvalidVersion as exc:
             raise CblTestError(
-                f"Failed to parse Sync Gateway version from /_status response: {{resp}}\nversion={model.version}"
+                f"Failed to parse Sync Gateway version from /_status response: {resp}\nversion={model.version}"
             ) from exc
         return sg_version
 

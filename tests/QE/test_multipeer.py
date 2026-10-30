@@ -14,6 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.testserver import CouchbaseLiteFeature
 from shared.multipeer_test_helpers import build_group_transports
 
 
@@ -24,7 +25,7 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize("transport, timeout", [("BLUETOOTH", 600), ("WIFI", 300), ("MIXED_MODE", 420)])
     async def test_scalable_conflict_resolution(self, cblpytest: CBLPyTest, transport: str, timeout: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -116,7 +117,7 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize("transport, timeout", [("BLUETOOTH", 180), ("WIFI", 60), ("MIXED_MODE", 120)])
     async def test_large_mesh_sanity(self, cblpytest: CBLPyTest, transport: str, timeout: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -167,7 +168,7 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize("transport, timeout", [("BLUETOOTH", 300), ("WIFI", 120), ("MIXED_MODE", 240)])
     async def test_large_mesh_consistency(self, cblpytest: CBLPyTest, transport: str, timeout: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -225,7 +226,7 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize("transport, timeout", [("BLUETOOTH", 600), ("WIFI", 300), ("MIXED_MODE", 420)])
     async def test_network_partition(self, cblpytest: CBLPyTest, transport: str, timeout: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -501,7 +502,7 @@ class TestMultipeer(CBLTestClass):
     @pytest.mark.parametrize("transport, timeout", [("BLUETOOTH", 600), ("WIFI", 300), ("MIXED_MODE", 420)])
     async def test_dynamic_peer_addition_removal(self, cblpytest: CBLPyTest, transport: str, timeout: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)
@@ -660,7 +661,7 @@ class TestMultipeer(CBLTestClass):
         self, cblpytest: CBLPyTest, transport: str, timeout: int, blob: str, doc_count: int
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         self.mark_test_step("Reset local database and load `empty` dataset on all devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]

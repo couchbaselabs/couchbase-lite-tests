@@ -200,8 +200,8 @@ a valid session.
 
 Checks that disabling a user logs out the open sessions of that user. This runs for each source.
 
-Fails on Sync Gateway 4.2: basic auth for the disabled user gets 401, but the old session still
-reads and writes documents.
+Needs Sync Gateway 3.3.9, 4.0.9, 4.1.3, 4.2 or later. Older versions return 401 to basic auth for
+the disabled user, but the old session still reads and writes documents (CBG-5940).
 
 ### Steps
 

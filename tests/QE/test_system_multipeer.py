@@ -19,7 +19,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 from shared.multipeer_test_helpers import build_group_transports
 
 
@@ -45,8 +45,7 @@ class TestSystemMultipeer(CBLTestClass):
         docs_per_crud: int,
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=test_duration)
         CRUD_INTERVAL = timedelta(seconds=crud_interval)
@@ -200,8 +199,7 @@ class TestSystemMultipeer(CBLTestClass):
     )
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport: str, doc_count: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         NO_OF_DOCS = doc_count
         NUM_DEVICES = len(cblpytest.test_servers)
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
@@ -298,8 +296,7 @@ class TestSystemMultipeer(CBLTestClass):
         #    /                       \
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         DOC_COUNT = doc_count
 
         self.mark_test_step("Reset SG and load `names` dataset")
