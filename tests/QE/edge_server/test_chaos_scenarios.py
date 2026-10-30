@@ -41,7 +41,7 @@ class TestEdgeServerChaos(CBLTestClass):
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Monitor replication progress")
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         hotel_docs = await edge_server.get_all_documents("travel", collection="travel.hotels")
         bulk_ops = [
@@ -66,7 +66,7 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server.bulk_doc_op(bulk_ops, db_name="travel", collection="travel.hotels")
 
         self.mark_test_step("Monitor replication progress")
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1, timeout=180)
 
         self.mark_test_step("Verify document created")
         await sgw.wait_for_documents("travel", docs_list.keys(), scope="travel", collection="hotels")
@@ -94,7 +94,7 @@ class TestEdgeServerChaos(CBLTestClass):
 
         await cblpytest.edge_servers[0].set_firewall_rules(allow=[sgw.hostname])
         self.mark_test_step("Monitor replication progress")
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1, timeout=180)
 
         self.mark_test_step("Verify document updated")
         for doc_id in random.sample(list(update_docs.keys()), 50):
@@ -188,9 +188,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server1.bulk_doc_op(bulk_ops, "travel", "travel", "hotels")
 
         self.mark_test_step("Verify document deleted")
-        await edge_server1.wait_for_idle(replicator_key=0)
-        await edge_server1.wait_for_idle(replicator_key=1)
-        await edge_server3.wait_for_idle()
+        await edge_server1.wait_for_idle(replication_id=1)
+        await edge_server1.wait_for_idle(replication_id=2)
+        await edge_server3.wait_for_idle(replication_id=1)
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
         edge2_docs = await edge_server2.get_all_documents("travel", collection="travel.hotels")
         edge3_docs = await edge_server3.get_all_documents("travel", collection="travel.hotels")
@@ -205,9 +205,9 @@ class TestEdgeServerChaos(CBLTestClass):
         await edge_server1.bulk_doc_op(bulk_ops, db_name="travel", collection="travel.hotels")
 
         self.mark_test_step("Verify document created")
-        await edge_server1.wait_for_idle(replicator_key=0)
-        await edge_server1.wait_for_idle(replicator_key=1)
-        await edge_server3.wait_for_idle()
+        await edge_server1.wait_for_idle(replication_id=1)
+        await edge_server1.wait_for_idle(replication_id=2)
+        await edge_server3.wait_for_idle(replication_id=1)
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
         edge2_docs = await edge_server2.get_all_documents("travel", collection="travel.hotels")
         edge3_docs = await edge_server3.get_all_documents("travel", collection="travel.hotels")
@@ -224,8 +224,8 @@ class TestEdgeServerChaos(CBLTestClass):
             edge3_docs.revmap,
             docs_list,
         )
-        await edge_server1.wait_for_idle(replicator_key=0)
-        await edge_server1.wait_for_idle(replicator_key=1)
+        await edge_server1.wait_for_idle(replication_id=1)
+        await edge_server1.wait_for_idle(replication_id=2)
         edge1_docs = await edge_server1.get_all_documents("travel", collection="travel.hotels")
 
         self.mark_test_step("killing edge_server1,edge_server3  ")

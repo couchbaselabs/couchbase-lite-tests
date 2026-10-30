@@ -30,7 +30,7 @@ class TestEdgeServerSync(CBLTestClass):
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path)
 
         self.mark_test_step("Monitor replication progress")
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verify document parity")
         for collection in [
@@ -99,7 +99,7 @@ class TestEdgeServerSync(CBLTestClass):
         edge_server2 = await cblpytest.edge_servers[1].configure_dataset(db_name="travel", config_file=config_path2)
 
         self.mark_test_step("Monitor replication progress")
-        await edge_server2.wait_for_idle()
+        await edge_server2.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verify document parity")
         for collection in [

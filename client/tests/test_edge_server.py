@@ -2,17 +2,18 @@
 
 import json
 import logging
-from collections.abc import Iterator
-from contextlib import contextmanager
+from collections.abc import AsyncIterator, Iterator, Sequence
+from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+import tenacity
 from aiohttp import web
 from aiohttp.test_utils import TestServer
-from cbltest.api.edgeserver import EdgeServer, EdgeServerConfig
-from cbltest.api.error import CblTestError
+from cbltest.api.edgeserver import EdgeServer, EdgeServerConfig, LiteCoreErrorDomain, ReplicationActivity
+from cbltest.api.error import CblEdgeServerBadResponseError, CblTestError
 from cbltest.httplog import _HttpLogWriter
 
 HOSTNAME = "es.example.com"
@@ -158,3 +159,123 @@ async def test_failure_writes_an_error_and_logs_it(
     assert len(errors) == 1
     assert errors[0].read_text().startswith(f"Edge Server [{server.host}] <- GET / failed: ")
     assert [r.getMessage() for r in caplog.records] == [errors[0].read_text()]
+
+
+def replication(status: str, **extra: Any) -> dict[str, Any]:
+    return {"task_id": 1, "status": status, "source": "ws://sgw/db", "target": "db", "age_secs": 0, **extra}
+
+
+@asynccontextmanager
+async def replicate_server(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, responses: Sequence[dict[str, Any] | None]
+) -> AsyncIterator[EdgeServer]:
+    """
+    An Edge Server whose ``/_replicate/1`` answers with each of ``responses`` in turn, then
+    keeps repeating the last one.  None answers 404, as Edge Server does for an unlisted task.
+    """
+    monkeypatch.setattr(_HttpLogWriter, "_HttpLogWriter__record_path", tmp_path / "http_log")
+    monkeypatch.setattr(tenacity, "wait_fixed", lambda _: tenacity.wait_none())
+    remaining = list(responses)
+
+    async def status(request: web.Request) -> web.Response:
+        body = remaining.pop(0) if len(remaining) > 1 else remaining[0]
+        return web.json_response({"error": "Not Found"}, status=404) if body is None else web.json_response(body)
+
+    async def start(request: web.Request) -> web.Response:
+        return web.json_response({"ok": True, "task_id": 3}, status=202)
+
+    app = web.Application()
+    app.router.add_get("/_replicate/1", status)
+    app.router.add_post("/_replicate", start)
+    server = TestServer(app)
+    await server.start_server()
+    config_file = write_config(tmp_path, "local.json", {"interface": f"{server.host}:{server.port}"})
+    client = EdgeServer(server.host, config_file=config_file)
+    try:
+        yield client
+    finally:
+        await client.close()
+        await server.close()
+
+
+@pytest.mark.asyncio
+async def test_wait_for_idle_returns_once_the_replication_is_idle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    responses = [replication("Connecting"), replication("Active"), replication("Idle")]
+    async with replicate_server(tmp_path, monkeypatch, responses) as client:
+        result = await client.wait_for_idle(replication_id=1)
+    assert result.status == ReplicationActivity.IDLE
+
+
+@pytest.mark.asyncio
+async def test_wait_for_idle_fails_fast_on_a_stopped_replication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    error = {"error": "Session Invalid", "x-litecore-domain": 6, "x-litecore-code": 401}
+    responses = [replication("Connecting"), replication("Stopped", error=error)]
+    async with replicate_server(tmp_path, monkeypatch, responses) as client:
+        with pytest.raises(CblEdgeServerBadResponseError) as e:
+            await client.wait_for_idle(replication_id=1, timeout=60)
+    assert e.value.code == 401
+
+
+@pytest.mark.asyncio
+async def test_wait_for_replication_error_returns_the_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    error = {"error": "Invalid login", "x-litecore-domain": 6, "x-litecore-code": 401}
+    responses = [replication("Idle"), replication("Stopped", error=error)]
+    async with replicate_server(tmp_path, monkeypatch, responses) as client:
+        result = await client.wait_for_replication_error(
+            replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401
+        )
+    assert result.message == "Invalid login"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "stopped",
+    [
+        replication("Stopped"),
+        replication("Stopped", error={"error": "Forbidden", "x-litecore-domain": 6, "x-litecore-code": 403}),
+        replication("Stopped", error={"error": "SSL EOF", "x-litecore-domain": 5, "x-litecore-code": 6}),
+    ],
+    ids=["no_error", "other_code", "other_domain"],
+)
+async def test_wait_for_replication_error_rejects_a_different_stop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stopped: dict
+) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [stopped]) as client:
+        with pytest.raises(AssertionError, match="without a WEBSOCKET 401 error"):
+            await client.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401)
+
+
+@pytest.mark.asyncio
+async def test_wait_for_replication_status_retries_until_the_replication_is_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [None, replication("Idle")]) as client:
+        result = await client.wait_for_idle(replication_id=1)
+    assert result.status == ReplicationActivity.IDLE
+
+
+@pytest.mark.asyncio
+async def test_wait_for_replication_status_times_out_on_an_unlisted_replication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [None]) as client:
+        with pytest.raises(TimeoutError, match="is not listed"):
+            await client.wait_for_idle(replication_id=1, timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_wait_for_replication_status_times_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [replication("Active")]) as client:
+        with pytest.raises(TimeoutError, match="is Active"):
+            await client.wait_for_idle(replication_id=1, timeout=0.2)
+
+
+@pytest.mark.asyncio
+async def test_start_replication_returns_the_task_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [None]) as client:
+        task_id = await client.start_replication("ws://sgw/db", "db", "user", "pass", False, True)
+    assert task_id == 3

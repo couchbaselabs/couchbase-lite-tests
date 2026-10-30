@@ -15,10 +15,10 @@ document reaching ES can only have crossed an authenticated connection. The sync
 `owner` is accepted only when the push connection authenticated as that owner. Documents are seeded
 through Couchbase Server, 3 per collection, and waited on until SGW has imported them.
 
-ES health comes from `EdgeServer.wait_for_idle()`. It raises `CblEdgeServerBadResponseError` when
-the replicator reports an error, carrying the code it reports, or with code 404 when ES no longer
-lists it, which is how ES drops a replicator whose handshake was answered 401. A rejected session
-must therefore fail with 401 or 404.
+ES health comes from `EdgeServer.wait_for_idle()`, which raises `CblEdgeServerBadResponseError`
+with the code the replicator reports. A rejected session is checked by waiting for replication 1 to
+reach `Stopped` and verifying that its error is 401 in the LiteCore `WEBSOCKET` domain (6). ES keeps
+a stopped replicator listed for 10 seconds, so the wait sees it before ES drops it.
 
 ## test_session_cookie_bidirectional_replication
 
