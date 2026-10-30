@@ -3,13 +3,15 @@ import re
 import ssl
 import warnings
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import AsyncIterator, Collection, Mapping
 from contextlib import asynccontextmanager
 from enum import Enum
+from itertools import batched
 from json import dumps, loads
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self, cast
+from typing import Any, NamedTuple, Self, cast
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
@@ -32,7 +34,7 @@ from cbltest.assertions import _assert_not_null
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
 from cbltest.logging import cbl_error, cbl_trace, cbl_warning
-from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
+from cbltest.utils import SHELL2HTTP_PORT, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
 # This is copied from environment/aws/sgw_setup/cert/ca_cert.pem
@@ -267,6 +269,7 @@ class ISGRPayload(JSONSerializable):
 # The fields DocumentUpdateEntry derives from its own id/revision arguments, which it
 # refuses to take in a body.
 _UPDATE_ENTRY_METADATA = frozenset({"_id", "_rev", "_cv"})
+_BULK_DOCS_BATCH_SIZE = 500
 
 
 class AllDocumentsResponseRow:
@@ -1298,40 +1301,25 @@ class _SyncGatewayBase:
             "load_dataset",
             attributes={"sg.database.name": db_name, "cbl.dataset.path": str(path)},
         ):
-            last_scope: str = ""
-            last_coll: str = ""
-            collected: list[dict] = []
+
+            class Keyspace(NamedTuple):
+                scope: str
+                collection: str
+
+            by_keyspace: defaultdict[Keyspace, list[DocumentUpdateEntry]] = defaultdict(list)
             async with aiofiles.open(path, encoding="utf8") as fin:
-                async for json_line in fin:
-                    json = cast(dict, loads(json_line))
-                    assert isinstance(json, dict), f"Invalid entry in {path}!"
-                    scope = cast(str, json["scope"])
-                    collection = cast(str, json["collection"])
-                    if (
-                        (last_scope != scope or last_coll != collection or len(collected) > 500)
-                        and last_scope
-                        and last_coll
-                        and collected
-                    ):
-                        resp = await self._send_request(
-                            "post",
-                            f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
-                            JSONDictionary({"docs": collected}),
-                        )
-                        analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
-                        collected.clear()
+                async for line_number, json_line in asyncstdlib.enumerate(fin, start=1):
+                    try:
+                        body = loads(json_line)
+                        keyspace = Keyspace(body["scope"], body["collection"])
+                        doc_id = body.pop("_id")
+                    except (ValueError, KeyError, TypeError) as e:
+                        e.add_note(f"Invalid dataset entry at {path}:{line_number}: {json_line.rstrip()}")
+                        raise
+                    by_keyspace[keyspace].append(DocumentUpdateEntry(doc_id, None, body))
 
-                    last_scope = scope
-                    last_coll = collection
-                    collected.append(json)
-
-            if collected:
-                resp = await self._send_request(
-                    "post",
-                    f"/{db_name}.{last_scope}.{last_coll}/_bulk_docs",
-                    JSONDictionary({"docs": collected}),
-                )
-                analyze_bulk_docs_response(resp, CblSyncGatewayBadResponseError)
+            for keyspace, updates in by_keyspace.items():
+                await self.update_documents(db_name, updates, scope=keyspace.scope, collection=keyspace.collection)
 
     async def get_all_documents(
         self,
@@ -1529,7 +1517,8 @@ class _SyncGatewayBase:
         wait_for_caching_feed: bool = False,
     ) -> None:
         """
-        Sends a list of documents to be updated on Sync Gateway
+        Sends a list of documents to be updated on Sync Gateway, in `_bulk_docs` requests of at most
+        `_BULK_DOCS_BATCH_SIZE` documents each
 
         :param db_name: The name of the DB endpoint to update
         :param updates: A list of updates to perform
@@ -1539,7 +1528,8 @@ class _SyncGatewayBase:
                                       revision this wrote, which covers the earlier ones too.  A replication
                                       started straight after would otherwise read a feed that still has the
                                       documents at their previous revisions (default False)
-        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update
+        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update.  The batches before
+            the failing one stay written, and the batches after it are not sent
         :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway answered with no usable
             entries, or the feed never reported the last revision written
         """
@@ -1551,14 +1541,14 @@ class _SyncGatewayBase:
                 "cbl.collection.name": collection,
             },
         ):
-            body = {"docs": [u.to_json() for u in updates]}
-
-            response = await self._send_request(
-                "post",
-                f"/{db_name}.{scope}.{collection}/_bulk_docs",
-                JSONDictionary(body),
-            )
-            entries = analyze_bulk_docs_response(response, CblSyncGatewayBadResponseError)
+            entries: list = []
+            for batch in batched(updates, _BULK_DOCS_BATCH_SIZE, strict=False):
+                response = await self._send_request(
+                    "post",
+                    f"/{db_name}.{scope}.{collection}/_bulk_docs",
+                    JSONDictionary({"docs": [u.to_json() for u in batch]}),
+                )
+                entries = analyze_bulk_docs_response(response, CblSyncGatewayBadResponseError)
 
             if not wait_for_caching_feed:
                 return
@@ -1571,9 +1561,9 @@ class _SyncGatewayBase:
             assert isinstance(doc_id, str), f"Bulk update response entry carries no document ID: {dumps(last)}"
 
             # A batch can end on a deletion, which the feed reports as deleted rather than live
-            last_update = assert_not_null(
-                next((u for u in updates if u.id == doc_id), None),
-                f"Bulk update response names {doc_id}, which was not in the batch",
+            last_update = updates[-1]
+            assert last_update.id == doc_id, (
+                f"Bulk update response ends on {doc_id}, but the last update was {last_update.id}"
             )
 
             await self._document_with_sequence(
