@@ -39,6 +39,23 @@ interface CollectionUpdates {
     onConflict?: cbl.ConflictHandler;
 }
 
+/** Statuses worth another attempt: server errors, plus the two "come back later" codes.
+ *
+ *  403 is deliberately absent.  GitHub uses it for some secondary rate limits, but it is
+ *  also the ordinary answer for a file you may not read, and retrying that would triple
+ *  the cost of every genuine permission error.
+ */
+function isRetryableStatus(status: number): boolean {
+    return status >= 500 || status === 408 || status === 429;
+}
+
+/** How many times to attempt a dataset/blob fetch before giving up. */
+const kFetchAttempts = 3;
+/** Per-attempt fetch timeout, generous enough for the largest (50 MB) blob. */
+const kFetchTimeoutMs = 60_000;
+/** Base delay between fetch attempts; multiplied by the attempt number. */
+const kFetchRetryDelayMs = 1_000;
+
 export const APIVersion = 1;
 
 /** Implementation of the TDK API, as a delegate object for TestServer. */
@@ -360,15 +377,15 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async #loadDataset(dbName: string, datasetName: string) {
         const url = tdk.kDatasetBaseURL + datasetName + "/";
 
-        const fetchRelative = async (suffix: string): Promise<string> => {
-            const response = await fetch(url + suffix);
-            if (response.status !== 200)
-                throw new HTTPError(
-                    502,
-                    `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
-                );
-            return await response.text();
-        };
+        const fetchRelative = async (suffix: string): Promise<string> =>
+            this.#fetchWithRetry(url + suffix, async (response) => {
+                if (response.status !== 200)
+                    throw new HTTPError(
+                        502,
+                        `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
+                    );
+                return await response.text();
+            });
 
         this.#logger.info`Loading database ${dbName} from dataset ${datasetName} at ${url} ...`;
         const config = JSON.parse(await fetchRelative("index.json")) as tdk.DatasetIndex;
@@ -447,22 +464,57 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return new cbl.NewBlob(contents, type);
     }
 
-    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
-        const absURL = new URL(blobURL, tdk.kBlobBaseURL);
-        const response = await fetch(absURL);
-        if (response.status !== 200) {
-            let status = 502;
-            if (response.status === 404) {
-                status = 400;
+    /** Fetches `url` and reads its body via `consume`, retrying transient failures.
+     *
+     *  Dataset and blob fixtures are fetched over the network, so a single dropped
+     *  connection or 5xx would otherwise fail the test outright.  `consume` runs inside
+     *  the retry so that a connection lost partway through the body is retried too, and
+     *  so the per-attempt timeout covers the whole transfer rather than just the headers.
+     *  A response the caller considers final -- a 404, say -- is signalled by throwing
+     *  HTTPError from `consume`, which is passed straight through: retrying a
+     *  deterministic answer only wastes time.
+     */
+    async #fetchWithRetry<T>(url: string | URL, consume: (response: Response) => Promise<T>): Promise<T> {
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= kFetchAttempts; attempt++) {
+            try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(kFetchTimeoutMs) });
+                if (!isRetryableStatus(response.status)) return await consume(response);
+                lastError = new Error(`${response.status} ${response.statusText}`);
+            } catch (error) {
+                if (error instanceof HTTPError) throw error;
+                lastError = error;
             }
-
-            throw new HTTPError(
-                status,
-                `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
-            );
+            if (attempt < kFetchAttempts) {
+                this.#logger
+                    .warn`Fetch of ${String(url)} failed (attempt ${attempt} of ${kFetchAttempts}): ${String(lastError)}; retrying ...`;
+                await new Promise((resolve) => setTimeout(resolve, kFetchRetryDelayMs * attempt));
+            }
         }
-        const data = await response.arrayBuffer();
-        return new Uint8Array(data);
+        throw new HTTPError(
+            502,
+            `Unable to fetch <${String(url)}> after ${kFetchAttempts} attempts: ${String(lastError)}`,
+        );
+    }
+
+    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
+        // kBlobBaseURL may be relative (local fixtures), which new URL() rejects as a base.
+        const absURL = new URL(blobURL, new URL(tdk.kBlobBaseURL, location.href));
+        return this.#fetchWithRetry(absURL, async (response) => {
+            if (response.status !== 200) {
+                let status = 502;
+                if (response.status === 404) {
+                    status = 400;
+                }
+
+                throw new HTTPError(
+                    status,
+                    `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
+                );
+            }
+            const data = await response.arrayBuffer();
+            return new Uint8Array(data);
+        });
     }
 
     readonly #databases = new Map<string, cbl.Database>();

@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway, get_basic_auth_headers
 from cbltest.api.syncgatewaystats import StatNotPresentError
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.responses import ServerVariant
 
 
 async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
@@ -40,6 +41,9 @@ async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -148,6 +152,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -260,6 +267,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -369,6 +379,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -565,6 +578,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
@@ -689,6 +705,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -760,6 +779,9 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        # Couchbase Lite JS does not implement delta sync.
+        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
