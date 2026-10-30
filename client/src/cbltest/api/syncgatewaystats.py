@@ -127,7 +127,7 @@ class SyncGatewayStats(_StatGroup):
             uptime: int = _stat(description="The total uptime. Unit: nanoseconds.")
             warn_count: int = _stat(description="The total number of warnings logged.")
 
-        class Config(_StatGroup):
+        class ConfigStats(_StatGroup):
             """``syncgateway.global.config``"""
 
             database_config_bucket_mismatches: int = _stat(  # new in 3.1.2
@@ -148,7 +148,7 @@ class SyncGatewayStats(_StatGroup):
             num_audits_logged: int = _stat(description="The total number of audit events logged.")
 
         resource_utilization: ResourceUtilization = _stat()
-        config: Config = _stat()  # new in 3.1.2
+        config: ConfigStats = _stat()  # new in 3.1.2
         audit: Audit = _stat()  # new in 3.2.1
 
     class PerDatabase(_StatGroup):

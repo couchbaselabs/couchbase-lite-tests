@@ -1,9 +1,12 @@
 import json
+import shutil
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import create_autospec, patch
 
+import pytest
 from cbltest.api import edgeserver, syncgateway
 from cbltest.httpclient import AsyncHTTPClient
 
@@ -57,3 +60,22 @@ def fake_edge_server(tmp_path: Path) -> Iterator[edgeserver.EdgeServer]:
         patch("cbltest.httpclient.ClientSession", autospec=True),
     ):
         yield edgeserver.EdgeServer(url="es.example.com", config_file=str(config))
+
+
+@dataclass(frozen=True)
+class NestedPytest:
+    pytester: pytest.Pytester
+    args: tuple[str, ...]
+
+
+@pytest.fixture
+def nested_pytest(pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch) -> NestedPytest:
+    """A pytester folder with its own config files, so the nested run never reads client/pyproject.toml."""
+    # Plugins warn from pytest_configure, before -W applies, so only the interpreter's filter catches those.
+    monkeypatch.setenv("PYTHONWARNINGS", "error")
+    shutil.copy(Path(__file__).with_name("empty_config.json"), pytester.path)
+    pytester.makepyprojecttoml("""
+        [tool.pytest.ini_options]
+        asyncio_default_fixture_loop_scope = "session"
+    """)
+    return NestedPytest(pytester, ("--config", "empty_config.json", "-p", "no:randomly", "-W", "error"))
