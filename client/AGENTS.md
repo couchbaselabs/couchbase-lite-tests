@@ -76,6 +76,7 @@ client/
         ├── cblpytest_fixture.py        # session-scoped `cblpytest` fixture
         ├── required_topology.py        # min_test_servers / min_sync_gateways / … markers
         ├── cbse_filter.py              # CBSE (CBS Edition) test filtering
+        ├── standalone_filter.py        # @pytest.mark.standalone — skipped unless named on the command line
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
@@ -129,6 +130,7 @@ Registered in `client/pyproject.toml`:
 [project.entry-points.pytest11]
 required_topology       = "cbltest.plugins.required_topology"
 cbse_filter             = "cbltest.plugins.cbse_filter"
+standalone_filter       = "cbltest.plugins.standalone_filter"
 cblpytest_fixture       = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture      = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
