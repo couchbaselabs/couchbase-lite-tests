@@ -65,9 +65,9 @@ pipeline {
             parallel {
                 stage('Windows') {
                     when { beforeAgent true; expression { params.RUN_WINDOWS } }
-                    agent { label 'mob-e2e-win-02' }
+                    agent { label 'net-windows' }
                     options {
-                        lock('mob-e2e-win-02')
+                        lock('net-windows')
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
