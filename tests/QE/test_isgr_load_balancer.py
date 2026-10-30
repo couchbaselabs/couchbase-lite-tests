@@ -33,6 +33,7 @@ async def _setup_isgr_pair(
     channels: list[str],
     user_name: str,
     user_password: str,
+    revs_limit: int | None = None,
 ) -> tuple[SyncGateway, SyncGateway]:
     """
     Gives a test two independent backends, SG1 and SG2, with the same database and user, kept in sync by ISGR. Each
@@ -53,6 +54,7 @@ async def _setup_isgr_pair(
                 num_index_replicas=0,
                 scopes={"_default": ScopeConfig(collections={"_default": {}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
+                revs_limit=revs_limit,
             ),
         )
         await sg.reset_user(db_name, user_name, user_password, channels)
@@ -149,14 +151,14 @@ class TestISGRLoadBalancer(CBLTestClass):
         )
 
     async def _skip_if_unpinnable(self, cblpytest: CBLPyTest) -> None:
-        """Skips the JS test server, which can't send the X-Backend pin header, and SGW without the channel-loss fix."""
+        """Skips the JS test server, which can't send the X-Backend pin header."""
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
-        await self._skip_if_unfixed_sgw(cblpytest)
 
     @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self._skip_if_unpinnable(cblpytest)
+        await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb"
         channels = ["isgr_lb_test"]
@@ -248,6 +250,7 @@ class TestISGRLoadBalancer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self._skip_if_unpinnable(cblpytest)
+        await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb_push"
         channels = ["isgr_lb_push_test"]
@@ -353,3 +356,96 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert status.error is None, f"Pull from SG1 failed: {status.error}"
         pulled = {update.document_id for update in replicator.document_updates if update.error is None}
         assert doc_id in pulled, f"Expected the pull from SG1 to transfer {doc_id}, got {pulled}"
+
+    @pytest.mark.min_load_balancers(2)
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_checkpoint_404_resurrects_tombstoned_doc(self, cblpytest: CBLPyTest) -> None:
+        await self._skip_if_unpinnable(cblpytest)
+        await self.skip_if_sgw_not(cblpytest.clusters[1].sync_gateways[0], "<4.0.0")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], "<4.0.0")
+
+        db_name = "db_isgr_lb_resurrection"
+        channels = ["isgr_lb_resurrection_test"]
+        user_name, user_password = "isgr_lb_resurrection_user", "pass"
+        doc_id = "d1"
+        revs_limit = 5
+
+        self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
+        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password, revs_limit=revs_limit)
+
+        self.mark_test_step(f"Create doc {doc_id} directly on SG1, and wait for it to reach SG2 via ISGR")
+        await sg1.update_documents(
+            db_name,
+            [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})],
+            wait_for_caching_feed=True,
+        )
+        await _wait_for_propagation(sg2, db_name, [doc_id], link_owner=sg1)
+
+        self.mark_test_step("Create an empty local CBL database, and pull once pinned to SG1")
+        db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
+        pulled = {u.document_id for u in seed_pull.document_updates if u.error is None}
+        assert doc_id in pulled, f"Expected the seeding pull pinned to SG1 to transfer {doc_id}, got {pulled}"
+
+        self.mark_test_step(
+            f"Mutate {doc_id} on SG1 six times past its revs_limit ({revs_limit}), then tombstone it -- landing the"
+            f" tombstone at revision generation 8 -- without the local CBL client ever being told"
+        )
+        current = await sg1.get_document(db_name, doc_id)
+        for mutation_index in range(6):
+            await sg1.update_documents(
+                db_name,
+                [
+                    DocumentUpdateEntry(
+                        id=doc_id,
+                        revision=current.revid,
+                        body={"channels": channels, "mutation": mutation_index},
+                    )
+                ],
+            )
+            current = await sg1.get_document(db_name, doc_id)
+        tombstone = await sg1.delete_document(doc_id, current.revid, db_name)
+        assert tombstone.revid.split("-")[0] == "8", (
+            f"Expected the tombstone to land at revision generation 8, got {tombstone.revid}"
+        )
+        since_sg1 = await sg1.get_last_sequence(db_name)
+
+        self.mark_test_step("Wait for the tombstone to propagate to SG2 via ISGR")
+        await sg2.wait_for_documents(db_name, {doc_id}, deleted=True)
+        since_sg2 = await sg2.get_last_sequence(db_name)
+
+        self.mark_test_step(
+            "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL client, "
+            "a genuine checkpoint-404. The client still offers only the stale generation-1 revision it pulled before"
+        )
+        await _pinned_replication(
+            db,
+            repl_url,
+            user_name,
+            user_password,
+            _SG2_PIN,
+            replicator_type=ReplicatorType.PUSH_AND_PULL,
+        )
+
+        self.mark_test_step(
+            f"Confirm {doc_id} is resurrected on SG2 as a disconnected new rev-tree root (generation 1), orphaned"
+            f" from its 8-generation tombstoned history"
+        )
+        await sg2.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg2)
+        resurrected_sg2 = await sg2.get_document(db_name, doc_id)
+        assert not resurrected_sg2.tombstone, f"Expected {doc_id} to come back alive on SG2, not stay a tombstone"
+        assert resurrected_sg2.revid.split("-")[0] == "1", (
+            f"Expected a disconnected new rev-tree root (generation 1) on SG2, got {resurrected_sg2.revid}"
+        )
+
+        self.mark_test_step(
+            "Wait for the continuous ISGR link to propagate that same resurrection back to SG1, and confirm"
+            " it there too"
+        )
+        await sg1.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg1)
+        resurrected_sg1 = await sg1.get_document(db_name, doc_id)
+        assert not resurrected_sg1.tombstone, f"Expected {doc_id} to come back alive on SG1, not stay a tombstone"
+        assert resurrected_sg1.revid.split("-")[0] == "1", (
+            f"Expected a disconnected new rev-tree root (generation 1) on SG1, got {resurrected_sg1.revid}"
+        )
