@@ -19,19 +19,17 @@ Functions:
         Create a bridge for the C test server to be able to install, run, etc.
     latestbuilds_path(self) -> str:
         Get the path for the package on the latestbuilds server.
-    platform(self) -> str:
-        Get the platform name.
     uncompress_package(self, path: Path) -> None:
         Uncompress the C test server package.
 """
 
 import os
-import platform
 import shutil
 import subprocess
+import sys
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import click
 
@@ -67,9 +65,6 @@ class CTestServer(TestServer):
     Attributes:
         version (str): The version of the test server.
     """
-
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
 
     @abstractmethod
     def cbl_filename(self, version: str) -> str:
@@ -144,7 +139,7 @@ class CTestServer_Desktop(CTestServer):
             "--parallel",
             str(os.cpu_count()),
         ]
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             args.extend(["--config", "Release"])
 
         subprocess.run(
@@ -164,7 +159,7 @@ class CTestServer_Desktop(CTestServer):
         path.unlink()
 
 
-@TestServer.register("c_ios")
+@TestServer.register
 class CTestServer_iOS(CTestServer):
     """
     A class for managing C test servers on iOS.
@@ -173,18 +168,7 @@ class CTestServer_iOS(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "c_ios"
+    platform = "c_ios"
 
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-ios.zip"
@@ -315,7 +299,7 @@ class CTestServer_iOS(CTestServer):
         path.unlink()
 
 
-@TestServer.register("c_android")
+@TestServer.register
 class CTestServer_Android(CTestServer):
     """
     A class for managing C test servers on Android.
@@ -324,18 +308,7 @@ class CTestServer_Android(CTestServer):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "c_android"
+    platform = "c_android"
 
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-android.zip"
@@ -372,7 +345,7 @@ class CTestServer_Android(CTestServer):
         """
         self._download_cbl()
         gradle_path = C_TEST_SERVER_DIR / "platforms" / "android" / "gradlew"
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             gradle_path = gradle_path.with_suffix(".bat")
 
         args = [
@@ -381,7 +354,7 @@ class CTestServer_Android(CTestServer):
             "-PabiFilters=arm64-v8a",
             f"-PcblVersion={self.version.split('-')[0]}",
         ]
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             args.append("--no-daemon")
 
         subprocess.run(args, cwd=gradle_path.parent, check=True)
@@ -457,7 +430,7 @@ class CTestServer_Android(CTestServer):
         click.secho("No uncompressing needed for Android test server package", fg="yellow")
 
 
-@TestServer.register("c_windows")
+@TestServer.register
 class CTestServer_Windows(CTestServer_Desktop):
     """
     A class for managing C test servers on Windows.
@@ -466,18 +439,7 @@ class CTestServer_Windows(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "c_windows"
+    platform = "c_windows"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -520,7 +482,7 @@ class CTestServer_Windows(CTestServer_Desktop):
         return str(zip_path)
 
 
-@TestServer.register("c_macos")
+@TestServer.register
 class CTestServer_macOS(CTestServer_Desktop):
     """
     A class for managing C test servers on macOS.
@@ -529,21 +491,10 @@ class CTestServer_macOS(CTestServer_Desktop):
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str) -> None:
-        super().__init__(version)
+    platform = "c_macos"
 
     def cbl_filename(self, version: str) -> str:
         return f"{self.product}-enterprise-{version}-macos.zip"
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return "c_macos"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -583,30 +534,20 @@ class CTestServer_macOS(CTestServer_Desktop):
         return str(zip_path)
 
 
+@TestServer.register
 class CTestServer_Linux(CTestServer_Desktop):
     """
-    A class for managing C test servers on Linux.
+    A class for managing C test servers on Linux x86_64.
 
     Attributes:
         version (str): The version of the test server.
     """
 
-    def __init__(self, version: str, arch: str) -> None:
-        super().__init__(version)
-        self.__arch = arch
-
-    @property
-    def platform(self) -> str:
-        """
-        Get the platform name.
-
-        Returns:
-            str: The platform name.
-        """
-        return f"c_linux_{self.__arch}"
+    platform = "c_linux_x86_64"
+    _arch: Final = "x86_64"
 
     def cbl_filename(self, version: str) -> str:
-        return f"{self.product}-enterprise-{version}-linux-{self.__arch}.tar.gz"
+        return f"{self.product}-enterprise-{version}-linux-{self._arch}.tar.gz"
 
     @property
     def latestbuilds_path(self) -> str:
@@ -616,7 +557,7 @@ class CTestServer_Linux(CTestServer_Desktop):
         Returns:
             str: The path for the latest builds.
         """
-        return self.artifact_path(f"testserver_linux-{self.__arch}.tar.gz")
+        return self.artifact_path(f"testserver_linux-{self._arch}.tar.gz")
 
     def create_bridge(self, **kwargs: Any) -> PlatformBridge:
         """
@@ -655,16 +596,3 @@ class CTestServer_Linux(CTestServer_Desktop):
         """
         untar_directory(path, path.parent)
         path.unlink()
-
-
-@TestServer.register("c_linux_x86_64")
-class CTestServer_Linux_x86_64(CTestServer_Linux):
-    """
-    A class for managing C test servers on Linux x86_64.
-
-    Attributes:
-        version (str): The version of the test server.
-    """
-
-    def __init__(self, version: str) -> None:
-        super().__init__(version, "x86_64")

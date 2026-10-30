@@ -157,10 +157,10 @@ def main(topology: TopologyConfig) -> None:
 
 Abstract base with registry pattern:
 
-- `TestServer.register(name)` — decorator
+- `@TestServer.register` — decorator that registers a subclass under its own `platform = "key"` class attribute, and refuses one that only inherits it
 - `TestServer.create(name, version)` — factory
 - `TestServer.initialize()` — imports all platform modules to trigger registration
-- Abstract: `build()`, `compress_package()`, `uncompress_package()`, `create_bridge()`, `latestbuilds_path`, `platform`
+- Abstract: `build()`, `compress_package()`, `uncompress_package()`, `create_bridge()`, `latestbuilds_path`
 
 ### `PlatformBridge` (`test_server_platforms/platform_bridge.py`)
 
