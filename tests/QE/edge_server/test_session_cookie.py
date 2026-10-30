@@ -106,6 +106,7 @@ class TestSessionCookie(CBLTestClass):
     async def test_session_cookie_bidirectional_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, prefixed: bool, cookie_header: str | None
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         sync_gateway = cblpytest.sync_gateways[0]
         await self._setup_sgw(cblpytest)
 
@@ -150,6 +151,7 @@ class TestSessionCookie(CBLTestClass):
     async def test_session_cookie_across_restart_revoke_and_rotate(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         sync_gateway = cblpytest.sync_gateways[0]
         es_manager = cblpytest.edge_servers[0]
         await self._setup_sgw(cblpytest)
@@ -203,6 +205,7 @@ class TestSessionCookie(CBLTestClass):
     async def test_invalid_session_cookie_rejected(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, session_kind: str
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         sync_gateway = cblpytest.sync_gateways[0]
         await self._setup_sgw(cblpytest)
 

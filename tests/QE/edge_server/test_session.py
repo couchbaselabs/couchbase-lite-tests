@@ -31,6 +31,7 @@ class TestEdgeServerSession(CBLTestClass):
     async def test_create_session_requires_one_time_true(
         self, cblpytest: CBLPyTest, dataset_path: Path, one_time: bool | str | None
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server on the session config with the test users")
         admin = await self._setup(cblpytest)
 
@@ -48,6 +49,7 @@ class TestEdgeServerSession(CBLTestClass):
     async def test_create_session_rejects_bad_credentials(
         self, cblpytest: CBLPyTest, dataset_path: Path, headers: dict[str, str]
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server on the session config with the test users")
         await self._setup(cblpytest)
 
@@ -61,6 +63,7 @@ class TestEdgeServerSession(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_create_session_unknown_database(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server on the session config with the test users")
         admin = await self._setup(cblpytest)
 
@@ -96,6 +99,7 @@ class TestEdgeServerSession(CBLTestClass):
     async def test_create_session_access_control(
         self, cblpytest: CBLPyTest, dataset_path: Path, user: str, db: str, expected: int
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server on the session config with the test users")
         await self._setup(cblpytest)
 

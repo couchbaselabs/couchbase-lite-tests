@@ -120,6 +120,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_basic_auth_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "basic")
 
@@ -135,6 +136,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_session_auth_push_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "sess")
 
@@ -150,6 +152,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_session_auth_continuous_live_changes(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "live")
 
@@ -178,6 +181,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_one_time_false_gives_no_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "otf")
 
@@ -198,6 +202,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_reused_session_rejected(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset local databases `db1` and `db2`")
         admin, db, db2 = await self._setup(cblpytest, "reuse")
 
@@ -222,6 +227,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_session_for_other_database_rejected(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "xdb")
 
@@ -246,6 +252,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("session_id", [secrets.token_hex(16), "not-a-session"], ids=["unknown", "malformed"])
     async def test_invalid_session_rejected(self, cblpytest: CBLPyTest, dataset_path: Path, session_id: str) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "bad")
 
@@ -260,6 +267,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_restart_revokes_sessions(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         _, db, _ = await self._setup(cblpytest, "restart")
@@ -278,6 +286,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_second_replicator_needs_its_own_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset local databases `db1` and `db2`")
         admin, db, db2 = await self._setup(cblpytest, "two")
 
@@ -307,6 +316,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_read_only_session_cannot_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "ro")
 
@@ -323,6 +333,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_read_only_session_can_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "rop")
 
@@ -336,6 +347,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_collection_grants_apply_to_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "coll")
 
@@ -363,6 +375,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_session_has_full_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "adm")
 
@@ -381,6 +394,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_session_limited_to_granted_database(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "own")
 
@@ -401,6 +415,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_no_access_user_gets_no_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "none")
 
@@ -416,6 +431,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_write_only_session_cannot_sync(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server, seed one doc per collection, and reset the local database")
         admin, db, _ = await self._setup(cblpytest, "wo")
 
