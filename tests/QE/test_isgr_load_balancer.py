@@ -132,7 +132,6 @@ async def _pinned_replication(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(1)
-@pytest.mark.min_load_balancers(2)
 @pytest.mark.min_clusters(3)
 class TestISGRLoadBalancer(CBLTestClass):
     async def _skip_if_unfixed_sgw(self, cblpytest: CBLPyTest) -> None:
@@ -147,6 +146,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
         await self._skip_if_unfixed_sgw(cblpytest)
 
+    @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self._skip_if_unpinnable(cblpytest)
@@ -169,19 +169,20 @@ class TestISGRLoadBalancer(CBLTestClass):
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
         repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
-        async def pinned_pull(pin: dict[str, str], sg: SyncGateway, other: SyncGateway) -> tuple[int, int]:
+        async def pinned_pull(pin: dict[str, str], sgw: SyncGateway, other: SyncGateway) -> tuple[int, int]:
             """Returns (docs transferred, `sg`'s since-zero delta) of a pull pinned to `sg`; fails if it hit `other`."""
             connects = await sg1.get_isgr_connect_attempts(db_name, _ISGR_REPLICATION_ID)
-            before = await sg.get_pull_repl_since_zero_count(db_name)
+            before = await sgw.get_pull_repl_since_zero_count(db_name)
             other_before = await other.get_pull_repl_since_zero_count(db_name)
             replicator = await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PULL)
             await _assert_no_isgr_reconnect(sg1, db_name, connects)
             other_delta = await other.get_pull_repl_since_zero_count(db_name) - other_before
             assert other_delta == 0, (
                 f"Pull pinned with {pin} moved {other.hostname}'s since-zero count by {other_delta}, so the pin"
-                f" reached {other.hostname} instead of {sg.hostname}"
+                f" reached {other.hostname} instead of {sgw.hostname}"
             )
-            return len(replicator.document_updates), await sg.get_pull_repl_since_zero_count(db_name) - before
+            pulled = {update.document_id for update in replicator.document_updates if update.error is None}
+            return len(pulled), await sgw.get_pull_repl_since_zero_count(db_name) - before
 
         self.mark_test_step("Pull pinned to SG1, then to SG2, the first contact with each")
         sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
@@ -232,6 +233,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         link_status = await sg1.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
 
+    @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self._skip_if_unpinnable(cblpytest)
@@ -252,7 +254,7 @@ class TestISGRLoadBalancer(CBLTestClass):
                 updater.upsert_document(_DEFAULT_COLLECTION, doc_id, [{"channels": channels}])
         repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
 
-        async def pinned_push(pin: dict[str, str], sg: SyncGateway) -> int:
+        async def pinned_push(pin: dict[str, str], sgw: SyncGateway) -> int:
             """
             Returns `sg`'s propose-count delta for one push pinned to `sg`. Only a push pinned to SG2 can prove where it
             went, because ISGR also raises SG2's count.
@@ -263,7 +265,7 @@ class TestISGRLoadBalancer(CBLTestClass):
             await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PUSH)
             await _assert_no_isgr_reconnect(sg1, db_name, connects)
             sg1_delta = await sg1.get_push_propose_change_count(db_name) - sg1_before
-            if sg is sg1:
+            if sgw is sg1:
                 return sg1_delta
             assert sg1_delta == 0, (
                 f"Push pinned with {pin} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin reached"

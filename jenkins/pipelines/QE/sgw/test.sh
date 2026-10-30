@@ -59,10 +59,6 @@ if [ "$SETUP_ONLY" = true ]; then
   exit 0
 fi
 
-# test_replication_xdcr.py needs two separate Couchbase Server clusters, which
-# this single-cluster topology does not provide; it is deferred until the
-# multi-cluster topology is sorted out rather than left to fail every night. See CBL-8686
-
 section_start "$COLOR_YELLOW" "RUN TESTS"
 pushd "$TESTS_DIR" >/dev/null
 if [ -n "$TEST_FILTER" ]; then
