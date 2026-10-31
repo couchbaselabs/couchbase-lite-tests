@@ -14,7 +14,7 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, docToJSON, errorInfo, HTTPError, normalizeCollectionID } from "./utils";
+import { browserInfo, check, docToJSON, errorInfo, HTTPError, normalizeCollectionID } from "./utils";
 import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
@@ -83,6 +83,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             apiVersion: APIVersion,
             cbl: "couchbase-lite-js",
             device: {
+                ...browserInfo(navigator.userAgent),
                 "User-Agent": navigator.userAgent,
             },
         };
@@ -270,7 +271,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     //////// STOP REPLICATOR:
     async [tdk.StopReplicatorCommand](rq: tdk.StopReplicatorRequest): Promise<void> {
         const info = this.#replicators.get(rq.id);
-        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
         info.replicator.stop();
     }
 
@@ -279,7 +280,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         rq: tdk.GetReplicatorStatusRequest,
     ): Promise<tdk.GetReplicatorStatusResponse> {
         const info = this.#replicators.get(rq.id);
-        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
         const status = info.replicator.status;
         const documents = info.documents;
         info.documents = undefined;
@@ -323,7 +324,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const db = this.#getDatabase(rq.database);
         const snap = new Snapshot(db);
         for (const d of rq.documents) await snap.record(d.collection, d.id);
-        const snapID = `snap-${++this.#snapshotCounter}`;
+        const snapID = crypto.randomUUID();
         this.#snapshots.set(snapID, snap);
         return { id: snapID };
     }
@@ -332,7 +333,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async [tdk.VerifyDocumentsCommand](rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const snap = this.#snapshots.get(rq.snapshot);
-        if (snap === undefined) throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+        if (snap === undefined) throw new HTTPError(400, `No such snapshot ${rq.snapshot}`);
         if (snap.db !== db) throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
         return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
@@ -475,7 +476,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     readonly #snapshots = new Map<string, Snapshot>();
     readonly #logger = logtape.getLogger("TDK");
     #idCounter = 0;
-    #snapshotCounter = 0;
     #sessionID?: string;
     #logSender?: LogSlurpSender;
 }

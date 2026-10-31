@@ -96,7 +96,7 @@ spec/
 
 | Version | Date | Change |
 |---|---|---|
-| 2.0.5 | 10/29/2026 | `newSession` returns 400 for the ID of the current session |
+| 2.0.5 | 10/29/2026 | `newSession` returns 400 for the ID of the current session; fix `getAllDocuments` / `runQuery` response schemas; replicator and listener IDs are opaque strings; `updatedBlobs` values are strings; a `reset` database entry takes `collections` or `dataset`, and a non-empty `collections` array; a browser reports itself as the device `systemName` / `systemVersion` |
 | 2.0.4 | 09/23/2026 | Add ReplicatorBearerAuthenticator to ReplicatorConfiguration.authenticator |
 | 2.0.3 | 04/17/2026 | Add identity property to `startListener` |
 | 2.0.2 | 07/24/2025 | Add peer ID to `startMultipeerReplicator` return |

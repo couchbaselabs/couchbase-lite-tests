@@ -13,6 +13,7 @@ import org.nanohttpd.protocols.http.request.Method;
 import org.nanohttpd.protocols.http.response.Response;
 import org.nanohttpd.protocols.http.response.Status;
 
+import com.couchbase.lite.mobiletest.errors.CblApiFailure;
 import com.couchbase.lite.mobiletest.errors.ClientError;
 import com.couchbase.lite.mobiletest.errors.ServerError;
 import com.couchbase.lite.mobiletest.errors.TestError;
@@ -116,6 +117,15 @@ public class Server extends NanoHTTPD {
         catch (ServerError err) {
             Log.err(TAG, "Server error", err);
             resp = handleError(reply, Status.INTERNAL_ERROR, reqId, err);
+        }
+        catch (CblApiFailure err) {
+            Log.err(TAG, "Couchbase Lite error", err);
+            resp = handleError(reply, Status.BAD_REQUEST, reqId, err);
+        }
+        // Couchbase Lite throws this for an invalid argument, and every argument comes from the request
+        catch (IllegalArgumentException err) {
+            Log.err(TAG, "Invalid argument", err);
+            resp = handleError(reply, Status.BAD_REQUEST, reqId, new ClientError(String.valueOf(err.getMessage()), err));
         }
         catch (Exception err) {
             Log.err(TAG, "Internal Server error", err);

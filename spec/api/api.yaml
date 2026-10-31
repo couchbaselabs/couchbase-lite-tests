@@ -48,6 +48,11 @@ info:
     Changes
     2.0.5 (10/29/2026)
     * [/newSession](#operation/newSession) returns 400 for the ID of the current session
+    * Fix response schemas: getAllDocuments values are arrays, runQuery results is an array
+    * Replicator and listener IDs are opaque strings, not UUIDs
+    * updatedBlobs values are strings, and a reset database entry takes collections or dataset, not both
+    * A reset collections array must not be empty
+    * A test server that runs in a browser reports the browser as the device systemName and systemVersion
 
     2.0.4 (09/23/2026)
     * Add ReplicatorBearerAuthenticator (type BEARER) to ReplicatorConfiguration.authenticator
@@ -850,8 +855,7 @@ paths:
               properties:
                 id:
                   type: string
-                  format: uuid
-                  example: '123e4567-e89b-12d3-a456-426614174000'
+                  examples: ['123e4567-e89b-12d3-a456-426614174000', '@urlendpointlistener::1']
         required: true
       responses:
         '200':
@@ -1003,7 +1007,15 @@ components:
         and a "rev" key which is either a revtree id or a hlv cv
       type: object
       additionalProperties:
-        type: string
+        type: array
+        items:
+          type: object
+          required: ['id', 'rev']
+          properties:
+            id:
+              type: string
+            rev:
+              type: string
       example: {'catalog.cloths': [{'id': 'c1', 'rev': '800@Bob'}, {'id': 'c2', 'rev': '1-9ef'}], 'catalog.shoes': [{'id': 's1', 'rev': '1-ff0'}, {'id': 's2', 'rev': '1010@Alice'}]}
     Document:
       description: |-
@@ -1077,8 +1089,9 @@ components:
         updatedBlobs:
           description: A dictionary whose keys are the key paths into the document to be updated with the blob objects and values are the urls from which to obtain the blob files.
           type: object
-          additionalProperties: {}
-          example: {'photo.thumbnail': 'https://media.githubusercontent.com/media/blob/s1.jpg'}
+          additionalProperties:
+            type: string
+          example: {'photo.thumbnail': 'https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/s1.jpg'}
     Error:
       type: object
       required: ['domain', 'code']
@@ -1132,9 +1145,9 @@ components:
       required: ['id']
       properties:
         id:
+          description: 'An opaque ID that the test server assigns'
           type: string
-          format: uuid
-          example: '123e4567-e89b-12d3-a456-426614174000'
+          examples: ['123e4567-e89b-12d3-a456-426614174000', '@replicator::1', 'repl-1']
     ReplicatorBasicAuthenticator:
       type: object
       required: ['type', 'username', 'password']
@@ -1404,24 +1417,25 @@ components:
             will be created.
           type: ['null', object]
           additionalProperties:
-            type: object
-            oneOf:
-              - properties:
-                  collections:
-                    description: |-
-                      A list of fully qualified collection names (<scope>.<collection>) to be created in the database.
-                      Collections may be null, but if an array is provided, it may not be empty.
-                      The Collections parameter cannot be used together with dataset.'
-                    type: ['null', array]
-                    items:
-                      type: string
-                    example: ["_default.employees", "_default.departments"]
-              - properties:
-                  dataset:
-                    description: 'Dataset url. Cannot be used together with collections.'
-                    type: string
-                    example: "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"
-          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/4.0/travel.cblite2.zip"}}
+            type: ['null', object]
+            additionalProperties: false
+            maxProperties: 1
+            properties:
+              collections:
+                description: |-
+                  A list of fully qualified collection names (<scope>.<collection>) to be created in the database.
+                  Collections may be null, but if an array is provided, it may not be empty.
+                  The Collections parameter cannot be used together with dataset.
+                type: ['null', array]
+                minItems: 1
+                items:
+                  type: string
+                example: ["_default.employees", "_default.departments"]
+              dataset:
+                description: 'Dataset url. Cannot be used together with collections.'
+                type: string
+                example: "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/4.0/travel.cblite2.zip"
+          example: {'db1': {}, 'db2': {'collections': ["_default.employees"]}, 'db3': {'dataset': "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/4.0/travel.cblite2.zip"}}
     ServerInfo:
       type: object
       required: ['version', 'apiVersion', 'cbl', 'device']
@@ -1448,11 +1462,11 @@ components:
               type: string
               example: 'Android Nexus X'
             systemName:
-              description: 'Operating System Name'
+              description: 'Operating System Name, or the browser name for a test server that runs in a browser'
               type: string
               example: 'Android OS Name'
             systemVersion:
-              description: 'Operating System Version'
+              description: 'Operating System Version, or the browser version for a test server that runs in a browser'
               type: string
               example: '6.0.0'
             systemApiVersion:
@@ -1480,17 +1494,18 @@ components:
       required: ['results']
       properties:
         results:
-          description: 'The JSON serialized results of the query run'
-          type: object
+          description: 'The JSON serialized results of the query run, one object per result row'
+          type: array
+          items:
+            type: object
     StartListenerResponse:
       type: object
       required: ['id', 'port']
       properties:
         id:
-          description: 'The ID of the listener'
+          description: 'The opaque ID of the listener, which the test server assigns'
           type: string
-          format: uuid
-          example: '123e4567-e89b-12d3-a456-426614174000'
+          examples: ['123e4567-e89b-12d3-a456-426614174000', '@urlendpointlistener::1']
         port:
           description: 'The port the listener is listening on'
           type: integer

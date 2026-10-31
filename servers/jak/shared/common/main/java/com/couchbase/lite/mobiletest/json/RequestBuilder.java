@@ -76,8 +76,9 @@ public class RequestBuilder {
                 return json.nextBoolean();
             case NUMBER:
                 final String s = json.nextString();
-                if (s.contains(".")) { return Double.valueOf(s); }
-                return Long.valueOf(s);
+                try { return Long.valueOf(s); }
+                catch (NumberFormatException ignore) { }
+                return Double.valueOf(s);
             case STRING:
                 return json.nextString();
             case BEGIN_ARRAY:

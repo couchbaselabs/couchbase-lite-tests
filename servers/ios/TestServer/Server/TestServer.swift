@@ -44,6 +44,8 @@ class TestServer : ObservableObject {
     private func configure(port: Int) {
         app.http.server.configuration.hostname = "0.0.0.0"
         app.http.server.configuration.port = port
+        // Raise Vapor's 16kb default, which rejects large updateDatabase and verifyDocuments bodies
+        app.routes.defaultMaxBodySize = "100mb"
         
         Log.log(level: .info, message: "Configuring HTTP server with hostname: 0.0.0.0 and port: \(port)")
         
@@ -66,6 +68,7 @@ class TestServer : ObservableObject {
         app.post("verifyDocuments", use: Handlers.verifyDocuments)
         app.post("startReplicator", use: Handlers.startReplicator)
         app.post("getReplicatorStatus", use: Handlers.getReplicatorStatus)
+        app.post("stopReplicator", use: Handlers.stopReplicator)
         app.post("startMultipeerReplicator", use: Handlers.startMultipeerReplicator)
         app.post("stopMultipeerReplicator", use: Handlers.stopMultipeerReplicator)
         app.post("performMaintenance", use: Handlers.performMaintenance)

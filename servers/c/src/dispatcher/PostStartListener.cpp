@@ -19,5 +19,6 @@ int Dispatcher::handlePOSTStartListener(Request &request, Session *session) {
 
     json result;
     result["id"] = id;
+    result["port"] = CBLURLEndpointListener_Port(session->cblManager()->listener(id));
     return request.respondWithJSON(result);
 }
