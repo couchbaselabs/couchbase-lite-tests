@@ -9,6 +9,7 @@
 #   uv run --group dotnet-build client/smoke_tests/run_local.py --platform dotnet --build-testserver 4.1.2
 #   uv run client/smoke_tests/run_local.py --platform jak_desktop --build-testserver 4.1.2-3
 #   uv run client/smoke_tests/run_local.py --platform js --build-testserver 1.0.3
+#   uv run client/smoke_tests/run_local.py --platform c --cbl-version 3.2.1 -- --junitxml=results.xml
 #   uv run client/smoke_tests/run_local.py --platform reactnative
 #   uv run client/smoke_tests/run_local.py --skip-testserver -- -k test_get_root
 #
@@ -44,7 +45,7 @@ REPO_ROOT = SCRIPT_DIR.parent.parent
 if __name__ == "__main__":
     sys.path.append(str(REPO_ROOT))
 
-from environment.aws.topology_setup.test_server import listen_port
+from environment.aws.topology_setup.test_server import TestServer, listen_port
 from environment.local.start_local import LOCAL_PLATFORMS, get_cbl_platform, run_test_server
 
 CONFIG_IN = SCRIPT_DIR / "config_in.json"
@@ -145,8 +146,19 @@ def _ensure_java() -> None:
     raise click.ClickException("No Java runtime found. Install one, for example `brew install openjdk@17`.")
 
 
+def _exact_version(platform_key: str, version: str | None) -> str | None:
+    """Resolve a full version (3.4.2) as the prebuild job does: the release, or else its latest good build."""
+    if version is None or "-" in version or version.count(".") != 2:
+        return version
+
+    resolved = TestServer.create(platform_key, version).version
+    # start_local.py reads a version with no build number as a prefix, and build 0 as a release
+    return resolved if "-" in resolved else f"{resolved}-0"
+
+
 def _start_test_server(platform: str, build_testserver: str | None, cbl_version: str | None) -> None:
     platform_key = get_cbl_platform(platform)
+    cbl_version = _exact_version(platform_key, cbl_version)
     if platform == "dotnet" and build_testserver and importlib.util.find_spec("dotnetenv") is None:
         raise click.UsageError("Building the .NET server needs `uv run --group dotnet-build`.")
     if platform == "jak_desktop":
@@ -260,8 +272,9 @@ def _run_reactnative_pytest(device: str, cmd: list[str]) -> int:
 @click.option("--platform", type=click.Choice(PLATFORMS), default="c", show_default=True)
 @click.option(
     "--cbl-version",
-    help="Couchbase Lite version of the prebuilt test server to download: a release prefix (3.4) "
-    "or an exact build (3.4.2-2). Defaults to the latest release.",
+    help="Couchbase Lite version of the prebuilt test server to download: a release prefix (3.4), "
+    "a version (3.4.2), which is the release or else its latest good build, or an exact build "
+    "(3.4.2-2). Defaults to the latest release.",
 )
 @click.option(
     "--build-testserver",

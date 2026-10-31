@@ -110,7 +110,64 @@ pipeline {
                 }
             }
         }
+        stage('Smoke Test') {
+            when {
+                beforeAgent true
+                expression { getSmokeTestPlatform(params.TS_PLATFORM) != null }
+            }
+            agent {
+                label getNodeForPlatform(params.TS_PLATFORM, params.CBL_VERSION)
+            }
+            steps {
+                cleanWs()
+
+                // Tests always come from main, and run against the server that the Build stage uploaded
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/couchbaselabs/couchbase-lite-tests']]
+                ])
+                script {
+                    def fullVersion = params.CBL_BUILD ? "${params.CBL_VERSION}-${params.CBL_BUILD}" : params.CBL_VERSION
+                    def runCmd = "uv run --python 3.13 client/smoke_tests/run_local.py --platform ${getSmokeTestPlatform(params.TS_PLATFORM)} --cbl-version ${fullVersion} --junitxml=junit_result.xml"
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                        if (params.TS_PLATFORM == 'js') {
+                            sh 'uv run --python 3.13 playwright install chromium'
+                        }
+                        if (isUnix()) {
+                            sh runCmd
+                        } else {
+                            pwsh runCmd
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    script {
+                        def stopCmd = 'uv run --python 3.13 environment/local/start_local.py --stop-testserver'
+                        if (isUnix()) {
+                            sh stopCmd
+                        } else {
+                            pwsh stopCmd
+                        }
+                    }
+                    junit allowEmptyResults: true, testResults: 'client/smoke_tests/junit_result.xml'
+                }
+            }
+        }
     }
+}
+
+// The run_local.py platform that runs this prebuild platform on its build host, or null if none does
+def getSmokeTestPlatform(platform) {
+    def platforms = [
+        c_macos: 'c', c_linux_x86_64: 'c', c_windows: 'c',
+        dotnet_macos: 'dotnet', dotnet_windows: 'dotnet',
+        jak_desktop: 'jak_desktop',
+        js: 'js',
+    ]
+    return platforms[platform]
 }
 
 def getNodeForPlatform(platform, version) {
