@@ -1,0 +1,27 @@
+{
+    "$schema": "https://packages.couchbase.com/couchbase-edge-server/config_schema.json",
+    "interface": "0.0.0.0:59840",
+    "enable_anonymous_users": true,
+    "users": "/home/ec2-user/user/public_api_authorization_users.json",
+    "databases": {
+        "names": {
+            "path": "/home/ec2-user/database/names.cblite2",
+            "enable_adhoc_queries": true,
+            "enable_client_writes": true,
+            "queries": {
+                "female_ids": "SELECT meta().id FROM _default WHERE gender = 'female'"
+            },
+            "enable_user_access_control": true
+        }
+    },
+    "logging": {
+        "console": false,
+        "file": {
+            "dir": "/home/ec2-user/log",
+            "format": "text"
+        },
+        "domains": {
+            "Listener": "info"
+        }
+    }
+}

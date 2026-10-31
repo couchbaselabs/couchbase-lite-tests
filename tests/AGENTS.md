@@ -191,6 +191,101 @@ Located in `dataset/sg/`. Each has a `-sg.json` (data) and `-sg-config.json` (SG
 - **Check the spec first** — every new/modified test must align with `spec/tests/`. Add or update the spec before changing the code.
 - **No markdown sidecars for code changes** — do not create `ENHANCEMENT_*.md`, `IMPLEMENTATION_*.md`, etc. PR descriptions cover motivation; the spec covers behavior.
 
+## OpenAPI Conformance Tests (schemathesis)
+
+[schemathesis](https://schemathesis.readthedocs.io/) generates requests from a product's OpenAPI spec and checks
+each response against that spec. `tests/dev_e2e/syncgateway/test_admin_api_schema.py` (Sync Gateway admin API) and
+`tests/QE/edge_server/test_public_api_schema.py` (Edge Server public API) follow this pattern: copy their shape for
+any other REST API.
+
+### The pattern
+
+1. **Fetch the spec for the version under test.** Never vendor it into this repo.
+2. **Start a server with real data**, then pin every path parameter that names a database (`{db}`, `{keyspace}`)
+   in `[parameters]`. Otherwise almost every request is a 404.
+3. **Run the `schemathesis` CLI with `cbltest.schemathesis.run_schemathesis`**, which passes `--config-file`,
+   `--url`, `--auth` and one `--include-name "METHOD /path"` per operation in scope. Assert that the exit code is 0.
+4. **Keep the configuration in a `schemathesis.toml` beside the test.** Set `seed`, `deterministic = true` and
+   `database = "none"`, so that every run sends the same requests.
+5. **Add operations a few at a time.** For each new failure, reproduce it with `curl` first. Then add one
+   `[[operations]]` entry per operation that turns off only the failing check. Start its comment with
+   `Spec:` (the spec is wrong), `Bug:` (the server is wrong) or `Harness:` (cbltest causes it), and end it with
+   the ticket key once one is filed, for example `(CBL-9281)`. Schemathesis has no field for a note and does not
+   report disabled checks, so the comment is the only record.
+
+### Gotchas (schemathesis 4.x)
+
+- **Pass the generation mode with `run_schemathesis(mode=...)`**, which sends `--mode`. The top-level
+  `[generation] mode` does not reach the coverage and fuzzing phases, and a mode set on a phase overrides
+  `--mode`. Edge Server sets no mode in its config, and runs once per mode. Sync Gateway sets `positive` on every
+  phase. Also set `[phases.coverage] unexpected-methods = []`, so that coverage does not probe methods the spec
+  does not list.
+- **Set `request-timeout`**, so that a request the server never answers fails fast and does not stall the run.
+- **Do not use hooks to filter cases.** `filter_case` hooks skip the cases that the coverage phase builds. Use
+  `[[operations]]` entries and `parameters = {...}` pins instead.
+- **Pin parameters that hold a request open**, for example `feed = "normal"` on `_changes`. A body field cannot
+  be pinned in every phase, so leave out an operation whose `feed` is in the body.
+- **Do not use `--baseline`.** Random multipart boundaries change the failure signatures on every run.
+- **Pin a header with its location**, for example `parameters = { "header.If-Match" = "*" }`.
+- **A known 500 turns off `not_a_server_error` for the whole operation.** If one parameter value causes the
+  500, pin that parameter instead, for example `revs_limit = 20` on Sync Gateway `_bulk_get`.
+
+### Local run
+
+Mark each conformance test `@pytest.mark.openapi`. `scripts/run_openapi_tests.sh --es-version 1.1.1-0` runs
+every marked test on this host. It starts Sync Gateway on rosmar and Edge Server in Docker, runs both suites, and
+stops both servers. It needs no Couchbase Server and no test server. `--sgw-only` and `--es-only` run one suite,
+`--keep` leaves the servers running, and arguments after `--` go to pytest. The script stops the Sync Gateways
+that this checkout started before.
+
+### Edge Server
+
+The test is `tests/QE/edge_server/test_public_api_schema.py`, with its spec in
+`spec/tests/QE/edge_server/test_public_api_schema.md`.
+
+- **Spec source.** The `couchbase/edge-server` repository holds the spec as `api/public.yaml` plus `$ref` files,
+  but the repository is private, so CI cannot clone it. The test uses the bundled spec that the docs site publishes:
+  `https://docs.couchbase.com/couchbase-edge-server/current/public-api-reference/_attachments/public.bundle.yaml`.
+  It describes only the current release, so the test skips when the server's major and minor version differ from
+  the spec's `info.version`.
+- **Server.** `config/test_public_api_schema.json` declares the provisioned users file, because `_active_tasks`
+  needs the admin role. The test signs in as `manager.admin_user`. The config also sets `enable_anonymous_users`,
+  `enable_adhoc_queries`, `enable_client_writes` and the `female_ids` named query. The query has no
+  parameters, because a named query rejects any parameter it does not declare, and the spec cannot list them.
+- **Parameters.** `db` is pinned to the `names` database, `keyspace` to `ES_OPENAPI_KEYSPACE`, and `name` to
+  the named query. Pin `docid`
+  to `name_1` per operation for reads. Do not pin it globally, because writes need fresh IDs. Each
+  `{key}` operation pins its own document, key and dataset revision, because the spec has no links, so the
+  stateful phase never chains a write to a real document. For the same reason the stateful phase is off. `If-Match` is pinned to `*` on document writes,
+  because an empty header value closes the connection.
+- **Batches**, one at a time with a report after each:
+  1. Done. Read only: `GET /`, `GET /_all_dbs`, `GET /_active_tasks`, `GET /{keyspace}`, `GET` and `POST
+     /{keyspace}/_all_docs`, `GET` and `HEAD /{keyspace}/{docid}`.
+  2. Done. Writes: `PUT` and `DELETE /{keyspace}/{docid}`,
+     `POST /{keyspace}/_bulk_docs`, and `GET`, `PUT` and `DELETE /{keyspace}/{docid}/{key}`. Leave out
+     `PUT /{keyspace}`. The spec calls it "Create a document", but it creates a database or a collection.
+  3. Done. Queries and changes: `POST /{keyspace}/_query`, `GET` and `POST /{keyspace}/_query/{name}`, and
+     `GET /{keyspace}/_changes` with `feed = "normal"`. Leave out `POST _changes`, as for Sync Gateway.
+  4. Done. `POST /{db}/_session`, `GET /_replicate`, and `GET` and `DELETE /_replicate/{taskid}`. The test
+     starts two replications to an unreachable port on the Edge Server host, and passes their task IDs through
+     `ES_OPENAPI_READ_TASK` and `ES_OPENAPI_STOP_TASK`, because task IDs change on every run. `POST /_replicate`
+     is left out: a body field cannot be pinned in every phase, so Edge Server would connect to generated hosts.
+  5. Done. Negative mode: the test runs once per mode, with the same operations and config. Invalid requests
+     must get a 4xx. `negative_data_rejection` is off where Edge Server ignores an invalid value instead of
+     rejecting it.
+  6. Done. Keyspaces: `PUT /{keyspace}`, and every positive run again in `names.schema_coll` and
+     `names.schema_scope.schema_coll`. Edge Server cannot create a collection through the API: `PUT /{keyspace}`
+     is always a 403, because 1.1.1 never turns on `allowCreateDBs` or `allowCreateCollections`. The config
+     creates the collections instead (`"create": true` and `"collections"`). The test copies `name_1` to `name_3`
+     into each with `new_edits=False`, which keeps the dataset revisions that the `{key}` pins use.
+- **Authorization** is not a schemathesis test. The spec declares no security schemes, and documents a 401 or
+  403 only on `_session`, so schemathesis cannot know which user is allowed what.
+  `test_public_api_authorization.py` sends one valid request per operation as each user, and checks the status
+  against a table. `KNOWN_BUGS` holds the requests that Edge Server allows although it must not.
+- **Reproducing a failure.** Run `scripts/run_openapi_tests.sh --es-only --keep`. Between runs, the teardown
+  restores the provisioned config, which declares no users. To reproduce a failure with `curl` after a run, leave
+  out the credentials. During a run, the admin user is `admin_user`, with the password `password`.
+
 ## Commands
 
 ```bash
@@ -202,6 +297,9 @@ cd tests/QE      && uv run pytest -x -v --config config.json
 cd tests/dev_e2e && uv run pytest -x -v --config config.json -k test_push
 cd tests/QE      && uv run pytest -x -v --config config.json test_xattrs.py
 cd tests/QE      && uv run pytest -x -v --config config.json -m sgw
+
+# OpenAPI conformance tests on local rosmar Sync Gateway and Docker Edge Server
+scripts/run_openapi_tests.sh --es-version 1.1.1-0
 
 # Lint & format
 uv run ruff check tests/

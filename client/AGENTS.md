@@ -38,6 +38,7 @@ client/
     ├── httpclient.py             # AsyncHTTPClient: wraps ClientSession so timeouts name the request; stream_download()
     ├── httplog.py                # HTTP request/response logging (get_next_writer)
     ├── shell2http.py             # Shell2HttpClient: sidecar calls with a host-side timeout, logged to http_log/
+    ├── schemathesis.py           # run_schemathesis(): the schemathesis CLI, for the OpenAPI conformance tests
     ├── greenboarduploader.py     # Upload test results to Greenboard
     ├── websocket_router.py       # WebSocket routing (used by JS server)
     ├── utils.py                  # General utilities

@@ -1,0 +1,197 @@
+# schemathesis run configuration for test_admin_api_schema.py, which supplies the base URL, auth,
+# spec path and operation list on the command line.
+# A fixed seed with deterministic generation makes every run send the same requests.
+seed = 20261029
+tls-verify = false
+request-timeout = 10
+
+[parameters]
+db = "${SGW_OPENAPI_DB}"
+keyspace = "${SGW_OPENAPI_DB}"
+
+[generation]
+mode = "positive"
+max-examples = 100
+deterministic = true
+database = "none"
+
+[phases.stateful]
+max-steps = 20
+
+# Only valid requests for now. Each phase needs its own mode, as the global one does not reach
+# fuzzing or coverage, and coverage otherwise also probes methods the spec does not list.
+[phases.fuzzing.generation]
+mode = "positive"
+
+[phases.stateful.generation]
+mode = "positive"
+
+[phases.coverage]
+unexpected-methods = []
+
+[phases.coverage.generation]
+mode = "positive"
+
+# Known mismatches, one entry per operation. "Spec:" lines are gaps in the spec, and "Bug:" lines are
+# Sync Gateway bugs. Remove a setting once its cause is fixed.
+
+[[operations]]
+include-name = "GET /{db}/_user/"
+# Spec: limit with name_only=true is a 400; name_only=false returns objects, not strings.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "PUT /{db}/_user/{name}"
+# Spec: a body "name" that differs from the path is a 400; an unknown collection_access keyspace is a 404,
+# which stateful runs also report as a missing resource right after a POST created the user.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.ensure_resource_availability.enabled = false
+
+[[operations]]
+include-name = "PUT /{db}/_role/{name}"
+# Spec: a body "name" that differs from the path is a 400; an unknown collection_access keyspace is a 404,
+# which stateful runs also report as a missing resource right after a POST created the role.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.ensure_resource_availability.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/{docid}"
+# Spec: open_revs returns multipart/mixed.
+checks.positive_data_acceptance.enabled = false
+checks.content_type_conformance.enabled = false
+
+[[operations]]
+include-name = "PUT /{keyspace}/{docid}"
+# Spec: a body _rev that differs from ?rev= is a 400.
+# Bug: an unquoted If-Match (e.g. `*`) is a 500, "ETag value is not quoted".
+# Bug: roundtrip=true can wait in waitForSequenceNotSkipped until the client times out.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+parameters = { roundtrip = false }
+
+[[operations]]
+include-name = "DELETE /{keyspace}/{docid}"
+# Spec: deleting a stale revision is a 409; a revision such as 0-1 is a 400.
+# Bug: a malformed ?rev= is a 500, "Invalid version type for OCC value".
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/"
+# Spec: a body _rev with no existing document is a 404.
+# Bug: attachment data that is not base64 is a 500, "illegal base64 data".
+# Bug: roundtrip=true can wait in waitForSequenceNotSkipped until the client times out.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+parameters = { roundtrip = false }
+
+[[operations]]
+include-name = "GET /{keyspace}/_all_docs"
+# Spec: keys, startkey and endkey must be JSON.
+checks.positive_data_acceptance.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_all_docs"
+# Spec: a missing body is a 400; repeated keys repeat their rows, but the spec says rows are unique.
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_bulk_docs"
+# Spec: a missing body is a 400; error rows have no "id".
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_bulk_get"
+# Spec: a missing body is a 400.
+# Bug: a revs_limit above int64 panics in trimEncodedRevisionsToAncestor and drops the connection.
+checks.positive_data_acceptance.enabled = false
+parameters = { revs_limit = 20 }
+
+[[operations]]
+include-name = "GET /{keyspace}/_raw/{docid}"
+# Spec: redact=true with include_doc=true is a 400.
+# Bug: redact=true is a 500 for any document, "couldn't redact global sync data".
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/_revtree/{docid}"
+# Spec: returns text/plain; an unusual doc ID is a 400.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.content_type_conformance.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_revs_diff"
+# Spec: returns text/plain; revision lists must hold strings.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.content_type_conformance.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/_changes"
+# Spec: filter=sync_gateway/bychannel without channels is a 400.
+# Spec: changes[] items are a oneOf of {rev} and {cv} with nothing required, so every item matches both.
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+# A longpoll or continuous feed would hold the request open until it times out.
+parameters = { feed = "normal" }
+
+[[operations]]
+include-name = "PUT /{keyspace}/_local/{docid}"
+# Spec: a missing body is a 400; a body _rev with no existing document is a 404.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+
+[[operations]]
+include-name = "DELETE /{keyspace}/{docid}/{attach}"
+# Spec: a malformed ?rev= is a 400.
+# Bug: an unquoted If-Match (e.g. `*`) is a 500, "ETag value is not quoted".
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+
+[[operations]]
+include-name = "GET /{db}/_config"
+# Spec: redact=false is a 400, "no longer supported".
+# Harness: cbltest stores a uuid marker in feed_type, which the spec limits to "DCP".
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+# refresh_config=true reloads the config from the bucket and takes seconds per request.
+parameters = { refresh_config = false }
+
+[[operations]]
+include-name = "POST /{db}/_user/"
+# Spec: a name over 239 characters is a 400; an unknown collection_access keyspace is a 404.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+
+[[operations]]
+include-name = "GET /{db}/_user/{name}/_access_history"
+# Spec: a collection with no history is null, not an array.
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "POST /{db}/_role/"
+# Spec: a missing name is a 400.
+# Bug: an empty name is a 500, "cannot create principal with empty name".
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+
+[[operations]]
+include-name = "POST /{db}/_session"
+# Spec: a missing name is a 400; an unknown user is a 404.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false

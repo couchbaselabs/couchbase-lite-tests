@@ -48,7 +48,7 @@ explicit = true
 [dependency-groups]
 lint = ["ty>=0.0.72", "ruff>=0.16.3", "types-netifaces==0.11.0.20241025"]
 dotnet-build = ["dotnetenv"]
-dev = ["pytest-randomly==5.0.0", "pytest-repeat==0.9.4"]
+dev = ["pytest-randomly==5.0.0", "pytest-repeat==0.9.4", "schemathesis==4.32.7"]
 
 [tool.uv.workspace]
 members = ["client"]
@@ -70,4 +70,5 @@ markers = [
   "sgw: tests that focus on Sync Gateway functionality",
   "upg_sgw: tests that focus on Sync Gateway upgrade scenario",
   "cbl: tests that focus on Couchbase Lite functionality",
+  "openapi: tests that check a REST API against its OpenAPI spec",
 ]

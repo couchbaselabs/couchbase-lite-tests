@@ -162,7 +162,9 @@ class BulkDocOperation(JSONSerializable):
                 raise CblTestError("Delete cannot be performed without rev id")
             body["_deleted"] = True
             body["_rev"] = rev
-        body["_id"] = _id
+        # Without an _id, Edge Server generates one.
+        if _id is not None:
+            body["_id"] = _id
         self._body = body
         self._id = _id
 
@@ -216,6 +218,11 @@ class EdgeServer:
         return self.__hostname
 
     @property
+    def base_url(self) -> str:
+        """The REST API base URL this client sends its requests to"""
+        return f"{self.scheme}{self.__hostname}:{self.__port}"
+
+    @property
     def caddy(self) -> caddy.Caddy:
         """Gets the Caddy file server running alongside this Edge Server"""
         return self._caddy
@@ -248,7 +255,7 @@ class EdgeServer:
 
             connector = TCPConnector(ssl=ssl_context)
         return AsyncHTTPClient(
-            f"{self.scheme}{self.__hostname}:{self.__port}",
+            self.base_url,
             headers=headers,
             connector=connector,
         )
@@ -527,8 +534,8 @@ class EdgeServer:
         self,
         source: str,
         target: str,
-        user: str,
-        password: str,
+        user: str | None,
+        password: str | None,
         bidirectional: bool,
         continuous: bool,
         collections: list[str] | None = None,
@@ -541,7 +548,8 @@ class EdgeServer:
         openid_token: str | None = None,
         tls_client_cert: str | None = None,
         tls_client_cert_key: str | None = None,
-    ) -> Any:
+    ) -> int:
+        """Start a replication, and return its task ID."""
         with self.__tracer.start_as_current_span(
             "Start Replication with Edge Server",
             attributes={
@@ -550,41 +558,36 @@ class EdgeServer:
                 "cbl.collection.name": collections or [],
             },
         ):
+            options: dict[str, Any] = {
+                "collections": collections,
+                "channels": channels,
+                "doc_ids": doc_ids,
+                "headers": headers,
+                "trusted_root_certs": trusted_root_certs,
+                "pinned_cert": pinned_cert,
+                "user": user,
+                "password": password,
+                "session_cookie": session_cookie,
+                "openid_token": openid_token,
+                "tls_client_cert": tls_client_cert,
+                "tls_client_cert_key": tls_client_cert_key,
+            }
+            # Edge Server rejects a null option, so send only those that are set.
             payload: dict[str, Any] = {
                 "source": source,
                 "target": target,
                 "bidirectional": bidirectional,
                 "continuous": continuous,
-                "collections": collections,
-                "channels": channels,
-                "doc_ids": doc_ids,
-                "headers": headers,
+                **{key: value for key, value in options.items() if value},
             }
-
-            if trusted_root_certs:
-                payload["trusted_root_certs"] = trusted_root_certs
-            if pinned_cert:
-                payload["pinned_cert"] = pinned_cert
-            if user:
-                payload["user"] = user
-            if password:
-                payload["password"] = password
-            if session_cookie:
-                payload["session_cookie"] = session_cookie
-            if openid_token:
-                payload["openid_token"] = openid_token
-            if tls_client_cert:
-                payload["tls_client_cert"] = tls_client_cert
-            if tls_client_cert_key:
-                payload["tls_client_cert_key"] = tls_client_cert_key
 
             response = await self._send_request("post", "/_replicate", JSONDictionary(payload))
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post /_replicate (not JSON)")
 
-            return cast(dict, response).get("session_id")
+            return _get_typed_required(cast(dict, response), "task_id", int)
 
-    async def replication_status(self, replicator_id: str) -> dict:
+    async def replication_status(self, replicator_id: int) -> dict:
         with self.__tracer.start_as_current_span(
             "get replication status with Edge Server",
             attributes={"cbl.replicator.id": replicator_id},
