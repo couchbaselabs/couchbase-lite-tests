@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -111,6 +112,23 @@ async def _assert_auth_rejected(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestSessionAuthReplication(CBLTestClass):
+    # These tests were added without ever running in the regression suite, so
+    # whether they pass on these platforms is unknown -- this is "not yet
+    # verified", not a diagnosed failure like the .NET skips below. Re-enable a
+    # platform once it has been checked: https://jira.issues.couchbase.com/browse/CBL-9287
+    # ANDROID and JVM are distinct variants, so Java desktop/webservice and
+    # Android each need naming.
+    _UNVERIFIED = ServerVariant.IOS | ServerVariant.ANDROID | ServerVariant.JVM | ServerVariant.C
+
+    @pytest_asyncio.fixture(scope="function", autouse=True)
+    async def _skip_unverified_platforms(self, cblpytest: CBLPyTest) -> None:
+        """Skips every test in this class on platforms it has never been verified against."""
+        variant = (await cblpytest.test_servers[0].info).variant
+        self.skip_if_not(
+            variant not in self._UNVERIFIED,
+            f"not yet verified on CBL {variant}: https://jira.issues.couchbase.com/browse/CBL-9287",
+        )
+
     async def _skip_if_bearer_unsupported(self, test_server: TestServer) -> None:
         """Skips on CBL .NET, which does not send replicator headers, so it cannot present a bearer token."""
         variant = (await test_server.info).variant
