@@ -116,9 +116,9 @@ class TestSessionAuthReplication(CBLTestClass):
     # whether they pass on these platforms is unknown -- this is "not yet
     # verified", not a diagnosed failure like the .NET skips below. Re-enable a
     # platform once it has been checked: https://jira.issues.couchbase.com/browse/CBL-9287
-    # ANDROID and JVM are distinct variants, so Java desktop/webservice and
-    # Android each need naming.
-    _UNVERIFIED = ServerVariant.IOS | ServerVariant.ANDROID | ServerVariant.JVM
+    # JVM covers Java desktop and webservice; Android is a separate variant and
+    # is deliberately not listed here.
+    _UNVERIFIED = ServerVariant.IOS | ServerVariant.JVM
 
     @pytest_asyncio.fixture(scope="function", autouse=True)
     async def _skip_unverified_platforms(self, cblpytest: CBLPyTest) -> None:
