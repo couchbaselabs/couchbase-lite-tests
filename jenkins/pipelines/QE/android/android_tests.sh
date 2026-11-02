@@ -4,10 +4,7 @@
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -eu
 
-BUILD_TOOLS_VERSION='34.0.0'
-SDK_MGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-export PATH="/opt/homebrew/opt/coreutils/libexec/gnubin:/opt/homebrew/bin:$PATH"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
@@ -52,9 +49,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-echo "Install Android SDK"
-yes | "$SDK_MGR" --channel=1 --licenses
-"$SDK_MGR" --channel=1 --install "build-tools;${BUILD_TOOLS_VERSION}"
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
 echo "Setup backend..."

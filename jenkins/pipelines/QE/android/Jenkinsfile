@@ -39,21 +39,18 @@ pipeline {
             }
         }
         stage('Android') {
-            agent { label 'qe-mac-india' }
+            agent { label 'mob-e2e-android-01' }
             options {
-                lock('56141JEBF18456')
+                lock('mob-e2e-android-01')
             }
             environment {
-                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                ANDROID_HOME = "${env.HOME}/Library/Android/sdk"
-                ANDROID_SERIAL = "56141JEBF18456"
-                JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                // ANDROID_HOME comes from the node: android_tests.sh needs it and
+                // the dev_e2e android jobs on this node get it the same way. No
+                // ANDROID_SERIAL either -- the bridge passes `-s <location>` from
+                // the topology.
                 TS_ARTIFACTS_DIR = 'android'
             }
             steps {
-                // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "=== Run Android Tests"
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
