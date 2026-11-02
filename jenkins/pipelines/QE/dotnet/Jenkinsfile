@@ -102,12 +102,8 @@ pipeline {
                         TS_ARTIFACTS_DIR = 'dotnet_macos'
                     }
                     steps {
-                        // Unlock keychain: the Catalyst app is signed, and the
-                        // dev_e2e Mac Catalyst stage unlocks on this same pool.
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet macOS Tests"
-                        // The label matches a shared pool and the test server binds
-                        // fixed localhost ports, so serialize per node as dev_e2e does.
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
                                 sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
