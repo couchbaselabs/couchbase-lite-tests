@@ -37,6 +37,7 @@ class TestCors(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, origin: list[str] | None, pull_allowed: bool
     ) -> None:
         await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
 
         self.mark_test_step("Start Edge Server with the case's CORS origins, and seed a doc in `travel.hotels`")
         config = json.loads(CONFIG.read_text())

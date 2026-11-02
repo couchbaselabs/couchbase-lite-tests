@@ -165,6 +165,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_unset_database_inherits_root_true(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true and `inherits` setting no flag")
@@ -187,6 +188,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_database_set_true_enforces_rules(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true and `enforced` setting true")
@@ -218,6 +220,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_database_set_false_ignores_rules(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true and `exempt` setting false")
@@ -237,6 +240,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_root_false_enforces_only_databases_set_true(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step(
@@ -258,6 +262,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_access_does_not_leak_between_databases(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true")
@@ -278,6 +283,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_missing_collection_status_follows_database_flag(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true")
@@ -296,6 +302,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     async def test_all_dbs_follows_database_flag(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with root flag true")
@@ -318,6 +325,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_collections_and_queries(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         users = {
             "hotel_reader": _user({"travel.travel.hotels": ["read"], "names._default._default": ["read"]}),
@@ -372,6 +380,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     @pytest.mark.min_edge_servers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         provider_es, consumer_es = cblpytest.edge_servers[0], cblpytest.edge_servers[1]
 
         self.mark_test_step("Start the provider with `enforced` true and `exempt` false")
@@ -431,6 +440,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     @pytest.mark.min_test_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_cbl_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with `enforced` true and `exempt` false")

@@ -65,6 +65,7 @@ class TestAccessControl(CBLTestClass):
     async def test_access_blocks_require_the_flag(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         config = json.loads(CONFIG.read_text())
         config["enable_user_access_control"] = False
@@ -82,6 +83,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_no_access_user_is_denied_everywhere(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         await self._start(es)
@@ -96,6 +98,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_has_full_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         admin = await self._start(es)
@@ -113,6 +116,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_access_block_is_ignored(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         await self._start(es)
@@ -124,6 +128,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_endpoints_need_a_role(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         await self._start(es)
@@ -143,6 +148,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_keyspace_patterns(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         await self._start(es)
@@ -176,6 +182,7 @@ class TestAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_missing_keyspace_is_403_without_access(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on")
         await self._start(es)
