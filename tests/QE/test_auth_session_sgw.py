@@ -112,21 +112,19 @@ async def _assert_auth_rejected(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestSessionAuthReplication(CBLTestClass):
-    # These tests were added without ever running in the regression suite, so
-    # whether they pass on these platforms is unknown -- this is "not yet
-    # verified", not a diagnosed failure like the .NET skips below. Re-enable a
-    # platform once it has been checked: https://jira.issues.couchbase.com/browse/CBL-9287
-    # JVM covers Java desktop and webservice; Android is a separate variant and
-    # is deliberately not listed here.
-    _UNVERIFIED = ServerVariant.IOS | ServerVariant.JVM
-
     @pytest_asyncio.fixture(scope="function", autouse=True)
     async def _skip_unverified_platforms(self, cblpytest: CBLPyTest) -> None:
-        """Skips every test in this class on platforms it has never been verified against."""
+        """
+        Skips the whole class on CBL iOS.
+
+        These tests were added without ever running in the regression suite, so whether
+        they pass on iOS is unknown -- "not yet verified", not a diagnosed failure like
+        the .NET skips below. Drop this fixture once iOS has been checked.
+        """
         variant = (await cblpytest.test_servers[0].info).variant
         self.skip_if_not(
-            variant not in self._UNVERIFIED,
-            f"not yet verified on CBL {variant}: https://jira.issues.couchbase.com/browse/CBL-9287",
+            variant != ServerVariant.IOS,
+            "not yet verified on CBL iOS: https://jira.issues.couchbase.com/browse/CBL-9287",
         )
 
     async def _skip_if_bearer_unsupported(self, test_server: TestServer) -> None:
