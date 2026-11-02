@@ -118,7 +118,7 @@ class TestSessionAuthReplication(CBLTestClass):
     # platform once it has been checked: https://jira.issues.couchbase.com/browse/CBL-9287
     # ANDROID and JVM are distinct variants, so Java desktop/webservice and
     # Android each need naming.
-    _UNVERIFIED = ServerVariant.IOS | ServerVariant.ANDROID | ServerVariant.JVM | ServerVariant.C
+    _UNVERIFIED = ServerVariant.IOS | ServerVariant.ANDROID | ServerVariant.JVM
 
     @pytest_asyncio.fixture(scope="function", autouse=True)
     async def _skip_unverified_platforms(self, cblpytest: CBLPyTest) -> None:
