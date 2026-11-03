@@ -19,7 +19,7 @@ from cbltest.api.syncgateway import (
 )
 from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 _ISGR_REPLICATION_ID = "isgr-lb-link"
 _SG1_PIN = {"X-Backend": "sg-0"}
@@ -142,15 +142,15 @@ async def _pinned_replication(
 @pytest.mark.min_clusters(3)
 class TestISGRLoadBalancer(CBLTestClass):
     async def _skip_if_unfixed_sgw(self, cblpytest: CBLPyTest) -> None:
-        """Skips SGW without the ISGR channel-loss fix (CBG-5772 in 4.0.8, CBG-5773 in 4.1.2; 4.1.0.1 lacks it)."""
         await self.skip_if_sgw_not(
             cblpytest.clusters[1].sync_gateways[0],
             "!=4.0.0,!=4.0.1,!=4.0.2,!=4.0.3,!=4.0.4,!=4.0.5,!=4.0.6,!=4.0.7,!=4.1.0.*,!=4.1.1",
+            "ISGR channel-loss fix: CBG-5772 (4.0.8), CBG-5773 (4.1.2); 4.1.0.1 lacks it",
         )
 
     async def _skip_if_unpinnable(self, cblpytest: CBLPyTest) -> None:
-        """Skips the JS test server, which can't send the X-Backend pin header, and SGW without the channel-loss fix."""
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        """Skips test servers that can't send the X-Backend pin header, and SGW without the channel-loss fix."""
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
         await self._skip_if_unfixed_sgw(cblpytest)
 
     @pytest.mark.min_load_balancers(2)
