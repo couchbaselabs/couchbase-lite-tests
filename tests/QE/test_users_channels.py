@@ -8,6 +8,7 @@ from cbltest.api.syncgateway import (
     DatabaseConfig,
     DocumentUpdateEntry,
     ScopeConfig,
+    SyncGatewayFeature,
 )
 
 
@@ -100,7 +101,7 @@ class TestUsersChannels(CBLTestClass):
                     assert len(row.revid) > 0, f"Document {row.id} has no revision"
                     assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
-            supports_version_vectors = await sgs[0].supports_version_vectors()
+            supports_version_vectors = await sgs[0].supports(SyncGatewayFeature.VERSION_VECTORS)
             if supports_version_vectors:
                 self.mark_test_step("Verify all documents have correct version vector format (SGW 4.0+)")
                 for row in all_docs.rows:

@@ -14,7 +14,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.cbl
@@ -23,7 +23,7 @@ from cbltest.responses import ServerVariant
 class TestReplicatorEncryptionHook(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_replication_complex_doc_encryption(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.PROPERTY_ENCRYPTION)
 
         self.mark_test_step("Reset SG and load `posts` dataset")
         cloud = cblpytest.clusters[0]
@@ -192,7 +192,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_encryption(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.PROPERTY_ENCRYPTION)
 
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]

@@ -12,6 +12,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
+from cbltest.responses import ServerVariant
 
 
 @pytest.mark.min_test_servers(1)
@@ -74,7 +75,16 @@ class TestReplicationBehavior(CBLTestClass):
     @pytest.mark.min_couchbase_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_pull_resurrected_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.2.0")
+        await self.skip_if_cbl_not(
+            cblpytest.test_servers[0],
+            ">= 3.0.0, != 4.0.*, != 4.1.*",
+            reason="CBL 4.0 and 4.1 keep the local deletion of a resurrected document (CBL-7841, CBL-8964)",
+        )
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0],
+            ServerVariant.ALL & ~ServerVariant.JS,
+            reason="CBL JS does not pull a document resurrected after a local delete (CBL-9223)",
+        )
 
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]

@@ -12,12 +12,6 @@ so "leaving a channel" in these tests just means updating that field. Compaction
 ever removes *historical* (already-ended) channel-membership entries; it never touches a
 document's live, current channel assignment.
 
-One test below is implemented as an explicit `skip` rather than dropped, per repo
-convention of keeping test intent visible even when it can't run yet:
-- `test_get_and_compact_require_application_rbac_role` — the TDK has no support yet for
-  provisioning a restricted (non-"Application") Couchbase Server RBAC caller against the
-  Sync Gateway admin API; this needs new framework plumbing before it can run for real.
-
 ## test_get_history_of_doc_that_never_left_a_channel
 
 A document that has always lived in the same channel has no channel history yet.
@@ -82,16 +76,6 @@ Compacting with a sequence number that has no matching history entry is not an e
 3. Update the document to move it from `ABC` to `OTHER`.
 4. Attempt to compact `ABC` with a missing `seq` field; check the request fails with 400.
 5. Attempt to compact `ABC` with a non-integer `seq` value; check the request fails with 400.
-
-## test_get_and_compact_require_application_rbac_role
-
-Skipped — needs new framework plumbing. Sync Gateway's admin API enforces
-Couchbase-Server-RBAC roles (e.g. "Sync Gateway Application" vs "Sync Gateway Application
-Read Only") independently of channel access, and the TDK currently always talks to the
-admin API as a full admin. There is no existing helper to provision a restricted-role
-caller, so `get`/`compact` RBAC enforcement (expect: a caller without the Application role
-gets 403 on both; an Application Read Only caller gets 200 on GET and 403 on compact)
-cannot be exercised yet. https://jira.issues.couchbase.com/browse/CBG-5796
 
 ## test_all_keyspace_forms_behave_identically
 

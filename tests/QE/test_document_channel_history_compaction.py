@@ -227,11 +227,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
             )
         assert non_integer_seq_exc.value.code == 400
 
-    @pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/CBG-5796")
-    @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_and_compact_require_application_rbac_role(self, cblpytest: CBLPyTest) -> None:
-        pass
-
     @pytest.mark.asyncio(loop_scope="session")
     async def test_all_keyspace_forms_behave_identically(self, cblpytest: CBLPyTest) -> None:
         sg = cblpytest.sync_gateways[0]
