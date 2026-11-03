@@ -11,7 +11,7 @@ from itertools import batched
 from json import dumps, loads
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self, assert_never, cast
+from typing import Any, NamedTuple, Self, assert_never, cast
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
