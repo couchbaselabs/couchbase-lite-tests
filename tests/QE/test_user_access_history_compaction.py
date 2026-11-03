@@ -674,14 +674,6 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         history_db2 = await sg.get_user_access_history("db2", "shared_name")
         assert "A" in _channels(history_db2)
 
-    @pytest.mark.skip(
-        reason="No test infra exists for creating a scoped SGW/CBS RBAC admin credential (e.g. 'Application "
-        "Read Only'); needs new helper support in client/ before this can be written. See spec for details."
-    )
-    @pytest.mark.asyncio(loop_scope="session")
-    async def test_rbac_read_only_can_get_but_not_compact(self, cblpytest: CBLPyTest) -> None:
-        pass
-
     @pytest.mark.min_test_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_compact_while_client_offline_leaves_stale_access_undetected(self, cblpytest: CBLPyTest) -> None:

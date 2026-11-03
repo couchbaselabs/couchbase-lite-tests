@@ -14,8 +14,7 @@ from cbltest.api.replicator_types import (
     ReplicatorConflictResolver,
     ReplicatorType,
 )
-from packaging.specifiers import SpecifierSet
-from packaging.version import Version
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -26,14 +25,13 @@ class TestReplicationMultipleRemotes(CBLTestClass):
     async def test_replicate_after_doc_synced_through_two_endpoints(
         self, cblpytest: CBLPyTest, dataset_path: Path, replicator_type: ReplicatorType
     ) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         # Each endpoint URL gets its own remote ID in CBL, so a doc pulled through two URLs and then edited
         # locally makes CBL send three known revs in its reply to `changes`.
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
-        sgw_version = Version((await sync_gateway.get_version()).version)
-        self.skip_if_not(
-            sgw_version in SpecifierSet(">=4.0.9,!=4.1.0,!=4.1.1,!=4.1.2"),
-            f"SGW {sgw_version} lacks the fix for CBG-5978",
+        await self.skip_if_sgw_not(
+            sync_gateway, ">= 4.0.9, != 4.1.0, != 4.1.1, != 4.1.2", reason="needs the CBG-5978 fix"
         )
 
         url_by_hostname = sync_gateway.replication_url("names")

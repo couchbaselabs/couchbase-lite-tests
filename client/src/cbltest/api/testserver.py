@@ -1,17 +1,38 @@
 import asyncio
-from typing import Final, cast
+from enum import Enum
+from typing import Final, assert_never, cast
 from urllib.parse import urljoin, urlparse
 
 import asyncstdlib
 from opentelemetry.trace import get_tracer
+from packaging.version import Version
 
 from cbltest.api.database import Database
 from cbltest.assertions import _assert_not_null
 from cbltest.globals import CBLPyTestGlobal
 from cbltest.request_types import PostResetRequestMethods
 from cbltest.requests import RequestFactory, TestServerRequestType
-from cbltest.responses import GetRootResponse
+from cbltest.responses import GetRootResponse, ServerVariant
 from cbltest.version import VERSION
+
+
+class CouchbaseLiteFeature(Enum):
+    """CBL features that not every test server supports. Each value names the feature in skip messages."""
+
+    # LiteCore-based platforms from 4.0.0. CBL JS and CBL React Native do not support them yet.
+    VERSION_VECTORS = "version vectors"
+    # CBL iOS and CBL Android from 3.3.0.
+    MULTIPEER = "multipeer replication"
+    # LiteCore-based platforms.
+    LEGACY_P2P = "legacy peer-to-peer replication"
+    # CBL JS does not support it.
+    DELTA_SYNC = "delta sync"
+    # The CBL JS WebSocket library cannot send them.
+    CUSTOM_REPLICATOR_HEADERS = "custom replicator headers"
+    # CBL React Native has no API for one.
+    CUSTOM_CONFLICT_RESOLVER = "custom conflict resolver"
+    # Only the CBL C test server implements it.
+    PROPERTY_ENCRYPTION = "property encryption"
 
 
 class TestServer:
@@ -53,6 +74,27 @@ class TestServer:
             request = self.__request_factory.create_request(TestServerRequestType.ROOT)
             resp = await self.__request_factory.send_request(self.__index, request)
             return cast(GetRootResponse, resp)
+
+    async def supports(self, feature: CouchbaseLiteFeature) -> bool:
+        """Returns whether this test server's CBL supports the given feature."""
+        info = await self.info
+        variant = info.variant
+        version = Version(info.library_version.split("-")[0])
+        match feature:
+            case CouchbaseLiteFeature.VERSION_VECTORS:
+                return variant not in ServerVariant.JS | ServerVariant.REACT_NATIVE and version >= Version("4.0.0")
+            case CouchbaseLiteFeature.MULTIPEER:
+                return variant in ServerVariant.IOS | ServerVariant.ANDROID and version >= Version("3.3.0")
+            case CouchbaseLiteFeature.LEGACY_P2P:
+                return variant not in ServerVariant.JS | ServerVariant.REACT_NATIVE
+            case CouchbaseLiteFeature.DELTA_SYNC | CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS:
+                return variant != ServerVariant.JS
+            case CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER:
+                return variant != ServerVariant.REACT_NATIVE
+            case CouchbaseLiteFeature.PROPERTY_ENCRYPTION:
+                return variant == ServerVariant.C
+            case _:
+                assert_never(feature)
 
     async def create_and_reset_db(
         self,

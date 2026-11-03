@@ -335,11 +335,16 @@ class TestSyncGatewaySession(CBLTestClass):
         async with sg.get_user_client(headers) as client:
             await assert_unauthorized(client, "doc_a")
 
-    @pytest.mark.skip(reason="bug: CBG-5940 disabling a user keeps an invalid session")
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize("source", SESSION_SOURCES)
     async def test_disabled_user_session_is_rejected(self, cblpytest: CBLPyTest, source: str) -> None:
         sg = cblpytest.sync_gateways[0]
+        await self.skip_if_sgw_not(
+            sg,
+            ">= 3.3.9, != 4.0.0, != 4.0.1, != 4.0.2, != 4.0.3, != 4.0.4, != 4.0.5, != 4.0.6, != 4.0.7, != 4.0.8, "
+            "!= 4.1.0, != 4.1.1, != 4.1.2",
+            reason="needs the CBG-5940 fix, which rejects the session of a disabled user",
+        )
         username = await self._create_user(sg)
 
         self.mark_test_step(f"Create a session for {username} through the {source} API, and read doc_a with it")

@@ -1,10 +1,6 @@
-from pathlib import Path
-
-import pytest
+from conftest import NestedPytest
 
 pytest_plugins = ["pytester"]
-
-_ARGS = ("--config", str(Path(__file__).parent / "empty_config.json"), "-p", "no:randomly")
 
 _TEST_FILE = """
 from cbltest.api.cbltestclass import CBLTestClass
@@ -24,9 +20,9 @@ class TestSteps(CBLTestClass):
 """
 
 
-def test_last_step_shown_on_failure(pytester: pytest.Pytester) -> None:
-    pytester.makepyfile(_TEST_FILE)
-    result = pytester.runpytest(*_ARGS)
+def test_last_step_shown_on_failure(nested_pytest: NestedPytest) -> None:
+    nested_pytest.pytester.makepyfile(_TEST_FILE)
+    result = nested_pytest.pytester.runpytest_subprocess(*nested_pytest.args)
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.fnmatch_lines(
         ["*TestSteps.test_fails*", "Last test step (2):", "*second step", "*with two lines", "", "self = *"]
@@ -48,9 +44,9 @@ class TestSteps(CBLTestClass):
 """
 
 
-def test_last_step_shown_once_for_nested_exceptions(pytester: pytest.Pytester) -> None:
-    pytester.makepyfile(_NESTED_TEST_FILE)
-    result = pytester.runpytest(*_ARGS)
+def test_last_step_shown_once_for_nested_exceptions(nested_pytest: NestedPytest) -> None:
+    nested_pytest.pytester.makepyfile(_NESTED_TEST_FILE)
+    result = nested_pytest.pytester.runpytest_subprocess(*nested_pytest.args)
     result.assert_outcomes(failed=1)
     result.stdout.fnmatch_lines(
         [

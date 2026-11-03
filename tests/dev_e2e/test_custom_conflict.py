@@ -16,6 +16,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -28,6 +29,7 @@ class TestCustomConflict(CBLTestClass):
         conflict_resolver: ReplicatorConflictResolver,
         setup_snapshot: Callable[[SnapshotUpdater], str],
     ) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -117,6 +119,7 @@ class TestCustomConflict(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]

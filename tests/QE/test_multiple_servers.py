@@ -13,6 +13,7 @@ from cbltest.api.syncgateway import (
     DocumentUpdateEntry,
     ISGRPayload,
     ScopeConfig,
+    SyncGatewayFeature,
     SyncGatewayUserClient,
     UnsupportedSettings,
 )
@@ -114,7 +115,7 @@ class TestMultipleServers(CBLTestClass):
             original_revs = {row.id: row.revid for row in all_docs.rows}
             original_vvs = {}
 
-            supports_version_vectors = await sg.supports_version_vectors()
+            supports_version_vectors = await sg.supports(SyncGatewayFeature.VERSION_VECTORS)
             if supports_version_vectors:
                 changes_initial = await sg_user.get_changes(sg_db, version_type="cv")
                 original_vvs = {

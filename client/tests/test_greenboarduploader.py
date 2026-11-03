@@ -3,7 +3,7 @@
 import inspect
 import json
 from collections.abc import AsyncGenerator, Callable, Container, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
@@ -41,6 +41,7 @@ from cbltest.greenboarduploader import (
 from cbltest.plugins import greenboard_fixture
 from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
+from conftest import NestedPytest
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
 
@@ -1471,18 +1472,13 @@ async def cblpytest():
     yield _FakeCBLPyTest()
 """
 
-_LIFECYCLE_ARGS = (
-    "--config",
-    str(Path(__file__).with_name("empty_config.json")),
-    "--branch",
-    "main",
-    "-p",
-    "no:randomly",
+
+@pytest.fixture
+def lifecycle_pytest(nested_pytest: NestedPytest) -> NestedPytest:
+    nested_pytest.pytester.makeconftest(_LIFECYCLE_CONFTEST)
     # cluster_cleanup is autouse and expects a real CBLPyTest.clusters;
     # irrelevant to what's under test here (incomplete/collected detection).
-    "-p",
-    "no:cluster_cleanup",
-)
+    return replace(nested_pytest, args=(*nested_pytest.args, "--branch", "main", "-p", "no:cluster_cleanup"))
 
 
 class TestRealPytestLifecycle:
@@ -1499,8 +1495,8 @@ class TestRealPytestLifecycle:
     leak into this file's own process.
     """
 
-    def test_complete_run_not_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+    def test_complete_run_not_flagged_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -1519,7 +1515,7 @@ class TestRealPytestLifecycle:
             async def test_three():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args)
         result.assert_outcomes(passed=3)
 
         captured_path = pytester.path / "captured_doc.json"
@@ -1529,11 +1525,11 @@ class TestRealPytestLifecycle:
         doc = json.loads(captured_path.read_text())
         assert (doc["passCount"], doc["failCount"], doc["incomplete"], doc["collected"]) == (3, 0, False, 3)
 
-    def test_maxfail_stops_early_flags_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_maxfail_stops_early_flags_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """``--maxfail=1`` stops the session after the first failure via the
         same ``session.shouldfail`` early-exit path a session-timeout uses --
         a real, genuinely truncated session."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -1552,7 +1548,7 @@ class TestRealPytestLifecycle:
             async def test_three():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args, "--maxfail=1")
         result.assert_outcomes(passed=1, failed=1)
 
         captured_path = pytester.path / "captured_doc.json"
@@ -2000,10 +1996,10 @@ class TestSiblingDocuments:
         assert collection.upsert.call_args[0][0] == run_key
         assert "details" not in collection.upsert.call_args[0][1]
 
-    def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """Regression: skips raised before fixture setup (``@pytest.mark.skip``, topology/cbse skips) used to finish
         before the ``greenboard`` fixture registered its counter, so a run that finished cleanly read as incomplete."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -2027,15 +2023,15 @@ class TestSiblingDocuments:
             async def test_two():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args)
         result.assert_outcomes(passed=2, skipped=2)
 
         doc = json.loads((pytester.path / "captured_doc.json").read_text())
         assert (doc["passCount"], doc["skipCount"], doc["incomplete"], doc["collected"]) == (2, 2, False, 4)
 
-    def test_real_truncation_after_leading_skip_still_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_real_truncation_after_leading_skip_still_flagged_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """The fix must not lose true positives: a genuinely cut-short session is still incomplete."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -2054,7 +2050,7 @@ class TestSiblingDocuments:
             async def test_two():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args, "--maxfail=1")
         result.assert_outcomes(failed=1, skipped=1)
 
         doc = json.loads((pytester.path / "captured_doc.json").read_text())

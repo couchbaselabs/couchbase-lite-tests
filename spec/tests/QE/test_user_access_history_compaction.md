@@ -243,25 +243,6 @@ fully separate access history; compacting in one database must not affect the ot
 5. Get the user's access history on the second database and check that channel 'A' is
    still present there (untouched by the first database's compaction).
 
-## test_rbac_read_only_can_get_but_not_compact
-
-**Status: SKIPPED — pending test infrastructure.** There is currently no helper anywhere in
-the `cbltest` framework for provisioning a Sync Gateway/Couchbase Server RBAC credential
-scoped to a specific admin role (e.g. "Application Read Only" vs "Application"), so this
-case cannot be written without first adding that support. Tracked as a follow-up; not
-built here per the standing no-scope-creep-into-`client/`-without-sign-off policy.
-
-### Description
-A caller authenticated with the "Application Read Only" Sync Gateway RBAC role can GET a
-user's access history but gets 403 attempting to compact it.
-
-### Steps
-1. Create a bucket and configure a Sync Gateway database on it.
-2. Create user 'kelly' with access to channel 'A', then revoke it.
-3. As a caller with the "Application Read Only" role, get the user's access history and
-   check that it succeeds.
-4. As the same caller, attempt to compact the history and check that it fails with 403.
-
 ## test_compact_while_client_offline_leaves_stale_access_undetected
 
 This is the flagship scenario for this endpoint pair (mirrors the "Bob" offline-revoke

@@ -17,6 +17,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.api.test_functions import compare_doc_results_p2p
+from cbltest.api.testserver import CouchbaseLiteFeature
 from cbltest.responses import ServerVariant
 
 
@@ -76,7 +77,7 @@ class TestPeerToPeer(CBLTestClass):
         replicator_type: ReplicatorType,
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -163,7 +164,7 @@ class TestPeerToPeer(CBLTestClass):
         self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -245,7 +246,7 @@ class TestPeerToPeer(CBLTestClass):
         self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -322,7 +323,7 @@ class TestPeerToPeer(CBLTestClass):
         self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
@@ -412,7 +413,7 @@ class TestPeerToPeer(CBLTestClass):
         self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
 
         self.mark_test_step("Create 3 dbs and sdd 10 docs each to Device-1")
@@ -516,7 +517,7 @@ class TestPeerToPeer(CBLTestClass):
         self, cblpytest: CBLPyTest, num_of_docs: int, continuous: bool, replicator_type: ReplicatorType
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 2.8.0")
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.LEGACY_P2P)
         self.mark_test_step("Reset local database and load `empty` dataset on two devices")
         reset_tasks = [ts.create_and_reset_db(["db1"]) for ts in cblpytest.test_servers]
         all_devices_dbs = await asyncio.gather(*reset_tasks)

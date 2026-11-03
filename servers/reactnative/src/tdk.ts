@@ -25,6 +25,7 @@ import {
   Collection,
   CollectionConfig,
 } from 'cbl-reactnative';
+import {version as cblVersion} from 'cbl-reactnative/package.json';
 
 import {KeyPathCache} from './keyPath';
 import {LogSlurpSender} from './logSlurpSender';
@@ -148,7 +149,7 @@ export class TDKImpl implements tdk.TDK {
     _rq: TestRequest,
   ): Promise<tdk.GetInfoResponse> {
     return {
-      version: '1.0.0',
+      version: cblVersion,
       apiVersion: APIVersion,
       cbl: 'cbl-reactnative',
       device: {

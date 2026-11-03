@@ -4,8 +4,7 @@
         {
             "platform": "c_android",
             "cbl_version": "{{version}}",
-            "location": "56141JEBF18456",
-            "ip_hint": "172.16.150.165",
+            "location": "1BCACS00001MX3",
             "download": true
         }
     ],

@@ -13,7 +13,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_doc_ids, compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -68,10 +68,11 @@ class TestReplicationXdcr(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-        # These tests pin the replicator to one Sync Gateway with an X-Backend header,
-        # which the JS test server cannot send due to limitations of Websocket library.
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_not_supports(
+            cblpytest.test_servers[0],
+            CouchbaseLiteFeature.VERSION_VECTORS,
+            CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS,
+        )
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")
@@ -208,10 +209,11 @@ class TestReplicationXdcr(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.0.0")
-        # These tests pin the replicator to one Sync Gateway with an X-Backend header,
-        # which the JS test server cannot send due to limitations of Websocket library.
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_not_supports(
+            cblpytest.test_servers[0],
+            CouchbaseLiteFeature.VERSION_VECTORS,
+            CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS,
+        )
 
         self.mark_test_step("Prepare clusters and start XDCR.")
         await self.setup_xdcr_clusters(cblpytest, dataset_path, "names")

@@ -21,7 +21,7 @@ function usage() {
 }
 
 function prepare_dotnet() {
-  source "$SCRIPT_DIR/prepare_env.sh"
+  # MAUI is installed by dotnetenv as part of the server build instead.
   uv run --group dotnet-build dotnetenv install "$DOTNET_ENV_NAME"
   if [ "$platform" != "macos" ]; then
     # XHarness is shared, machine-wide infra (swift_ios/c_ios also rely on
@@ -72,6 +72,10 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+if [[ "$(uname)" == "Darwin" ]]; then
+  export MD_APPLE_SDK_ROOT="/$(echo "$(xcode-select -p)" | cut -d'/' -f2-3)"
+fi
+
 prepare_dotnet
 
 uv run "$SCRIPT_DIR/setup_test.py" "$platform" "$cbl_version" "$sgw_version"
@@ -84,7 +88,6 @@ fi
 
 pushd "$QE_TESTS_DIR"
 
-export DEVELOPER_DIR="/Applications/Xcode-$DOTNET_XCODE_VERSION.app/"
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header -W ignore::DeprecationWarning \
     --config config.json \
