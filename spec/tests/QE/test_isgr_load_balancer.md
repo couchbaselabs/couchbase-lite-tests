@@ -70,7 +70,7 @@ the load balancer, so it also runs on the JS test server.
    lost
 5. Pull it through CBL directly from SG1 as that user, and verify the pull transferred it
 
-## test_checkpoint_404_resurrects_tombstoned_doc
+## test_checkpoint_404_keeps_tombstoned_doc_deleted
 
 Regression coverage for CBG-5904 (root cause CBSE-23569): a checkpoint ID is shared between a pull and a pushAndPull
 replicator for the same (local db, remote URL, collections) tuple, direction is not part of its hash. Combined with the
@@ -78,12 +78,13 @@ load-balancer checkpoint-sharing mechanism this suite already exercises, a CBL c
 SG1 presents that SAME checkpoint ID to SG2 the first time a replication lands there. SG2 has no record of it -- a
 genuine checkpoint-404, not a client-driven reset -- so it runs `proposeChanges` with an empty `remoteAncestorRev`.
 LiteCore's anti-echo protection, which guards against this exact push/pull race in continuous mode, is not wired up for
-one-shot `pushAndPull`, so the client's stale, long-since tombstoned revision gets proposed and accepted by Sync Gateway
-as a disconnected new rev-tree root (`branched:true` in Sync Gateway's own logs, no 409, no conflict rejection). This is
-confirmed, currently-unmitigated behavior on Sync Gateway and Couchbase Lite versions before 4.0 -- the suite asserts
-the resurrection happens, not that it's prevented.
+one-shot `pushAndPull`, so with revision trees the client's stale, long-since tombstoned revision gets proposed and
+accepted by Sync Gateway as a disconnected new rev-tree root (`branched:true` in Sync Gateway's own logs, no 409, no
+conflict rejection). Version vectors in Sync Gateway and Couchbase Lite 4.0 keep enough history to reject it, so the
+test asserts the document stays deleted.
 
-Runs only below SGW and CBL version 4.0.0, where this is confirmed to reproduce; not run against mixed SGW/CBL versions.
+Skipped below CBL 4.0.0, where the resurrection is known, intended client behavior. CBL 4.x always runs against SGW
+4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
 
 1. Create a same-named database on both SG1 and SG2 (separate buckets) with `revs_limit` set to 5, and a matching user
    on both
@@ -98,7 +99,6 @@ Runs only below SGW and CBL version 4.0.0, where this is confirmed to reproduce;
 6. Wait for the tombstone to propagate to SG2 via the continuous ISGR link, and for SG2's channel cache to catch up
 7. Fire a one-shot bidirectional (pushAndPull) replication pinned to SG2 (`X-Backend: sg-1`) -- SG2's first-ever contact
    with this CBL client. The client still offers only the stale generation-1 revision it pulled in step 4
-8. Confirm `d1` comes back alive on SG2 at revision generation 1 -- a disconnected new rev-tree root, orphaned from its
-   8-generation tombstoned history, not a continuation of it
-9. Wait for the continuous ISGR link to propagate that same resurrection back to SG1, and confirm it there too at
-   revision generation 1
+8. Verify `d1` is still deleted on SG2: a GET for it answers 404
+9. Write a channel-less marker document on SG2 and wait for ISGR to carry it to SG1, so anything SG2 accepted in step 7
+   has crossed too, then verify `d1` is still deleted on SG1

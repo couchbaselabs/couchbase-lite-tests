@@ -2,6 +2,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -91,6 +92,16 @@ async def _wait_for_propagation(
     except TimeoutError as e:
         status = await link_owner.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
+
+
+async def _assert_still_deleted(sg: SyncGateway, db_name: str, doc_id: str) -> None:
+    """Fails if `doc_id` is live on `sg`. Sync Gateway answers a GET for a tombstoned document with a 404."""
+    try:
+        doc = await sg.get_document(db_name, doc_id)
+    except CblSyncGatewayBadResponseError as e:
+        assert e.code == 404, f"Expected a 404 for the tombstoned {doc_id} on {sg.hostname}, got {e.code}"
+        return
+    raise AssertionError(f"{doc_id} was resurrected on {sg.hostname} at {doc.revid}")
 
 
 def _assert_no_isgr_reconnect(snapshot: SyncGatewayStats.PerDatabase, connects_before: int) -> None:
@@ -357,13 +368,12 @@ class TestISGRLoadBalancer(CBLTestClass):
 
     @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
-    async def test_checkpoint_404_resurrects_tombstoned_doc(self, cblpytest: CBLPyTest) -> None:
+    async def test_checkpoint_404_keeps_tombstoned_doc_deleted(self, cblpytest: CBLPyTest) -> None:
         await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
-        await self.skip_if_sgw_not(
-            cblpytest.clusters[1].sync_gateways[0], "<4.0.0", "CBG-5904 resurrection only confirmed before SGW 4.0"
-        )
         await self.skip_if_cbl_not(
-            cblpytest.test_servers[0], "<4.0.0", "CBG-5904 resurrection only confirmed before CBL 4.0"
+            cblpytest.test_servers[0],
+            ">=4.0.0",
+            "CBG-5904: CBL 3.x pushes a pruned revision with no remote ancestor after a checkpoint 404",
         )
 
         db_name = "db_isgr_lb_resurrection"
@@ -411,11 +421,9 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert tombstone.revid.split("-")[0] == "8", (
             f"Expected the tombstone to land at revision generation 8, got {tombstone.revid}"
         )
-        since_sg1 = await sg1.get_last_sequence(db_name)
 
         self.mark_test_step("Wait for the tombstone to propagate to SG2 via ISGR")
         await sg2.wait_for_documents(db_name, {doc_id}, deleted=True)
-        since_sg2 = await sg2.get_last_sequence(db_name)
 
         self.mark_test_step(
             "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL client, "
@@ -430,24 +438,12 @@ class TestISGRLoadBalancer(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
         )
 
-        self.mark_test_step(
-            f"Confirm {doc_id} is resurrected on SG2 as a disconnected new rev-tree root (generation 1), orphaned"
-            f" from its 8-generation tombstoned history"
-        )
-        await sg2.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg2)
-        resurrected_sg2 = await sg2.get_document(db_name, doc_id)
-        assert not resurrected_sg2.tombstone, f"Expected {doc_id} to come back alive on SG2, not stay a tombstone"
-        assert resurrected_sg2.revid.split("-")[0] == "1", (
-            f"Expected a disconnected new rev-tree root (generation 1) on SG2, got {resurrected_sg2.revid}"
-        )
+        self.mark_test_step(f"Verify {doc_id} is still deleted on SG2")
+        await _assert_still_deleted(sg2, db_name, doc_id)
 
         self.mark_test_step(
-            "Wait for the continuous ISGR link to propagate that same resurrection back to SG1, and confirm"
-            " it there too"
+            f"Write a marker doc on SG2, wait for ISGR to carry it to SG1, and verify {doc_id} is still deleted on SG1"
         )
-        await sg1.wait_for_documents(db_name, {doc_id}, deleted=False, since=since_sg1)
-        resurrected_sg1 = await sg1.get_document(db_name, doc_id)
-        assert not resurrected_sg1.tombstone, f"Expected {doc_id} to come back alive on SG1, not stay a tombstone"
-        assert resurrected_sg1.revid.split("-")[0] == "1", (
-            f"Expected a disconnected new rev-tree root (generation 1) on SG1, got {resurrected_sg1.revid}"
-        )
+        await sg2.update_documents(db_name, [DocumentUpdateEntry(id="isgr_barrier", revision=None, body={})])
+        await _wait_for_propagation(sg1, db_name, ["isgr_barrier"], link_owner=sg1)
+        await _assert_still_deleted(sg1, db_name, doc_id)
