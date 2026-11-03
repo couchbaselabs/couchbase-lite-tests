@@ -238,7 +238,7 @@ build:
 
 ```bash
 uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --build-testserver 4.0.3
-uv run --group dotnet-build environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --platform dotnet --build-testserver 4.0.3-12
+uv run environment/local/start_local.py --server rosmar --repo-path /path/to/sync-gateway --platform dotnet --build-testserver 4.0.3-12
 ```
 
 Every run stops the test server that the previous run started, then starts the new one. It stops
