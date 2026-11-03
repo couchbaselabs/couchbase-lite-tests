@@ -87,6 +87,7 @@ uv run environment/local/start_local.py --server rosmar --git-tag main
 Dependency groups in root:
 - `dev` — `pytest-repeat` + `pytest-randomly` for flake hunting, installed by default. The root `addopts = "-p no:randomly"` keeps `tests/` runs in file order (`client/tests` shuffles); see [tests/AGENTS.md](tests/AGENTS.md)
 - `lint` — `ty`, `ruff`, type stubs (use `uv run --group lint …`)
+- `dotnet-build` — empty on purpose: `dotnetenv` is a default dependency, but the prebuild Jenkinsfile passes `--group dotnet-build` to release branches that still need the group
 
 AWS orchestrator scripts run from the root workspace — there is **no** separate `orchestrator` group.
 

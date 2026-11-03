@@ -324,6 +324,7 @@ dev = [
     { name = "pytest-randomly", specifier = "==5.0.0" },
     { name = "pytest-repeat", specifier = "==0.9.4" },
 ]
+dotnet-build = []
 lint = [
     { name = "ruff", specifier = ">=0.16.3" },
     { name = "ty", specifier = ">=0.0.72" },
