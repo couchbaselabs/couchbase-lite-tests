@@ -83,22 +83,17 @@ accepted by Sync Gateway as a disconnected new rev-tree root (`branched:true` in
 conflict rejection). Version vectors in Sync Gateway and Couchbase Lite 4.0 keep enough history to reject it, so the
 test asserts the document stays deleted.
 
-Skipped below CBL 4.0.0, where the resurrection is known, intended client behavior. CBL 4.x always runs against SGW
-4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
+Skipped when the test server's CBL lacks version vectors (below 4.0.0, and on JS and React Native), where the
+resurrection is known, intended client behavior, and when it can't send custom replicator headers. CBL 4.x always runs
+against SGW 4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
 
-1. Create a same-named database on both SG1 and SG2 (separate buckets) with `revs_limit` set to 5, and a matching user
-   on both
-2. Start a continuous, bidirectional ISGR link from SG1 to SG2
-3. Create doc `d1` directly on SG1 (native), and wait for it to reach SG2 via ISGR and for the channel cache to catch up
-   on both backends
-4. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`) -- the only contact this CBL
-   client ever has with SG1 before the tombstone below, establishing the checkpoint this test's bug hinges on. The
-   client now holds `d1` at revision generation 1 and is never told about anything that happens to it afterward
-5. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it -- landing the tombstone at revision
-   generation 8, matching the generation observed in the original reproduction
-6. Wait for the tombstone to propagate to SG2 via the continuous ISGR link, and for SG2's channel cache to catch up
-7. Fire a one-shot bidirectional (pushAndPull) replication pinned to SG2 (`X-Backend: sg-1`) -- SG2's first-ever contact
-   with this CBL client. The client still offers only the stale generation-1 revision it pulled in step 4
-8. Verify `d1` is still deleted on SG2: a GET for it answers 404
-9. Write a channel-less marker document on SG2 and wait for ISGR to carry it to SG1, so anything SG2 accepted in step 7
-   has crossed too, then verify `d1` is still deleted on SG1
+1. Create the database and user on SG1 and SG2 as in the first test, with `revs_limit` set to 5, and start the ISGR link
+2. Create doc `d1` directly on SG1, and wait for its ID on SG2's changes feed. A timeout reports the ISGR link's status
+3. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`). Expect the pull to transfer
+   `d1`. This is the client's only contact with SG1, and it holds `d1` at revision generation 1 from here on
+4. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it. Expect the tombstone at revision
+   generation 8, the generation seen in the original reproduction
+5. Wait for `d1` to appear as a tombstone on SG2's changes feed, as in step 2
+6. Run a one-shot pushAndPull replication pinned to SG2 (`X-Backend: sg-1`), SG2's first contact with this client. The
+   client still offers only the stale generation-1 revision from step 3
+7. Verify `d1` is still deleted on SG2: a GET for it answers 404

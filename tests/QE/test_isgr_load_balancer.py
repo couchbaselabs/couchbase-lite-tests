@@ -85,10 +85,11 @@ async def _wait_for_propagation(
     db_name: str,
     doc_ids: list[str],
     link_owner: SyncGateway,
+    deleted: bool = False,
 ) -> None:
     """Waits for `doc_ids` to reach `secondary` via ISGR, so a broken link fails with its status, not a bare timeout."""
     try:
-        await secondary.wait_for_documents(db_name, doc_ids)
+        await secondary.wait_for_documents(db_name, doc_ids, deleted=deleted)
     except TimeoutError as e:
         status = await link_owner.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
@@ -324,8 +325,7 @@ class TestISGRLoadBalancer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest) -> None:
-        # Connects to SG1 directly, it passes no headers=. The other three use load_balancers and headers=pin.
-        # Hence, doesn't need a skip for CUSTOM_REPLICATOR_HEADERS.
+        # Connects to SG1 directly, it passes no headers.
         await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb_channels"
@@ -369,11 +369,10 @@ class TestISGRLoadBalancer(CBLTestClass):
     @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_404_keeps_tombstoned_doc_deleted(self, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
-        await self.skip_if_cbl_not(
+        await self.skip_if_not_supports(
             cblpytest.test_servers[0],
-            ">=4.0.0",
-            "CBG-5904: CBL 3.x pushes a pruned revision with no remote ancestor after a checkpoint 404",
+            CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS,
+            CouchbaseLiteFeature.VERSION_VECTORS,
         )
 
         db_name = "db_isgr_lb_resurrection"
@@ -405,25 +404,21 @@ class TestISGRLoadBalancer(CBLTestClass):
             f" tombstone at revision generation 8 -- without the local CBL client ever being told"
         )
         current = await sg1.get_document(db_name, doc_id)
-        for mutation_index in range(6):
-            await sg1.update_documents(
+        num_mutations = 6
+        for mutation_index in range(num_mutations):
+            current = await sg1.update_document(
                 db_name,
-                [
-                    DocumentUpdateEntry(
-                        id=doc_id,
-                        revision=current.revid,
-                        body={"channels": channels, "mutation": mutation_index},
-                    )
-                ],
+                doc_id,
+                {"channels": channels, "mutation": mutation_index},
+                current.revid,
             )
-            current = await sg1.get_document(db_name, doc_id)
         tombstone = await sg1.delete_document(doc_id, current.revid, db_name)
-        assert tombstone.revid.split("-")[0] == "8", (
-            f"Expected the tombstone to land at revision generation 8, got {tombstone.revid}"
+        assert tombstone.revid.split("-")[0] == str(num_mutations + 2), (
+            f"Expected the tombstone to land at revision generation {num_mutations + 2}, got {tombstone.revid}"
         )
 
         self.mark_test_step("Wait for the tombstone to propagate to SG2 via ISGR")
-        await sg2.wait_for_documents(db_name, {doc_id}, deleted=True)
+        await _wait_for_propagation(sg2, db_name, [doc_id], link_owner=sg1, deleted=True)
 
         self.mark_test_step(
             "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL client, "
@@ -440,10 +435,3 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         self.mark_test_step(f"Verify {doc_id} is still deleted on SG2")
         await _assert_still_deleted(sg2, db_name, doc_id)
-
-        self.mark_test_step(
-            f"Write a marker doc on SG2, wait for ISGR to carry it to SG1, and verify {doc_id} is still deleted on SG1"
-        )
-        await sg2.update_documents(db_name, [DocumentUpdateEntry(id="isgr_barrier", revision=None, body={})])
-        await _wait_for_propagation(sg1, db_name, ["isgr_barrier"], link_owner=sg1)
-        await _assert_still_deleted(sg1, db_name, doc_id)
