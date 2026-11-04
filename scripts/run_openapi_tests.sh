@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # Runs the tests marked `openapi` (the REST API conformance tests) on this host: Sync Gateway on
-# rosmar, and Edge Server in Docker. No Couchbase Server or Couchbase Lite test server is needed.
+# rosmar, Edge Server in Docker, and the C test server, which cblpytest asks for its API version at
+# setup. No Couchbase Server is needed.
 #
 # Usage:
 #   scripts/run_openapi_tests.sh --es-version 1.1.1-0
@@ -91,13 +92,13 @@ cleanup() {
   if $keep; then
     echo "Leaving the servers running. Stop them with:"
     echo "  uv run environment/local/start_edge_server.py --stop"
-    echo "  uv run environment/local/start_local.py --stop-sync-gateway"
+    echo "  uv run environment/local/start_local.py --stop-sync-gateway --stop-testserver"
     return
   fi
   if $run_es; then
     uv run "$LOCAL_DIR/start_edge_server.py" --stop || true
   fi
-  uv run "$LOCAL_DIR/start_local.py" --stop-sync-gateway || true
+  uv run "$LOCAL_DIR/start_local.py" --stop-sync-gateway --stop-testserver || true
 }
 
 if [[ -n $git_tag ]]; then
@@ -112,7 +113,7 @@ cd "$REPO_ROOT"
 trap cleanup EXIT
 
 # Edge Server also needs a Sync Gateway config to start from, so Sync Gateway always starts.
-uv run "$LOCAL_DIR/start_local.py" --server rosmar --skip-testserver "${sgw_build[@]}"
+uv run "$LOCAL_DIR/start_local.py" --server rosmar "${sgw_build[@]}"
 sgw_config="$(cat "$LOCAL_DIR/topology_config")"
 if $run_es; then
   uv run "$LOCAL_DIR/start_edge_server.py" --version "$es_version"
@@ -124,7 +125,7 @@ if $run_sgw; then
   (cd tests/dev_e2e && uv run pytest -v --rootdir . -m openapi --config "$sgw_config" ${pytest_args[@]+"${pytest_args[@]}"}) || status=1
 fi
 if $run_es; then
-  (cd tests/QE && uv run pytest -v --rootdir . -m openapi \
-    --config "$LOCAL_DIR/edge_server/topology_config.json" ${pytest_args[@]+"${pytest_args[@]}"}) || status=1
+  uv run pytest -v -m openapi --config "$LOCAL_DIR/edge_server/topology_config.json" \
+    tests/QE/edge_server tests/schemathesis ${pytest_args[@]+"${pytest_args[@]}"} || status=1
 fi
 exit $status

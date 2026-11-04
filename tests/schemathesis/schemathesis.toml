@@ -1,0 +1,207 @@
+# schemathesis configuration for the Edge Server public API, loaded by test_edge_server_public_api.py.
+# Everything that is the same for every run is here. The test sets the keyspace and the generation mode
+# (positive or negative) for each run, and supplies the base URL and credentials.
+# A fixed seed with deterministic generation makes every run send the same requests.
+seed = 20261030
+tls-verify = false
+# A hang fails its request quickly, and does not stall the run.
+request-timeout = 10
+
+# The names database, its default collection, and the named query in config/edge_server.json. The query has no parameters, because the spec cannot describe a query's
+# parameters.
+[parameters]
+db = "names"
+keyspace = "names"
+name = "female_ids"
+
+[generation]
+max-examples = 100
+deterministic = true
+database = "none"
+
+# The spec has no links, so stateful runs only chain query operations, which takes most of the run time.
+[phases.stateful]
+enabled = false
+
+# Coverage otherwise also probes methods the spec does not list.
+[phases.coverage]
+unexpected-methods = []
+
+# Operations that no run sends.
+
+[[operations]]
+include-name = "POST /_replicate"
+# A body field cannot be pinned in every phase, so Edge Server would connect to generated hosts.
+enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_changes"
+# The feed is in the body, which cannot be pinned in every phase, so a longpoll or continuous feed would
+# hold the request open until it times out.
+enabled = false
+
+# Known mismatches, one entry per operation. "Spec:" lines are gaps in the spec, and "Bug:" lines are
+# Edge Server bugs, each with its ticket once filed. negative_data_rejection runs only in negative mode.
+# Remove a setting once its cause is fixed.
+
+[[operations]]
+include-name = "GET /_active_tasks"
+# Spec: a replication task matches more than one ActiveTask schema, so the oneOf never holds.
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}"
+# Spec: a database response matches both DatabaseInfo and KeyspaceInfo, so the oneOf never holds.
+checks.response_schema_conformance.enabled = false
+
+[[operations]]
+include-name = "PUT /{keyspace}"
+# Spec: this is "Create a document", but Edge Server creates a database or collection here, and 1.1.1 never
+# allows that, so every request is a 403. POST /{keyspace} creates a document, and the spec does not list it.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/_all_docs"
+# Spec: keys must be one JSON array string (CBL-9281).
+# Spec: with include_docs=true, each row's doc has no _id or _rev.
+# Bug: a query parameter that is not an integer is ignored, not rejected.
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.negative_data_rejection.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_all_docs"
+# Spec: limit and skip must be integers (CBL-9281).
+# Spec: a missing body is a 415 (CBL-9281).
+# Spec: keys with limit, skip, startkey or endkey is a 400.
+# Spec: with include_docs=true, each row's doc has no _id or _rev.
+# Bug: a body include_docs or descending that is not a boolean is accepted, not rejected.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.negative_data_rejection.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/{docid}"
+# Spec: a 404 has no "reason" (CBL-9281).
+# Spec: a malformed rev is a 400.
+# Bug: a query parameter that is not an integer is ignored, not rejected.
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.negative_data_rejection.enabled = false
+parameters = { docid = "name_1" }
+
+[[operations]]
+include-name = "HEAD /{keyspace}/{docid}"
+# Spec: a malformed rev is a 400.
+# Bug: a query parameter that is not an integer is ignored, not rejected.
+checks.positive_data_acceptance.enabled = false
+checks.negative_data_rejection.enabled = false
+parameters = { docid = "name_1" }
+
+[[operations]]
+include-name = "PUT /{keyspace}/{docid}"
+# Spec: a body _rev that differs from ?rev is a 400.
+# Spec: the body requires _rev, but a new document has none.
+# Spec: a 404 has no "reason" (CBL-9281).
+# Bug: a header with an empty value closes the connection with no response.
+# Bug: a document ID with a control character is a 500, "invalid document ID".
+checks.positive_data_acceptance.enabled = false
+checks.negative_data_rejection.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+parameters = { "header.If-Match" = "*" }
+
+[[operations]]
+include-name = "DELETE /{keyspace}/{docid}"
+# Spec: a missing revision is a 409 (CBL-9281).
+# Spec: a 404 has no "reason" (CBL-9281).
+# Bug: a header with an empty value closes the connection with no response.
+# Bug: a document ID with a control character is a 500, "invalid document ID".
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.not_a_server_error.enabled = false
+parameters = { "header.If-Match" = "*" }
+
+[[operations]]
+include-name = "POST /{keyspace}/_bulk_docs"
+# Spec: a missing body is a 415 (CBL-9281).
+# Spec: an error row for a document with no _id has no "id" (CBL-9281).
+# Bug: a _rev that is not a string is ignored, not rejected.
+checks.positive_data_acceptance.enabled = false
+checks.negative_data_rejection.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+
+# Each key operation uses its own names document, so that one never changes another's data. The pinned
+# revisions are those in the dataset. Only the first write succeeds, and later ones are a 409.
+
+[[operations]]
+include-name = "GET /{keyspace}/{docid}/{key}"
+# Spec: a 404 has no "reason" (CBL-9281).
+# Spec: a malformed rev is a 400.
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+parameters = { docid = "name_1", key = "contact" }
+
+[[operations]]
+include-name = "PUT /{keyspace}/{docid}/{key}"
+# Spec: a 404 has no "reason" (CBL-9281).
+# Spec: a success is a 200, not a 201 (CBL-9281).
+checks.status_code_conformance.enabled = false
+checks.response_schema_conformance.enabled = false
+parameters = { docid = "name_2", key = "contact", rev = "1-d5a8ac1edd03517f76095c4a4615d1351ad6e1ae" }
+
+[[operations]]
+include-name = "DELETE /{keyspace}/{docid}/{key}"
+# Spec: a 404 has no "reason" (CBL-9281).
+checks.response_schema_conformance.enabled = false
+parameters = { docid = "name_3", key = "gender", rev = "1-4bf8b00e9fedcfb45b4fc2c15fa027e08d2843d2" }
+
+[[operations]]
+include-name = "POST /{keyspace}/_query"
+# Spec: an empty query is a 400.
+# Spec: the parameters field is "params" (CBL-9281).
+# Spec: a missing body is a 415 (CBL-9281).
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+
+[[operations]]
+include-name = "POST /{keyspace}/_query/{name}"
+# Spec: a body key that is not a parameter of the query is a 400.
+# Spec: a missing body is a 415 (CBL-9281).
+# Bug: the 400 for an unknown key puts the key in the status line unescaped, so a key with a control
+# character breaks the response and the client waits until it times out. Fuzzing generates such keys (CBL-9294).
+checks.positive_data_acceptance.enabled = false
+checks.status_code_conformance.enabled = false
+phases.fuzzing.enabled = false
+
+[[operations]]
+include-name = "GET /{keyspace}/_changes"
+# Spec: last_seq is an integer (CBL-9281).
+# Spec: the only supported filter is doc_ids (CBL-9281).
+# Bug: a query parameter that is not an integer is ignored, not rejected.
+# Bug: a timeout below its minimum is accepted (CBL-9278).
+checks.positive_data_acceptance.enabled = false
+checks.response_schema_conformance.enabled = false
+checks.negative_data_rejection.enabled = false
+# A longpoll or continuous feed would hold the request open until it times out.
+parameters = { feed = "normal" }
+
+[[operations]]
+include-name = "GET /_replicate/{taskid}"
+# The task ID is pinned, so a request that negative mode reports as invalid is a valid one.
+checks.negative_data_rejection.enabled = false
+# A placeholder, so that generation never changes it. The test puts in the real task ID, which changes on
+# every run.
+parameters = { taskid = 0 }
+
+[[operations]]
+include-name = "DELETE /_replicate/{taskid}"
+# Spec: a 404 has no "reason" (CBL-9281).
+checks.response_schema_conformance.enabled = false
+# A placeholder, like GET /_replicate/{taskid}.
+parameters = { taskid = 0 }

@@ -233,8 +233,10 @@ any other REST API.
 ### Local run
 
 Mark each conformance test `@pytest.mark.openapi`. `scripts/run_openapi_tests.sh --es-version 1.1.1-0` runs
-every marked test on this host. It starts Sync Gateway on rosmar and Edge Server in Docker, runs both suites, and
-stops both servers. It needs no Couchbase Server and no test server. `--sgw-only` and `--es-only` run one suite,
+every marked test on this host. It starts Sync Gateway on rosmar, Edge Server in Docker and the C test server,
+which cblpytest asks for its API version at setup. It runs the suites, and stops the servers. It needs no Couchbase
+Server. The Edge Server suite is `tests/QE/edge_server` plus `tests/schemathesis`, which runs the same checks
+through the schemathesis pytest integration. `--sgw-only` and `--es-only` run one suite,
 `--keep` leaves the servers running, and arguments after `--` go to pytest. The script stops the Sync Gateways
 that this checkout started before.
 
