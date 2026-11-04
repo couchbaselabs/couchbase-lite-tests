@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.error import CblSyncGatewayBadResponseError
@@ -111,6 +112,21 @@ async def _assert_auth_rejected(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestSessionAuthReplication(CBLTestClass):
+    @pytest_asyncio.fixture(scope="function", autouse=True)
+    async def _skip_unverified_platforms(self, cblpytest: CBLPyTest) -> None:
+        """
+        Skips the whole class on CBL iOS.
+
+        These tests were added without ever running in the regression suite, so whether
+        they pass on iOS is unknown -- "not yet verified", not a diagnosed failure like
+        the .NET skips below. Drop this fixture once iOS has been checked.
+        """
+        variant = (await cblpytest.test_servers[0].info).variant
+        self.skip_if_not(
+            variant != ServerVariant.IOS,
+            "not yet verified on CBL iOS: https://jira.issues.couchbase.com/browse/CBL-9287",
+        )
+
     async def _skip_if_bearer_unsupported(self, test_server: TestServer) -> None:
         """Skips on CBL .NET, which does not send replicator headers, so it cannot present a bearer token."""
         variant = (await test_server.info).variant
