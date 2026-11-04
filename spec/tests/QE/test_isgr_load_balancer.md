@@ -89,11 +89,14 @@ against SGW 4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
 
 1. Create the database and user on SG1 and SG2 as in the first test, with `revs_limit` set to 5, and start the ISGR link
 2. Create doc `d1` directly on SG1, and wait for its ID on SG2's changes feed. A timeout reports the ISGR link's status
-3. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`). Expect the pull to transfer
-   `d1`. This is the client's only contact with SG1, and it holds `d1` at revision generation 1 from here on
+3. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`), its first contact. Expect
+   SG1's since-zero count to grow by 1, SG2's not to move, and the pull to transfer `d1`. This is the client's only
+   contact with SG1, and it holds `d1` at revision generation 1 from here on
 4. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it. Expect the tombstone at revision
    generation 8, the generation seen in the original reproduction
 5. Wait for `d1` to appear as a tombstone on SG2's changes feed, as in step 2
 6. Run a one-shot pushAndPull replication pinned to SG2 (`X-Backend: sg-1`), SG2's first contact with this client. The
-   client still offers only the stale generation-1 revision from step 3
+   client still offers only the stale generation-1 revision from step 3. Expect SG2's propose count to grow by exactly
+   1, the stale `d1`, and SG1's not to move. No document is written on SG1 after step 5, so ISGR adds no proposals to
+   SG2
 7. Verify `d1` is still deleted on SG2: a GET for it answers 404

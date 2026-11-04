@@ -392,10 +392,23 @@ class TestISGRLoadBalancer(CBLTestClass):
         )
         await _wait_for_propagation(sg2, db_name, [doc_id], link_owner=sg1)
 
-        self.mark_test_step("Create an empty local CBL database, and pull once pinned to SG1")
+        self.mark_test_step("Create an empty local CBL database, and pull once pinned to SG1, its first contact")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
         repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
+        connects_before = _connect_attempts(sg1_stats)
+        sg1_since_zero = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero
+        sg2_since_zero = sg2_stats.cbl_replication_pull.num_pull_repl_since_zero
         seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
+        sg1_stats = await sg1.get_db_stats(db_name)
+        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        sg1_delta = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero - sg1_since_zero
+        assert sg1_delta == 1, f"Expected SG1's first contact to start from since=0 once, got {sg1_delta}"
+        sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - sg2_since_zero
+        assert sg2_delta == 0, (
+            f"Seed pull pinned with {_SG1_PIN} moved {sg2.hostname}'s since-zero count by {sg2_delta}, so the pin"
+            f" reached {sg2.hostname} instead of {sg1.hostname}"
+        )
         pulled = {u.document_id for u in seed_pull.document_updates if u.error is None}
         assert doc_id in pulled, f"Expected the seeding pull pinned to SG1 to transfer {doc_id}, got {pulled}"
 
@@ -424,6 +437,10 @@ class TestISGRLoadBalancer(CBLTestClass):
             "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL client, "
             "a genuine checkpoint-404. The client still offers only the stale generation-1 revision it pulled before"
         )
+        sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
+        connects_before = _connect_attempts(sg1_stats)
+        sg1_proposed = sg1_stats.cbl_replication_push.propose_change_count
+        sg2_proposed = sg2_stats.cbl_replication_push.propose_change_count
         await _pinned_replication(
             db,
             repl_url,
@@ -432,6 +449,15 @@ class TestISGRLoadBalancer(CBLTestClass):
             _SG2_PIN,
             replicator_type=ReplicatorType.PUSH_AND_PULL,
         )
+        sg1_stats = await sg1.get_db_stats(db_name)
+        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        sg1_delta = sg1_stats.cbl_replication_push.propose_change_count - sg1_proposed
+        assert sg1_delta == 0, (
+            f"pushAndPull pinned with {_SG2_PIN} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin"
+            f" reached {sg1.hostname} instead of {sg2.hostname}"
+        )
+        sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_push.propose_change_count - sg2_proposed
+        assert sg2_delta == 1, f"Expected the client to propose {doc_id} to SG2 exactly once, got {sg2_delta}"
 
         self.mark_test_step(f"Verify {doc_id} is still deleted on SG2")
         await _assert_still_deleted(sg2, db_name, doc_id)
