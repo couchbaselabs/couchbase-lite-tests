@@ -68,8 +68,10 @@ pipeline {
                             jenkins/pipelines/dev_e2e/android/android_teardown.sh
                         '''
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log*', fingerprint: true, allowEmptyArchive: true
                     archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/*-sgcollectinfo-*.zip', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/logcat.txt*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

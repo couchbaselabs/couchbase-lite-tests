@@ -208,6 +208,12 @@ resource "aws_instance" "log_slurp" {
     vpc_security_group_ids = [data.aws_security_group.main.id]
     associate_public_ip_address = true
 
+    # The AMI default can be as small as 2 GiB, which verbose test server logs fill within minutes
+    root_block_device {
+        volume_size = 30  # 30 GiB (minimum required by AMI)
+        volume_type = "gp2"
+    }
+
     tags = {
         Name = "ls"
         Type = "logslurp"

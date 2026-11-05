@@ -44,19 +44,35 @@ STATUS=0
 
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
+# The workspace is not cleaned between builds, so remove the previous run's logs before anything
+# can fail; otherwise the Jenkinsfile would archive them as this run's
+rm -rf "$DEV_E2E_TESTS_DIR"/{http_log,testserver.log,session.log*,logcat.txt*} "$DEV_E2E_TESTS_DIR"/*-sgcollectinfo-*.zip
+
+# Capture the device log for the run (install, app start, crashes). CBL's own console lines
+# are left out: LogSlurp already collects them. android_teardown.sh stops it; the Jenkinsfile
+# archives it.
+DEVICE_SERIAL="${ANDROID_SERIAL:-}"
+if [ -z "$DEVICE_SERIAL" ]; then
+  DEVICE_SERIAL=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["test_servers"][0]["location"])' "$SCRIPT_DIR/topology_single_device.json")
+fi
+
+CBL_LOG_TAGS=()
+for domain in DATABASE QUERY REPLICATOR NETWORK LISTENER PEER_DISCOVERY MULTIPEER; do
+  CBL_LOG_TAGS+=("CouchbaseLite/$domain:S")
+done
+
+echo "Start logcat for $DEVICE_SERIAL"
+adb -s "$DEVICE_SERIAL" logcat -c || true
+adb -s "$DEVICE_SERIAL" logcat -v threadtime "${CBL_LOG_TAGS[@]}" >"$DEV_E2E_TESTS_DIR/logcat.txt" 2>&1 &
+echo $! >"$SCRIPT_DIR/logcat.pid"
+
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
-echo "Start logcat"
-pushd $SCRIPT_DIR
-python3 logcat.py &
-echo $! >logcat.pid
-
 pushd $DEV_E2E_TESTS_DIR >/dev/null
-rm -rf http_log testserver.log
 
 echo "Run the tests"
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION" -k "$TEST_FILTER" --no-result-upload
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION" --sgcollect-on-test-failure -k "$TEST_FILTER" --no-result-upload
 else
-  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION"
+  uv run pytest -v --no-header --maxfail=7 -W ignore::DeprecationWarning --config config.json -m min_test_servers --dataset-version "$DATASET_VERSION" --sgcollect-on-test-failure
 fi
