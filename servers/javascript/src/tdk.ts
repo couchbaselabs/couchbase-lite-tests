@@ -301,6 +301,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         };
     }
 
+    //////// LOG:
+    async [tdk.LogCommand](rq: tdk.LogRequest): Promise<void> {
+        this.#logger.info(rq.message);
+    }
+
     //////// PERFORM MAINTENANCE:
     async [tdk.PerformMaintenanceCommand](rq: tdk.PerformMaintenanceRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);

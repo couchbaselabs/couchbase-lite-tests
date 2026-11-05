@@ -692,7 +692,12 @@ class DatabaseManager {
             .appendingPathComponent(filename)
             .relativePath
         
-        let blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        let blobFileURL: URL
+        do {
+            blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        } catch FileDownloader.DownloadError.notFound {
+            throw TestServerError.badRequest("Request for nonexistent blob '\(filename)'")
+        }
         Log.log(level: .debug, message: "Load blob from \(blobFileURL.path)")
         
         let contentType: String = {

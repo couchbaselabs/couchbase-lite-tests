@@ -124,7 +124,10 @@ public class EndptListenerManager {
                     final String password = identityReq.getString(KEY_PASSWORD);
                     tlsId = keyStoreSvc.getTLSIdentity(alias, encoding, data, password.toCharArray());
                 } else {
-                    tlsId = keyStoreSvc.getTLSIdentity(alias, null, null, null);
+                    try { tlsId = keyStoreSvc.getTLSIdentity(alias, null, null, null); }
+                    catch (CouchbaseLiteException e) {
+                        throw new ClientError("TLS enabled but no existing TLS identity found for: " + alias);
+                    }
                 }
             }
             catch (CouchbaseLiteException e){

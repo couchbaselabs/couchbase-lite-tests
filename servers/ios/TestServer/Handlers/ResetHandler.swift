@@ -12,7 +12,12 @@ extension Handlers {
         let dbManager = req.databaseManager
         try dbManager.reset()
         
-        if let config = try? req.content.decode(ContentTypes.ResetConfiguration.self), let databases = config.databases {
+        let config = try? req.content.decode(ContentTypes.ResetConfiguration.self)
+        if let test = config?.test {
+            Log.log(level: .info, message: ">>>>>>>>>> \(test)")
+        }
+
+        if let databases = config?.databases {
             for (dbName, spec) in databases {
                 if spec["dataset"] != nil && spec["collections"] != nil {
                     throw TestServerError.badRequest("Invalid Reset Spec, dataset and collection cannot both be specified.")

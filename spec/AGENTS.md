@@ -83,7 +83,7 @@ spec/
 |---|---|
 | Format | OpenAPI 3.1.0 |
 | Server | `http://{tenant}:8080` (test server on localhost or EC2) |
-| Current version | **2.0.3** |
+| Current version | **2.0.5** |
 | Required request headers | `CBLTest-API-Version` (int), `CBLTest-Client-ID` (UUID) |
 | Required response headers | `CBLTest-API-Version`, `CBLTest-Server-ID` |
 | Enum values | **Case-insensitive** (stated in `info.description`) |
@@ -96,7 +96,8 @@ spec/
 
 | Version | Date | Change |
 |---|---|---|
-| 2.0.4 | Add ReplicatorBearerAuthenticator to ReplicatorConfiguration.authenticator |
+| 2.0.5 | 10/29/2026 | `newSession` returns 400 for the ID of the current session |
+| 2.0.4 | 09/23/2026 | Add ReplicatorBearerAuthenticator to ReplicatorConfiguration.authenticator |
 | 2.0.3 | 04/17/2026 | Add identity property to `startListener` |
 | 2.0.2 | 07/24/2025 | Add peer ID to `startMultipeerReplicator` return |
 | 2.0.1 | 07/10/2025 | Add Merge-Dict conflict resolver |

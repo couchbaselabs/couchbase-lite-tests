@@ -121,7 +121,13 @@ public class Session {
         }
 
         final Session oldSession = app.getSession();
-        if (oldSession != null) { oldSession.close(); }
+        if (oldSession != null) {
+            if (oldSession.client.equals(sessionId)) {
+                new FileUtils().deleteRecursive(rootDir);
+                throw new ClientError("Session with ID '" + sessionId + "' already exists");
+            }
+            oldSession.close();
+        }
 
         final String dsVersion = req.getString(KEY_DATASET_VERSION);
         this.datasetVersion = (dsVersion != null) ? dsVersion : DEFAULT_DATASET_VERSION;

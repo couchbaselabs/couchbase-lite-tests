@@ -71,6 +71,7 @@ class TestServer : ObservableObject {
         app.post("performMaintenance", use: Handlers.performMaintenance)
         app.post("getMultipeerReplicatorStatus", use: Handlers.getMultipperReplicatorStatus)
         app.post("runQuery", use: Handlers.runQuery)
+        app.post("log", use: Handlers.log)
         app.post("startListener", use: Handlers.startListener)
         app.post("stopListener", use: Handlers.stopListener)
         

@@ -25,27 +25,45 @@ export class KeyPath {
       }
     }
 
-    let str = path.trim();
-    if (str.startsWith('$')) {
-      str = str.substring(1);
-    } else if (!str.startsWith('[')) {
-      str = '.' + str;
-    }
+    const str = path.trim();
+    let i = str.startsWith('$.') ? 2 : 0;
 
-    let i = 0;
-    while (i < str.length) {
-      const m = str.substring(i).match(/\.([^.[]*)|\[(-?\d+)\]/);
-      localCheck(m !== null);
-      if (m![0].startsWith('.')) {
-        const key = m![1];
-        localCheck(key.length > 0);
-        this.components.push(key);
-      } else {
-        const n = Number(m![2]);
-        localCheck(Number.isSafeInteger(n));
-        this.components.push(n);
+    // A property runs up to the next unescaped '.', '[' or ']'; '\\' makes the next character literal
+    const parseProperty = () => {
+      let key = '';
+      while (i < str.length && !'.[]'.includes(str[i])) {
+        if (str[i] === '\\') {
+          i++;
+          localCheck(i < str.length);
+        }
+        key += str[i++];
       }
-      i += m![0].length;
+      localCheck(key.length > 0);
+      this.components.push(key);
+    };
+
+    const parseIndex = () => {
+      const m = str.substring(i).match(/^\[(\d+)\]/);
+      localCheck(m !== null);
+      const n = Number(m[1]);
+      localCheck(Number.isSafeInteger(n));
+      this.components.push(n);
+      i += m[0].length;
+    };
+
+    if (str[i] === '[') {
+      parseIndex();
+    } else {
+      parseProperty();
+    }
+    while (i < str.length) {
+      if (str[i] === '.') {
+        i++;
+        parseProperty();
+      } else {
+        localCheck(str[i] === '[');
+        parseIndex();
+      }
     }
 
     this.str = str;

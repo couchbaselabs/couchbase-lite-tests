@@ -73,6 +73,7 @@ set(SOURCE_FILES
         src/dispatcher/PostGetAllDocuments.cpp
         src/dispatcher/PostGetDocument.cpp
         src/dispatcher/PostGetReplicatorStatus.cpp
+        src/dispatcher/PostLog.cpp
         src/dispatcher/PostNewSession.cpp
         src/dispatcher/PostPerformMaintenance.cpp
         src/dispatcher/PostReset.cpp

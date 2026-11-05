@@ -19,6 +19,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -125,6 +126,7 @@ public final class UpdateChange extends Change {
             final String blobUri = (isUri) ? content : BLOB_DIR + content;
             Log.p(TAG, "Fetching blob: " + blobUri + " to " + blobFile);
             try { NetUtils.fetchFile(blobUri, blobFile); }
+            catch (FileNotFoundException e) { throw new ClientError("Request for nonexistent blob '" + blobFileName + "'"); }
             catch (IOException e) { throw new ServerError("Failed fetching blob: " + blobUri, e); }
 
             if (blobFileName.endsWith(FileUtils.ZIP_EXTENSION)) {

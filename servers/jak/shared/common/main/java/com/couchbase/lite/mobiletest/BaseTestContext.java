@@ -82,7 +82,7 @@ public abstract class BaseTestContext {
         app.getReplSvc().init(getTestContext());
         app.getListenerService().init(getTestContext());
 
-        Log.p(TAG, ">>>>> START TEST: " + testName);
+        Log.p(TAG, ">>>>>>>>>> " + testName);
     }
 
     @NonNull
@@ -95,7 +95,7 @@ public abstract class BaseTestContext {
     public File getDbDir() { return dbDir; }
 
     public void close(@NonNull TestApp app) {
-        Log.p(TAG, "<<<<< END TEST: " + testName);
+        Log.p(TAG, "<<<<<<<<<< " + testName);
 
         // belt
         openDocListeners = null;

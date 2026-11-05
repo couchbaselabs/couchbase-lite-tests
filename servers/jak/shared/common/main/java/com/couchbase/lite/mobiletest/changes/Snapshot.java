@@ -176,40 +176,37 @@ public class Snapshot {
         @Nullable Change change,
         List<Difference> diffs
     ) {
+        // A doc that exists where it shouldn't (or vice versa) has no keypath, so no actual/expected/document.
         if (expected == null) {
             if (actual != null) {
-                diffs.add(
-                    new Difference(
-                        collName,
-                        docId,
-                        null,
-                        null,
-                        null,
-                        actual.toMap(),
-                        change,
-                        "Document should not exist"));
+                diffs.add(new Difference(collName, docId, null, null, null, null, change, unexpectedDocReason(change)));
             }
             return;
         }
 
-        final Map<String, Object> expectedContent = expected.toMap();
-
         if (actual == null) {
-            diffs.add(new Difference(
-                collName,
-                docId,
-                null,
-                null,
-                expectedContent,
-                null,
-                change,
-                "Document was not found"));
+            diffs.add(new Difference(collName, docId, null, null, null, null, change, "was not found"));
             return;
         }
 
         // at this point, the two documents should be identical
         final Map<String, Object> actualContent = actual.toMap();
-        compareDocContent(collName, docId, actualContent, "", expectedContent, actualContent, change, diffs);
+        compareDocContent(collName, docId, actualContent, "", expected.toMap(), actualContent, change, diffs);
+    }
+
+    @NonNull
+    private static String unexpectedDocReason(@Nullable Change change) {
+        if (change != null) {
+            switch (change.type) {
+                case DELETE:
+                    return "was not deleted";
+                case PURGE:
+                    return "was not purged";
+                default:
+                    break;
+            }
+        }
+        return "should not exist";
     }
 
     @SuppressWarnings({"unchecked", "PMD.ExcessiveMethodLength", "PMD.NPathComplexity"})
@@ -226,7 +223,7 @@ public class Snapshot {
         allProps.addAll(expected.keySet());
         for (String prop: allProps) {
             String propPath = path;
-            if (path.length() > 2) { propPath += "."; }
+            if (!path.isEmpty()) { propPath += "."; }
             propPath += prop;
 
             final Object expectedVal = expected.get(prop);
