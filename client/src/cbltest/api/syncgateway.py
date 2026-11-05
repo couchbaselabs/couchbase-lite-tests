@@ -2137,8 +2137,8 @@ class _SyncGatewayBase:
                     cbl_info(f"SGCollect on {self.hostname} completed after {elapsed:.1f}s ({attempt} polls)")
                     return
                 raise Exception(
-                    f"SGCollect completed after {elapsed:.1f}s ({attempt} polls, {wait_time}s apart), "
-                    f"longer than the {limit}s limit"
+                    f"SGCollect was observed complete after {elapsed:.1f}s ({attempt} polls, {wait_time}s apart); "
+                    f"completion was not observed within the {max_attempts} polls budgeted for {limit}s"
                 )
             await asyncio.sleep(wait_time)
 
