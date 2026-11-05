@@ -2143,8 +2143,10 @@ class _SyncGatewayBase:
             await asyncio.sleep(wait_time)
 
         raise Exception(
-            f"SGCollect was still running after {time.monotonic() - start:.1f}s "
-            f"(even after the grace_attempts), hence unknown if it hung or finished later."
+            f"SGCollect completion was not observed after {time.monotonic() - start:.1f}s "
+            f"(including {grace_attempts} grace polls).\n"
+            f"Status: {status_resp.get('status')}.\n"
+            f"Error: {status_resp.get('error')}"
         )
 
     async def run_sgcollect(
