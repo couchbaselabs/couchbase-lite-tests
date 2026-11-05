@@ -2128,7 +2128,7 @@ class _SyncGatewayBase:
         """
         start = time.monotonic()
         limit = max_attempts * wait_time
-        grace_attempts = 5
+        grace_attempts = 12
         for attempt in range(1, max_attempts + grace_attempts + 1):
             status_resp = await self.get_sgcollect_status()
             if status_resp.get("status") in ["stopped", "completed"]:
