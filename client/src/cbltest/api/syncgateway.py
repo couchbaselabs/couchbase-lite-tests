@@ -867,13 +867,6 @@ class StartupConfigResponse(BaseModel):
     heap_profile_disable_collection: bool | None = None
 
 
-class ResyncAction(str, Enum):
-    """The action to perform via POST /{db}/_resync"""
-
-    START = "start"
-    STOP = "stop"
-
-
 class ResyncState(str, Enum):
     """The state of a Sync Gateway resync process, as reported by /{db}/_resync"""
 
@@ -2606,32 +2599,6 @@ class SyncGateway(_SyncGatewayBase):
             )
             return await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
 
-    async def _put_resync(
-        self,
-        db_name: str,
-        *,
-        action: ResyncAction,
-        reset: bool = False,
-    ) -> ResyncStatusResponse:
-        """
-        Starts or stops a resync operation via POST /{db}/_resync. The database
-        must be offline (see `SyncGatewayCluster.take_database_offline`) before
-        starting a resync.
-
-        :param db_name: The name of the database to resync.
-        :param action: Whether to start or stop the resync operation.
-        :param reset: Whether to discard previous resync progress before starting.
-            Only meaningful when ``action`` is :attr:`ResyncAction.START`.
-        """
-        with self._tracer.start_as_current_span(
-            "put_resync",
-            attributes={"sg.database.name": db_name, "sg.resync.action": action.value},
-        ):
-            params = {"action": action.value, "reset": "true" if reset else "false"}
-            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
-            assert isinstance(resp, dict)
-            return ResyncStatusResponse.model_validate(resp)
-
     async def start_resync(self, db_name: str, *, reset: bool = False) -> ResyncStatusResponse:
         """
         Starts a resync operation via POST /{db}/_resync. The database must be
@@ -2641,15 +2608,11 @@ class SyncGateway(_SyncGatewayBase):
         :param db_name: The name of the database to resync.
         :param reset: Whether to discard previous resync progress before starting.
         """
-        return await self._put_resync(db_name, action=ResyncAction.START, reset=reset)
-
-    async def stop_resync(self, db_name: str) -> ResyncStatusResponse:
-        """
-        Stops a running resync operation via POST /{db}/_resync.
-
-        :param db_name: The name of the database whose resync operation to stop.
-        """
-        return await self._put_resync(db_name, action=ResyncAction.STOP)
+        with self._tracer.start_as_current_span("start_resync", attributes={"sg.database.name": db_name}):
+            params = {"action": "start", "reset": "true" if reset else "false"}
+            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
 
     async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
         """
@@ -2684,28 +2647,6 @@ class SyncGateway(_SyncGatewayBase):
             tenacity.stop_after_attempt(max_retries),
         )
 
-    async def wait_for_resync_running(
-        self,
-        db_name: str,
-        *,
-        max_retries: int = 30,
-        retry_delay: int = 1,
-    ) -> ResyncStatusResponse:
-        """
-        Wait until the resync operation on this node reports Running, then
-        return its status.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        """
-        return await self._wait_for_resync_state(
-            db_name,
-            ResyncState.RUNNING,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-        )
-
     async def wait_for_resync_completed(
         self,
         db_name: str,
@@ -2724,28 +2665,6 @@ class SyncGateway(_SyncGatewayBase):
         return await self._wait_for_resync_state(
             db_name,
             ResyncState.COMPLETED,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-        )
-
-    async def wait_for_resync_stopped(
-        self,
-        db_name: str,
-        *,
-        max_retries: int = 30,
-        retry_delay: int = 2,
-    ) -> ResyncStatusResponse:
-        """
-        Wait until the resync operation on this node reports Stopped, then
-        return its final status.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        """
-        return await self._wait_for_resync_state(
-            db_name,
-            ResyncState.STOPPED,
             max_retries=max_retries,
             retry_delay=retry_delay,
         )
