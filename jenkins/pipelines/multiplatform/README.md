@@ -56,7 +56,7 @@ This directory contains scripts and configurations for running Couchbase Lite (C
 
 3. **SGW_VERSION**: Sync Gateway version (e.g., `3.2.3`)
 
-4. **TEST_NAME**: Optional test name to run (defaults to `test_delta_sync.py::TestDeltaSync::test_delta_sync_replication`)
+4. **TEST_NAME**: Optional pytest path or node ID within `tests/multiplatform` (empty or omitted runs every test there)
 
 **Note**: SSH private key is hardcoded to `~/.ssh/jborden.pem`
 
@@ -179,7 +179,7 @@ Use the standalone script to check available builds:
 ## File Structure
 
 ```
-p2p/
+multiplatform/
 ├── test_multiplatform.sh           # Main test execution script
 ├── setup_multiplatform.py          # Platform-specific setup logic with dynamic topology composition
 ├── latest_successful_build.sh      # Standalone build lookup utility

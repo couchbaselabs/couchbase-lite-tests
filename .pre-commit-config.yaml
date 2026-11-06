@@ -23,7 +23,7 @@ repos:
         name: check topology markers
         language: unsupported
         entry: uv run python scripts/check_topology_markers.py
-        files: ^tests/(functional|p2p|system|upgrade_sgw)/.*test_.*\.py$
+        files: ^tests/(functional|multiplatform|system|upgrade_sgw)/.*test_.*\.py$
       - id: pytest-collect
         name: pytest collect (tests/)
         language: unsupported

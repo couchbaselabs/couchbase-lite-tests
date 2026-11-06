@@ -42,7 +42,7 @@ assert _spec is not None and _spec.loader is not None
 ctm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ctm)
 
-TEST_DIRS = [REPO_ROOT / "tests" / d for d in ("functional", "p2p", "system", "upgrade_sgw")]
+TEST_DIRS = [REPO_ROOT / "tests" / d for d in ("functional", "multiplatform", "system", "upgrade_sgw")]
 
 
 def _iter_test_files() -> Iterator[Path]:

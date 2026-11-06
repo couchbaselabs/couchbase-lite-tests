@@ -22,10 +22,10 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | Path             | Contents                                                                                  | Sub-doc                                     |
 |------------------|-------------------------------------------------------------------------------------------|---------------------------------------------|
 | `client/`        | `cbltest` Python framework, pytest plugins, request/response API                          | [client/AGENTS.md](client/AGENTS.md)        |
-| `tests/`         | `functional/`, `p2p/`, `system/` and `upgrade_sgw/` suites                                | [tests/AGENTS.md](tests/AGENTS.md)          |
+| `tests/`         | `functional/`, `multiplatform/`, `system/` and `upgrade_sgw/` suites                                | [tests/AGENTS.md](tests/AGENTS.md)          |
 | `servers/`       | Per-platform test servers: `c/`, `dotnet/`, `ios/`, `jak/`, `javascript/`                 | [servers/AGENTS.md](servers/AGENTS.md)      |
 | `environment/`   | `aws/` (Terraform + orchestrator), `local/`, `LogSlurp/`, `otel-collector/`               | [environment/AGENTS.md](environment/AGENTS.md) |
-| `jenkins/`       | CI/CD pipelines: `functional/`, `main/`, `upg-sgw/`, `p2p/`                               | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
+| `jenkins/`       | CI/CD pipelines: `functional/`, `main/`, `upg-sgw/`, `multiplatform/`                               | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
 | `spec/`          | OpenAPI spec (`api/api.yaml`), test specs, dataset docs                                   | [spec/AGENTS.md](spec/AGENTS.md)            |
 | `dataset/`       | Test datasets: cblite2 databases, SGW configs, blobs                                      | [dataset/AGENTS.md](dataset/AGENTS.md)      |
 
@@ -113,7 +113,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Config Files (Generated — Do Not Hand-Edit)
 
-- Test config: `tests/{functional,p2p,system,upgrade_sgw}/config.json` (schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`)
+- Test config: `tests/{functional,multiplatform,system,upgrade_sgw}/config.json` (schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`)
 - Topology: `environment/aws/topology_setup/*.json` (schema: `topology_schema.json`)
 
 ## Branching
@@ -135,8 +135,8 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Recurring Patterns (Know Before Editing)
 
-1. **Jenkins per-platform `setup_test.py`** — most files under `jenkins/pipelines/functional/{platform}/` (and `upg-sgw`) are thin click wrappers calling `setup_test(...)` from `jenkins/pipelines/shared/`, differing only in `platform_name`, `topology_file`, and `config_file`. Exceptions: `functional/es` and `p2p` don't use the shared wrapper — they call `environment.aws.start_backend.script_entry` directly.
-2. **`conftest.py` `dataset_path` fixtures** — five near-identical copies in `tests/functional/`, `tests/p2p/`, `tests/system/`, `tests/upgrade_sgw/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
+1. **Jenkins per-platform `setup_test.py`** — most files under `jenkins/pipelines/functional/{platform}/` (and `upg-sgw`) are thin click wrappers calling `setup_test(...)` from `jenkins/pipelines/shared/`, differing only in `platform_name`, `topology_file`, and `config_file`. Exceptions: `functional/es` and `multiplatform` don't use the shared wrapper — they call `environment.aws.start_backend.script_entry` directly.
+2. **`conftest.py` `dataset_path` fixtures** — five near-identical copies in `tests/functional/`, `tests/multiplatform/`, `tests/system/`, `tests/upgrade_sgw/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
 3. **Server build scripts** — the `download_cbl.sh` → `build_*.sh` → package chain applies to the `c` and `ios` platforms; `dotnet` only has `build_cli.sh`/`.ps1`, `jak` builds via Gradle, and `javascript` via `npm`.
 4. **AWS setup scripts** — every `environment/aws/*_setup/setup_*.py` follows: SSH via `paramiko` → SFTP upload → `remote_exec` → start service (Docker / systemd).
 5. **Bucket cleanup mode** — `--bucketpool` picks how `cluster_cleanup` empties a Couchbase Server bucket between tests, through `CouchbaseServer.clean_bucket()`. `purge` (the default) empties the bucket in place with `purge_bucket()`, which runs the downloaded [`bucketpool`](https://github.com/couchbaselabs/bucketpool) tool, and keeps its collections and indexes, so `BucketPool` (`client/src/cbltest/api/couchbaseserver.py`) caps the cluster at 10 buckets and evicts the least recently used one. `delete` drops the bucket instead. There is no pool in `delete` mode, because nothing survives to reuse.

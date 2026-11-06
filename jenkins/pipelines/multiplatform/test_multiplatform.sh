@@ -4,7 +4,8 @@
 # Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <sgw_version> [test_name] topology-file
 # Examples:
 #   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3
-#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3 "test_delta_sync.py::TestDeltaSync::test_delta_sync_replication"
+#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3 "test_no_conflicts.py::TestNoConflicts"
+# An empty or missing test_name runs every test in tests/multiplatform.
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
@@ -13,10 +14,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../shared/config.sh
 
 function list_available_tests() {
-  echo "📋 Available tests (found in $P2P_TESTS_DIR):"
+  echo "📋 Available tests (found in $MULTIPLATFORM_TESTS_DIR):"
 
-  if [ -d "$P2P_TESTS_DIR" ]; then
-    cd "$P2P_TESTS_DIR"
+  if [ -d "$MULTIPLATFORM_TESTS_DIR" ]; then
+    cd "$MULTIPLATFORM_TESTS_DIR"
 
     # Find all test files and extract test methods
     for test_file in test_*.py; do
@@ -36,7 +37,7 @@ function list_available_tests() {
       fi
     done
   else
-    echo "  ❌ P2P tests directory not found: $P2P_TESTS_DIR"
+    echo "  ❌ Multi-platform tests directory not found: $MULTIPLATFORM_TESTS_DIR"
   fi
 }
 
@@ -46,7 +47,7 @@ function usage() {
   echo "Supported platforms: android, ios, dotnet, c, java"
   echo ""
   echo "Examples:"
-  echo "  # Auto-fetch latest builds with default test:"
+  echo "  # Auto-fetch latest builds and run every test:"
   echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2.3"
   echo ""
   echo "  # With specific test:"
@@ -58,12 +59,7 @@ function usage() {
   echo "  # List available tests:"
   echo "  $0 --list-tests"
   echo ""
-  echo "Common tests:"
-  echo "  - test_delta_sync.py::TestDeltaSync::test_delta_sync_utf8_strings (default)"
-  echo "  - test_delta_sync.py::TestDeltaSync::test_delta_sync_replication"
-  echo "  - test_no_conflicts.py::TestNoConflicts::test_no_conflicts_basic"
-  echo "  - test_replication_eventing.py::TestReplicationEventing::test_replication_eventing"
-  echo "  - Or any other pytest test specification"
+  echo "test_name is a pytest path or node ID within tests/multiplatform (default: every test there)."
   exit 1
 }
 
@@ -79,7 +75,7 @@ fi
 
 PLATFORM_CONFIGS="$1"
 SG_VERSION="$2"
-TEST_NAME="${3:-test_delta_sync.py::TestDeltaSync::test_delta_sync_replication}"
+TEST_NAME="${3:-}" # empty: every test in tests/multiplatform
 TOPOLOGY_FILE="$SCRIPT_DIR/${4:-topology.json}"
 
 # Validate inputs
@@ -102,7 +98,7 @@ echo "🚀 MULTIPLATFORM CBL TEST SETUP"
 echo "==============================="
 echo "📋 Platform configurations: $PLATFORM_CONFIGS"
 echo "🔄 SG version: $SG_VERSION"
-echo "🧪 Test: $TEST_NAME"
+echo "🧪 Test: ${TEST_NAME:-every test in tests/multiplatform}"
 echo " Topology: $TOPOLOGY_FILE"
 
 # Parse platform configurations
@@ -186,19 +182,19 @@ echo ""
 # Phase 2: Run the coordinated test
 echo "🧪 PHASE 2: RUNNING COORDINATED TEST"
 echo "==================================="
-echo "🎯 Test: $TEST_NAME"
+echo "🎯 Test: ${TEST_NAME:-every test in tests/multiplatform}"
 echo ""
 
 # Run tests following the same pattern as individual platform scripts
 echo "🏃 Running coordinated test across all platforms..."
 echo "========== PYTEST OUTPUT START =========="
 
-pushd "${P2P_TESTS_DIR}" >/dev/null
+pushd "${MULTIPLATFORM_TESTS_DIR}" >/dev/null
 
 # Set environment variables to prevent output truncation
 export COLUMNS=200
 
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "$TEST_NAME"; then
+if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "${TEST_NAME:-.}"; then
   echo "========== PYTEST OUTPUT END =========="
   echo ""
   echo "🎉 COORDINATED TEST PASSED!"

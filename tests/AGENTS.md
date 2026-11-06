@@ -6,7 +6,7 @@ The Python test suites that exercise Couchbase Lite via the `cbltest` framework.
 
 You own everything under `tests/`:
 - `tests/functional/` — functional tests (plus a `test_replication_filter_data.py` data helper); pipelines pick their slice by `min_*` marker, not by folder
-- `tests/p2p/` — peer-to-peer tests: multipeer replicator (`test_basic_multipeer.py`, `test_multipeer.py`) and listener-based replication (`test_peer_to_peer.py`, `test_peer_to_peer_topology.py`, `test_no_conflicts.py`); they need 2–6 test servers
+- `tests/multiplatform/` — tests that need several test servers (2–6): multipeer replicator (`test_basic_multipeer.py`, `test_multipeer.py`), listener-based replication (`test_peer_to_peer.py`, `test_peer_to_peer_topology.py`, `test_no_conflicts.py`), and several clients replicating with one Sync Gateway (`test_replication_multiple_clients.py`)
 - `tests/system/` — system tests (`test_system_multipeer.py`, `edge_server/test_system.py`)
 - `tests/upgrade_sgw/` — Sync Gateway upgrade tests (`upg_sgw` marker)
 - `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
@@ -26,14 +26,15 @@ tests/
 │   ├── test_replication_filter_data.py # Data helper for filter tests
 │   └── edge_server_config/             # Edge Server configs the tests load (SCRIPT_DIR / "edge_server_config")
 │
-├── p2p/                                # Peer-to-peer tests (2–6 test servers)
+├── multiplatform/                      # Tests needing several test servers (2–6)
 │   ├── conftest.py                     # Same dataset_path fixture
 │   ├── config.json                     # Generated — DO NOT hand-edit
 │   ├── test_basic_multipeer.py         # Multipeer replicator
 │   ├── test_multipeer.py
 │   ├── test_peer_to_peer.py            # Listener-based replication
 │   ├── test_peer_to_peer_topology.py
-│   └── test_no_conflicts.py
+│   ├── test_no_conflicts.py
+│   └── test_replication_multiple_clients.py  # Several clients, one Sync Gateway
 │
 ├── system/                             # System tests
 │   ├── conftest.py                     # Same dataset_path fixture
@@ -128,7 +129,7 @@ marker whatever its count, so a `0` marker pulls the test into a pipeline that i
 | Suite | Contents | Run by |
 |---|---|---|
 | `functional/` | Feature tests for CBL, SGW, P2P and Edge Server | `jenkins/pipelines/functional/`: platform pipelines (`-m min_test_servers`), `sgw` (`-m min_sync_gateways`), `es` (`-m min_edge_servers`) |
-| `p2p/` | Peer-to-peer scenarios: multipeer replicator and listener replication (2–6 test servers) | `p2p` (several test servers in one topology) |
+| `multiplatform/` | Scenarios needing several test servers (2–6): multipeer replicator, listener replication, several clients against one Sync Gateway | `multiplatform` (several test servers in one topology) |
 | `system/` | Long-running system scenarios | No scheduled pipeline yet |
 | `upgrade_sgw/` | SGW upgrade scenarios (`upg_sgw` marker) | `upg-sgw` |
 
@@ -219,5 +220,5 @@ cd tests/functional && uv run pytest -v --config config.json -m sgw -p randomly 
 | Test specs (dev_e2e) | [spec/tests/dev_e2e/](../spec/tests/dev_e2e/) | Behavior contracts mirroring `mark_test_step` |
 | Test specs (QE) | [spec/tests/QE/](../spec/tests/QE/) | Same, for tests that came from QE |
 | Datasets | [dataset/sg/](../dataset/sg/) | JSON data + SGW configs used in tests |
-| CI pipelines | [jenkins/pipelines/functional/](../jenkins/pipelines/functional/), [jenkins/pipelines/upg-sgw/](../jenkins/pipelines/upg-sgw/), [jenkins/pipelines/p2p/](../jenkins/pipelines/p2p/) | Drive these tests per platform |
+| CI pipelines | [jenkins/pipelines/functional/](../jenkins/pipelines/functional/), [jenkins/pipelines/upg-sgw/](../jenkins/pipelines/upg-sgw/), [jenkins/pipelines/multiplatform/](../jenkins/pipelines/multiplatform/) | Drive these tests per platform |
 | Config schema | `https://packages.couchbase.com/couchbase-lite/testserver.schema.json` | Validates `config.json` |

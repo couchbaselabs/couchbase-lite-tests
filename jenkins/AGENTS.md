@@ -9,7 +9,7 @@ You own everything under `jenkins/`:
 - `jenkins/pipelines/functional/` — pipelines that run `tests/functional`: one per CBL platform (`android`, `c`, `dotnet`, `ios`, `java`, `javascript`) plus `sgw` (`-m min_sync_gateways`) and `es` (`-m min_edge_servers`)
 - `jenkins/pipelines/main/` — daily triggers: `cbl/` starts `e2e-functional-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw` for new Sync Gateway builds; `es/` starts `functional/es` for new Edge Server builds
 - `jenkins/pipelines/upg-sgw/` — SGW upgrade pipelines (`tests/upgrade_sgw`)
-- `jenkins/pipelines/p2p/` — peer-to-peer pipeline: runs `tests/p2p` with several test servers in one topology
+- `jenkins/pipelines/multiplatform/` — multi-platform pipeline: runs `tests/multiplatform` with several test servers in one topology
 - `jenkins/pipelines/prebuild/` — test server prebuild pipeline
 - `jenkins/docker/` — Jenkins controller + agent Docker setup
 
@@ -48,7 +48,7 @@ jenkins/
 │   │   └── es/                         #   functional/es for new Edge Server builds
 │   │
 │   ├── upg-sgw/                        # SGW upgrade (iterates versions)
-│   └── p2p/                            # tests/p2p (several test servers)
+│   └── multiplatform/                  # tests/multiplatform (several test servers)
 │
 └── docker/                             # Jenkins server Docker setup
     ├── docker-compose.yml              # Controller + agent
@@ -108,12 +108,12 @@ if __name__ == "__main__":
 | `functional/sgw/` | `topology.json` | `config.json` | `sgw` | — |
 | `upg-sgw/` | `topology.json` | `config.json` | `upg-sgw` | `setup_dir="upgrade_sgw"` |
 | `functional/es/` | **Custom** — `generate_topology()` | `config.json` | `es` | Calls `start_backend()` directly |
-| `p2p/` | `topology.json` | `config_multiplatform.json` | varies | Own inline topology-composition logic, doesn't call shared `setup_test()` |
+| `multiplatform/` | `topology.json` | `config_multiplatform.json` | varies | Own inline topology-composition logic, doesn't call shared `setup_test()` |
 
 ### Exceptions to the template
 
 1. **`functional/es/setup_test.py`** — does NOT use `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly with ES-specific CLI options (`--sgw-version`, `--cbs-version`).
-2. **`p2p/setup_test.py`** — does not call the shared `setup_test()` at all; it has its own inline topology-composition logic.
+2. **`multiplatform/setup_test.py`** — does not call the shared `setup_test()` at all; it has its own inline topology-composition logic.
 
 ## Shared Scripts (`shared/`)
 

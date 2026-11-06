@@ -20,9 +20,9 @@ Topology must provide:
   "sync_gateways": [{"cluster": 0}, {"cluster": 1}]          // 2 SGW
 ```
 
-#### Peer-to-Peer Pipeline (p2p/)
+#### Multi-Platform Pipeline (multiplatform/)
 
-The `p2p/` pipeline (runs `tests/p2p`):
+The `multiplatform/` pipeline (runs `tests/multiplatform`):
 - **Cross-platform replication tests** — C, .NET, iOS, Java all syncing together
 - Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version maps
 - Single topology, multiple test servers

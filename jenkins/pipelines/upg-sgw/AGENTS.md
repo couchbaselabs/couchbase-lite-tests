@@ -1,16 +1,16 @@
-# Agent: SGW Upgrade and Multi-Platform Pipelines (jenkins/pipelines/upg-sgw/, jenkins/pipelines/p2p/)
+# Agent: SGW Upgrade and Multi-Platform Pipelines (jenkins/pipelines/upg-sgw/, jenkins/pipelines/multiplatform/)
 
 ## Identity
 
 You maintain the pipelines whose topologies go beyond one test server and one Sync Gateway:
-SGW upgrade scenarios (`upg-sgw/`) and peer-to-peer replication (`../p2p/`). You focus on
+SGW upgrade scenarios (`upg-sgw/`) and multi-platform tests (`../multiplatform/`). You focus on
 ensuring topology files match test requirements and on multi-node cluster configurations.
 
 ## Scope
 
 You own:
 - `jenkins/pipelines/upg-sgw/` — SGW upgrade (`Jenkinsfile`) and rolling upgrade (`Jenkinsfile_rolling`), running `tests/upgrade_sgw`
-- `jenkins/pipelines/p2p/` — runs `tests/p2p` with several test servers (on one or more platforms) in one topology
+- `jenkins/pipelines/multiplatform/` — runs `tests/multiplatform` with several test servers (on one or more platforms) in one topology
 
 Platform pipelines live in `../functional/`; the daily triggers live in `../main/` (`cbl/`, `sgw/`).
 
@@ -120,7 +120,7 @@ if __name__ == "__main__":
 4. Provision SGW version N+1
 5. Repeat tests (verifying data persistence)
 
-### Peer-to-Peer Pipeline (p2p/)
+### Multi-Platform Pipeline (multiplatform/)
 
 **Per-Platform Versions:**
 - Does not call the shared `setup_test()` — has its own inline topology-composition logic

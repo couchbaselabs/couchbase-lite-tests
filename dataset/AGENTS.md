@@ -1,6 +1,6 @@
 # Test Datasets — `dataset/`
 
-Binary and JSON fixtures consumed by `tests/functional/`, `tests/p2p/`, `tests/system/`, `tests/upgrade_sgw/`, and `client/smoke_tests/` via the `dataset_path` fixture. Couchbase Server backup archives (`dataset/couchbase-server/*.zip`) and Sync Gateway data/config pairs (`dataset/sg/*-sg.json` + `*-sg-config.json`) are tracked via Git LFS.
+Binary and JSON fixtures consumed by `tests/functional/`, `tests/multiplatform/`, `tests/system/`, `tests/upgrade_sgw/`, and `client/smoke_tests/` via the `dataset_path` fixture. Couchbase Server backup archives (`dataset/couchbase-server/*.zip`) and Sync Gateway data/config pairs (`dataset/sg/*-sg.json` + `*-sg-config.json`) are tracked via Git LFS.
 
 ## `upgrade` dataset (`dataset/couchbase-server/upgrade.zip`)
 

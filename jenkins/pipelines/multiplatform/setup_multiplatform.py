@@ -394,7 +394,7 @@ def setup_multiplatform_test(
     config_file_in: Path,
     topology_tag: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "p2p",
+    setup_dir: str = "multiplatform",
     auto_fetch_builds: bool = True,
     topology_file: str = "",
 ) -> None:

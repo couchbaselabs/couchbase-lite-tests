@@ -9,7 +9,7 @@ You own everything under `jenkins/pipelines/`:
 - `functional/` — pipelines that run `tests/functional`: one per CBL platform (`android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`) plus `sgw/` and `es/`
 - `main/` — daily triggers: `cbl/` starts `e2e-functional-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw`; `es/` starts `functional/es`
 - `upg-sgw/` — SGW upgrade pipelines
-- `p2p/` — peer-to-peer pipeline (`tests/p2p`, several test servers)
+- `multiplatform/` — multi-platform pipeline (`tests/multiplatform`, several test servers)
 - `prebuild/` — test server artifact prebuild pipeline
 
 ## ⚠️ Topology–Test Synchronization (most important rule)
@@ -83,7 +83,7 @@ Iterates SGW versions. Requires **≥ 2 SGW nodes and ≥ 2 CBS clusters** for u
 
 Does NOT use shared `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly. CLI options: `--sgw-version`, `--cbs-version`.
 
-### `p2p/`
+### `multiplatform/`
 
 Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version parsing.
 

@@ -16,5 +16,15 @@
             "download": true
         }
     ],
+    "clusters": [
+        {
+            "server_count": 1
+        }
+    ],
+    "sync_gateways": [
+        {
+            "cluster": 0
+        }
+    ],
     "logslurp": false
-} 
+}

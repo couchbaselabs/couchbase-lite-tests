@@ -24,7 +24,7 @@ def setup_multiplatform_test(
     platform_versions: dict,
     sgw_version: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "p2p",
+    setup_dir: str = "multiplatform",
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions.
@@ -149,7 +149,7 @@ def cli_entry(
     setup_multiplatform_test(
         platform_versions,
         sgw_version,
-        setup_dir="p2p",
+        setup_dir="multiplatform",
     )
 
 

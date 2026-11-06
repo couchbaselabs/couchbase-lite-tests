@@ -9,7 +9,7 @@ It coordinates infrastructure, platform test servers, and Python tests to valida
 
 1. Provision backend + test-server topology (`environment/aws` or `environment/local`)
 2. Generate/consume test config JSON
-3. Execute Python suites (`tests/functional`, `tests/p2p`, `tests/system`, `tests/upgrade_sgw`, or `client/smoke_tests`)
+3. Execute Python suites (`tests/functional`, `tests/multiplatform`, `tests/system`, `tests/upgrade_sgw`, or `client/smoke_tests`)
 4. Tests call `cbltest` APIs (`client/src/cbltest`)
 5. `cbltest` sends versioned REST requests to platform test servers (`servers/*`)
 6. Servers execute CBL operations and return typed responses
@@ -20,7 +20,7 @@ It coordinates infrastructure, platform test servers, and Python tests to valida
 | Module | Responsibility | Key Paths |
 |---|---|---|
 | Framework | Request factory, API wrappers, pytest plugins, config parsing | `client/src/cbltest/` |
-| Test suites | Scenario orchestration and assertions | `tests/functional/`, `tests/p2p/`, `tests/system/`, `tests/upgrade_sgw/` |
+| Test suites | Scenario orchestration and assertions | `tests/functional/`, `tests/multiplatform/`, `tests/system/`, `tests/upgrade_sgw/` |
 | Platform servers | Platform-specific execution of CBL operations | `servers/` |
 | Environment | Provisioning and lifecycle of CBS/SGW/ES/LB/LogSlurp/test servers | `environment/aws/`, `environment/local/` |
 | CI/CD | Repeatable validation and pipeline setup | `.github/workflows/`, `jenkins/pipelines/` |

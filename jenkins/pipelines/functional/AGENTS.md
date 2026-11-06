@@ -61,8 +61,8 @@ different marker and keep their own topologies.
 Change the CBL backend there, not per platform. `shared/setup_test.py` re-roots any relative `include`
 for the generated topology, so the include can live outside `environment/aws/topology_setup/`.
 
-The only `min_test_servers` tests this cannot satisfy are in `test_replication_multiple_clients.py`
-(`min_test_servers(2)`), since every platform topology has one test server.
+Every platform topology has one test server, so tests that need more live in `tests/multiplatform`
+and run in the `multiplatform` pipeline.
 
 ## Topology-Test Synchronization
 

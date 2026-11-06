@@ -244,4 +244,4 @@ cd servers/javascript && npm install && npm run dev
 | Test suites | [tests/functional/](../tests/functional/), [tests/system/](../tests/system/), [tests/upgrade_sgw/](../tests/upgrade_sgw/) | Exercise these servers via the framework |
 | Platform bridges | [environment/aws/topology_setup/test_server_platforms/](../environment/aws/topology_setup/test_server_platforms/) | Deploys and manages servers in AWS |
 | CI prebuild | [jenkins/pipelines/prebuild/](../jenkins/pipelines/prebuild/) | Builds server artifacts for CI |
-| CI test pipelines | [jenkins/pipelines/functional/](../jenkins/pipelines/functional/), [jenkins/pipelines/upg-sgw/](../jenkins/pipelines/upg-sgw/), [jenkins/pipelines/p2p/](../jenkins/pipelines/p2p/) | Runs tests against these servers |
+| CI test pipelines | [jenkins/pipelines/functional/](../jenkins/pipelines/functional/), [jenkins/pipelines/upg-sgw/](../jenkins/pipelines/upg-sgw/), [jenkins/pipelines/multiplatform/](../jenkins/pipelines/multiplatform/) | Runs tests against these servers |

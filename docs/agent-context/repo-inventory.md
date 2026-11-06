@@ -14,7 +14,7 @@
 
 - `client/src/cbltest/`: request/response APIs, plugin fixtures, v1/v2 protocol support
 - `client/smoke_tests/`: smoke validation entry points
-- `tests/functional/`, `tests/p2p/`, `tests/system/`, `tests/upgrade_sgw/`: test suites and `conftest.py` fixtures
+- `tests/functional/`, `tests/multiplatform/`, `tests/system/`, `tests/upgrade_sgw/`: test suites and `conftest.py` fixtures
 - `environment/aws/`: Terraform + Python orchestrator (`start_backend.py`, `stop_backend.py`)
 - `environment/local/`: local test server + Sync Gateway runner (no Docker/AWS)
 - `jenkins/pipelines/`: shared and platform-specific setup/test pipeline code
