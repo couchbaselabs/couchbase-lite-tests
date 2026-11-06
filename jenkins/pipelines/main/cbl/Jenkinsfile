@@ -1,3 +1,6 @@
+// Triggers the e2e-functional-<platform> jobs (jenkins/pipelines/functional/<platform>) for
+// the latest build of each Couchbase Lite train. Merges the former dev_e2e/main and QE/main.
+
 // platform -> [ [version: "4.2.0", build: "9", dataset: "4.0"], ... ]  (one entry per train)
 def resolved = [:]
 // "<platform> <train>" strings that failed to resolve; marks the build UNSTABLE.
@@ -9,47 +12,6 @@ def progetProductFor(String platform) {
     return "couchbase-lite-" + ((platform == "dotnet") ? "net" : platform)
 }
 
-// Look up a version's build number via ProGet get_version. Returns "" when the
-// version has no published build yet (404 / non-JSON body) rather than throwing.
-def getBuildNumber(String product, String version) {
-    def url = "http://proget.build.couchbase.com:8080/api/get_version?product=${product}&version=${version}"
-    return sh(
-        script: "curl -s --max-time 30 '${url}' | python3 -c 'import json,sys; s=sys.stdin.read().strip(); print(json.loads(s).get(\"BuildNumber\",\"\") if s.startswith(\"{\") else \"\")'",
-        returnStdout: true
-    ).trim()
-}
-
-// A fully-qualified "<version>-<build>" param is used as-is; otherwise the latest
-// build is looked up via ProGet get_version. Returns null when the train's latest
-// version has no published build yet (a normal new-train state right after a
-// manifest version bump, since the previous patch is frozen and can no longer be
-// built) so the caller can skip it quietly; genuine failures still throw.
-def resolveVersionBuild(proget, String product, String param, String label) {
-    def version = proget.resolveProgetVersion(product, param, label)
-    def buildNo
-    if (version.contains('-')) {
-        def parts = version.split('-', 2)
-        version = parts[0]
-        buildNo = parts[1]
-    } else {
-        buildNo = getBuildNumber(product, version)
-    }
-    if (!buildNo) { return null }  // no published build for this train yet
-    def major = version.tokenize('.')[0].toInteger()
-    return [version: version, build: buildNo, dataset: (major >= 4) ? "4.0" : "3.2"]
-}
-
-// Fetch the list of currently-supported (non-EOL) trains for a product, e.g.
-// get_trains?product=couchbase-lite-ios -> ["3.2","3.3","4.0","3.4","4.1","4.2"].
-def fetchTrains(String product) {
-    def url = "http://proget.build.couchbase.com:8080/api/get_trains?product=${product}"
-    def raw = sh(
-        script: "curl -sf --max-time 30 '${url}' | python3 -c 'import json,sys; print(\"\\n\".join(json.load(sys.stdin)))'",
-        returnStdout: true
-    ).trim()
-    return raw ? raw.tokenize() : []
-}
-
 pipeline {
     // Dedup state lives on this node's filesystem (~/.jenkins_build_info).
     agent { label 'qe-mac-india' }
@@ -57,10 +19,10 @@ pipeline {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
     parameters {
-        choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL platform to run QE tests for')
+        choice(name: 'CBL_PLATFORM', choices: ['all', 'c', 'android', 'java', 'ios', 'dotnet'], description: 'CBL platform to run functional tests for')
         string(name: 'CBL_VERSION', defaultValue: '', description: "CBL version or train (e.g. 4.2.0 or 4.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains, per platform. The build number is resolved automatically.")
-        string(name: 'SGW_VERSION', defaultValue: '4.0.0', description: 'The version of Sync Gateway to use')
-        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the QE test job(s) even if this version+build already ran')
+        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway version to use (a prefix such as 4 resolves to the latest release)')
+        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the functional test job(s) even if this version+build already ran')
     }
     options {
         ansiColor('xterm')
@@ -86,6 +48,7 @@ pipeline {
                 script {
                     def platforms = (params.CBL_PLATFORM == 'all') ? ALL_PLATFORMS : [params.CBL_PLATFORM]
                     def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
 
                     for (p in platforms) {
                         def product = progetProductFor(p)
@@ -97,7 +60,7 @@ pipeline {
                             trains = [params.CBL_VERSION.trim()]
                         } else {
                             try {
-                                trains = fetchTrains(product)
+                                trains = builds.fetchTrains(product)
                             } catch (Exception e) {
                                 echo "WARN: could not fetch trains for ${p} (${product}): ${e.getMessage()}"
                                 failed << "${p} (get_trains)"
@@ -115,12 +78,13 @@ pipeline {
                         def entries = []
                         for (train in trains) {
                             try {
-                                def info = resolveVersionBuild(proget, product, train, "CBL_VERSION")
+                                def info = builds.resolveVersionBuild(proget, product, train, "CBL_VERSION", true)
                                 if (info == null) {
                                     // No published build yet (new train) — normal, not a failure.
                                     echo "SKIP: ${p} train ${train} — no published build yet"
                                     continue
                                 }
+                                info.dataset = (info.version.tokenize('.')[0].toInteger() >= 4) ? "4.0" : "3.2"
                                 entries << info
                                 echo "${p}: CBL ${info.version}-${info.build} (dataset ${info.dataset})"
                             } catch (Exception e) {
@@ -140,13 +104,14 @@ pipeline {
                 }
             }
         }
-        stage('Trigger QE Tests') {
+        stage('Trigger Functional Tests') {
             steps {
                 script {
                     def selected = (params.CBL_PLATFORM == 'all') ? ALL_PLATFORMS : [params.CBL_PLATFORM]
                     def force = params.FORCE_TRIGGER
                     def sgwVersion = params.SGW_VERSION
                     def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    def triggers = load 'jenkins/pipelines/shared/triggerRecord.groovy'
 
                     // platform -> list of "<version>-<build>" actually triggered this run.
                     def triggeredByPlatform = [:]
@@ -157,26 +122,16 @@ pipeline {
                             echo "SKIP: ${platform} (no version could be resolved)"
                             continue
                         }
-                        def jobName = "qe-${platform}-pipeline"
+                        def jobName = "e2e-functional-${platform}"
 
-                        // Dedup per build: state is a { "<version>": "<build>" } map,
-                        // shared across all trains of this platform.
-                        def buildInfoFile = "${env.HOME}/.jenkins_build_info/${env.JOB_NAME}/${platform}.json"
-                        echo "Build Info File: ${buildInfoFile}"
-                        def buildInfo = [:]
-                        if (!force && fileExists(buildInfoFile)) {
-                            try {
-                                buildInfo = readJSON file: buildInfoFile, returnPojo: true
-                            } catch (Exception e) {
-                                echo "WARN : Error when reading ${platform}.json : ${e}"
-                            }
-                        }
+                        // Dedup per build, shared across all trains of this platform.
+                        def buildInfo = triggers.readRecord(platform)
 
                         def triggered = []
                         def skipped = []
                         for (info in entries) {
                             def fullVersion = "${info.version}-${info.build}"
-                            if (!force && buildInfo[info.version] == info.build) {
+                            if (!force && triggers.alreadyTriggered(buildInfo, info.version, info.build)) {
                                 echo "SKIP: ${platform} v${fullVersion} (already triggered)"
                                 skipped << fullVersion
                                 continue
@@ -190,7 +145,8 @@ pipeline {
 
                             echo "Triggering '${jobName}' for ${platform} v${fullVersion} (dataset ${info.dataset})"
                             build job: jobName, parameters: [
-                                string(name: "CBL_VERSION", value: fullVersion),
+                                string(name: "CBL_VERSION", value: info.version),
+                                string(name: "CBL_BUILD", value: info.build),
                                 string(name: "SGW_VERSION", value: sgwVersion),
                                 string(name: "TS_DATASET_VERSION", value: info.dataset)
                             ], wait: false
@@ -201,11 +157,7 @@ pipeline {
 
                         // Persist dedup state once, after all trains are processed.
                         if (triggered) {
-                            try {
-                                writeJSON file: buildInfoFile, json: buildInfo
-                            } catch (Exception e) {
-                                error "Cannot save ${platform}.json with error: ${e}"
-                            }
+                            triggers.saveRecord(platform, buildInfo)
                             triggeredByPlatform[platform] = triggered
                         }
 
@@ -216,7 +168,7 @@ pipeline {
                     def title = triggeredByPlatform ?
                         triggeredByPlatform.collect { p, v -> "${p}: ${v.join(', ')}" }.join('  |  ') :
                         'none'
-                    currentBuild.displayName = "QE ${params.CBL_PLATFORM}  |  ${title}  (#${currentBuild.number})"
+                    currentBuild.displayName = "${params.CBL_PLATFORM}  |  ${title}  (#${currentBuild.number})"
                 }
             }
         }
