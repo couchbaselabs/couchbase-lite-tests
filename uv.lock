@@ -299,6 +299,7 @@ dependencies = [
     { name = "bcrypt" },
     { name = "cbltest" },
     { name = "click" },
+    { name = "dotnetenv" },
     { name = "paramiko" },
     { name = "psutil" },
     { name = "pyyaml" },
@@ -312,9 +313,6 @@ dev = [
     { name = "pytest-repeat" },
     { name = "schemathesis" },
 ]
-dotnet-build = [
-    { name = "dotnetenv" },
-]
 lint = [
     { name = "ruff" },
     { name = "ty" },
@@ -326,6 +324,7 @@ requires-dist = [
     { name = "bcrypt", specifier = "==4.2.1" },
     { name = "cbltest", editable = "client" },
     { name = "click", specifier = "==8.1.8" },
+    { name = "dotnetenv", git = "https://github.com/couchbaselabs/couchbase-mobile-tools?subdirectory=dotnet_testing_env&rev=c7b7b451c31b1faff91730372ec554f907edcaf9" },
     { name = "paramiko", specifier = "==3.5.0" },
     { name = "psutil", specifier = "==7.0.0" },
     { name = "pyyaml", specifier = "==6.0.2" },
@@ -339,7 +338,7 @@ dev = [
     { name = "pytest-repeat", specifier = "==0.9.4" },
     { name = "schemathesis", specifier = "==4.32.7" },
 ]
-dotnet-build = [{ name = "dotnetenv", index = "https://proget.sc.couchbase.com/pypi/cbl-py/simple" }]
+dotnet-build = []
 lint = [
     { name = "ruff", specifier = ">=0.16.3" },
     { name = "ty", specifier = ">=0.0.72" },
@@ -404,11 +403,7 @@ wheels = [
 [[package]]
 name = "dotnetenv"
 version = "0.2.3"
-source = { registry = "https://proget.sc.couchbase.com/pypi/cbl-py/simple" }
-sdist = { url = "https://proget.sc.couchbase.com/pypi/cbl-py/download/dotnetenv/0.2.3/dotnetenv-0.2.3.tar.gz", hash = "sha512:ece6c6f255b1c5f1ff6bd26e82ee60916d300a3e6e69d5aef8312fccbe33d5253dbbe39ebbad92e1c54808df437f9502a3b71e6f94260626bfd011eba13f94af", size = 12861, upload-time = "2026-06-11T22:08:00.72Z" }
-wheels = [
-    { url = "https://proget.sc.couchbase.com/pypi/cbl-py/download/dotnetenv/0.2.3/dotnetenv-0.2.3-py3-none-any.whl", hash = "sha512:1d5ca6a090d9c7583241275b0ef61a20876a384ca22f1d79c8585eadf76708841286abb1b707c0ff737e4e478032d2bab4e99c0e3fc26986117791798467892d", size = 12715, upload-time = "2026-06-11T22:08:00.525Z" },
-]
+source = { git = "https://github.com/couchbaselabs/couchbase-mobile-tools?subdirectory=dotnet_testing_env&rev=c7b7b451c31b1faff91730372ec554f907edcaf9#c7b7b451c31b1faff91730372ec554f907edcaf9" }
 
 [[package]]
 name = "frozenlist"

@@ -1,6 +1,7 @@
 import asyncio
 import re
 import ssl
+import time
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Collection, Mapping
@@ -31,7 +32,7 @@ from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.assertions import _assert_not_null
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
-from cbltest.logging import cbl_error, cbl_trace, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
@@ -2119,19 +2120,31 @@ class _SyncGatewayBase:
     async def wait_for_sgcollect_to_complete(self, max_attempts: int = 100, wait_time: int = 5) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
-        Polls 60 times, waiting 2 seconds between each poll.
+        Polls up to max_attempts times, waiting wait_time seconds between each poll. If SGCollect is still running
+        after that, keeps polling a few more times only to report how long it actually took, then fails either way.
 
         :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
         :param wait_time: Time to wait between attempts
         """
-        for _ in range(max_attempts):
+        start = time.monotonic()
+        limit = max_attempts * wait_time
+        grace_attempts = 12
+        for attempt in range(1, max_attempts + grace_attempts + 1):
             status_resp = await self.get_sgcollect_status()
             if status_resp.get("status") in ["stopped", "completed"]:
-                return
+                elapsed = time.monotonic() - start
+                if attempt <= max_attempts:
+                    cbl_info(f"SGCollect on {self.hostname} completed after {elapsed:.1f}s ({attempt} polls)")
+                    return
+                raise Exception(
+                    f"SGCollect was observed complete after {elapsed:.1f}s ({attempt} polls, {wait_time}s apart); "
+                    f"completion was not observed within the {max_attempts} polls budgeted for {limit}s"
+                )
             await asyncio.sleep(wait_time)
 
         raise Exception(
-            f"SGCollect did not complete after {max_attempts * wait_time} seconds.\n"
+            f"SGCollect completion was not observed after {time.monotonic() - start:.1f}s "
+            f"(including {grace_attempts} grace polls).\n"
             f"Status: {status_resp.get('status')}.\n"
             f"Error: {status_resp.get('error')}"
         )
