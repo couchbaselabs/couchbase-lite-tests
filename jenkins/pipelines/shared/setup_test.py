@@ -25,28 +25,6 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 
-def ts_to_topology(ts_platform: str) -> str:
-    if ts_platform.startswith("swift"):
-        return "ios"
-
-    if ts_platform == "jak_android":
-        return "android"
-
-    if ts_platform.startswith("jak_"):
-        return "java"
-
-    if ts_platform.startswith("dotnet_"):
-        return "dotnet"
-
-    if ts_platform.startswith("c_"):
-        return "c"
-
-    if ts_platform == "js":
-        return "js"
-
-    raise ValueError(f"Unknown test server platform: {ts_platform}")
-
-
 def resolved_version(product: str, version: str | None) -> str:
     """
     Resolves `version` to a concrete released version of `product`. A full
@@ -58,13 +36,6 @@ def resolved_version(product: str, version: str | None) -> str:
         return version
 
     return resolve_latest_version(product, version)
-
-
-def get_platform_version(version_map: dict[str, str], platform: str) -> str:
-    if platform in version_map:
-        return version_map[platform]
-
-    raise ValueError(f"Platform {platform} not found in version map: {version_map}")
 
 
 def parse_versions(value: str) -> list[str]:
@@ -111,7 +82,7 @@ def setup_test(
     config_file_in: Path,
     topology_tag: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "dev_e2e",
+    setup_dir: str = "functional",
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version(s) and Sync Gateway version(s).
@@ -159,24 +130,13 @@ def setup_test(
     with open(topology_file_in) as fin:
         topology = cast(dict[str, Any], json.load(fin))
         topology["$schema"] = "topology_schema.json"
-        if "include" in topology and str(topology["include"]).endswith("default_topology.json"):
+        if "include" in topology:
+            # The include is relative to the template, but the topology is written (and read
+            # back) from topology_file_out's directory, so re-root it there.
             old_include = Path(str(topology["include"]))
             if not old_include.is_absolute():
                 absolute_include = (topology_file_in.parent / old_include).resolve()
-                if not absolute_include.is_relative_to(topology_file_out.parent):
-                    click.secho(f"When requesting include '{old_include}'", fg="yellow")
-                    click.secho(
-                        f"Resolved path {absolute_include} is not relative to {topology_file_out.parent}",
-                        fg="yellow",
-                    )
-                    click.secho(
-                        "Setting include to absolute path instead of adjusted relative",
-                        fg="yellow",
-                    )
-                    topology["include"] = str(absolute_include)
-                else:
-                    new_include = absolute_include.relative_to(topology_file_out.parent)
-                    topology["include"] = str(new_include)
+                topology["include"] = Path(os.path.relpath(absolute_include, topology_file_out.parent)).as_posix()
 
         topology["defaults"] = {
             "cbs": {"version": couchbase_server_version},
