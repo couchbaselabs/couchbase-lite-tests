@@ -108,12 +108,12 @@ if __name__ == "__main__":
 | `functional/sgw/` | `topology.json` | `config.json` | `sgw` | — |
 | `upg-sgw/` | `topology.json` | `config.json` | `upg-sgw` | `setup_dir="upgrade_sgw"` |
 | `functional/es/` | **Custom** — `generate_topology()` | `config.json` | `es` | Calls `start_backend()` directly |
-| `multiplatform/` | `topology.json` | `config_multiplatform.json` | varies | Own inline topology-composition logic, doesn't call shared `setup_test()` |
+| `multiplatform/` | `topology.json` | `config_multiplatform.json` | `multiplatform` | `setup_multiplatform.py` passes only the test servers `PLATFORM_VERSIONS` uses, `setup_dir="multiplatform"` |
 
 ### Exceptions to the template
 
 1. **`functional/es/setup_test.py`** — does NOT use `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly with ES-specific CLI options (`--sgw-version`, `--cbs-version`).
-2. **`multiplatform/setup_test.py`** — does not call the shared `setup_test()` at all; it has its own inline topology-composition logic.
+2. **`multiplatform/setup_multiplatform.py`** — not a thin wrapper: `setup_multiplatform.py` checks `PLATFORM_VERSIONS` against `topology.json` (every test server the agent can reach) and ProGet, then calls the shared `setup_test()` on just the test servers the entries use.
 
 ## Shared Scripts (`shared/`)
 

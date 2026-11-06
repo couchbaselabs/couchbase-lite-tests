@@ -23,10 +23,8 @@ Topology must provide:
 #### Multi-Platform Pipeline (multiplatform/)
 
 The `multiplatform/` pipeline (runs `tests/multiplatform`):
-- **Cross-platform replication tests** — C, .NET, iOS, Java all syncing together
-- Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version maps
-- Single topology, multiple test servers
-- Complex topology with multiple platforms and topologies
+- **Tests needing several test servers** — C, .NET, iOS, Android, Java, each on its own CBL version
+- `setup_multiplatform.py` checks `PLATFORM_VERSIONS` against `topology.json` (every test server the agent can reach) and ProGet, then calls the shared `setup_test()` on just the test servers the entries use.
 
 ## Important Files
 

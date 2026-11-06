@@ -123,7 +123,7 @@ if __name__ == "__main__":
 ### Multi-Platform Pipeline (multiplatform/)
 
 **Per-Platform Versions:**
-- Does not call the shared `setup_test()` — has its own inline topology-composition logic
+- `setup_multiplatform.py` checks `PLATFORM_VERSIONS` against `topology.json` (every test server the agent can reach) and ProGet, then calls the shared `setup_test()` on just the test servers the entries use.
 - Each platform can run different CBL version
 - Topology supports multiple test servers
 

@@ -85,7 +85,7 @@ Does NOT use shared `setup_test()`. Has its own `generate_topology()` and calls 
 
 ### `multiplatform/`
 
-Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version parsing.
+`setup_multiplatform.py` checks `PLATFORM_VERSIONS` against `topology.json` (every test server the agent can reach) and ProGet, then calls the shared `setup_test()` on just the test servers the entries use.
 
 ## `shared/setup_test.py` Recap
 
