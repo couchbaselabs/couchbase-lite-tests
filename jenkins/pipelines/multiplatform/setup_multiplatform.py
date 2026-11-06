@@ -390,6 +390,8 @@ def main(
     with open(topology_path) as fin:
         topology = json.load(fin)
     topology["test_servers"] = [topology["test_servers"][ts.index] for ts, _ in used]
+    # TODO: Trim the backend too when the run needs none. topology.json always provisions a Couchbase Server and a
+    # Sync Gateway, which multipeer and peer-to-peer runs (e.g. TS_TEST_FILTER=multipeer) never use.
     with tempfile.TemporaryDirectory() as tmp_dir:
         used_topology_path = Path(tmp_dir) / topology_path.name
         with open(used_topology_path, "w") as fout:
