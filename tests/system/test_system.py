@@ -88,7 +88,7 @@ class TestSystem(CBLTestClass):
 
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         config_path = str(tmp_path / "es_config.json")

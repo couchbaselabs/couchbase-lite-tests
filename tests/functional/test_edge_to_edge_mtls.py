@@ -73,7 +73,7 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
             await target.write_file(f"{CERT_DIR}/server.crt", server_cert_pem)
             await target.write_file(f"{CERT_DIR}/server.key", server_key_pem)
             await target.configure_dataset(
-                db_name="db", config_file=f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_target.json"
+                db_name="db", config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_to_edge_mtls_target.json"
             )
 
             self.mark_test_step("Push client cert/key + CA to the source host")
@@ -82,7 +82,7 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
             await source.write_file(f"{CERT_DIR}/ca.crt", ca_pem)
 
             self.mark_test_step("Configure the source with a config-file mTLS replication to the target")
-            config = await read_json_file(f"{SCRIPT_DIR}/config/test_edge_to_edge_mtls_source.json")
+            config = await read_json_file(f"{SCRIPT_DIR}/edge_server_config/test_edge_to_edge_mtls_source.json")
             config["replications"][0]["target"] = f"wss://{target_host}:59840/db"
             # Write the run-specific target into a temp file so the checked-in fixture stays clean.
             config_path = str(tmp_path / "mtls_source_config.json")

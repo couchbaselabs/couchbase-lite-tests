@@ -263,7 +263,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """Default ``--junitxml=junit_result.xml`` so pytest_sessionfinish can read pass/fail counts from the XML.
 
     Done here rather than ``addopts`` in ``client/pyproject.toml``: pytest's rootdir discovery walks up from the cwd
-    and picks the repo-root ``pyproject.toml`` for production runs from ``tests/QE``/``tests/dev_e2e``, never reaching
+    and picks the repo-root ``pyproject.toml`` for production runs from ``tests/functional``/``tests/system``/``tests/upgrade_sgw``, never reaching
     ``client/pyproject.toml``. An explicit ``--junitxml=<path>`` on the CLI still wins (pytest's last-wins behavior).
     """
     if not getattr(config.option, "xmlpath", None):

@@ -22,7 +22,7 @@ class TestEdgeServerSync(CBLTestClass):
         source_db = sync_gateway.replication_url("travel")
 
         self.mark_test_step("Configure Edge Server with travel dataset")
-        config_path = f"{SCRIPT_DIR}/config/test_sgw_edge_server.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_sgw_edge_server.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = source_db
         config_path = str(tmp_path / "es_config.json")
@@ -85,8 +85,8 @@ class TestEdgeServerSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
         self.mark_test_step("test_edge_to_edge_replication")
-        config_path1 = f"{SCRIPT_DIR}/config/test_primary_edge.json"
-        config_path2 = f"{SCRIPT_DIR}/config/test_edge_to_edge_server.json"
+        config_path1 = f"{SCRIPT_DIR}/edge_server_config/test_primary_edge.json"
+        config_path2 = f"{SCRIPT_DIR}/edge_server_config/test_edge_to_edge_server.json"
 
         self.mark_test_step("Configure Edge Server with travel dataset")
         edge_server1 = await cblpytest.edge_servers[0].configure_dataset(db_name="travel", config_file=config_path1)

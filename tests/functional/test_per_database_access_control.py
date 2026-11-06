@@ -24,10 +24,10 @@ from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
-ROOT_TRUE_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control.json"
-ROOT_FALSE_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control_root_false.json"
-OPT_IN_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control_opt_in.json"
-TRAVEL_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control_travel.json"
+ROOT_TRUE_CONFIG = f"{SCRIPT_DIR}/edge_server_config/test_per_db_access_control.json"
+ROOT_FALSE_CONFIG = f"{SCRIPT_DIR}/edge_server_config/test_per_db_access_control_root_false.json"
+OPT_IN_CONFIG = f"{SCRIPT_DIR}/edge_server_config/test_per_db_access_control_opt_in.json"
+TRAVEL_CONFIG = f"{SCRIPT_DIR}/edge_server_config/test_per_db_access_control_travel.json"
 
 # Every config here reads this file, so the provisioned users.json is never touched.
 USERS_FILE = "/home/ec2-user/user/per_db_access_users.json"

@@ -16,8 +16,8 @@ from cbltest.api.replicator_types import (
 )
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = str(SCRIPT_DIR / "config" / "test_access_control.json")
-USERS = SCRIPT_DIR / "config" / "test_access_control_users.json"
+CONFIG = str(SCRIPT_DIR / "edge_server_config" / "test_access_control.json")
+USERS = SCRIPT_DIR / "edge_server_config" / "test_access_control_users.json"
 USERS_FILE = "/home/ec2-user/user/access_control_users.json"
 PASSWORD = "password"
 HOTELS = "travel.hotels"

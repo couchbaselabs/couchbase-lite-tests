@@ -16,7 +16,7 @@ class TestCrud(CBLTestClass):
     async def test_basic_information_retrieval(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_basic_information_retrieval")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("get server information")
         version = await edge_server.get_version()
@@ -26,7 +26,7 @@ class TestCrud(CBLTestClass):
     async def test_database_config(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_database_config")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("fetch all databases")
         all_dbs = await edge_server.get_all_dbs()
@@ -42,7 +42,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("test_single_doc_crud")
         db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("create single document with Auto ID")
         doc = {"test": "This is a test document"}
@@ -78,7 +78,7 @@ class TestCrud(CBLTestClass):
     async def test_sub_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("test_sub_doc_crud")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json"
         )
         db_name = "db"
         self.mark_test_step("create single document with Auto ID")
@@ -109,7 +109,7 @@ class TestCrud(CBLTestClass):
         self.mark_test_step("test_single_doc_crud_tll")
         db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json"
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json"
         )
         self.mark_test_step("create single document with Auto ID")
         doc = {"test": "This is a test document"}
@@ -153,7 +153,7 @@ class TestCrud(CBLTestClass):
     async def test_multiple_doc_crud(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name="names",
-            config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/adhoc_disabled_config.json",
         )
 
         self.mark_test_step("Fetch existing documents to prepare a list of bulk changes")

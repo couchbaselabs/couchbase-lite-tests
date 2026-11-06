@@ -12,7 +12,7 @@ from cbltest.api.x509_certificate import CertKeyPair, create_ca_certificate, cre
 from cbltest.asyncfile import read_json_file, write_json_file
 
 SCRIPT_DIR = str(Path(__file__).parent)
-TARGET_USERS = Path(SCRIPT_DIR) / "config" / "test_e2e_mtls_users.json"
+TARGET_USERS = Path(SCRIPT_DIR) / "edge_server_config" / "test_e2e_mtls_users.json"
 TARGET_USERS_FILE = "/home/ec2-user/user/e2e_mtls_users.json"
 """The target's own users file, so the provisioned users.json never gains an access block."""
 
@@ -74,7 +74,7 @@ async def _start_target(
     await target.write_file(client_ca_path, _cert_bytes(ca, fmt))
     await target.write_file(TARGET_USERS_FILE, TARGET_USERS.read_text())
 
-    config = await read_json_file(f"{SCRIPT_DIR}/config/test_e2e_mtls_target.json")
+    config = await read_json_file(f"{SCRIPT_DIR}/edge_server_config/test_e2e_mtls_target.json")
     config["https"] = {"tls_cert_path": cert_path, "tls_key_path": key_path, "client_cert_path": client_ca_path}
     config_path = str(tmp_path / "target_config.json")
     await write_json_file(config_path, config)
@@ -89,7 +89,7 @@ async def _start_source(
     trusted_roots_path = f"{REMOTE_CERT_DIR}/trusted_roots.pem"
     await source.write_file(trusted_roots_path, ca.pem_bytes())
 
-    config = await read_json_file(f"{SCRIPT_DIR}/config/test_e2e_mtls_source.json")
+    config = await read_json_file(f"{SCRIPT_DIR}/edge_server_config/test_e2e_mtls_source.json")
     replication = config["replications"][0]
     replication["target"] = f"wss://{cblpytest.edge_servers[1]}:{ES_PORT}/db"
     replication["trusted_root_certs"] = trusted_roots_path

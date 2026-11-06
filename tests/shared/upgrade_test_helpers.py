@@ -57,7 +57,7 @@ def is_initial_upgrade_phase() -> bool:
     with no state to inherit from the phase before it.
 
     `SGW_UPGRADE_PHASE` is set per pytest invocation by the upgrade pipelines
-    (`jenkins/pipelines/QE/upg-sgw/test{,_rolling}.sh`); unset means no pipeline is
+    (`jenkins/pipelines/upg-sgw/test{,_rolling}.sh`); unset means no pipeline is
     driving the test, which is treated the same as the first phase.
     """
     return os.environ.get("SGW_UPGRADE_PHASE", "") in ("", "initial")

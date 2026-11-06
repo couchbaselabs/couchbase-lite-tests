@@ -25,8 +25,8 @@ from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.responses import ServerVariant
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = str(SCRIPT_DIR / "config" / "test_session.json")
-USERS = SCRIPT_DIR / "config" / "test_session_users.json"
+CONFIG = str(SCRIPT_DIR / "edge_server_config" / "test_session.json")
+USERS = SCRIPT_DIR / "edge_server_config" / "test_session_users.json"
 USERS_FILE = "/home/ec2-user/user/session_users.json"
 DB = "travel"
 OTHER_DB = "names"

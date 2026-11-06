@@ -15,8 +15,8 @@ from cbltest.api.error import CblEdgeServerBadResponseError, CblTimeoutError
 from cbltest.api.syncgateway import get_basic_auth_headers
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = SCRIPT_DIR / "config" / "test_access_control.json"
-USERS = SCRIPT_DIR / "config" / "test_access_control_users.json"
+CONFIG = SCRIPT_DIR / "edge_server_config" / "test_access_control.json"
+USERS = SCRIPT_DIR / "edge_server_config" / "test_access_control_users.json"
 USERS_FILE = "/home/ec2-user/user/access_control_users.json"
 EDGE_LOG = "/home/ec2-user/log/edge.log"
 PASSWORD = "password"

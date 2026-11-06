@@ -19,7 +19,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Creating a document with TTL of 5 seconds")
@@ -46,7 +46,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Creating a document with Expires of 5 seconds")
@@ -76,7 +76,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Creating a document with TTL of 30 seconds")
@@ -117,7 +117,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Creating a document with TTL of 10 seconds and Expires of 30 seconds")
@@ -184,7 +184,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Checking if updating TTL of a non-existent document returns 404")
@@ -198,7 +198,7 @@ class TestTTLExpires(CBLTestClass):
 
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         # Document distribution:
