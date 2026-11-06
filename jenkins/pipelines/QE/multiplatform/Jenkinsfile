@@ -126,7 +126,7 @@ pipeline {
         }
         stage('Setup and Run Tests') {
             when { beforeAgent true; expression { env.SKIP_RUN != 'true' } }
-            agent { label 'qe-mac-india' }
+            agent { label 'mac-mini-new' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
                 DOTNET_ROOT = "/opt/homebrew/opt/dotnet/libexec"
