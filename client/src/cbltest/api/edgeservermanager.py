@@ -45,6 +45,9 @@ class EdgeServerManager:
         self.__sidecar = Shell2HttpClient("Edge Server", info.hostname, error=CblEdgeServerBadResponseError)
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
+        # Whether the host may differ from its provisioned state.  It starts out True,
+        # because a previous run may have been interrupted before cleaning up.
+        self.__changed = True
 
     def __str__(self) -> str:
         return self.__info.hostname
@@ -52,6 +55,15 @@ class EdgeServerManager:
     def __declares_users(self) -> bool:
         """Whether the running config declares users.  One that does not rejects any credentials."""
         return EdgeServerConfig.load(self.__config_file).declares_users
+
+    @property
+    def changed_since_reset(self) -> bool:
+        """
+        Whether anything may have changed the host since :func:`reset_to_initial_state`
+        last finished: every sidecar call but log collection counts, e.g. a restart, a
+        new config or a firewall rule.  True until the first reset.
+        """
+        return self.__changed
 
     @property
     def admin_user(self) -> str:
@@ -90,12 +102,17 @@ class EdgeServerManager:
         path: str,
         payload: JSONDictionary | None = None,
         timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT,
+        changes_state: bool = True,
     ) -> str:
         """Call a shell2http endpoint on the Edge Server host, raising unless the script succeeded.
 
         :param timeout: Total HTTP timeout in seconds.  See :meth:`Shell2HttpClient.call`.
+        :param changes_state: False for an endpoint that only reads the host, such as log
+            collection, which leaves :attr:`changed_since_reset` alone
         :return: The response body, which every endpoint but this one ignores
         """
+        if changes_state:
+            self.__changed = True
         return await self.__sidecar.call(
             method,
             path,
@@ -276,7 +293,9 @@ class EdgeServerManager:
             timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             safe_host = self.__info.hostname.replace(".", "-").replace(":", "-")
             filename = f"es-collect-{safe_host}-{timestamp}.tar.gz"
-            response = await self._call_sidecar("post", "/collect-logs", JSONDictionary({"filename": filename}))
+            response = await self._call_sidecar(
+                "post", "/collect-logs", JSONDictionary({"filename": filename}), changes_state=False
+            )
             # tar reports a file that changed as it was read, which still leaves a usable
             # archive.  A body that is not the JSON the script emits is not worth losing it over.
             with suppress(json.JSONDecodeError, AttributeError):
@@ -317,3 +336,4 @@ class EdgeServerManager:
             await self.kill_server()
             await self._call_sidecar("post", "/reset-all-dbs")
             await self.__start_process(self.__info.config_path)
+            self.__changed = False
