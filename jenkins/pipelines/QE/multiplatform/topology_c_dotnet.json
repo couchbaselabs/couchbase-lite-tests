@@ -8,9 +8,9 @@
 			"download": true
 		},
 		{
-			"platform": "dotnet_macos",
+			"platform": "swift_ios",
 			"cbl_version": "{{version}}",
-			"location": "localhost",
+			"location": "00008101-000E0519020A001E",
 			"download": true
 		}
 	],
