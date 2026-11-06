@@ -69,3 +69,34 @@ the load balancer, so it also runs on the JS test server.
 4. Verify the channel-restricted user sees it on SG1's `request_plus` `_changes` feed, which needs the channel the bug
    lost
 5. Pull it through CBL directly from SG1 as that user, and verify the pull transferred it
+
+## test_checkpoint_404_keeps_tombstoned_doc_deleted
+
+Regression coverage for CBG-5904 (root cause CBSE-23569): a checkpoint ID is shared between a pull and a pushAndPull
+replicator for the same (local db, remote URL, collections) tuple, direction is not part of its hash. Combined with the
+load-balancer checkpoint-sharing mechanism this suite already exercises, a CBL client that has only ever pulled through
+SG1 presents that SAME checkpoint ID to SG2 the first time a replication lands there. SG2 has no record of it -- a
+genuine checkpoint-404, not a client-driven reset -- so it runs `proposeChanges` with an empty `remoteAncestorRev`.
+LiteCore's anti-echo protection, which guards against this exact push/pull race in continuous mode, is not wired up for
+one-shot `pushAndPull`, so with revision trees the client's stale, long-since tombstoned revision gets proposed and
+accepted by Sync Gateway as a disconnected new rev-tree root (`branched:true` in Sync Gateway's own logs, no 409, no
+conflict rejection). Version vectors in Sync Gateway and Couchbase Lite 4.0 keep enough history to reject it, so the
+test asserts the document stays deleted.
+
+Skipped when the test server's CBL lacks version vectors (below 4.0.0, and on JS and React Native), where the
+resurrection is known, intended client behavior, and when it can't send custom replicator headers. CBL 4.x always runs
+against SGW 4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
+
+1. Create the database and user on SG1 and SG2 as in the first test, with `revs_limit` set to 5, and start the ISGR link
+2. Create doc `d1` directly on SG1, and wait for its ID on SG2's changes feed. A timeout reports the ISGR link's status
+3. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`), its first contact. Expect
+   SG1's since-zero count to grow by 1, SG2's not to move, and the pull to transfer `d1`. This is the client's only
+   contact with SG1, and it holds `d1` at revision generation 1 from here on
+4. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it. Expect the tombstone at revision
+   generation 8, the generation seen in the original reproduction
+5. Wait for `d1` to appear as a tombstone on SG2's changes feed, as in step 2
+6. Run a one-shot pushAndPull replication pinned to SG2 (`X-Backend: sg-1`), SG2's first contact with this client. The
+   client still offers only the stale generation-1 revision from step 3. Expect SG2's propose count to grow by exactly
+   1, the stale `d1`, and SG1's not to move. No document is written on SG1 after step 5, so ISGR adds no proposals to
+   SG2
+7. Verify `d1` is still deleted on SG2: a GET for it answers 404

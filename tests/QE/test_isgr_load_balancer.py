@@ -2,6 +2,7 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -33,6 +34,7 @@ async def _setup_isgr_pair(
     channels: list[str],
     user_name: str,
     user_password: str,
+    revs_limit: int | None = None,
 ) -> tuple[SyncGateway, SyncGateway]:
     """
     Gives a test two independent backends, SG1 and SG2, with the same database and user, kept in sync by ISGR. Each
@@ -53,6 +55,7 @@ async def _setup_isgr_pair(
                 num_index_replicas=0,
                 scopes={"_default": ScopeConfig(collections={"_default": {}})},
                 unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
+                revs_limit=revs_limit,
             ),
         )
         await sg.reset_user(db_name, user_name, user_password, channels)
@@ -82,13 +85,24 @@ async def _wait_for_propagation(
     db_name: str,
     doc_ids: list[str],
     link_owner: SyncGateway,
+    deleted: bool = False,
 ) -> None:
     """Waits for `doc_ids` to reach `secondary` via ISGR, so a broken link fails with its status, not a bare timeout."""
     try:
-        await secondary.wait_for_documents(db_name, doc_ids)
+        await secondary.wait_for_documents(db_name, doc_ids, deleted=deleted)
     except TimeoutError as e:
         status = await link_owner.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         raise AssertionError(f"{e} -- ISGR status on {link_owner.hostname}: {status}") from e
+
+
+async def _assert_still_deleted(sg: SyncGateway, db_name: str, doc_id: str) -> None:
+    """Fails if `doc_id` is live on `sg`. Sync Gateway answers a GET for a tombstoned document with a 404."""
+    try:
+        doc = await sg.get_document(db_name, doc_id)
+    except CblSyncGatewayBadResponseError as e:
+        assert e.code == 404, f"Expected a 404 for the tombstoned {doc_id} on {sg.hostname}, got {e.code}"
+        return
+    raise AssertionError(f"{doc_id} was resurrected on {sg.hostname} at {doc.revid}")
 
 
 def _assert_no_isgr_reconnect(snapshot: SyncGatewayStats.PerDatabase, connects_before: int) -> None:
@@ -148,15 +162,11 @@ class TestISGRLoadBalancer(CBLTestClass):
             "ISGR channel-loss fix: CBG-5772 (4.0.8), CBG-5773 (4.1.2); 4.1.0.1 lacks it",
         )
 
-    async def _skip_if_unpinnable(self, cblpytest: CBLPyTest) -> None:
-        """Skips test servers that can't send the X-Backend pin header, and SGW without the channel-loss fix."""
-        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
-        await self._skip_if_unfixed_sgw(cblpytest)
-
     @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
-        await self._skip_if_unpinnable(cblpytest)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
+        await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb"
         channels = ["isgr_lb_test"]
@@ -247,7 +257,8 @@ class TestISGRLoadBalancer(CBLTestClass):
     @pytest.mark.min_load_balancers(2)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
-        await self._skip_if_unpinnable(cblpytest)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
+        await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb_push"
         channels = ["isgr_lb_push_test"]
@@ -314,6 +325,7 @@ class TestISGRLoadBalancer(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_isgr_pull_preserves_channel_set(self, cblpytest: CBLPyTest) -> None:
+        # Connects to SG1 directly, it passes no headers.
         await self._skip_if_unfixed_sgw(cblpytest)
 
         db_name = "db_isgr_lb_channels"
@@ -353,3 +365,99 @@ class TestISGRLoadBalancer(CBLTestClass):
         assert status.error is None, f"Pull from SG1 failed: {status.error}"
         pulled = {update.document_id for update in replicator.document_updates if update.error is None}
         assert doc_id in pulled, f"Expected the pull from SG1 to transfer {doc_id}, got {pulled}"
+
+    @pytest.mark.min_load_balancers(2)
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_checkpoint_404_keeps_tombstoned_doc_deleted(self, cblpytest: CBLPyTest) -> None:
+        await self.skip_if_not_supports(
+            cblpytest.test_servers[0],
+            CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS,
+            CouchbaseLiteFeature.VERSION_VECTORS,
+        )
+
+        db_name = "db_isgr_lb_resurrection"
+        channels = ["isgr_lb_resurrection_test"]
+        user_name, user_password = "isgr_lb_resurrection_user", "pass"
+        doc_id = "d1"
+        revs_limit = 5
+
+        self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
+        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password, revs_limit=revs_limit)
+
+        self.mark_test_step(f"Create doc {doc_id} directly on SG1, and wait for it to reach SG2 via ISGR")
+        await sg1.update_documents(
+            db_name,
+            [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})],
+            wait_for_caching_feed=True,
+        )
+        await _wait_for_propagation(sg2, db_name, [doc_id], link_owner=sg1)
+
+        self.mark_test_step("Create an empty local CBL database, and pull once pinned to SG1, its first contact")
+        db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
+        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
+        connects_before = _connect_attempts(sg1_stats)
+        sg1_since_zero = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero
+        sg2_since_zero = sg2_stats.cbl_replication_pull.num_pull_repl_since_zero
+        seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
+        sg1_stats = await sg1.get_db_stats(db_name)
+        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        sg1_delta = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero - sg1_since_zero
+        assert sg1_delta == 1, f"Expected SG1's first contact to start from since=0 once, got {sg1_delta}"
+        sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - sg2_since_zero
+        assert sg2_delta == 0, (
+            f"Seed pull pinned with {_SG1_PIN} moved {sg2.hostname}'s since-zero count by {sg2_delta}, so the pin"
+            f" reached {sg2.hostname} instead of {sg1.hostname}"
+        )
+        pulled = {u.document_id for u in seed_pull.document_updates if u.error is None}
+        assert doc_id in pulled, f"Expected the seeding pull pinned to SG1 to transfer {doc_id}, got {pulled}"
+
+        self.mark_test_step(
+            f"Mutate {doc_id} on SG1 six times past its revs_limit ({revs_limit}), then tombstone it -- landing the"
+            f" tombstone at revision generation 8 -- without the local CBL client ever being told"
+        )
+        current = await sg1.get_document(db_name, doc_id)
+        num_mutations = 6
+        for mutation_index in range(num_mutations):
+            current = await sg1.update_document(
+                db_name,
+                doc_id,
+                {"channels": channels, "mutation": mutation_index},
+                current.revid,
+            )
+        tombstone = await sg1.delete_document(doc_id, current.revid, db_name)
+        assert tombstone.revid.split("-")[0] == str(num_mutations + 2), (
+            f"Expected the tombstone to land at revision generation {num_mutations + 2}, got {tombstone.revid}"
+        )
+
+        self.mark_test_step("Wait for the tombstone to propagate to SG2 via ISGR")
+        await _wait_for_propagation(sg2, db_name, [doc_id], link_owner=sg1, deleted=True)
+
+        self.mark_test_step(
+            "Fire a one-shot bidirectional replication pinned to SG2 -- its first-ever contact with this CBL client, "
+            "a genuine checkpoint-404. The client still offers only the stale generation-1 revision it pulled before"
+        )
+        sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
+        connects_before = _connect_attempts(sg1_stats)
+        sg1_proposed = sg1_stats.cbl_replication_push.propose_change_count
+        sg2_proposed = sg2_stats.cbl_replication_push.propose_change_count
+        await _pinned_replication(
+            db,
+            repl_url,
+            user_name,
+            user_password,
+            _SG2_PIN,
+            replicator_type=ReplicatorType.PUSH_AND_PULL,
+        )
+        sg1_stats = await sg1.get_db_stats(db_name)
+        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        sg1_delta = sg1_stats.cbl_replication_push.propose_change_count - sg1_proposed
+        assert sg1_delta == 0, (
+            f"pushAndPull pinned with {_SG2_PIN} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin"
+            f" reached {sg1.hostname} instead of {sg2.hostname}"
+        )
+        sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_push.propose_change_count - sg2_proposed
+        assert sg2_delta == 1, f"Expected the client to propose {doc_id} to SG2 exactly once, got {sg2_delta}"
+
+        self.mark_test_step(f"Verify {doc_id} is still deleted on SG2")
+        await _assert_still_deleted(sg2, db_name, doc_id)
