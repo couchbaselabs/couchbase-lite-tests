@@ -10,13 +10,13 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source $SCRIPT_DIR/../../shared/config.sh
+source $SCRIPT_DIR/../shared/config.sh
 
 function list_available_tests() {
-  echo "📋 Available tests (found in $QE_TESTS_DIR):"
+  echo "📋 Available tests (found in $P2P_TESTS_DIR):"
 
-  if [ -d "$QE_TESTS_DIR" ]; then
-    cd "$QE_TESTS_DIR"
+  if [ -d "$P2P_TESTS_DIR" ]; then
+    cd "$P2P_TESTS_DIR"
 
     # Find all test files and extract test methods
     for test_file in test_*.py; do
@@ -36,7 +36,7 @@ function list_available_tests() {
       fi
     done
   else
-    echo "  ❌ QE tests directory not found: $QE_TESTS_DIR"
+    echo "  ❌ P2P tests directory not found: $P2P_TESTS_DIR"
   fi
 }
 
@@ -164,7 +164,7 @@ echo ""
 # Phase 1: Setup all platforms using centralized multiplatform setup
 echo "🔧 PHASE 1: SETTING UP CBL TEST SERVERS"
 echo "======================================="
-echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" >>$SCRIPT_DIR/../../../../servers/jak/android/gradle.properties
+echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" >>$SCRIPT_DIR/../../../servers/jak/android/gradle.properties
 echo "🏗️ Using centralized multiplatform setup..."
 cd "$SCRIPT_DIR"
 
@@ -193,7 +193,7 @@ echo ""
 echo "🏃 Running coordinated test across all platforms..."
 echo "========== PYTEST OUTPUT START =========="
 
-pushd "${QE_TESTS_DIR}" >/dev/null
+pushd "${P2P_TESTS_DIR}" >/dev/null
 
 # Set environment variables to prevent output truncation
 export COLUMNS=200

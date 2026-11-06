@@ -161,7 +161,7 @@ pipeline {
                 sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                 echo "Run Multiplatform Test"
                 timeout(time: 25, unit: 'HOURS') {
-                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.SGW_VERSION} ${params.CBL_TEST_NAME} ${params.TOPOLOGY_FILE}"
+                    sh "jenkins/pipelines/p2p/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.SGW_VERSION} ${params.CBL_TEST_NAME} ${params.TOPOLOGY_FILE}"
                 }
             }
             post {
@@ -171,10 +171,10 @@ pipeline {
                     junit testResults: '**/junit_result.xml', allowEmptyResults: true
 
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/QE/multiplatform/teardown.sh'
+                        sh 'jenkins/pipelines/p2p/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/p2p/session.log', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/p2p/http_log/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

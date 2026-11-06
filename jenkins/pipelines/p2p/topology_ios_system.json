@@ -1,5 +1,5 @@
 {
-    "$schema": "../../../../environment/aws/topology_setup/topology_schema.json",
+    "$schema": "../../../environment/aws/topology_setup/topology_schema.json",
     "test_servers": [
         {
             "platform": "swift_ios",

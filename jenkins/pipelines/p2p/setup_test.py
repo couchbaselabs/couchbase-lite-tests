@@ -11,7 +11,7 @@ import click
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
@@ -24,7 +24,7 @@ def setup_multiplatform_test(
     platform_versions: dict,
     sgw_version: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "QE",
+    setup_dir: str = "p2p",
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions.
@@ -39,7 +39,7 @@ def setup_multiplatform_test(
     config_file_in = SCRIPT_DIR / "config_multiplatform.json"
 
     config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
-    topology_file_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
+    topology_file_out = SCRIPT_DIR.parents[2] / "environment" / "aws" / "topology_setup" / "topology.json"
 
     # Handle multiplatform case - if platform_versions is empty, topology is already composed
     if not platform_versions:
@@ -149,7 +149,7 @@ def cli_entry(
     setup_multiplatform_test(
         platform_versions,
         sgw_version,
-        setup_dir="QE",
+        setup_dir="p2p",
     )
 
 

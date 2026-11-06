@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(str(SCRIPT_DIR.parents[3]))
+sys.path.append(str(SCRIPT_DIR.parents[2]))
 
 import click
 import requests
@@ -24,19 +24,19 @@ if __name__ == "__main__":
 # Configuration for supported platforms
 SUPPORTED_PLATFORMS = {
     "android": {
-        "script_path": "../android/android_tests.sh",
+        "script_path": "../functional/android/test.sh",
         "param_format": "simple",  # version, sgw_version, [private_key], [--setup-only]
     },
     "ios": {
-        "script_path": "../ios/test.sh",
+        "script_path": "../functional/ios/test.sh",
         "param_format": "ios",  # edition, version, build, sgw_version, private_key, [--setup-only]
     },
     "dotnet": {
-        "script_path": "../dotnet/run_test.sh",
+        "script_path": "../functional/dotnet/run_test.sh",
         "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
     },
     "c": {
-        "script_path": "../c/run_test.sh",
+        "script_path": "../functional/c/run_test.sh",
         "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
     },
 }
@@ -216,11 +216,11 @@ def get_platform_topology_files(
 
     if target_os:
         # If target OS is specified, look in platform_targetOS directory
-        platform_dirs.append(SCRIPT_DIR.parent / f"{platform_key}_{target_os}")
-        platform_dirs.append(SCRIPT_DIR.parent / platform_key / target_os)
+        platform_dirs.append(SCRIPT_DIR.parent / "functional" / f"{platform_key}_{target_os}")
+        platform_dirs.append(SCRIPT_DIR.parent / "functional" / platform_key / target_os)
 
     # Always check the base platform directory
-    platform_dirs.append(SCRIPT_DIR.parent / platform_key)
+    platform_dirs.append(SCRIPT_DIR.parent / "functional" / platform_key)
 
     for platform_dir in platform_dirs:
         if platform_dir.exists():
@@ -348,7 +348,7 @@ def run_platform_specific_setup(
         sgw_version: Sync Gateway version
         target_os: Optional OS specification (windows, macos, linux, android, ios)
     """
-    QE_dir = SCRIPT_DIR.parent
+    QE_dir = SCRIPT_DIR.parent / "functional"
 
     # Find and run the main platform script
     if platform_key == "android":
@@ -394,15 +394,15 @@ def setup_multiplatform_test(
     config_file_in: Path,
     topology_tag: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "QE",
+    setup_dir: str = "p2p",
     auto_fetch_builds: bool = True,
     topology_file: str = "",
 ) -> None:
     """
     Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
     """
-    config_file_out = SCRIPT_DIR.parents[3] / "tests" / setup_dir / "config.json"
-    topology_file_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
+    config_file_out = SCRIPT_DIR.parents[2] / "tests" / setup_dir / "config.json"
+    topology_file_out = SCRIPT_DIR.parents[2] / "environment" / "aws" / "topology_setup" / "topology.json"
 
     assert config_file_in.exists() and config_file_in.is_file(), f"Config file {config_file_in} does not exist."
 
