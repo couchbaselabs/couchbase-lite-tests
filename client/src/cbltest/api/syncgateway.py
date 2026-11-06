@@ -1982,6 +1982,17 @@ class _SyncGatewayBase:
         await self.__session.close()
         await self._caddy.close()
 
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self.close()
+
     async def get_database_config(self, db_name: str) -> DatabaseConfig:
         """
         Gets the configuration for a specific database from the admin API.
@@ -3010,14 +3021,3 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         """
         with self._tracer.start_as_current_span("delete_public_session", attributes={"sg.database.name": db_name}):
             await self._send_request("delete", f"/{db_name}/_session")
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        await self.close()

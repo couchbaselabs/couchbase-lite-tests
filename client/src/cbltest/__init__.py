@@ -136,20 +136,24 @@ class CBLPyTest:
         if not ret_val.extra_props.get("auto_start_tdk_page", True):
             CBLPyTestGlobal.auto_start_tdk_page = False
 
-        for cluster in ret_val.clusters:
-            if not cluster.couchbase_servers and not await cluster.sync_gateways[0].using_rosmar:
-                raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
+        try:
+            for cluster in ret_val.clusters:
+                if not cluster.couchbase_servers and not await cluster.sync_gateways[0].using_rosmar:
+                    raise CblTestError("Couchbase Server must be provided if Sync Gateway is not using Rosmar")
 
-        cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
-        await ret_val.request_factory.start()
+            cbl_log_init(str(ret_val.request_factory.uuid), ret_val.config.logslurp_url)
+            await ret_val.request_factory.start()
 
-        await ret_val.resolve_api_version()
-        for ts_index, ts in enumerate(ret_val.test_servers):
-            await ts.new_session(
-                str(ret_val.request_factory.uuid),
-                ret_val.config.logslurp_url,
-                f"test-server[{ts_index}]",
-            )
+            await ret_val.resolve_api_version()
+            for ts_index, ts in enumerate(ret_val.test_servers):
+                await ts.new_session(
+                    str(ret_val.request_factory.uuid),
+                    ret_val.config.logslurp_url,
+                    f"test-server[{ts_index}]",
+                )
+        except BaseException:
+            await ret_val.close()
+            raise
 
         return ret_val
 
