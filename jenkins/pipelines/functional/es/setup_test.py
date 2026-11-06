@@ -87,7 +87,7 @@ def main(
     topology_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
 
     config_in = SCRIPT_DIR / config_file
-    config_out = SCRIPT_DIR.parents[3] / "tests" / "QE" / "config.json"
+    config_out = SCRIPT_DIR.parents[3] / "tests" / "functional" / "config.json"
 
     if sgw_version is None or len(sgw_version) == 0:
         sgw_version = resolve_latest_version("sync-gateway")

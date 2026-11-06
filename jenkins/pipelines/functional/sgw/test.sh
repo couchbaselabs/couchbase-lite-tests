@@ -60,20 +60,21 @@ if [ "$SETUP_ONLY" = true ]; then
 fi
 
 section_start "$COLOR_YELLOW" "RUN TESTS"
-pushd "$TESTS_DIR" >/dev/null
+pushd "$FUNCTIONAL_TESTS_DIR" >/dev/null
+# Every test that needs a Sync Gateway. Tests whose other min_* markers this
+# topology can't satisfy (e.g. a second test server) are skipped by the required_topology plugin.
+PYTEST_ARGS=(
+  -v --no-header --config config.json
+  --ignore=test_replication_xdcr.py
+  --ignore=test_query_consistency.py
+  --dataset-version "$DATASET_VERSION"
+  --sgcollect-on-test-failure
+  --cbcollect-on-test-failure
+  -m min_sync_gateways
+)
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header --config QE/config.json \
-    --ignore=dev_e2e/test_replication_xdcr.py \
-    --sgcollect-on-test-failure \
-    --cbcollect-on-test-failure \
-    --dataset-version "$DATASET_VERSION" \
-    -k "$TEST_FILTER" \
-    --no-result-upload
-else
-  uv run pytest -v --no-header --config QE/config.json \
-    --ignore=dev_e2e/test_replication_xdcr.py \
-    --dataset-version "$DATASET_VERSION" \
-    --sgcollect-on-test-failure \
-    --cbcollect-on-test-failure
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
+uv run pytest "${PYTEST_ARGS[@]}"
+popd >/dev/null
 section_end

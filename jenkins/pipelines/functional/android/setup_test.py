@@ -31,8 +31,8 @@ def cli_entry(
     setup_test(
         cbl_versions,
         sgw_versions,
-        SCRIPT_DIR / "topology_single_device.json",
-        SCRIPT_DIR / "config_android.json",
+        SCRIPT_DIR / "topology.json",
+        SCRIPT_DIR / "config.json",
         "jak_android",
     )
 

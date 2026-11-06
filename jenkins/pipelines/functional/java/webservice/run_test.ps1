@@ -2,21 +2,29 @@ param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
     [Parameter()][string]$DatasetVersion = "4.0",
-    [Parameter()][string]$TestFilter = ""
+    [Parameter()][string]$TestFilter = "",
+    [Parameter()][switch]$SetupOnly
 )
 $ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
-
 uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
+if($LASTEXITCODE -ne 0) {
+    throw "Setup failed!"
+}
+
+if ($SetupOnly) {
+    Write-Host "Setup completed. Exiting due to -SetupOnly flag."
+    exit 0
+}
 
 # The full suite already runs on desktop. Basic replication is enough to check that
-# the CBL jars and native libraries load and work inside the web container:
+# the CBL jars and native libraries load and work inside the web container.
 $pytestArgs = @('-v', '--no-header', '--maxfail=7', '-W', 'ignore::DeprecationWarning', '--config', 'config.json', 'test_basic_replication.py', '-m', 'min_test_servers', '--dataset-version', $DatasetVersion)
 if ($TestFilter) {
     $pytestArgs += @('-k', $TestFilter, '--no-result-upload')
 }
 
-Push-Location $DEV_E2E_TESTS_DIR
+Push-Location $FUNCTIONAL_TESTS_DIR
 try {
     uv run pytest @pytestArgs
     $saved_exit = $LASTEXITCODE

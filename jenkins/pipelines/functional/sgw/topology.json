@@ -44,5 +44,6 @@
             "sync_gateways": [3, 4]
         }
     ],
+    "edge_servers": [{}, {}, {}],
     "logslurp": true
 }

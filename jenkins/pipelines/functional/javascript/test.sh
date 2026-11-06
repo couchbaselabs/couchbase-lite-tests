@@ -4,26 +4,31 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <edition> <cbl_version> <cbl_build> <sgw_version> [--test-filter EXPR]"
+  echo "Usage: $0 <cbl_version-build> <sgw_version> [--test-filter EXPR] [--setup-only]"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
+  echo "  --setup-only: Only set up the backend and test server, skip test execution"
 }
 
-if [ $# -lt 4 ]; then
+if [ $# -lt 2 ]; then
   usage
   exit 1
 fi
 
-EDITION=${1}
-CBL_VERSION=${2}
-CBL_BLD_NUM=${3}
-SGW_VERSION=${4}
-shift 4
+CBL_VERSION=${1}
+SGW_VERSION=${2}
+shift 2
 
 TEST_FILTER=""
+SETUP_ONLY=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --test-filter)
       TEST_FILTER="$2"
       shift 2
+      ;;
+    --setup-only)
+      SETUP_ONLY=true
+      shift
       ;;
     *)
       echo "Unknown argument: $1"
@@ -42,15 +47,19 @@ if [[ "$(uname)" != "Darwin" ]]; then
 fi
 
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION-$CBL_BLD_NUM $SGW_VERSION
+uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 
 echo "Install Playwright Chromium..."
 uv run playwright install chromium
 
-# Run Tests :
+if [ "$SETUP_ONLY" = true ]; then
+  echo "Setup completed. Exiting due to --setup-only flag."
+  exit 0
+fi
+
 echo "Run tests..."
 
-pushd "${DEV_E2E_TESTS_DIR}" >/dev/null
+pushd "${FUNCTIONAL_TESTS_DIR}" >/dev/null
 if [ -n "$TEST_FILTER" ]; then
   uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json -m min_test_servers -k "$TEST_FILTER" --no-result-upload
 else

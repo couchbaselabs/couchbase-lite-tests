@@ -34,7 +34,6 @@ def cli_entry(
         SCRIPT_DIR / "topology.json",
         SCRIPT_DIR / "config.json",
         "sgw",
-        setup_dir="QE",
     )
 
 

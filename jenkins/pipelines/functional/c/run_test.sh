@@ -1,4 +1,5 @@
 #!/bin/bash
+# Set up the backend, deploy the C test server, and run the functional tests
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
@@ -7,30 +8,27 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <version> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
-  echo "version: CBL version (e.g. 3.2.1-2)"
-  echo "platform: The C platform to build (e.g. ios)"
-  echo "sgw_version: Version of Sync Gateway to download and use"
-  echo "  --dataset-version: Optional dataset version (default: 4.0)"
-  echo "  --test-filter: An optional pytest -k filter expression"
-  echo "  --setup-only: Only build test server and setup backend, skip test execution"
+  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
+  echo "  platform: The C platform to test (macos, ios, android, linux_x86_64)"
+  echo "  sgw_version: Version of Sync Gateway to download and use"
+  echo "  --dataset-version: Version of the CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
+  echo "  --setup-only: Only set up the backend and test server, skip test execution"
+  exit 1
 }
 
-if [ $# -lt 3 ]; then
-  usage
-  exit 1
-fi
+if [ $# -lt 3 ]; then usage; fi
 
-cbl_version=$1
-platform=$2
-sgw_version=$3
+CBL_VERSION=$1
+PLATFORM=$2
+SGW_VERSION=$3
 shift 3
 
-SETUP_ONLY=false
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+SETUP_ONLY=false
 
-# Parse optional arguments
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
@@ -48,30 +46,30 @@ while [ "$#" -gt 0 ]; do
     *)
       echo "Unknown argument: $1"
       usage
-      exit 1
       ;;
   esac
 done
 
-uv run $SCRIPT_DIR/setup_test.py $platform $cbl_version $sgw_version
+uv run $SCRIPT_DIR/setup_test.py "$PLATFORM" "$CBL_VERSION" "$SGW_VERSION"
 
-# Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
   echo "Setup completed. Exiting due to --setup-only flag."
   exit 0
 fi
 
-pushd $QE_TESTS_DIR
+pushd $FUNCTIONAL_TESTS_DIR >/dev/null
+rm -rf http_log testserver.log
+
+# Every test that needs a test server. Tests whose other min_* markers this
+# topology can't satisfy are skipped by the required_topology plugin.
+PYTEST_ARGS=(
+  -v --no-header -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  -m min_test_servers
+)
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl \
-    -k "$TEST_FILTER" \
-    --no-result-upload
-else
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
+
+uv run pytest "${PYTEST_ARGS[@]}"

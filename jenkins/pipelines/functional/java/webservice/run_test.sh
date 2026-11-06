@@ -1,4 +1,5 @@
 #!/bin/bash
+# Set up the backend, start the Java Web Service test server, and run the functional tests
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
@@ -7,40 +8,67 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source $SCRIPT_DIR/../../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [--test-filter EXPR]"
-  echo "version: CBL version (e.g. 3.2.1-2)"
-  echo "sgw_version: Version of Sync Gateway to download and use"
+  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
+  echo "  sgw_version: Version of Sync Gateway to download and use"
+  echo "  --dataset-version: Version of the CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
+  echo "  --setup-only: Only set up the backend and test server, skip test execution"
+  exit 1
 }
 
-if [ $# -lt 2 ]; then
-  usage
-  exit 1
-fi
+if [ $# -lt 2 ]; then usage; fi
 
-cbl_version=$1
-sgw_version=$2
+CBL_VERSION=$1
+SGW_VERSION=$2
 shift 2
 
-test_filter=""
+DATASET_VERSION="4.0"
+TEST_FILTER=""
+SETUP_ONLY=false
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --test-filter)
-      test_filter="$2"
+    --dataset-version)
+      DATASET_VERSION="$2"
       shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
+    --setup-only)
+      SETUP_ONLY=true
+      shift
       ;;
     *)
       echo "Unknown argument: $1"
       usage
-      exit 1
       ;;
   esac
 done
 
-uv run $SCRIPT_DIR/setup_test.py $cbl_version $sgw_version
+uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
 
-pushd $QE_TESTS_DIR
-if [ -n "$test_filter" ]; then
-  uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl -k "$test_filter" --no-result-upload
-else
-  uv run pytest --maxfail=7 -W ignore::DeprecationWarning --config config.json -m cbl
+if [ "$SETUP_ONLY" = true ]; then
+  echo "Setup completed. Exiting due to --setup-only flag."
+  exit 0
 fi
+
+pushd $FUNCTIONAL_TESTS_DIR >/dev/null
+rm -rf http_log testserver.log
+
+# The full suite already runs on desktop. Basic replication is enough to check that
+# the CBL jars and native libraries load and work inside the web container.
+PYTEST_ARGS=(
+  -v --no-header --maxfail=7 -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  -m min_test_servers
+  test_basic_replication.py
+)
+if [ -n "$TEST_FILTER" ]; then
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
+fi
+
+uv run pytest "${PYTEST_ARGS[@]}"

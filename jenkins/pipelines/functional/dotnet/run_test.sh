@@ -11,12 +11,12 @@ XHARNESS_VERSION="10.0.0-prerelease*"
 XHARNESS_SOURCE="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json"
 
 function usage() {
-  echo "Usage: $0 <version> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
-  echo "version: CBL version (e.g. 3.2.1-2)"
-  echo "platform: The .NET platform to build (e.g. ios)"
-  echo "sgw_version: Version of Sync Gateway to download and use"
+  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
+  echo "  platform: The .NET platform to test (macos, ios, android)"
+  echo "  sgw_version: Version of Sync Gateway to download and use"
   echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
-  echo "  --test-filter: An optional pytest -k filter expression"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
 }
 
@@ -86,18 +86,19 @@ if [ "$SETUP_ONLY" = true ]; then
   exit 0
 fi
 
-pushd "$QE_TESTS_DIR"
+pushd "$FUNCTIONAL_TESTS_DIR" >/dev/null
+rm -rf http_log testserver.log
 
+# Every test that needs a test server. Tests whose other min_* markers this
+# topology can't satisfy are skipped by the required_topology plugin.
+PYTEST_ARGS=(
+  -v --no-header -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  -m min_test_servers
+)
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl \
-    -k "$TEST_FILTER" \
-    --no-result-upload
-else
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
+
+uv run pytest "${PYTEST_ARGS[@]}"

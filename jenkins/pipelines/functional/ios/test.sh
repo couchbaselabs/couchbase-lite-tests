@@ -4,11 +4,11 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
   echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
-  echo "  --test-filter: An optional pytest -k filter expression"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
-  echo "  Build number will be auto-fetched for the specified version"
   exit 1
 }
 
@@ -59,21 +59,20 @@ if [ "$SETUP_ONLY" = true ]; then
   exit 0
 fi
 
-# Run Tests :
 echo "Run tests..."
+pushd "${FUNCTIONAL_TESTS_DIR}" >/dev/null
+rm -rf http_log testserver.log
 
-pushd "${QE_TESTS_DIR}" >/dev/null
-
+# Every test that needs a test server. Tests whose other min_* markers this
+# topology can't satisfy are skipped by the required_topology plugin.
+PYTEST_ARGS=(
+  -v --no-header -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  -m min_test_servers
+)
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl \
-    -k "$TEST_FILTER" \
-    --no-result-upload
-else
-  uv run pytest -v --no-header -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
+
+uv run pytest "${PYTEST_ARGS[@]}"
