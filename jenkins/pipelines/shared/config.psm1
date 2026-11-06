@@ -37,8 +37,27 @@ function Move-Artifacts {
 
     Write-Host "Moving artifacts to $DST_DIR"
 
+    # The workspace can persist between builds, so drop an earlier build's session log first
+    Remove-Item "$DST_DIR\session.log*" -Force -ErrorAction SilentlyContinue
     if (Test-Path "$SRC_DIR\session.log") {
         Move-Item -Path "$SRC_DIR\session.log" -Destination "$DST_DIR\session.log" -Force
+        # session.log is the full LogSlurp aggregate and can reach ~200 MB: gzip it, as config.sh
+        # does. This must never stop the teardown, so keep the raw log if it fails.
+        try {
+            $in = [System.IO.File]::OpenRead("$DST_DIR\session.log")
+            try {
+                $out = [System.IO.Compression.GZipStream]::new(
+                    [System.IO.File]::Create("$DST_DIR\session.log.gz"),
+                    [System.IO.Compression.CompressionMode]::Compress)
+                try { $in.CopyTo($out) } finally { $out.Dispose() }
+            } finally {
+                $in.Dispose()
+            }
+            Remove-Item "$DST_DIR\session.log"
+        } catch {
+            Write-Host "Warning: failed to gzip session.log; leaving it uncompressed: $_"
+            Remove-Item "$DST_DIR\session.log.gz" -ErrorAction SilentlyContinue
+        }
     }
     if (Test-Path "$SRC_DIR\http_log") {
         Move-Item -Path "$SRC_DIR\http_log" -Destination "$DST_DIR\http_log" -Force
