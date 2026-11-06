@@ -25,7 +25,7 @@ the ES config (`reconnect_on_token_change=false`, no file watching).
 5. Wait until SGW has imported all 5 documents from CBS.
 6. Verify the JWT token authenticates against the SGW REST API (`GET /travel/` with `Authorization: Bearer <token>` returns 200).
 7. Configure and start ES with the inline JWT token in `auth.openid_token` and `reconnect_on_token_change=false`.
-8. Verify the replicator was created (`/_replicate` is non-empty), then wait until it is idle.
+8. Wait until replication 1 is idle.
 9. Wait until ES has the 5 new documents (`jwt_test_airline_1..5`), and verify it holds exactly 155 airline docs (the 150 pre-loaded plus the 5 new).
 10. Wait until SGW has every document on ES.
 11. Fetch one document from ES and verify it is retrievable and has a `name` field.
@@ -87,17 +87,15 @@ and the replicator permanently stops (no retry, since 401 is not transient).
 5. Write the valid token to the JWT file and start ES with `reconnect_on_token_change=true`.
 6. Wait until replication is idle (confirming the valid token works).
 7. Overwrite the JWT file with the invalid token.
-8. Poll (up to 60s) the ES `/_replicate` list until the task is removed or its status becomes `Stopped`/`Offline`.
-9. Verify the outcome: either the replicator task was removed (permanent stop after 401), or its status is `Stopped`/`Offline` with a 401 auth error.
+8. Wait until replication 1 is `Stopped`, and verify its error is 401 in the LiteCore `WEBSOCKET` domain (6).
 
 ## test_corrupt_token_file_content_mid_replication
 
 ### Description
 
 Test ES behavior when the JWT file is overwritten mid-replication with corrupt
-content (a single space, which is not a valid JWT). ES either stops replication
-on reconnect (401) or keeps the existing connection alive if the file watcher
-does not treat the content as a valid change.
+content (a single space, which is not a valid JWT). ES treats the file as empty,
+ignores the change, and keeps replicating on the existing connection.
 
 ### Steps
 
@@ -108,8 +106,8 @@ does not treat the content as a valid change.
 5. Write the valid token to the JWT file and start ES with `reconnect_on_token_change=true`.
 6. Wait until replication is idle.
 7. Overwrite the JWT file with invalid content (a single space).
-8. Poll (up to 30s) the ES `/_replicate` list until the task is removed or its status becomes `Stopped`/`Offline`.
-9. Verify the outcome: the task was removed or `Stopped`/`Offline` (corrupt token rejected), or `Idle` (ES kept the existing connection because the file watcher did not treat the change as a valid token). Any other status fails the test.
+8. Insert `filedel_test_4` into CBS, and wait until ES has it. ES ignores an empty token file, so replication continues on the existing connection.
+9. Verify replication 1 is still `Idle` with no error.
 
 ## test_valid_invalid_valid_token_cycle
 
@@ -127,7 +125,7 @@ re-triggered, after which it recovers.
 3. Add the JWT user `test-provider_user1` with `["airlines"]` channel access to `travel.airlines`.
 4. Insert 3 documents into CBS (`cycle_test_1..3`).
 5. **Phase 1:** Write Token-A to the JWT file, start ES with `reconnect_on_token_change=true`, wait until idle, and verify at least 3 documents replicated.
-6. **Phase 2:** Overwrite the JWT file with the invalid token. Poll (up to 60s) until the replicator is removed or `Stopped`/`Offline`, confirming a permanent 401 stop.
+6. **Phase 2:** Overwrite the JWT file with the invalid token. Wait until replication 1 is `Stopped`, and verify its error is 401 in the LiteCore `WEBSOCKET` domain (6).
 7. Insert 3 more documents into CBS (`cycle_test_4..6`) while replication is stopped, and verify ES still has only the original document count.
 8. **Phase 3:** Write Token-C to the JWT file, then manually re-trigger replication (re-run `configure_dataset`, which calls `/_replicate`).
 9. Wait until replication is idle, then wait until ES has `cycle_test_4..6` (recovery succeeded with Token-C).

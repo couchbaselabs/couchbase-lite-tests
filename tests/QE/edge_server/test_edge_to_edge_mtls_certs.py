@@ -6,8 +6,7 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.edgeserver import EdgeServer
-from cbltest.api.error import CblEdgeServerBadResponseError, CblTimeoutError
+from cbltest.api.edgeserver import EdgeServer, LiteCoreErrorDomain
 from cbltest.api.x509_certificate import CertKeyPair, create_ca_certificate, create_leaf_certificate
 from cbltest.asyncfile import read_json_file, write_json_file
 
@@ -141,7 +140,7 @@ class TestEdgeToEdgeMtls(CBLTestClass):
             source = await _start_source(cblpytest, tmp_path, ca, source_client, client_format)
 
             self.mark_test_step("Wait for the source replicator to become idle")
-            await source.wait_for_idle()
+            await source.wait_for_idle(replication_id=1)
 
             self.mark_test_step(f"Verify {seed_id} replicated to the source")
             await source.wait_for_documents("db", [seed_id])
@@ -188,9 +187,9 @@ class TestEdgeToEdgeMtls(CBLTestClass):
             self.mark_test_step(f"Start the source replicating to the target with {rejected_client}")
             source = await _start_source(cblpytest, tmp_path, ca, client)
 
-            self.mark_test_step("Wait for the source replicator to give up")
-            with pytest.raises((CblEdgeServerBadResponseError, CblTimeoutError)):
-                await source.wait_for_idle(timeout=5)
+            self.mark_test_step("Wait for the source replicator to stop with a TLS error")
+            tls_code = 6 if rejected_client == "no_client_cert" else 10
+            await source.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.NETWORK, code=tls_code)
 
             self.mark_test_step(f"Verify {seed_id} did not replicate to the source")
             source_docs = await source.get_all_documents("db")
@@ -223,10 +222,8 @@ class TestEdgeToEdgeMtls(CBLTestClass):
             self.mark_test_step(f"Start the source replicating to the target as {common_name}")
             source = await _start_source(cblpytest, tmp_path, ca, client)
 
-            self.mark_test_step("Verify the source replicator is refused with 401 or 403")
-            with pytest.raises(CblEdgeServerBadResponseError) as e:
-                await source.wait_for_idle(timeout=5)
-            assert e.value.code in (401, 403, 404), f"{common_name}: expected a 401 or 403 refusal, got {e.value.body}"
+            self.mark_test_step("Verify the source replicator is refused with 403")
+            await source.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=403)
 
             self.mark_test_step(f"Verify {seed_id} did not replicate to the source")
             source_docs = await source.get_all_documents("db")

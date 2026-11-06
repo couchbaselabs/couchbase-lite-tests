@@ -181,8 +181,11 @@ the host, so these replications reach the host Sync Gateway.
 
 Limits:
 
-- One Edge Server only. The test framework expects ports 20000 and 20001 on each Edge Server host,
-  so a second container cannot share `localhost`.
+- `--count N` starts N Edge Servers, for tests marked `min_edge_servers(N)`. The test framework
+  expects ports 20000 and 20001 on each Edge Server host, so the containers cannot share
+  `localhost`. Each one is named `<container-name>-N` and is reached on its Docker bridge IP, which
+  only Linux hosts can reach. The image's server certificate names `localhost`, so a test that
+  verifies an Edge Server's own certificate by IP fails.
 - `set_firewall_rules` adds its rules inside the container. A rule that names a Sync Gateway IP
   does not match, because the forwarded traffic leaves the container from `localhost`.
 

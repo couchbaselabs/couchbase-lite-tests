@@ -57,7 +57,7 @@ class TestChangesFeed(CBLTestClass):
         config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verifying initial synchronization from Couchbase Server to Edge Server.")
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")

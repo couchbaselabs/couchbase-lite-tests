@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.edgeserver import EdgeServer
-from cbltest.api.error import CblEdgeServerBadResponseError, CblSyncGatewayBadResponseError
+from cbltest.api.edgeserver import EdgeServer, LiteCoreErrorDomain
+from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.syncgateway import (
     SYNC_GATEWAY_SESSION_COOKIE,
     DatabaseConfig,
@@ -121,7 +121,7 @@ class TestSessionCookie(CBLTestClass):
         session_cookie = f"{SYNC_GATEWAY_SESSION_COOKIE}={session_id}" if prefixed else session_id
         config_path = await self._es_config(cblpytest, tmp_path, session_cookie, cookie_header)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=ES_DB, config_file=config_path)
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verify only the `session_ch` documents were pulled")
         for collection in COLLECTIONS:
@@ -159,14 +159,14 @@ class TestSessionCookie(CBLTestClass):
         session_a = await sync_gateway.create_session(SG_DB, SESSION_USER)
         config_a = await self._es_config(cblpytest, tmp_path, session_a)
         edge_server = await es_manager.configure_dataset(db_name=ES_DB, config_file=config_a)
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
         assert set(phase1) <= await self._es_doc_ids(edge_server, COLLECTIONS[0]), "Phase 1 not pulled"
 
         self.mark_test_step("Stop Edge Server, seed phase 2 documents, and restart it on the same config")
         await es_manager.kill_server()
         phase2 = await self._seed_docs(cblpytest, "phase2")
         edge_server = await es_manager.start_server()
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
         assert set(phase2) <= await self._es_doc_ids(edge_server, COLLECTIONS[0]), "Phase 2 not pulled after restart"
 
         self.mark_test_step("Stop Edge Server, revoke session A, and verify SGW rejects it")
@@ -177,9 +177,7 @@ class TestSessionCookie(CBLTestClass):
         self.mark_test_step("Seed phase 3 documents, restart Edge Server, and verify the replicator fails with a 401")
         phase3 = await self._seed_docs(cblpytest, "phase3")
         edge_server = await es_manager.start_server()
-        with pytest.raises(CblEdgeServerBadResponseError) as e:
-            await edge_server.wait_for_idle(timeout=10)
-        assert e.value.code in (401, 404), f"Replicator failed, but not on a 401: {e.value.body}"
+        await edge_server.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401)
         assert not set(phase3) & await self._es_doc_ids(edge_server, COLLECTIONS[0]), "Pulled with a revoked session"
 
         self.mark_test_step("On Edge Server, write `offline_write` while the replicator is down")
@@ -192,7 +190,7 @@ class TestSessionCookie(CBLTestClass):
         config_b = await self._es_config(cblpytest, tmp_path, session_b)
         await es_manager.kill_server()
         edge_server = await es_manager.start_server(config_b)
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verify phase 3 was pulled and `offline_write` was pushed")
         assert set(phase3) <= await self._es_doc_ids(edge_server, COLLECTIONS[0]), "Phase 3 not pulled with session B"
@@ -220,9 +218,7 @@ class TestSessionCookie(CBLTestClass):
         self.mark_test_step("Start Edge Server with the session, and verify the replicator fails with a 401")
         config_path = await self._es_config(cblpytest, tmp_path, session_id)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=ES_DB, config_file=config_path)
-        with pytest.raises(CblEdgeServerBadResponseError) as e:
-            await edge_server.wait_for_idle(timeout=10)
-        assert e.value.code in (401, 404), f"Replicator failed, but not on a 401: {e.value.body}"
+        await edge_server.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401)
 
         self.mark_test_step("Verify none of the seeded documents were pulled")
         assert not set(seeded) & await self._es_doc_ids(edge_server, COLLECTIONS[0]), "Pulled with a bad session"

@@ -57,14 +57,14 @@ class TestReplicationSanity(CBLTestClass):
         config_path = str(tmp_path / "es_config.json")
         await write_json_file(config_path, config)
         edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verifying that Sync Gateway has 10 documents.")
         response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
         assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
 
         self.mark_test_step("Waiting for replication to Edge Server to be idle.")
-        await edge_server.wait_for_idle(timeout=5)
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verifying that Edge Server has 10 documents.")
         response = await edge_server.get_all_documents(es_db_name)

@@ -10,7 +10,6 @@ Valid openid_token config formats (per ES config schema oneOf):
   - File path:      "openid_token": {"path": "/path/to/jwt.txt"}
 """
 
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -166,22 +165,10 @@ class TestJWTSimple(CBLTestClass):
 
         # =====================================================================
         # STEP 9: Wait for replication to complete.
-        # First verify the replicator was actually created (not silently
-        # dropped due to invalid config). Then wait for idle status.
         # =====================================================================
         self.mark_test_step("Waiting for replication to Edge Server to be idle.")
 
-        # Give ES a moment to parse config and start the replicator
-        await asyncio.sleep(1)
-
-        # Verify replicator exists — if /_replicate returns [], the config was
-        # rejected (e.g. invalid openid_token format) and no replication started
-        repl_status = await edge_server.all_replication_status()
-        assert len(repl_status) > 0, (
-            "No replicators found on Edge Server — the replication config was likely rejected. Check openid_token format."
-        )
-
-        await edge_server.wait_for_idle(timeout=15)
+        await edge_server.wait_for_idle(replication_id=1)
 
         # =====================================================================
         # STEP 10: Verify replication pulled the 5 docs added to SGW, alongside

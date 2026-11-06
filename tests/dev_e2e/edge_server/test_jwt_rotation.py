@@ -1,9 +1,9 @@
-import asyncio
 from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.edgeserver import LiteCoreErrorDomain
 from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.asyncfile import read_json_file, write_json_file
 from shared.jwt_helper import generate_jwt, generate_rsa_keypair, local_jwt_provider, public_key_to_jwk
@@ -111,7 +111,7 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 5: Verify replication works ---
         self.mark_test_step("Wait for replication to become idle")
-        await edge_server.wait_for_idle()
+        await edge_server.wait_for_idle(replication_id=1)
 
         self.mark_test_step("Verify document parity between ES and SGW")
         for collection in [
@@ -200,7 +200,7 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 4: Wait for initial replication to become idle with Token-A ---
         self.mark_test_step("Wait for initial replication with Token-A to be idle")
-        await edge_server.wait_for_idle(timeout=30)
+        await edge_server.wait_for_idle(replication_id=1)
 
         # Verify initial replication pulled docs
         response = await edge_server.get_all_documents("travel", collection="travel.airlines")
@@ -253,7 +253,7 @@ class TestJWTReplication(CBLTestClass):
         """
 
         # --- Step 1: Setup SGW + CBS ---
-        self.mark_test_step("Setup SGW with local_jwt for network disconnect test")
+        self.mark_test_step("Setup SGW with local_jwt for invalid token rotation test")
         private_key, public_key = generate_rsa_keypair()
         token_valid = generate_jwt(private_key, subject="user1", expires_in=3600)
         jwk = public_key_to_jwk(public_key)
@@ -305,7 +305,7 @@ class TestJWTReplication(CBLTestClass):
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
-        await edge_server.wait_for_idle(timeout=30)
+        await edge_server.wait_for_idle(replication_id=1)
         self.mark_test_step("Replication idle with valid token — confirmed working")
 
         # --- Step 3: Write invalid token ---
@@ -317,65 +317,12 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 4: Wait for ES to detect change, reconnect, and fail auth ---
         self.mark_test_step("Waiting for automatic token change detection and auth failure")
-
-        # Poll for up to 60s — the ES file watcher may take time to detect
-        # the token change, disconnect, and reconnect with the invalid token.
-        max_wait = 60
-        poll_interval = 5
-        elapsed = 0
-        repl_status = []
-        while elapsed < max_wait:
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-            repl_status = await edge_server.all_replication_status()
-            if len(repl_status) == 0:
-                break
-            task = repl_status[0]
-            status = task.get("status", "")
-            if status in ("Stopped", "Offline"):
-                break
-
-        # Check replication status.
-        # When 401 occurs (non-transient error), the replicator task is
-        # permanently stopped and REMOVED from the /_replicate list.
-        # So either: empty list (task removed) or Stopped status.
-        repl_status = await edge_server.all_replication_status()
-
-        if len(repl_status) == 0:
-            # Task removed after permanent 401 — this IS expected behavior
-            self.mark_test_step(
-                "PASSED — Replicator task removed after 401 auth failure (invalid token correctly rejected by SGW)"
-            )
-        else:
-            task = repl_status[0]
-            status = task.get("status", "")
-            error = task.get("error", {})
-            error_code = error.get("x-litecore-code", 0) if isinstance(error, dict) else 0
-
-            self.mark_test_step(f"Replication status: {status}, error: {error}")
-
-            assert status in ("Stopped", "Offline"), (
-                f"Expected replication to stop/go offline with invalid token, but status is '{status}'. Error: {error}"
-            )
-            assert error_code == 401 or "login" in str(error).lower(), f"Expected 401 auth error, got: {error}"
-
-            self.mark_test_step("PASSED — Invalid token correctly causes auth failure")
+        await edge_server.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_corrupt_token_file_content_mid_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
-        """
-        Overwrite the JWT token file with corrupt content while replication is active.
-
-        Scenario:
-        1. Start ES with valid token file, replication goes idle
-        2. Overwrite the JWT file with invalid content (single space)
-        3. ES detects file change → either stops replication (401) or continues
-           with existing connection (if FileWatcher treats empty as no-change)
-        4. Verify replication behavior
-        """
-
         # --- Step 1: Setup ---
         self.mark_test_step("Setup SGW for file deletion test")
         private_key, public_key = generate_rsa_keypair()
@@ -423,7 +370,7 @@ class TestJWTReplication(CBLTestClass):
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
-        await edge_server.wait_for_idle(timeout=30)
+        await edge_server.wait_for_idle(replication_id=1)
         self.mark_test_step("Replication idle — now deleting JWT file")
 
         # --- Step 3: Delete the JWT file content ---
@@ -432,48 +379,14 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Overwriting JWT file with invalid content on ES")
         await es_manager.write_file(JWT_FILE, " ")
 
-        # --- Step 4: Poll until replication stops or wait times out ---
-        self.mark_test_step("Polling for ES to detect corrupt token")
-        max_wait = 30
-        poll_interval = 3
-        elapsed = 0
-        while elapsed < max_wait:
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-            repl_status = await edge_server.all_replication_status()
-            if len(repl_status) == 0:
-                break
-            task = repl_status[0]
-            if task.get("status", "") in ("Stopped", "Offline"):
-                break
+        self.mark_test_step("Insert filedel_test_4 into CBS and verify it still replicates to ES")
+        doc = {"id": "filedel_test_4", "channels": ["airlines"], "type": "airline", "name": "FileDel Airline 4"}
+        cbs.upsert_document("travel", "filedel_test_4", doc, scope="travel", collection="airlines")
+        await edge_server.wait_for_documents("travel", ["filedel_test_4"], collection="travel.airlines")
 
-        repl_status = await edge_server.all_replication_status()
-
-        if len(repl_status) == 0:
-            # Task removed — ES detected empty file, tried to reconnect with
-            # empty/no token, got 401, task permanently stopped and removed
-            self.mark_test_step(
-                "PASSED — File deletion (empty content) caused replicator to stop "
-                "and be removed (401 on reconnect with empty token)"
-            )
-        else:
-            task = repl_status[0]
-            status = task.get("status", "")
-            error = task.get("error", {})
-
-            self.mark_test_step(f"After file deletion — Status: {status}, Error: {error}")
-
-            if status in ("Stopped", "Offline"):
-                self.mark_test_step("PASSED — File deletion caused replication to stop as expected")
-            elif status == "Idle":
-                # ES might keep the existing connection alive with the old token
-                # if it doesn't consider empty file as a "change"
-                self.mark_test_step(
-                    "INFO — ES kept existing connection alive after file emptied "
-                    "(file watcher may only trigger on valid content change)"
-                )
-            else:
-                pytest.fail(f"Unexpected status after JWT file deletion: {status}, error: {error}")
+        self.mark_test_step("Verify the replication is still idle with no error")
+        replication = await edge_server.wait_for_idle(replication_id=1)
+        assert replication.error is None, f"Replication changed after the JWT file was emptied: {replication}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_valid_invalid_valid_token_cycle(
@@ -552,7 +465,7 @@ class TestJWTReplication(CBLTestClass):
 
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
-        await edge_server.wait_for_idle(timeout=30)
+        await edge_server.wait_for_idle(replication_id=1)
 
         # Verify initial replication worked
         response = await edge_server.get_all_documents("travel", collection="travel.airlines")
@@ -569,33 +482,7 @@ class TestJWTReplication(CBLTestClass):
         self.mark_test_step("Phase 2: Writing INVALID token to file")
         await es_manager.write_file(JWT_FILE, token_invalid)
 
-        # Poll until the replicator stops or task is removed
-        max_wait = 60
-        poll_interval = 3
-        elapsed = 0
-        status_after_invalid = "Unknown"
-        while elapsed < max_wait:
-            await asyncio.sleep(poll_interval)
-            elapsed += poll_interval
-            repl_status = await edge_server.all_replication_status()
-            if len(repl_status) == 0:
-                status_after_invalid = "Removed"
-                break
-            task = repl_status[0]
-            status_after_invalid = task.get("status", "")
-            if status_after_invalid in ("Stopped", "Offline"):
-                break
-
-        if status_after_invalid in ("Removed", "Stopped", "Offline"):
-            self.mark_test_step(
-                f"Phase 2 OK: Replication permanently stopped after invalid token "
-                f"(status: {status_after_invalid}, 401 is not transient → no retry)"
-            )
-        else:
-            pytest.fail(
-                f"Expected replication to permanently stop with invalid token "
-                f"(401), but status is '{status_after_invalid}' after {max_wait}s."
-            )
+        await edge_server.wait_for_replication_error(replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401)
 
         # --- Step 5: Insert more docs while replication is stopped ---
         self.mark_test_step("Insert 3 more docs while replication is stopped")
@@ -630,7 +517,7 @@ class TestJWTReplication(CBLTestClass):
         # Re-trigger replication via configure_dataset (calls _replicate)
         edge_server = await es_manager.configure_dataset(db_name="travel", config_file=config_path)
 
-        await edge_server.wait_for_idle(timeout=30)
+        await edge_server.wait_for_idle(replication_id=1)
 
         # Verify recovery — ES should now have the 3 docs written while stopped
         await edge_server.wait_for_documents(

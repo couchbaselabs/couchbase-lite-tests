@@ -1,10 +1,8 @@
-import asyncio
 from pathlib import Path
 
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
-from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.x509_certificate import create_ca_certificate, create_leaf_certificate
 from cbltest.asyncfile import read_json_file, write_json_file
 
@@ -15,27 +13,6 @@ CERT_DIR = "/home/ec2-user/cert"
 @pytest.mark.min_edge_servers(2)
 class TestEdgeToEdgeMTLS(CBLTestClass):
     """Edge-to-edge replication over mTLS. See spec/tests/dev_e2e/015-edge-to-edge-mtls.md."""
-
-    async def _wait_for_status(self, es: EdgeServer, wanted: set[str], timeout: int = 90) -> dict:
-        """Poll the replication task list until the first task's status is in `wanted`.
-
-        Returns the task dict, or {} if the task list stays empty for the whole
-        timeout (which itself signals a replication that never started).
-        """
-        elapsed = 0
-        task: dict = {}
-        while elapsed < timeout:
-            try:
-                tasks = await es.all_replication_status()
-                if tasks:
-                    task = tasks[0]
-                    if task.get("status") in wanted:
-                        return task
-            except Exception:
-                task = {}
-            await asyncio.sleep(3)
-            elapsed += 3
-        return task
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_edge_to_edge_mtls_replication(
@@ -89,10 +66,8 @@ class TestEdgeToEdgeMTLS(CBLTestClass):
             await write_json_file(config_path, config)
             source_es = await source.configure_dataset(db_name="db", config_file=config_path)
 
-            self.mark_test_step("Verify the mTLS handshake succeeds and replication reaches Idle/Busy")
-            status = await self._wait_for_status(source_es, {"Idle", "Busy"})
-            assert status.get("status") in {"Idle", "Busy"}, f"edge-to-edge mTLS replication did not start: {status}"
-            assert not status.get("error"), f"replication reported an error: {status.get('error')}"
+            self.mark_test_step("Verify the mTLS handshake succeeds and replication reaches Idle")
+            await source_es.wait_for_idle(replication_id=1, timeout=90)
         finally:
             for name, data in provisioned.items():
                 (cert_dir / name).write_bytes(data)
