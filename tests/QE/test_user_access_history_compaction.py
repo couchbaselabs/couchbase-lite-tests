@@ -43,8 +43,7 @@ async def _one_shot_pull(
         pinned_server_cert=sync_gateway.tls_cert(),
     )
     await replicator.start()
-    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    assert status.error is None, f"Pull replicator failed: {status.error}"
+    await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     return replicator
 
 
@@ -524,11 +523,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
             pinned_server_cert=sg.tls_cert(),
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Replicator failed to reach idle before compact: ({status.error.domain} / {status.error.code}) "
-            f"{status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step(
             "While that replicator is still continuously connected, compact channel 'A' out of user 'iris's "
@@ -541,8 +536,7 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         )
         status_after_compact = await replicator.get_status()
         assert status_after_compact.error is None, (
-            f"Replicator reported an error after compact: ({status_after_compact.error.domain} / "
-            f"{status_after_compact.error.code}) {status_after_compact.error.message}"
+            f"Replicator reported an error after compact: {status_after_compact.error}"
         )
         assert status_after_compact.activity != ReplicatorActivityLevel.STOPPED, (
             "Replicator was disconnected/stopped by the access-history compact"
@@ -554,12 +548,8 @@ class TestUserAccessHistoryCompaction(CBLTestClass):
         )
         replicator.clear_document_updates()
         await sg.update_documents(db_name, [DocumentUpdateEntry("doc_b", None, {"channels": ["B"]})])
-        status_after_doc = await replicator.wait_for_all_doc_events(
+        await replicator.wait_for_all_doc_events(
             {WaitForDocumentEventEntry("_default._default", "doc_b", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE)}
-        )
-        assert status_after_doc.error is None, (
-            f"Replicator errored while pulling doc_b: ({status_after_doc.error.domain} / "
-            f"{status_after_doc.error.code}) {status_after_doc.error.message}"
         )
 
     @pytest.mark.asyncio(loop_scope="session")

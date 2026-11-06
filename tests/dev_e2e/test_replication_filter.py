@@ -71,10 +71,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(
             "Check that only docs specified in the documentIDs filters are replicated except `travel.airline`.`airline_1000`"
@@ -98,10 +95,7 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only changes for docs in the specified documentIDs filters are replicated.")
         expected_ids = {"airline_1000", "airline_10", "route_10"}
@@ -152,10 +146,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(
             "Check that only docs specified in the documentIDs filters are replicated except `travel.airline`.`airline_1000`"
@@ -185,10 +176,7 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only changes for docs in the specified documentIDs filters are replicated.")
         expected_ids = {"airport_1000", "airport_10", "landmark_10"}
@@ -236,10 +224,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only docs in the filtered channels are pulled.")
         expected_ids = uk_and_france_doc_ids
@@ -293,10 +278,7 @@ class TestReplicationFilter(CBLTestClass):
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         replicator.clear_document_updates()
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only changes in the filtered channels are pulled.")
         expected_ids = {
@@ -362,10 +344,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only test_public was pulled")
         all_docs = await db.get_all_documents("_default._default")
@@ -405,10 +384,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify that the document on Sync Gateway was updated")
         sgw_doc = await sync_gateway.get_document("names", "test_public")
@@ -457,10 +433,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that no docs are replicated.")
         assert len(replicator.document_updates) == 0, (
@@ -481,10 +454,7 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Start the replicator with the same config as the step 3.")
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = {"name_10", "name_20"}
@@ -537,10 +507,7 @@ class TestReplicationFilter(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that no docs are replicated.")
         successful_replications1 = list(filter(repl_filter, replicator.document_updates))
@@ -567,10 +534,7 @@ class TestReplicationFilter(CBLTestClass):
 
         self.mark_test_step("Start a replicator with the same config as in step 3.")
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Pull replication failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only changes passed the push filters are replicated.")
         expected_ids = {"name_105", "name_193"}

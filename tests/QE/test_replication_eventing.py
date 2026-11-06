@@ -46,10 +46,7 @@ class TestReplicationEventing(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait for replication to complete.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Create document with a large attachment:
@@ -86,13 +83,10 @@ class TestReplicationEventing(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(
+        await replicator.wait_for(
             ReplicatorActivityLevel.STOPPED,
             timedelta(seconds=30),
             timedelta(seconds=300),
-        )
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
         )
 
         self.mark_test_step("Verify document was not replicated.")

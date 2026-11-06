@@ -111,14 +111,7 @@ class TestPeerToPeer(CBLTestClass):
         )
         await replicator.start()
         self.mark_test_step("Ensure replication is complete")
-        status = None
-        if continuous:
-            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
@@ -132,12 +125,9 @@ class TestPeerToPeer(CBLTestClass):
             )
 
         self.mark_test_step("Wait till replication is complete")
-        if continuous:
-            status = await replicator.wait_for(ReplicatorActivityLevel.IDLE, timeout=timedelta(seconds=200))
-        else:
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=200))
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
+        await replicator.wait_for(
+            ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED,
+            timeout=timedelta(seconds=200),
         )
 
         self.mark_test_step("Check that all docs are replicated correctly.")
@@ -205,21 +195,8 @@ class TestPeerToPeer(CBLTestClass):
         )
         await replicator2.start()
         self.mark_test_step("Wait till replication is complete")
-        status = None
-        if continuous:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator2: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
@@ -283,21 +260,8 @@ class TestPeerToPeer(CBLTestClass):
         )
         await replicator2.start()
         self.mark_test_step("Wait till replication is complete")
-        status = None
-        if continuous:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator2: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
@@ -367,28 +331,9 @@ class TestPeerToPeer(CBLTestClass):
         await replicator3.start()
 
         self.mark_test_step("Wait till replication is complete on all 3 sessions")
-        status = None
-        if continuous:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator2: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator3.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator3: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator3.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)
@@ -469,28 +414,9 @@ class TestPeerToPeer(CBLTestClass):
         )
         await replicator3.start()
         self.mark_test_step("Wait till replication is complete on all 3 sessions")
-        status = None
-        if continuous:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator2.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator2: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
-        if continuous:
-            status = await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator3.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator3: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
+        await replicator3.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in server_db_list]
         all_docs_results = await asyncio.gather(*all_docs_collection)
@@ -562,14 +488,7 @@ class TestPeerToPeer(CBLTestClass):
         await replicator1.start()
         listener1 = restarted_listener
         self.mark_test_step("Wait till replication is complete")
-        status = None
-        if continuous:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        else:
-            status = await replicator1.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE if continuous else ReplicatorActivityLevel.STOPPED)
         self.mark_test_step("Check that all docs are replicated correctly.")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]
         all_docs_results = await asyncio.gather(*all_docs_collection)

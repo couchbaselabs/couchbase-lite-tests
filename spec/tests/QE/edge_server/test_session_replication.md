@@ -102,7 +102,8 @@
 1. Start Edge Server, seed one doc per collection, and reset the local database.
 2. Pull both collections with a session as `coll`, and verify both seeded docs arrive.
 3. Push a doc to `travel.hotels` with a new session, and verify it lands.
-4. Push a doc to `travel.airlines` with a new session, and verify it does not land.
+4. Push a doc to `travel.airlines` with a new session, and verify it is refused as pull-only (403)
+   and does not land.
 
 ## test_admin_session_has_full_access
 
@@ -127,7 +128,7 @@
 
 1. Start Edge Server, seed one doc per collection, and reset the local database.
 2. Verify `none` is refused a session for `travel` with 403.
-3. Verify replicating as `none` with basic auth fails, and nothing was pulled.
+3. Verify replicating as `none` with basic auth is refused with 403, and nothing was pulled.
 
 ## test_write_only_session_cannot_sync
 

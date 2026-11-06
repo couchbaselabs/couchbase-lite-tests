@@ -208,10 +208,7 @@ async def do_upgrade_replication_test(
         )
     else:
         test_case.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
     cbl_info(f"Document replication events ({len(replicator.document_updates)}):")
     for entry in replicator.document_updates:

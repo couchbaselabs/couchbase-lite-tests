@@ -79,7 +79,7 @@ replicators, so a refused push to one collection cannot stop the allowed pull or
 1. Start Edge Server with access control on, seed one doc per collection, and reset `db1`.
 2. Pull both collections as `mixed`, and verify both seeded docs arrive.
 3. Push a doc to `travel.hotels` as `mixed`, and verify it lands.
-4. Push a doc to `travel.airlines` as `mixed`, and verify it does not land.
+4. Push a doc to `travel.airlines` as `mixed`, and verify it is refused as pull-only (403) and does not land.
 
 ## test_user_without_read_access_is_refused
 
@@ -92,4 +92,4 @@ database).
 
 1. Start Edge Server with access control on, seed one doc per collection, and reset `db1`.
 2. Create a local doc, and push and pull `travel` as the user.
-3. Verify the replicator is refused and nothing crossed in either direction.
+3. Verify the replicator is refused (403 for `none` and `names_rw`) and nothing crossed in either direction.

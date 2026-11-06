@@ -101,10 +101,7 @@ class TestReplicationXdcr(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
         await asyncio.sleep(5)
@@ -179,10 +176,7 @@ class TestReplicationXdcr(CBLTestClass):
                 )
 
         self.mark_test_step("Wait until the replicator is idle.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
         await asyncio.sleep(5)
@@ -242,10 +236,7 @@ class TestReplicationXdcr(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
         await asyncio.sleep(5)
@@ -333,10 +324,7 @@ class TestReplicationXdcr(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all updated docs are replicated correctly at SG2.")
         await compare_local_and_remote(

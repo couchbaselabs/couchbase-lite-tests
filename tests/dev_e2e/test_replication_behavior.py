@@ -59,10 +59,7 @@ class TestReplicationBehavior(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that only the 50 non deleted documents were replicated")
         assert len(replicator.document_updates) == 50
@@ -116,10 +113,7 @@ class TestReplicationBehavior(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #1: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         loc_deleted = "name_50"
         self.mark_test_step(f"Delete `{loc_deleted}` in the local database.")
@@ -145,10 +139,7 @@ class TestReplicationBehavior(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #2: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Resurrect `{loc_deleted}` in CBS")
         resurrected_body = {
@@ -191,10 +182,7 @@ class TestReplicationBehavior(CBLTestClass):
         await pull_replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator #3: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Check `{loc_deleted}` is not `deleted`")
         # Before the fix for CBL-7841, pulling the resurrected revision over a local tombstone was
