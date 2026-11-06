@@ -64,6 +64,7 @@ asyncio_default_fixture_loop_scope = "session"
 # "tests" puts tests/shared on the path
 pythonpath = ["tests"]
 filterwarnings = [
+  "error::pytest.PytestCollectionWarning",
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]
 markers = [
