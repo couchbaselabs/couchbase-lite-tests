@@ -83,7 +83,9 @@ class TestSnapshotVerify:
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_delete(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
-        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "name_2")])
+        snapshot_id = await db.create_snapshot(
+            [DocumentEntry("_default._default", "name_1"), DocumentEntry("_default._default", "name_2")]
+        )
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:
@@ -116,7 +118,9 @@ class TestSnapshotVerify:
     @pytest.mark.asyncio(loop_scope="session")
     async def test_verify_bad_purge(self, cblpytest: CBLPyTest) -> None:
         db = (await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="names"))[0]
-        snapshot_id = await db.create_snapshot([DocumentEntry("_default._default", "name_2")])
+        snapshot_id = await db.create_snapshot(
+            [DocumentEntry("_default._default", "name_1"), DocumentEntry("_default._default", "name_2")]
+        )
 
         snapshot_updater = SnapshotUpdater(snapshot_id)
         async with db.batch_updater() as b:

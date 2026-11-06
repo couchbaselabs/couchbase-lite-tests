@@ -116,19 +116,23 @@ public class EndptListenerManager {
 
         if (!Boolean.TRUE.equals(disableTLS)) {
             final TypedMap identityReq = req.getMap(KEY_IDENTITY);
-            TLSIdentity tlsId;
+            final TLSIdentity tlsId;
             try {
                 if (identityReq != null) {
                     final byte[] data = PlatformUtils.getDecoder().decodeString(identityReq.getString(KEY_DATA));
                     final String encoding = identityReq.getString(KEY_ENCODING);
                     final String password = identityReq.getString(KEY_PASSWORD);
-                    tlsId = keyStoreSvc.getTLSIdentity(alias, encoding, data, password.toCharArray());
+                    tlsId = keyStoreSvc.getTLSIdentity(
+                        alias,
+                        encoding,
+                        data,
+                        (password == null) ? null : password.toCharArray());
                 } else {
                     tlsId = keyStoreSvc.getTLSIdentity(alias, null, null, null);
                 }
             }
-            catch (CouchbaseLiteException e){
-                throw new CblApiFailure("Failed to configure TLS identity", e);
+            catch (CouchbaseLiteException e) {
+                throw new ClientError("Failed to configure TLS identity for " + alias + ": " + e.getMessage());
             }
             listenerConfig.setTlsIdentity(tlsId);
         }

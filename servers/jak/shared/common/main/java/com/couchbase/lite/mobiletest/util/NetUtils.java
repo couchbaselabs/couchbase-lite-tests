@@ -69,7 +69,7 @@ public final class NetUtils {
     // Fetch a file from the given path.  If it doesn't look like a URL, add the default base URL.
     public static void fetchFile(@NonNull String path, @NonNull File destFile) throws IOException {
         final URL url = new URL((path.startsWith("http") ? path : ASSET_BASE_URL + path));
-        try (FileOutputStream out = new FileOutputStream(destFile); InputStream in = url.openStream()) {
+        try (InputStream in = url.openStream(); FileOutputStream out = new FileOutputStream(destFile)) {
             out.getChannel().transferFrom(Channels.newChannel(in), 0, Long.MAX_VALUE);
         }
     }

@@ -164,6 +164,11 @@ class RequestFactory:
         """Gets the UUID identifying this request factory"""
         return self.__uuid
 
+    @property
+    def ws_router(self) -> WebSocketRouter:
+        """Gets the router that carries requests to the WebSocket test servers"""
+        return self.__ws_router
+
     async def start(self) -> None:
         await self.__ws_router.start()
 

@@ -84,6 +84,7 @@
 		40C7A5672CA4B15B0053ADCB /* QueryResults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C7A5662CA4B15B0053ADCB /* QueryResults.swift */; };
 		4F0E10A52F30FCD900025FB2 /* MultipeerTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0E10A42F30FCD900025FB2 /* MultipeerTransport.swift */; };
 		AED567692E01BBBE00007993 /* StartListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED567682E01BBBE00007993 /* StartListener.swift */; };
+		AED5676D2EA1B00000C0FFEE /* LogHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676C2EA1B00000C0FFEE /* LogHandler.swift */; };
 		AED5676B2E01BBD100007993 /* StopListener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676A2E01BBD100007993 /* StopListener.swift */; };
 		AED5676D2E01BC1100007993 /* Listener.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676C2E01BC1100007993 /* Listener.swift */; };
 		AED5676F2E01BC1D00007993 /* StartListenerRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = AED5676E2E01BC1D00007993 /* StartListenerRequest.swift */; };
@@ -181,6 +182,7 @@
 		40C7A5662CA4B15B0053ADCB /* QueryResults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryResults.swift; sourceTree = "<group>"; };
 		4F0E10A42F30FCD900025FB2 /* MultipeerTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultipeerTransport.swift; sourceTree = "<group>"; };
 		AED567682E01BBBE00007993 /* StartListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartListener.swift; sourceTree = "<group>"; };
+		AED5676C2EA1B00000C0FFEE /* LogHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogHandler.swift; sourceTree = "<group>"; };
 		AED5676A2E01BBD100007993 /* StopListener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StopListener.swift; sourceTree = "<group>"; };
 		AED5676C2E01BC1100007993 /* Listener.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Listener.swift; sourceTree = "<group>"; };
 		AED5676E2E01BC1D00007993 /* StartListenerRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartListenerRequest.swift; sourceTree = "<group>"; };
@@ -271,6 +273,7 @@
 				409F44012DEA823A00BB7851 /* StopMultipeerReplicator.swift */,
 				40AA34982CAF5D20004F4D08 /* StopReplicator.swift */,
 				AED567682E01BBBE00007993 /* StartListener.swift */,
+				AED5676C2EA1B00000C0FFEE /* LogHandler.swift */,
 				AED5676A2E01BBD100007993 /* StopListener.swift */,
 				40BDA7F22AF1C13B008DB256 /* UpdateDatabase.swift */,
 				40BDA7F12AF1C13B008DB256 /* VerifyDocuments.swift */,
@@ -493,6 +496,7 @@
 				40BDA8F52AF20AAB008DB256 /* ReplicationCollection.swift in Sources */,
 				40BDA8E02AF20AAB008DB256 /* VerifyResponse.swift in Sources */,
 				40BDA8E32AF20AAB008DB256 /* StartReplicatorRequest.swift in Sources */,
+				AED5676D2EA1B00000C0FFEE /* LogHandler.swift in Sources */,
 				AED5676B2E01BBD100007993 /* StopListener.swift in Sources */,
 				40AA349D2CAF6755004F4D08 /* CollectionSpec.swift in Sources */,
 				404619D02CB9A761003835C7 /* NewSession.swift in Sources */,

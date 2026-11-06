@@ -9,7 +9,11 @@ describe("KeyPath", () => {
             "$.foo": ["foo"],
             "foo[3]": ["foo", 3],
             "a.b.c": ["a", "b", "c"],
-            "a[12].b[-7]": ["a", 12, "b", -7],
+            "a[12].b[7]": ["a", 12, "b", 7],
+            "\\$.test": ["$", "test"],
+            "test2.\\[": ["test2", "["],
+            "test2.foo\\.test2.foo\\[bar": ["test2", "foo.test2", "foo[bar"],
+            "test4.$": ["test4", "$"],
             "a[1][2][3]": ["a", 1, 2, 3],
             "[12].z": [12, "z"],
         };
@@ -20,7 +24,7 @@ describe("KeyPath", () => {
     });
 
     test("Path parsing failure", () => {
-        const testCases = ["", "$.", "x..y", "[1z]", "[1.5]", "[1"];
+        const testCases = ["", "$.", "x..y", "[1z]", "[1.5]", "[1", "a[-1]", "a[]", "a.[3]", "a[3]]", "a\\"];
         for (const pathStr of testCases) {
             expect(() => new KeyPath(pathStr)).toThrow();
         }

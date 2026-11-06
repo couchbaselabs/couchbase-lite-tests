@@ -78,9 +78,7 @@ class SnapshotUpdater:
             )
 
         if new_blobs is not None:
-            for keypath in new_blobs:
-                blob_name = new_blobs[keypath]
-                new_blobs[keypath] = BASE_BLOB_URL + blob_name
+            new_blobs = {keypath: BASE_BLOB_URL + blob_name for keypath, blob_name in new_blobs.items()}
 
         self._updates.append(
             DatabaseUpdateEntry(
@@ -180,9 +178,7 @@ class DatabaseUpdater:
             return
 
         if new_blobs is not None:
-            for keypath in new_blobs:
-                blob_name = new_blobs[keypath]
-                new_blobs[keypath] = BASE_BLOB_URL + blob_name
+            new_blobs = {keypath: BASE_BLOB_URL + blob_name for keypath, blob_name in new_blobs.items()}
 
         self._updates.append(
             DatabaseUpdateEntry(

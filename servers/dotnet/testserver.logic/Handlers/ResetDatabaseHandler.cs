@@ -25,39 +25,39 @@ internal static partial class HandlerList
         foreach(var newDatabase in databases.EnumerateObject()) {
             var dbName = newDatabase.Name;
             if(newDatabase.Value.ValueKind != JsonValueKind.Object) {
-                await response.WriteBody($"Invalid value for database '{dbName}'", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                await response.WriteBody(Router.CreateErrorResponse($"Invalid value for database '{dbName}'"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                 return;
             }
 
             if(newDatabase.Value.TryGetProperty("collections", out var collectionsJson)) {
                 // collections were specified, dataset is disallowed
                 if(newDatabase.Value.TryGetProperty("dataset", out var _)) {
-                    await response.WriteBody($"Database '{dbName}' specified both collections and dataset, this is invalid!", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                    await response.WriteBody(Router.CreateErrorResponse($"Database '{dbName}' specified both collections and dataset, this is invalid!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                     return;
                 }
 
                 // collections must be an array
                 if(collectionsJson.ValueKind != JsonValueKind.Array) {
-                    await response.WriteBody($"Database '{dbName}' has invalid collections specified (not array)", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                    await response.WriteBody(Router.CreateErrorResponse($"Database '{dbName}' has invalid collections specified (not array)"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                     return;
                 }
 
                 // The collections array must only contain strings
                 if(collectionsJson.EnumerateArray().Any(x => x.ValueKind != JsonValueKind.String)) {
-                    await response.WriteBody($"Database '{dbName}' has invalid collections specified (non-string entry found)", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                    await response.WriteBody(Router.CreateErrorResponse($"Database '{dbName}' has invalid collections specified (non-string entry found)"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                     return;
                 }
             } else if(newDatabase.Value.TryGetProperty("dataset", out var datasetJson)) {
                 // dataset was specified, collections is disallowed
                 if (newDatabase.Value.TryGetProperty("collections", out var _)) {
-                    await response.WriteBody($"Database '{dbName}' specified both collections and dataset, this is invalid!", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                    await response.WriteBody(Router.CreateErrorResponse($"Database '{dbName}' specified both collections and dataset, this is invalid!"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                     return;
                 }
 
                 // dataset must be a string
                 var datasetName = datasetJson.GetString();
                 if (datasetName == null) {
-                    await response.WriteBody($"Database '{dbName}' has invalid dataset specified (not string)", HttpStatusCode.BadRequest).ConfigureAwait(false);
+                    await response.WriteBody(Router.CreateErrorResponse($"Database '{dbName}' has invalid dataset specified (not string)"), HttpStatusCode.BadRequest).ConfigureAwait(false);
                     return;
                 }
 

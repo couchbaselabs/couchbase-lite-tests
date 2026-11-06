@@ -31,7 +31,7 @@
         </div>
 
         <script type="module" defer>
-            import { TDKImpl } from "/src/tdk.ts";
+            import { APIVersion, TDKImpl } from "/src/tdk.ts";
             import { TestServer, StateNames } from "/src/testServer.ts";
 
             const deviceField = document.getElementById("deviceID");
@@ -90,7 +90,7 @@
                 document.cookie = `tdkURL=${url}`;
                 document.cookie = `autostart=${autostartBox.checked}`;
 
-                Server = new TestServer(deviceID);
+                Server = new TestServer(deviceID, APIVersion);
                 await Server.logToConsole();
                 Server.delegate = new TDKImpl();
 

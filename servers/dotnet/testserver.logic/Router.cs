@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using TestServer.Handlers;
@@ -142,7 +143,7 @@ namespace TestServer
         {
             return new
             {
-                domain = 0,
+                domain = TestServerErrorDomain.TestServer,
                 code = 1,
                 message = message
             };
@@ -169,8 +170,15 @@ namespace TestServer
 
         private static async Task HandleException(Exception ex, Uri endpoint, HttpListenerResponse response)
         {
-            if(ex is JsonException) {
+            // Malformed URLs and certificates in the request are client errors
+            if(ex is JsonException or FormatException or CryptographicException) {
                 await response.WriteBody(CreateErrorResponse(ex.Message), HttpStatusCode.BadRequest).ConfigureAwait(false);
+                return;
+            }
+
+            if(ex is CouchbaseException cbe) {
+                var (domain, code) = MapError(cbe);
+                await response.WriteBody(new { domain, code, message = ex.Message }, HttpStatusCode.BadRequest).ConfigureAwait(false);
                 return;
             }
 
@@ -190,13 +198,13 @@ namespace TestServer
             var path = endpoint.AbsolutePath!.TrimStart('/');
             if (path != "") {
                 if (version == 0) {
-                    await response.WriteBody($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint",
+                    await response.WriteBody(CreateErrorResponse($"{ApiVersionHeader} missing or set to 0 on a versioned endpoint"),
                         HttpStatusCode.Forbidden).ConfigureAwait(false);
                     return;
                 }
 
                 if(version != CBLTestServer.ApiVersion) {
-                    await response.WriteBody("The API version specified does not match this server", 
+                    await response.WriteBody(CreateErrorResponse("The API version specified does not match this server"), 
                         HttpStatusCode.Forbidden).ConfigureAwait(false);
                     return;
                 }

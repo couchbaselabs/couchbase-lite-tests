@@ -197,9 +197,10 @@ export class TestServer extends WebSocketClient {
             ...result,
         };
         if (error) {
-            let domain = "domain" in error && typeof error.domain === "string" ? error.domain : error.name;
-            const code = "code" in error && typeof error.code === "number" ? error.code : -1;
-            response.ts_error = { domain, code, message: error.message };
+            // The client reads a TESTSERVER code as the HTTP status, and any other failure is a 400
+            if ("domain" in error && error.domain === "TESTSERVER" && "code" in error && typeof error.code === "number")
+                response.ts_error = { domain: error.domain, code: error.code, message: error.message };
+            else response.ts_error = { domain: "TESTSERVER", code: 400, message: `${error.name}: ${error.message}` };
         }
         this.send(JSON.stringify(response));
     }

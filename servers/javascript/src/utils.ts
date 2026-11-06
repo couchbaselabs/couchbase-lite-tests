@@ -32,6 +32,23 @@ export function check(cond: boolean, message: string): asserts cond {
     if (!cond) throw new HTTPError(400, message);
 }
 
+const BROWSER_PATTERNS: Array<[string, RegExp]> = [
+    // Edge and Chrome user agents also name Chrome and Safari, so they come first
+    ["Edge", /Edg\/([\d.]+)/],
+    ["Firefox", /Firefox\/([\d.]+)/],
+    ["Chrome", /Chrome\/([\d.]+)/],
+    ["Safari", /Version\/([\d.]+).*Safari\//],
+];
+
+/** Gets the browser name and version from a user agent, as the systemName and systemVersion of the device. */
+export function browserInfo(userAgent: string): { systemName: string; systemVersion: string } {
+    for (const [name, pattern] of BROWSER_PATTERNS) {
+        const match = pattern.exec(userAgent);
+        if (match) return { systemName: name, systemVersion: match[1] };
+    }
+    return { systemName: "Unknown", systemVersion: "Unknown" };
+}
+
 /** Strips the default scope name from an incoming collection ID. */
 export function normalizeCollectionID(id: string): string {
     return id.startsWith("_default.") ? id.substring(9) : id;

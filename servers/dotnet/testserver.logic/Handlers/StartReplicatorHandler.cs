@@ -47,7 +47,7 @@ internal static partial class HandlerList
 
         public ReplicatorDocumentIDsFilter(IReadOnlyDictionary<string, JsonElement>? args)
         {
-            if(args?.ContainsKey(DOCUMENT_IDS_KEY) == false) {
+            if (args?.ContainsKey(DOCUMENT_IDS_KEY) != true) {
                 throw new ApplicationStatusException("documentIDs filter is missing documentIDs argument", HttpStatusCode.BadRequest);
             }
 
