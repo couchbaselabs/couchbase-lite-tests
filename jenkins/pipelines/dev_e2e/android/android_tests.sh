@@ -44,13 +44,8 @@ STATUS=0
 
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
-# The workspace is not cleaned between builds, so remove the previous run's logs before anything
-# can fail; otherwise the Jenkinsfile would archive them as this run's
-rm -rf "$DEV_E2E_TESTS_DIR"/{http_log,testserver.log,session.log*,logcat.txt*} "$DEV_E2E_TESTS_DIR"/*-sgcollectinfo-*.zip
-
 # Capture the device log for the run (install, app start, crashes). CBL's own console lines
-# are left out: LogSlurp already collects them. android_teardown.sh stops it; the Jenkinsfile
-# archives it.
+# are left out: LogSlurp already collects them. android_teardown.sh stops it and archives it.
 DEVICE_SERIAL="${ANDROID_SERIAL:-}"
 if [ -z "$DEVICE_SERIAL" ]; then
   DEVICE_SERIAL=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["test_servers"][0]["location"])' "$SCRIPT_DIR/topology_single_device.json")
@@ -69,6 +64,7 @@ echo $! >"$SCRIPT_DIR/logcat.pid"
 uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SG_VERSION
 
 pushd $DEV_E2E_TESTS_DIR >/dev/null
+rm -rf http_log testserver.log
 
 echo "Run the tests"
 if [ -n "$TEST_FILTER" ]; then

@@ -46,6 +46,9 @@ pipeline {
         }
         stage('Android') {
             agent { label 'mob-e2e-android-01' }
+            environment {
+                TS_ARTIFACTS_DIR = 'android'
+            }
             steps {
                 echo "Run Android Tests"
                 lock("mob-e2e-android-01") {
@@ -68,10 +71,7 @@ pipeline {
                             jenkins/pipelines/dev_e2e/android/android_teardown.sh
                         '''
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/session.log*', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/http_log/*', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/*-sgcollectinfo-*.zip', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/dev_e2e/logcat.txt*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/dev_e2e/android/**', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }
