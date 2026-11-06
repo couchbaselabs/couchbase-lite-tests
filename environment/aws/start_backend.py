@@ -327,7 +327,7 @@ def main(
 @click.option(
     "--topology",
     help="The path to the topology configuration file",
-    default=TopologyConfig(),
+    default=TopologyConfig,  # callable: built only when the command runs, so --help needs no network
     type=TopologyParamType(),
 )
 @click.option(
