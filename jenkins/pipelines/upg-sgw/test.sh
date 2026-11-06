@@ -39,11 +39,11 @@ while [ "$#" -gt 0 ]; do
 done
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source $SCRIPT_DIR/../../shared/config.sh
+source $SCRIPT_DIR/../shared/config.sh
 
 TOPOLOGY_FILE="$AWS_ENVIRONMENT_DIR/topology_setup/topology.json"
 CONFIG_TEMPLATE="$SCRIPT_DIR/config.json"
-CONFIG_FILE="$QE_TESTS_DIR/config.json"
+CONFIG_FILE="$UPGRADE_SGW_TESTS_DIR/config.json"
 
 function run_upg_sgw_tests() {
   if [ -n "$TEST_FILTER" ]; then
@@ -78,7 +78,7 @@ echo ">>> Running tests for initial setup with SGW: $CURRENT_SGW_VERSION ..."
 export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
 export SGW_UPGRADE_PHASE="initial"
 unset SGW_UPGRADED_NODE_INDEX 2>/dev/null || true
-pushd $QE_TESTS_DIR >/dev/null
+pushd $UPGRADE_SGW_TESTS_DIR >/dev/null
 run_upg_sgw_tests
 popd >/dev/null
 
@@ -111,7 +111,7 @@ for ((i = 1; i < ${#SGW_VERSIONS[@]}; i++)); do
   export SGW_VERSION_UNDER_TEST="$CURRENT_SGW_VERSION"
   export SGW_UPGRADE_PHASE="upgrade_to_$CURRENT_SGW_VERSION"
   export SGW_PREVIOUS_VERSION="$PREVIOUS_SGW_VERSION"
-  pushd $QE_TESTS_DIR >/dev/null
+  pushd $UPGRADE_SGW_TESTS_DIR >/dev/null
   run_upg_sgw_tests
   popd >/dev/null
 done

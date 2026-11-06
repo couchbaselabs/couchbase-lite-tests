@@ -9,7 +9,7 @@ import click
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
 
 from environment.aws.common.output import header
 from environment.aws.sgw_setup.setup_sgw import (

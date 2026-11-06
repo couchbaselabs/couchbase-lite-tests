@@ -48,7 +48,7 @@ pipeline {
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 echo "=== Run SGW Upgrades"
                 timeout(time: 90, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/QE/upg-sgw/test_rolling.sh ${env.CBL_VERSION} ${params.SGW_VERSIONS}"
+                    sh "jenkins/pipelines/upg-sgw/test_rolling.sh ${env.CBL_VERSION} ${params.SGW_VERSIONS}"
                 }
                 echo "=== SGW Upgrades Complete"
             }
@@ -56,9 +56,9 @@ pipeline {
                 always {
                     echo "=== Teardown SGW Upgrades"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/QE/upg-sgw/teardown.sh"
+                        sh "jenkins/pipelines/upg-sgw/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/QE/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/upgrade_sgw/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Upgrades Teardown Complete"
                 }
             }
