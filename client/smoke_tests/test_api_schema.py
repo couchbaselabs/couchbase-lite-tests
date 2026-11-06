@@ -191,7 +191,9 @@ def test_api_conforms_to_spec(case: Case, cblpytest: CBLPyTest, test_server_url:
     if variant == ServerVariant.REACT_NATIVE and case.path == "/startReplicator" and isinstance(case.body, dict):
         assume(not any(c.get("conflictResolver") for c in case.body["config"].get("collections") or []))
 
-    reset = send(requests.Request("POST", f"{test_server_url}/reset", json={"databases": EXAMPLE_DATABASES}))
+    # JAK creates databases only for a reset that names a test
+    reset_body = {"test": "test_api_conforms_to_spec", "databases": EXAMPLE_DATABASES}
+    reset = send(requests.Request("POST", f"{test_server_url}/reset", json=reset_body))
     assert reset.status_code == 200, f"Reset failed: {reset.status_code} {reset.text}"
     kwargs = {k: v for k, v in case.as_transport_kwargs().items() if k in REQUEST_ARGS}
     # The case keeps the v2 body, which the checks compare to the spec

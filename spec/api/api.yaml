@@ -813,6 +813,8 @@ paths:
                     example: 'store.cloths'
                 port:
                   type: integer
+                  minimum: 0
+                  maximum: 65535
                   example: 12345
                 disableTLS:
                   type: boolean
@@ -1288,7 +1290,7 @@ components:
         params:
           type: object
           additionalProperties: {}
-          example: {'documentIDs': ['doc1', 'doc2']}
+          example: {'documentIDs': {'store.cloths': ['doc1', 'doc2']}}
     ConflictResolver:
       description: |-
         The conflict resolver to set for this collection of the replication.  Each resolver is predefined
@@ -1399,7 +1401,7 @@ components:
 
         If specified "databases" if specified contains a dictionary describing how the database to be created
         as follows:
-            * Null or an empty dictionary for creating an empty database.
+            * An empty dictionary for creating an empty database.
             * A dictionary contains a single key named "collections", with a list of the collection names
               as its value, for creating a database with those collections.
             * A dictionary that contains the single key "dataset",
@@ -1417,7 +1419,7 @@ components:
             will be created.
           type: ['null', object]
           additionalProperties:
-            type: ['null', object]
+            type: object
             additionalProperties: false
             maxProperties: 1
             properties:

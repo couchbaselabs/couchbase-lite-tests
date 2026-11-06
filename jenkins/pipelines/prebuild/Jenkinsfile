@@ -130,7 +130,8 @@ pipeline {
                 script {
                     def fullVersion = params.CBL_BUILD ? "${params.CBL_VERSION}-${params.CBL_BUILD}" : params.CBL_VERSION
                     def runCmd = "uv run --python 3.13 client/smoke_tests/run_local.py --platform ${getSmokeTestPlatform(params.TS_PLATFORM)} --cbl-version ${fullVersion} --junitxml=junit_result.xml"
-                    catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                    // Callers trigger this job with propagate: true, so a smoke failure marks only the stage
+                    catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
                         if (params.TS_PLATFORM == 'js') {
                             sh 'uv run --python 3.13 playwright install chromium'
                         }
@@ -152,7 +153,7 @@ pipeline {
                             pwsh stopCmd
                         }
                     }
-                    junit allowEmptyResults: true, testResults: 'client/smoke_tests/junit_result.xml'
+                    junit allowEmptyResults: true, skipMarkingBuildUnstable: true, testResults: 'client/smoke_tests/junit_result.xml'
                 }
             }
         }

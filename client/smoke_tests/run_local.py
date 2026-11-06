@@ -122,9 +122,9 @@ def booted_simulator() -> str:
     return booted[0]
 
 
-def _clean_files(paths: list[pathlib.Path]) -> list[pathlib.Path]:
-    """The paths among these that have no uncommitted changes."""
-    return [p for p in paths if subprocess.run(["git", "diff", "--quiet", "--", str(p)], cwd=REPO_ROOT).returncode == 0]
+def _dirty_files(paths: list[pathlib.Path]) -> list[pathlib.Path]:
+    """The paths among these that have uncommitted changes."""
+    return [p for p in paths if subprocess.run(["git", "diff", "--quiet", "--", str(p)], cwd=REPO_ROOT).returncode != 0]
 
 
 def _restore_files(paths: list[pathlib.Path]) -> None:
@@ -296,7 +296,11 @@ def main(
 
     config = json.loads(CONFIG_IN.read_text())
     device = None
-    restore = _clean_files(BUILD_REWRITTEN_FILES)
+    builds = not skip_testserver and (platform == "reactnative" or build_testserver is not None)
+    restore = BUILD_REWRITTEN_FILES if builds else []
+    if dirty := _dirty_files(restore):
+        names = ", ".join(str(p.relative_to(REPO_ROOT)) for p in dirty)
+        raise click.ClickException(f"The build rewrites files with uncommitted changes. Commit or stash them: {names}")
     try:
         if platform == "reactnative":
             device = booted_simulator()
