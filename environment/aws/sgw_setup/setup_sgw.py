@@ -12,8 +12,8 @@ Functions:
     download_sgw_package(download_info: SgwDownloadInfo) -> None:
         Download the Sync Gateway package if it is not a release version.
 
-    setup_config(server_hostname: str) -> None:
-        Write the server hostname to the bootstrap configuration file.
+    setup_config(server_hostname: str, sgw_version: str) -> None:
+        Write the server hostname to the bootstrap configuration files.
 
     remote_exec(ssh: paramiko.SSHClient, command: str, desc: str, fail_on_error: bool = True) -> None:
         Execute a remote command via SSH with a description and optional error handling.
@@ -176,12 +176,19 @@ def download_sgw_package(download_info: SgwDownloadInfo) -> None:
         )
 
 
-def setup_config(server_hostname: str) -> None:
+def _supports_metadata_isolation(sgw_version: str) -> bool:
+    """Whether a Sync Gateway version has the use_system_metadata_collection bootstrap option, new in 4.1."""
+    major, minor = (int(part) for part in sgw_version.split(".")[:2])
+    return (major, minor) >= (4, 1)
+
+
+def setup_config(server_hostname: str, sgw_version: str) -> None:
     """
     Write the server hostname to the bootstrap configuration files.
 
     Args:
         server_hostname (str): The hostname of the Couchbase Server.
+        sgw_version (str): The version of Sync Gateway the configs are for, e.g. 4.1.0.
     """
     header(f"Writing {server_hostname} to bootstrap configs as CBS IP")
 
@@ -214,6 +221,16 @@ def setup_config(server_hostname: str) -> None:
     cbs_alternate_config["bootstrap"]["server"] = f"couchbases://{server_hostname}:11207"
     with open(SCRIPT_DIR / "bootstrap-cbs-alternate.json", "w") as fout:
         json.dump(cbs_alternate_config, fout, indent=4)
+
+    # 5. bootstrap-capella-pft.json (Capella's bootstrap for a free tier App Service, which tests start it with)
+    with open(SCRIPT_DIR / "config" / "bootstrap-capella-pft.json") as fin:
+        capella_pft_config = cast(dict, json.load(fin))
+    capella_pft_config["bootstrap"]["server"] = f"couchbases://{server_hostname}"
+    if not _supports_metadata_isolation(sgw_version):
+        # Capella leaves the option out for a Sync Gateway that does not have it
+        del capella_pft_config["bootstrap"]["use_system_metadata_collection"]
+    with open(SCRIPT_DIR / "bootstrap-capella-pft.json", "w") as fout:
+        json.dump(capella_pft_config, fout, indent=4)
 
     with open(SCRIPT_DIR / "start-sgw.sh.in") as file:
         start_sgw_content = file.read()
@@ -331,6 +348,11 @@ def setup_server(hostname: str, pkey: paramiko.Ed25519Key, sgw_info: SgwDownload
         SCRIPT_DIR / "bootstrap-cbs-alternate.json",
         "/home/ec2-user/config/bootstrap-cbs-alternate.json",
     )
+    sftp_progress_bar(
+        sftp,
+        SCRIPT_DIR / "bootstrap-capella-pft.json",
+        "/home/ec2-user/config/bootstrap-capella-pft.json",
+    )
     sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_cert.pem", "/home/ec2-user/cert/sg_cert.pem")
     sftp_progress_bar(sftp, SCRIPT_DIR / "cert" / "sg_key.pem", "/home/ec2-user/cert/sg_key.pem")
     sftp_progress_bar(sftp, SCRIPT_DIR / "Caddyfile", "/home/ec2-user/Caddyfile")
@@ -381,5 +403,5 @@ def main(topology: TopologyConfig) -> None:
     for sgw in topology.sync_gateways:
         sgw_info = SgwDownloadInfo(sgw.version)
         download_sgw_package(sgw_info)
-        setup_config(sgw.cluster_hostname)
+        setup_config(sgw.cluster_hostname, sgw_info.version)
         setup_server(sgw.hostname, topology.ssh_key, sgw_info)
