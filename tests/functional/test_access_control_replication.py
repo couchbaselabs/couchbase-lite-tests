@@ -70,6 +70,7 @@ class TestAccessControlReplication(CBLTestClass):
         Start Edge Server with access control on, seed `<prefix>_es_hotels` and `<prefix>_es_airlines`,
         and reset local database `db1` with both collections.
         """
+        await self.skip_if_not_edge_server_compatible(cblpytest.test_servers[0])
         es = cblpytest.edge_servers[0]
         await es.write_file(USERS_FILE, USERS.read_text())
         admin = await es.configure_dataset(db_name="travel", config_file=CONFIG)

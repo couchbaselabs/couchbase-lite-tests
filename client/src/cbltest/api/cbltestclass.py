@@ -80,6 +80,17 @@ class CBLTestClass:
 
         await self._skip_if_cbl_version_not(server, constraint, reason)
 
+    async def skip_if_not_edge_server_compatible(self, server: TestServer) -> None:
+        """
+        Skips the test if the server's CBL cannot replicate with Edge Server. CBL JS and
+        CBL React Native are always accepted. Every other platform must be CBL 3.x: Edge
+        Server rejects a CBL 4.x replicator with `Unsupported WebSocket protocol BLIP_3+CBMobile_4`.
+        """
+        if (await server.info).variant in ServerVariant.JS | ServerVariant.REACT_NATIVE:
+            return
+
+        await self._skip_if_cbl_version_not(server, "< 4.0.0", "Edge Server only replicates with CBL 3.x")
+
     async def skip_if_cbl_js_not(self, server: TestServer, constraint: str, reason: str) -> None:
         """
         Skips the test if the server is CBL JS and its version does not match the specified comparison
