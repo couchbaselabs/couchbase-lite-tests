@@ -1,44 +1,58 @@
+// ProGet product of a test server platform, mirroring TEST_SERVER_PLATFORMS in setup_multiplatform.py.
+def progetProduct(String platform) {
+    if (platform == 'swift_ios') { return 'couchbase-lite-ios' }
+    if (platform == 'jak_android') { return 'couchbase-lite-android' }
+    if (platform in ['jak_desktop', 'jak_webservice']) { return 'couchbase-lite-java' }
+    if (platform in ['dotnet_macos', 'dotnet_windows', 'dotnet_ios', 'dotnet_android']) { return 'couchbase-lite-net' }
+    if (platform in ['c_macos', 'c_windows', 'c_linux_x86_64', 'c_ios', 'c_android']) { return 'couchbase-lite-c' }
+    error "Unsupported platform '${platform}' in PLATFORM_VERSIONS"
+}
+
+// Splits "swift_ios=4 c_macos=4.1.0-18" into [platform, version] pairs, in input order. setup_multiplatform.py
+// checks the entries and logs every problem with them.
+def platformVersions(String value) {
+    def result = []
+    for (spec in value.trim().split(/\s+/)) {
+        def parts = spec.split('=', 2)
+        result.add([parts[0], parts.size() > 1 ? parts[1] : ''])
+    }
+    return result
+}
+
+// Returns a line for each platform the topology has fewer test servers of than PLATFORM_VERSIONS gives entries,
+// matching by platform whatever order the topology lists them in. Spare test servers are fine. setup_multiplatform.py
+// repeats this at setup along with its version checks; checking here as well stops the run before prebuilding.
+def topologyShortfalls(String topologyFile, List entries) {
+    def path = "jenkins/pipelines/QE/multiplatform/${topologyFile}"
+    if (!fileExists(path)) { return ["${path} does not exist"] }
+
+    def available = [:]
+    for (ts in (readJSON(file: path, returnPojo: true).test_servers ?: [])) {
+        available[ts.platform] = (available[ts.platform] ?: 0) + 1
+    }
+    def wanted = [:]
+    for (pv in entries) { wanted[pv[0]] = (wanted[pv[0]] ?: 0) + 1 }
+
+    def shortfalls = []
+    for (platform in wanted.keySet()) {
+        def have = available[platform] ?: 0
+        if (wanted[platform] > have) {
+            shortfalls.add("${platform}: PLATFORM_VERSIONS gives ${wanted[platform]} but ${topologyFile} has ${have}")
+        }
+    }
+    return shortfalls
+}
+
 pipeline {
     agent none
     parameters {
-        string(
-            name: 'PLATFORM_VERSIONS',
-            defaultValue: 'ios:3.3.0 android:3.3.0',
-            description: 'Platform versions in two supported formats:\n' +
-                        '1. Auto-fetch (recommended): platform1:version1 platform2:version2\n' +
-                        '   Example: "ios:3.2.3 android:3.2.4"\n' +
-                        '2. Explicit builds: platform1:version1-build1 platform2:version2-build2\n' +
-                        '   Example: "ios:3.2.3-1 android:3.2.4-2"\n' +
-                        'Supported platforms: ios, android, dotnet, java, c'
-        )
-        string(
-            name: 'SGW_VERSION',
-            defaultValue: '3.2.3',
-            description: 'Sync Gateway Version'
-        )
-
-
-        string(
-            name: 'CBL_TEST_NAME',
-            defaultValue: 'test_no_conflicts::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_pull',
-            description: 'Name of the test to run, leave empty to run all tests, or just mention a directory name[::class name] to run tests in that directory[::class]'
-        )
-        string(
-            name: 'TOPOLOGY_FILE',
-            defaultValue: 'topology.json',
-            description: 'Multiplatform Topology file in JSON format'
-        )
-        booleanParam(
-            name: 'DISABLE_AUTO_FETCH',
-            defaultValue: false,
-            description: 'Disable automatic fetching of latest successful builds (requires explicit build numbers in PLATFORM_VERSIONS)'
-        )
-        booleanParam(
-            name: 'DISABLE_PREBUILD',
-            defaultValue: false,
-            description: 'Disable automatic prebuilding of testserver)'
-        )
-
+        string(name: 'PLATFORM_VERSIONS', defaultValue: 'swift_ios=4 swift_ios=4', description: 'Space-separated <platform>=<version> list, one entry per test server, e.g. "swift_ios=4.1.0 swift_ios=4.2.0 jak_android=4.1.0-18". <platform> is a test server platform (swift_ios, jak_android, jak_desktop, jak_webservice, dotnet_macos, dotnet_windows, dotnet_ios, dotnet_android, c_macos, c_windows, c_linux_x86_64, c_ios, c_android); each entry uses the next test server of that platform in the topology, and test servers left over are not used. <version> is "4", "4.1", "4.1.0" or "4.1.0-18".')
+        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version, eg : "4" for the latest 4.x, or "4.1.3-18" for a specific version and build')
+        choice(name: 'TS_DATASET_VERSION', choices: ['auto', '4.0', '3.2'], description: 'Test server dataset version (auto: 3.2 if any platform runs CBL 3.x, else 4.0)')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
+        string(name: 'TOPOLOGY_FILE', defaultValue: 'topology.json', description: 'Topology file in jenkins/pipelines/QE/multiplatform')
+        booleanParam(name: 'TS_RUN_ALL_TESTS', defaultValue: false, description: 'Run every test, not only the tests that use more than one test server')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test servers. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
     options {
         ansiColor('xterm')
@@ -46,107 +60,72 @@ pipeline {
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
-                    if (params.PLATFORM_VERSIONS == '') { error "PLATFORM_VERSIONS is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "${params.PLATFORM_VERSIONS}-${params.SGW_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
-                }
-            }
-        }
-        stage('Validate Parameters') {
-            steps {
-                script {
-                    echo "Platform Versions: ${params.PLATFORM_VERSIONS}"
-                    echo "SGW Version: ${params.SGW_VERSION}"
-                    echo "Auto-fetch builds: ${!params.DISABLE_AUTO_FETCH}"
+                    if (!params.PLATFORM_VERSIONS?.trim()) { error "PLATFORM_VERSIONS is required" }
+                    if (!params.SGW_VERSION?.trim()) { error "SGW_VERSION is required" }
 
-                    // Validate platform versions format
-                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
-                    platformSpecs.each { spec ->
-                        def parts = spec.split(':')
-                        if (parts.size() < 2 || parts.size() > 2) {
-                            error("Invalid platform specification: ${spec}. Expected format: platform:version[-build]")
-                        }
-                        // Check if version contains build number (version-build format)
-                        def versionPart = parts[1]
-                        if (versionPart.contains('-')) {
-                            def versionBuildParts = versionPart.split('-')
-                            if (versionBuildParts.size() != 2) {
-                                error("Invalid version-build format in: ${spec}. Expected format: platform:version-build")
-                            }
-                            echo "Will deploy CBL ${versionBuildParts[0]}-${versionBuildParts[1]} to ${parts[0]} platform"
-                        } else {
-                            echo "Will auto-fetch latest build for ${parts[0]} v${versionPart}"
-                        }
+                    def topologyFile = params.TOPOLOGY_FILE?.trim() ?: 'topology.json'
+                    def shortfalls = topologyShortfalls(topologyFile, platformVersions(params.PLATFORM_VERSIONS))
+                    if (shortfalls) {
+                        env.SKIP_RUN = 'true'
+                        currentBuild.result = 'UNSTABLE'
+                        currentBuild.description = "PLATFORM_VERSIONS does not fit ${topologyFile}"
+                        echo "PLATFORM_VERSIONS does not fit ${topologyFile}, skipping the run:\n  ${shortfalls.join('\n  ')}"
+                        return
                     }
+
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    def resolved = []
+                    def incompatible = []
+                    def anyCbl3 = false
+                    for (pv in platformVersions(params.PLATFORM_VERSIONS)) {
+                        def version = proget.resolveProgetVersion(progetProduct(pv[0]), pv[1], pv[0])
+                        def reason = compat.incompatibility(version, env.SGW_VERSION)
+                        if (reason) { incompatible.add("${pv[0]}=${pv[1]}: ${reason}") }
+                        if (version.startsWith('3.')) { anyCbl3 = true }
+                        resolved.add("${pv[0]}=${version}")
+                    }
+                    if (incompatible) { error "Incompatible with Sync Gateway:\n  ${incompatible.join('\n  ')}" }
+
+                    env.PLATFORM_VERSIONS = resolved.join(' ')
+                    env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
+                    // 'auto' picks the dataset from the CBL versions: 3.2 if any platform runs 3.x, else 4.0
+                    env.TS_DATASET_VERSION = params.TS_DATASET_VERSION != 'auto' ? params.TS_DATASET_VERSION :
+                        (anyCbl3 ? '3.2' : '4.0')
+                    currentBuild.displayName = "${env.PLATFORM_VERSIONS} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "Topology: ${params.TOPOLOGY_FILE}, DS: ${env.TS_DATASET_VERSION}"
                 }
             }
         }
         stage('Prebuild Servers') {
+            when { beforeAgent true; expression { env.SKIP_RUN != 'true' && params.RUN_PREBUILD } }
             steps {
                 script {
-                    // Parse platform versions to determine which test servers to prebuild
-                    def platformSpecs = params.PLATFORM_VERSIONS.split(' ')
-                    def platformsToBuild = []
-
-                    // Map platform names to their test server platforms
-                    def platformMapping = [
-                        'ios': ['swift_ios'],
-                        'android': ['jak_android'],
-                        'dotnet': ['dotnet_ios', 'dotnet_windows', 'dotnet_macos', 'dotnet_android'],
-                        'java': ['jak_desktop', 'jak_webservice'],
-                        'c': ['c_ios', 'c_android', 'c_linux_x86_64', 'c_windows', 'c_macos']
-                    ]
-
-                    platformSpecs.each { spec ->
-                        def parts = spec.split(':')
-                        def platform = parts[0]
-                        def versionPart = parts[1]
-
-                        // Extract version (with or without build number)
-                        def cblVersion = versionPart
-
-                        // Add all test server platforms for this platform
-                        if (platformMapping.containsKey(platform)) {
-                            platformMapping[platform].each { serverPlatform ->
-                                if (!platformsToBuild.contains(serverPlatform)) {
-                                    platformsToBuild.add(serverPlatform)
-                                }
-                            }
-                        }
-                    }
-
-                    echo "Will prebuild test servers for platforms: ${platformsToBuild.join(', ')}"
-
-                    // Build all required test server platforms in parallel
+                    // Prebuild each requested test server platform once per version it runs.
                     def parallelBuilds = [:]
-                    platformsToBuild.each { platform ->
-                        parallelBuilds[platform] = {
-                            // For multiplatform, we'll use a generic version since each platform may have different versions
-                            // The actual version assignment happens during test setup
-
+                    for (pv in platformVersions(env.PLATFORM_VERSIONS)) {
+                        def platform = pv[0]
+                        def version = pv[1]
+                        parallelBuilds["${platform}=${version}"] = {
                             build job: 'prebuild-test-server',
                             parameters: [
                                 string(name: 'TS_PLATFORM', value: platform),
-                                string(name: 'CBL_VERSION', value: '3.3.0'), // Generic version for prebuild
-                                string(name: 'CBL_BUILD', value: ''),
+                                string(name: 'CBL_VERSION', value: version),
                             ],
                             wait: true,
                             propagate: true
                         }
                     }
-
-                    if (parallelBuilds.size() > 0 && !params.DISABLE_PREBUILD) {
-                        parallel parallelBuilds
-                    } else {
-                        echo "No test servers to prebuild"
-                    }
+                    parallel parallelBuilds
                 }
             }
         }
         stage('Setup and Run Tests') {
+            when { beforeAgent true; expression { env.SKIP_RUN != 'true' } }
             agent { label 'qe-mac-india' }
             environment {
                 KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
@@ -154,29 +133,56 @@ pipeline {
                 PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet:${DOTNET_ROOT}:/Users/qe_mobile_india/Library/Android/sdk/cmdline-tools/latest/bin:/Users/qe_mobile_india/Library/Android/sdk/platform-tools:/Users/qe_mobile_india/Library/Android/sdk/emulator:${PATH}"
                 AWS_PROFILE = "default"
                 ANDROID_HOME = "/Users/qe_mobile_india/Library/Android/sdk"
-
+                TS_ARTIFACTS_DIR = 'multiplatform'
+                // pytest's graceful stop budget (seconds), applied by the timeout_fixture plugin via
+                // --session-timeout. Kept 1 hour below the stage timeout below so pytest stops itself gracefully --
+                // with a runway to finish junit/greenboard/sgcollect/cbcollect -- before Jenkins' hard SIGTERM. The
+                // sgcollect and cbcollect session fixtures tear down one after the other, not in parallel, so the
+                // runway must cover both: up to ~8.5m of sgcollect polling plus up to 21m for cbcollect (the 1260s
+                // _COLLECT_LOGS_TIMEOUT in couchbaseserver.py), plus archive downloads.
+                CBL_PYTEST_SESSION_TIMEOUT = '86400'
             }
             steps {
                 // Unlock keychain:
-                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                echo "Run Multiplatform Test"
+                sh 'security unlock-keychain -p "$KEYCHAIN_PASSWORD" ~/Library/Keychains/login.keychain-db'
                 timeout(time: 25, unit: 'HOURS') {
-                    sh "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh ${params.PLATFORM_VERSIONS} ${params.SGW_VERSION} ${params.CBL_TEST_NAME} ${params.TOPOLOGY_FILE}"
+                    script {
+                        def status = sh(
+                            script: "jenkins/pipelines/QE/multiplatform/test_multiplatform.sh '${env.PLATFORM_VERSIONS}' '${env.SGW_VERSION}' --topology-file '${params.TOPOLOGY_FILE}' --dataset-version '${env.TS_DATASET_VERSION}' --test-filter '${env.TS_TEST_FILTER}'${params.TS_RUN_ALL_TESTS ? ' --all-tests' : ''}",
+                            returnStatus: true
+                        )
+                        // The input not fitting the topology is not a test failure: the sanity check above lists
+                        // every problem, and no test ran.
+                        // 3 is SANITY_CHECK_EXIT_CODE in setup_multiplatform.py
+                        if (status == 3) {
+                            unstable "PLATFORM_VERSIONS or SGW_VERSION does not fit ${params.TOPOLOGY_FILE}, see the sanity check problems above"
+                        } else if (status != 0) {
+                            error "test_multiplatform.sh failed with exit code ${status}"
+                        }
+                    }
                 }
             }
             post {
                 always {
-                    // Publish pytest's JUnit XML so per-test failures (messages and
-                    // tracebacks) are surfaced in Jenkins even if teardown fails.
-                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+                    junit testResults: 'tests/junit_result.xml', allowEmptyResults: true
 
                     timeout(time: 5, unit: 'MINUTES') {
                         sh 'jenkins/pipelines/QE/multiplatform/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/QE/session.log', fingerprint: true, allowEmptyArchive: true
-                    archiveArtifacts artifacts: 'tests/QE/http_log/*', fingerprint: true, allowEmptyArchive: true
+                    // Archived after teardown because teardown's move_artifacts is what populates
+                    // tests/multiplatform/ (the whole tests/ tree runs in one session, so artifacts live at the
+                    // tests/ root).
+                    archiveArtifacts artifacts: 'tests/multiplatform/**/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+        fixed {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "vipul.bhardwaj@couchbase.com";
         }
     }
 }

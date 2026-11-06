@@ -45,6 +45,36 @@ def pytest_configure(config: pytest.Config) -> None:
     )
 
 
+# This adds the --select-min-test-servers command line option to pytest.
+def pytest_addoption(parser: pytest.Parser) -> None:
+    group = parser.getgroup("CBL E2E Testing")
+    group.addoption(
+        "--select-min-test-servers",
+        type=int,
+        metavar="count",
+        help=f"If specified, only run the tests marked {_min_test_servers_key}(N) with N at least `count`, "
+        "e.g. 2 for the tests that use more than one test server",
+    )
+
+
+# Deselects the tests that need fewer test servers than --select-min-test-servers, so that they are left out of
+# the run (and its results) instead of being reported as skipped.
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    minimum = config.getoption("--select-min-test-servers")
+    if minimum is None:
+        return
+
+    selected: list[pytest.Item] = []
+    deselected: list[pytest.Item] = []
+    for item in items:
+        mark = item.get_closest_marker(_min_test_servers_key)
+        (selected if mark is not None and mark.args[0] >= minimum else deselected).append(item)
+
+    if deselected:
+        config.hook.pytest_deselected(items=deselected)
+        items[:] = selected
+
+
 # This is run before each test to determine if there are enough backend
 # resources to run the test.  If not, the test is skipped.
 def pytest_runtest_setup(item: pytest.Item) -> None:
