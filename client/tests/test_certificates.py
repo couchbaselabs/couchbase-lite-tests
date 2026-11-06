@@ -101,12 +101,13 @@ class TestSyncGatewayCaCertificate:
         if not _SG_CERT_FILE.is_file() or not _SG_KEY_FILE.is_file():
             pytest.skip(_SKIP_REASON)
 
-        async with _tls_server(_SG_CERT_FILE, _SG_KEY_FILE) as port:
-            sync_gateway = SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True)
-
-            session = sync_gateway._create_session(True, "https://", "127.0.0.1", port, None)
-            async with session, await session.get("/") as response:
-                assert response.status == 200
+        async with (
+            _tls_server(_SG_CERT_FILE, _SG_KEY_FILE) as port,
+            SyncGateway(url="127.0.0.1", username="user", password="pass", port=port, secure=True) as sync_gateway,
+            sync_gateway._create_session(True, "https://", "127.0.0.1", port, None) as session,
+            await session.get("/") as response,
+        ):
+            assert response.status == 200
 
 
 class TestGeneratedCertificates:
