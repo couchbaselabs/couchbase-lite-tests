@@ -1,6 +1,6 @@
 # cbltest Framework — `client/`
 
-The `cbltest` Python package is the test framework that drives platform test servers via HTTP. It is an async request factory + pytest plugin suite. Tests in `tests/dev_e2e/` and `tests/QE/` consume this package; per-platform servers in `servers/` implement the API it calls.
+The `cbltest` Python package is the test framework that drives platform test servers via HTTP. It is an async request factory + pytest plugin suite. Tests in `tests/functional/`, `tests/system/` and `tests/upgrade_sgw/` consume this package; per-platform servers in `servers/` implement the API it calls.
 
 ## Scope
 
@@ -181,7 +181,7 @@ cd client/smoke_tests && uv run pytest -x -v --config config_in.json
 | What | Where | Relationship |
 |---|---|---|
 | API contract | [spec/api/api.yaml](../spec/api/api.yaml) | Defines what test servers implement |
-| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Consume this framework |
+| Test suites | [tests/functional/](../tests/functional/), [tests/system/](../tests/system/), [tests/upgrade_sgw/](../tests/upgrade_sgw/) | Consume this framework |
 | Platform servers | [servers/](../servers/) (c, dotnet, ios, jak, javascript) | Implement the API this calls |
 | Infrastructure | [environment/](../environment/) (aws, docker) | Deploys the test environment |
 | CI | [jenkins/pipelines/](../jenkins/pipelines/) | Drives tests using this framework |

@@ -77,11 +77,11 @@ The system automatically maps platform names in topology files to version specif
 The system now uses **dynamic topology composition** from existing platform-specific topology files:
 
 #### **Platform Topology Sources:**
-- **iOS**: `jenkins/pipelines/QE/ios/topology_single_device.json`
-- **Android**: `jenkins/pipelines/QE/android/topology_single_device.json`
-- **.NET**: `jenkins/pipelines/QE/dotnet/topologies/topology_single_*.json`
-- **Java**: `jenkins/pipelines/QE/java/topologies/topology_single_*.json`
-- **C**: `jenkins/pipelines/QE/c/topologies/topology_single_*.json`
+- **iOS**: `jenkins/pipelines/functional/ios/topology_single_device.json`
+- **Android**: `jenkins/pipelines/functional/android/topology.json`
+- **.NET**: `jenkins/pipelines/functional/dotnet/topologies/topology_single_*.json`
+- **Java**: `jenkins/pipelines/functional/java/{desktop,webservice}/topology_single_host.json`
+- **C**: `jenkins/pipelines/functional/c/topologies/topology_single_*.json`
 
 #### **Multi-OS Platform Support:**
 
@@ -179,7 +179,7 @@ Use the standalone script to check available builds:
 ## File Structure
 
 ```
-multiplatform/
+p2p/
 ├── test_multiplatform.sh           # Main test execution script
 ├── setup_multiplatform.py          # Platform-specific setup logic with dynamic topology composition
 ├── latest_successful_build.sh      # Standalone build lookup utility
@@ -195,31 +195,31 @@ multiplatform/
 - Requires physical device connection
 - Uses device UDID for targeting
 - Supports iOS SDK versions
-- **Topology**: Single device topology from QE/ios directory
+- **Topology**: Single device topology from functional/ios directory
 
 ### Android (`jak_android`, `java_android`, `dotnet_android`)
 - Supports both Java and .NET implementations
 - Uses device serial numbers
 - Requires ADB connectivity
-- **Topology**: Single device topology from QE/android directory
+- **Topology**: Single device topology from functional/android directory
 
 ### .NET (`dotnet_windows`, `dotnet_macos`, `dotnet_android`, `dotnet_ios`)
 - Cross-platform .NET support
 - Multiple OS targets with separate topologies
 - Framework-specific builds
-- **Topologies**: Platform-specific files in QE/dotnet/topologies/
+- **Topologies**: Platform-specific files in functional/dotnet/topologies/
 
 ### Java (`java_windows`, `java_linux`)
 - Pure Java implementations
 - Linux and Windows support
 - JVM compatibility testing
-- **Topologies**: Platform-specific files in QE/java/topologies/
+- **Topologies**: Platform-specific files in functional/java/
 
 ### C (`c_linux_x86_64`, `c_windows`, `c_macos`)
 - Native C implementations
 - Multi-OS support with architecture variants
 - Compiler-specific builds
-- **Topologies**: Platform-specific files in QE/c/topologies/
+- **Topologies**: Platform-specific files in functional/c/topologies/
 
 ## Troubleshooting
 

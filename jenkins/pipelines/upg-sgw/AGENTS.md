@@ -1,18 +1,20 @@
-# Agent: QE Test Pipelines (jenkins/pipelines/QE/)
+# Agent: SGW Upgrade and Multi-Platform Pipelines (jenkins/pipelines/upg-sgw/, jenkins/pipelines/p2p/)
 
 ## Identity
 
-You are a specialized agent for the QA test pipelines under `jenkins/pipelines/QE/`. You focus on
-maintaining infrastructure-as-code for all QE tests, ensuring topology files match test requirements,
-and managing multi-node cluster configurations for complex tests like SGW upgrade scenarios.
+You maintain the pipelines whose topologies go beyond one test server and one Sync Gateway:
+SGW upgrade scenarios (`upg-sgw/`) and peer-to-peer replication (`../p2p/`). You focus on
+ensuring topology files match test requirements and on multi-node cluster configurations.
 
 ## Scope
 
-You own all code under `jenkins/pipelines/QE/`:
-- Standard platform pipelines: `android/`, `c/`, `dotnet/`, `ios/`, `java/`
-- Special pipelines: `sgw/`, `upg-sgw/`, `es/`, `multiplatform/`
+You own:
+- `jenkins/pipelines/upg-sgw/` — SGW upgrade (`Jenkinsfile`) and rolling upgrade (`Jenkinsfile_rolling`), running `tests/upgrade_sgw`
+- `jenkins/pipelines/p2p/` — runs `tests/p2p` with several test servers (on one or more platforms) in one topology
 
-You do NOT own the QE test code itself (`tests/QE/`), but you are responsible for provisioning
+Platform pipelines live in `../functional/`; the daily triggers live in `../main/` (`cbl/`, `sgw/`).
+
+You do NOT own the test code (`tests/functional/`, `tests/system/`, `tests/upgrade_sgw/`), but you are responsible for provisioning
 the infrastructure that those tests require.
 
 ## Your Most Critical Responsibility: Topology-Test Synchronization
@@ -95,7 +97,6 @@ def cli_entry(cbl_versions: list[str], sgw_versions: list[str]) -> None:
         SCRIPT_DIR / "topology.json",  # ← platform-specific topology
         SCRIPT_DIR / "config.json",  # ← platform-specific config
         "platform_tag",  # ← e.g., "swift_ios", "jak_android"
-        setup_dir="QE",  # ← MUST be "QE" for all QE pipelines
     )
 
 
@@ -119,14 +120,7 @@ if __name__ == "__main__":
 4. Provision SGW version N+1
 5. Repeat tests (verifying data persistence)
 
-### Edge Server Pipeline (es/)
-
-**Different Pattern:**
-- Does NOT use shared `setup_test()`
-- Has custom `generate_topology()` function
-- Programmatically creates topology based on `--sgw-version` and `--cbs-version` args
-
-### Multi-Platform Pipeline (multiplatform/)
+### Peer-to-Peer Pipeline (p2p/)
 
 **Per-Platform Versions:**
 - Does not call the shared `setup_test()` — has its own inline topology-composition logic
@@ -136,7 +130,7 @@ if __name__ == "__main__":
 ## Coding Rules
 
 - **Topology MUST match test requirements** — non-negotiable
-- **`setup_dir="QE"`** required on ALL QE setup_test.py files
+- **`setup_dir`** omitted (defaults to `"functional"`) except `upg-sgw`, which passes `"upgrade_sgw"`
 - **Never hand-edit generated topology** — it's written at runtime by setup_test.py
 - **Validate topology against schema** — `jsonschema` validates against `topology_schema.json`
 - **Template placeholders** are resolved at runtime: `{{version}}`, `{{cbs_version}}`, etc.
@@ -147,15 +141,15 @@ if __name__ == "__main__":
 
 ```bash
 # Validate topology against schema (from repo root)
-jsonschema -i jenkins/pipelines/QE/upg-sgw/topology.json \
+jsonschema -i jenkins/pipelines/upg-sgw/topology.json \
   environment/aws/topology_setup/topology_schema.json
 
 # Run QE pipeline (SGW upgrade)
 cd environment/aws
-uv run ../jenkins/pipelines/QE/upg-sgw/setup_test.py 4.0.0 4.0.0
+uv run ../jenkins/pipelines/upg-sgw/setup_test.py 4.0.0 4.0.0
 
 # Teardown
-cd jenkins/pipelines/QE/upg-sgw
+cd jenkins/pipelines/upg-sgw
 ./teardown.sh
 ```
 
@@ -164,7 +158,7 @@ cd jenkins/pipelines/QE/upg-sgw
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline documentation |
-| QE test suites | `../../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
+| Test suites | `../../../tests/functional/`, `../../../tests/system/`, `../../../tests/upgrade_sgw/` | Source of `@pytest.mark.min_*` requirements |
 | Topology schema | `../../../environment/aws/topology_setup/topology_schema.json` | Validates topology JSON |
 | Shared setup | `../shared/setup_test.py` | `setup_test()` function all QE pipelines use |
 | AWS orchestrator | `../../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |

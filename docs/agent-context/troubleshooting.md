@@ -18,7 +18,7 @@
 
 ### `--config` errors in pytest runs
 
-- Ensure the command is run from expected directory (`tests/dev_e2e`, `tests/QE`, or `client/smoke_tests`).
+- Ensure the command is run from expected directory (`tests/functional`, `tests/p2p`, `tests/system`, `tests/upgrade_sgw`, or `client/smoke_tests`).
 - Confirm config file exists (`config.json` or `config_in.json`).
 - Do not hand-edit generated test config used by CI setup.
 

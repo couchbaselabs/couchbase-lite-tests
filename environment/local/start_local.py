@@ -8,7 +8,7 @@
 # Usage::
 #
 #   uv run environment/local/start_local.py --server rosmar
-#   cd tests/dev_e2e
+#   cd tests/functional
 #   uv run pytest --config "$(cat ../../environment/local/topology_config)"
 #
 import concurrent.futures

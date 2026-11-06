@@ -13,7 +13,7 @@ System-level test harness for Couchbase Lite releases across all supported platf
                                   │
                           ┌───────▼────────┐
                           │     Tests      │
-                          │  dev_e2e / QE  │
+                          │ functional/... │
                           └────────────────┘
 ```
 
@@ -22,10 +22,10 @@ System-level test harness for Couchbase Lite releases across all supported platf
 | Path             | Contents                                                                                  | Sub-doc                                     |
 |------------------|-------------------------------------------------------------------------------------------|---------------------------------------------|
 | `client/`        | `cbltest` Python framework, pytest plugins, request/response API                          | [client/AGENTS.md](client/AGENTS.md)        |
-| `tests/`         | `dev_e2e/` (developer E2E tests) and `QE/` (QA suite + an edge-server sub-suite)          | [tests/AGENTS.md](tests/AGENTS.md)          |
+| `tests/`         | `functional/`, `p2p/`, `system/` and `upgrade_sgw/` suites                                | [tests/AGENTS.md](tests/AGENTS.md)          |
 | `servers/`       | Per-platform test servers: `c/`, `dotnet/`, `ios/`, `jak/`, `javascript/`                 | [servers/AGENTS.md](servers/AGENTS.md)      |
 | `environment/`   | `aws/` (Terraform + orchestrator), `local/`, `LogSlurp/`, `otel-collector/`               | [environment/AGENTS.md](environment/AGENTS.md) |
-| `jenkins/`       | CI/CD pipelines under `pipelines/{dev_e2e,QE}/{platform}/`                                | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
+| `jenkins/`       | CI/CD pipelines: `functional/`, `main/`, `upg-sgw/`, `p2p/`                               | [jenkins/AGENTS.md](jenkins/AGENTS.md)      |
 | `spec/`          | OpenAPI spec (`api/api.yaml`), test specs, dataset docs                                   | [spec/AGENTS.md](spec/AGENTS.md)            |
 | `dataset/`       | Test datasets: cblite2 databases, SGW configs, blobs                                      | [dataset/AGENTS.md](dataset/AGENTS.md)      |
 
@@ -66,9 +66,10 @@ uv run -- pytest --config client/tests/empty_config.json client/tests
 # Smoke tests
 cd client/smoke_tests && uv run pytest -x -v --config config_in.json
 
-# dev_e2e / QE suites
-cd tests/dev_e2e && uv run pytest -x -v --config config.json
-cd tests/QE      && uv run pytest -x -v --config config.json
+# Test suites
+cd tests/functional  && uv run pytest -x -v --config config.json
+cd tests/system      && uv run pytest -x -v --config config.json
+cd tests/upgrade_sgw && uv run pytest -x -v --config config.json
 
 # AWS environment (requires `aws sso login`)
 cd environment/aws && uv run python start_backend.py --topology topology_setup/topology.json
@@ -112,7 +113,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Config Files (Generated — Do Not Hand-Edit)
 
-- Test config: `tests/{dev_e2e,QE}/config.json` (schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`)
+- Test config: `tests/{functional,p2p,system,upgrade_sgw}/config.json` (schema: `https://packages.couchbase.com/couchbase-lite/testserver.schema.json`)
 - Topology: `environment/aws/topology_setup/*.json` (schema: `topology_schema.json`)
 
 ## Branching
@@ -134,8 +135,8 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 
 ## Recurring Patterns (Know Before Editing)
 
-1. **Jenkins per-platform `setup_test.py`** — most files under `jenkins/pipelines/{dev_e2e,QE}/{platform}/` are thin click wrappers calling `setup_test(...)` from `jenkins/pipelines/shared/`, differing only in `platform_name`, `topology_file`, and `config_file`. Exceptions: `QE/es` and `QE/multiplatform` don't use the shared wrapper — they call `environment.aws.start_backend.script_entry` directly.
-2. **`conftest.py` `dataset_path` fixtures** — three near-identical copies in `tests/dev_e2e/`, `tests/QE/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
+1. **Jenkins per-platform `setup_test.py`** — most files under `jenkins/pipelines/functional/{platform}/` (and `upg-sgw`) are thin click wrappers calling `setup_test(...)` from `jenkins/pipelines/shared/`, differing only in `platform_name`, `topology_file`, and `config_file`. Exceptions: `functional/es` and `p2p` don't use the shared wrapper — they call `environment.aws.start_backend.script_entry` directly.
+2. **`conftest.py` `dataset_path` fixtures** — five near-identical copies in `tests/functional/`, `tests/p2p/`, `tests/system/`, `tests/upgrade_sgw/`, `client/smoke_tests/` differing only in relative depth to `dataset/sg/`.
 3. **Server build scripts** — the `download_cbl.sh` → `build_*.sh` → package chain applies to the `c` and `ios` platforms; `dotnet` only has `build_cli.sh`/`.ps1`, `jak` builds via Gradle, and `javascript` via `npm`.
 4. **AWS setup scripts** — every `environment/aws/*_setup/setup_*.py` follows: SSH via `paramiko` → SFTP upload → `remote_exec` → start service (Docker / systemd).
 5. **Bucket cleanup mode** — `--bucketpool` picks how `cluster_cleanup` empties a Couchbase Server bucket between tests, through `CouchbaseServer.clean_bucket()`. `purge` (the default) empties the bucket in place with `purge_bucket()`, which runs the downloaded [`bucketpool`](https://github.com/couchbaselabs/bucketpool) tool, and keeps its collections and indexes, so `BucketPool` (`client/src/cbltest/api/couchbaseserver.py`) caps the cluster at 10 buckets and evicts the least recently used one. `delete` drops the bucket instead. There is no pool in `delete` mode, because nothing survives to reuse.
@@ -146,7 +147,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - `.github/workflows/python_verify.yml` — runs `client/tests` on Python changes.
 - `.github/workflows/openapi.yml` — Redocly lint + yamllint on `spec/api/` changes; posts PR preview link.
 - `jenkins/pipelines/prebuild/` — builds test-server artifacts.
-- `jenkins/pipelines/{dev_e2e,QE}/{platform}/` — per-platform CI runs.
+- `jenkins/pipelines/functional/{platform}/` — per-platform CI runs, triggered by `jenkins/pipelines/main/cbl/` (Jenkins jobs `e2e-functional-<platform>`).
 
 ## Validation Before Completion
 
@@ -157,7 +158,7 @@ For every code change provide evidence from applicable validators:
 3. Hooks: `uvx pre-commit run --all-files`
 4. Tests scoped to the changed area:
    - `client/` → `client/tests` and/or `client/smoke_tests`
-   - `tests/dev_e2e` or `tests/QE` → targeted pytest with `--config`
+   - `tests/functional`, `tests/system` or `tests/upgrade_sgw` → targeted pytest with `--config`
    - `environment/` → run the touched script with `--help` and dry-run-safe checks
 
 If full integration tests are not runnable locally, state exactly what was run and what remains.

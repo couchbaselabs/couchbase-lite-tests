@@ -142,7 +142,7 @@ QE specs may omit `## #N` and use just `## test_function_name`.
 |---|---|---|
 | `spec/tests/dev_e2e/` | `NNN-feature-name.md` (next: 013) | `001-basic-replication.md` ↔ `test_basic_replication.py` |
 | `spec/tests/QE/` | `test_feature_name.md` (matches `.py` filename) | `test_xattrs.md` ↔ `test_xattrs.py` |
-| `spec/tests/QE/edge_server/` | `test_feature_name.md` | `test_crud.md` ↔ `tests/QE/edge_server/test_crud.py` |
+| `spec/tests/QE/edge_server/` | `test_feature_name.md` | `test_crud.md` ↔ `tests/functional/test_crud.py` |
 
 ## Dataset Documentation (`dataset/`)
 
@@ -203,7 +203,7 @@ npx @redocly/cli preview-docs spec/api/api.yaml
 | Server implementations | [servers/](../servers/) (c, dotnet, ios, jak, javascript) | Must implement every `api.yaml` endpoint |
 | Python framework | [client/src/cbltest/requests.py](../client/src/cbltest/requests.py) | `TestServerRequestType` enum maps to `api.yaml` endpoints |
 | Versioned requests/responses | [client/src/cbltest/v1/](../client/src/cbltest/v1/), [v2/](../client/src/cbltest/v2/) | Match `api.yaml` schemas |
-| Test suites (dev_e2e) | [tests/dev_e2e/](../tests/dev_e2e/) | Must follow `spec/tests/dev_e2e/` |
-| Test suites (QE) | [tests/QE/](../tests/QE/) | Must follow `spec/tests/QE/` |
+| Test suites (dev_e2e specs) | [tests/functional/](../tests/functional/) | Must follow `spec/tests/dev_e2e/` |
+| Test suites (QE specs) | [tests/functional/](../tests/functional/), [tests/system/](../tests/system/), [tests/upgrade_sgw/](../tests/upgrade_sgw/) | Must follow `spec/tests/QE/` |
 | Datasets (actual files) | [dataset/sg/](../dataset/sg/), [dataset/server/](../dataset/server/) | Schema documented in `spec/dataset/` |
 | CI validation | [.github/workflows/openapi.yml](../.github/workflows/openapi.yml) | Lints `api.yaml` on every PR |

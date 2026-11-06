@@ -6,8 +6,10 @@ All Jenkins pipelines for building test servers, provisioning AWS environments, 
 
 You own everything under `jenkins/`:
 - `jenkins/pipelines/shared/` — scripts used by **all** pipelines
-- `jenkins/pipelines/dev_e2e/` — per-platform developer E2E pipelines
-- `jenkins/pipelines/QE/` — per-platform QA pipelines + special pipelines (`sgw`, `upg-sgw`, `es`, `multiplatform`)
+- `jenkins/pipelines/functional/` — pipelines that run `tests/functional`: one per CBL platform (`android`, `c`, `dotnet`, `ios`, `java`, `javascript`) plus `sgw` (`-m min_sync_gateways`) and `es` (`-m min_edge_servers`)
+- `jenkins/pipelines/main/` — daily triggers: `cbl/` starts `e2e-functional-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw` for new Sync Gateway builds; `es/` starts `functional/es` for new Edge Server builds
+- `jenkins/pipelines/upg-sgw/` — SGW upgrade pipelines (`tests/upgrade_sgw`)
+- `jenkins/pipelines/p2p/` — peer-to-peer pipeline: runs `tests/p2p` with several test servers in one topology
 - `jenkins/pipelines/prebuild/` — test server prebuild pipeline
 - `jenkins/docker/` — Jenkins controller + agent Docker setup
 
@@ -21,27 +23,32 @@ jenkins/
 │   ├── shared/                         # Used by ALL pipelines
 │   │   ├── setup_test.py               # setup_test() — takes lists of CBL/SGW versions
 │   │   ├── config.sh                   # Bash: move_artifacts, find_dir, print_box, path exports
-│   │   └── config.psm1                 # PowerShell equivalent (Windows pipelines)
+│   │   ├── config.psm1                 # PowerShell equivalent (Windows pipelines)
+│   │   ├── resolveProgetVersion.groovy # Version/train/prefix → concrete version via ProGet
+│   │   ├── progetBuilds.groovy         # Version → [version, build]; non-EOL trains (get_trains)
+│   │   ├── triggerRecord.groovy        # main/* "already triggered" record (~/.jenkins_build_info)
+│   │   └── cblSgwCompatibility.groovy  # Rejects CBL/SGW pairs that cannot replicate
 │   │
 │   ├── prebuild/                       # Test server prebuild
 │   │   └── Jenkinsfile                 # Builds + uploads artifacts to latestbuilds
 │   │
-│   ├── dev_e2e/                        # Developer E2E (per platform)
-│   │   ├── main/                       #   latest_sgw_url.sh, latest_successful_build.sh
-│   │   ├── android/                    #   Jenkinsfile + setup_test.py + config_android.json + topology_single_device.json
-│   │   ├── c/                          #   Jenkinsfile + setup_test.py + config.json + topologies/
-│   │   ├── dotnet/                     #   Jenkinsfile + setup_test.py + config_aws.json + topologies/
-│   │   ├── ios/                        #   Jenkinsfile + setup_test.py + config.json + topology_single_device.json
-│   │   ├── java/                       #   desktop/ + webservice/ sub-pipelines
-│   │   ├── javascript/                 #   Jenkinsfile + setup_test.py + config.json + topology_single_host.json
-│   │   └── multipeer_functional/       #   Multi-platform multipeer (per-platform version map → positional list)
+│   ├── functional/                     # Per-platform pipelines for tests/functional
+│   │   ├── android/                    #   Jenkinsfile + test.sh + teardown.sh + setup_test.py + config.json + topology.json + logcat.py
+│   │   ├── c/                          #   Jenkinsfile + run_test.sh/.ps1 + teardown.sh/.ps1 + setup_test.py + config.json + topologies/
+│   │   ├── dotnet/                     #   Jenkinsfile + run_test.sh/.ps1 + teardown.sh/.ps1 + setup_test.py + config_aws.json + topologies/
+│   │   ├── ios/                        #   Jenkinsfile + test.sh + teardown.sh + setup_test.py + config.json + topology_single_device.json
+│   │   ├── java/                       #   Jenkinsfile + desktop/ + webservice/ (each run_test.sh/.ps1 + teardown.sh/.ps1 + setup_test.py + config + topology)
+│   │   ├── javascript/                 #   Jenkinsfile + test.sh + teardown.sh + setup_test.py + config.json + topology_single_host.json
+│   │   ├── sgw/                        #   Every min_sync_gateways test (multi-SGW topology + load balancer)
+│   │   └── es/                         #   Every min_edge_servers test (own generate_topology(), topologies/)
 │   │
-│   └── QE/                             # QA (per platform + special)
-│       ├── android/, c/, dotnet/, ios/, java/
-│       ├── sgw/                        #   SGW-focused QE (no specific platform)
-│       ├── upg-sgw/                    #   SGW upgrade (iterates versions)
-│       ├── es/                         #   Edge Server (different pattern)
-│       └── multiplatform/              #   Multi-platform QE
+│   ├── main/                           # Daily triggers
+│   │   ├── cbl/                        #   e2e-functional-<platform> for every CBL train
+│   │   ├── sgw/                        #   functional/sgw for new Sync Gateway builds
+│   │   └── es/                         #   functional/es for new Edge Server builds
+│   │
+│   ├── upg-sgw/                        # SGW upgrade (iterates versions)
+│   └── p2p/                            # tests/p2p (several test servers)
 │
 └── docker/                             # Jenkins server Docker setup
     ├── docker-compose.yml              # Controller + agent
@@ -79,7 +86,7 @@ def cli_entry(cbl_versions: list[str], sgw_versions: list[str]) -> None:
         SCRIPT_DIR / "TOPOLOGY_FILE",  # ← varies per platform
         SCRIPT_DIR / "CONFIG_FILE",  # ← varies per platform
         "PLATFORM_TAG",  # ← varies per platform
-        setup_dir="SUITE",  # "dev_e2e" (default) or "QE"
+        setup_dir="SUITE",  # "functional" (default) or "upgrade_sgw"
     )
 
 
@@ -87,47 +94,36 @@ if __name__ == "__main__":
     cli_entry()
 ```
 
-### dev_e2e per-platform arguments
+### Per-pipeline arguments
 
-| Platform | `topology_file` | `config_file` | `platform_tag` | Extra CLI args |
+| Pipeline | `topology_file` | `config_file` | `platform_tag` | Extra args |
 |---|---|---|---|---|
-| `android/` | `topology_single_device.json` | `config_android.json` | `jak_android` | — |
-| `ios/` | `topology_single_device.json` | `config.json` | `swift_ios` | — |
-| `c/` | `topologies/topology_single_{platform}.json` | `config.json` | `c_{platform}` | `platform` positional |
-| `dotnet/` | `topologies/topology_single_{platform}.json` | `config_aws.json` | `dotnet_{platform}` | `platform` + `--cbs_version` |
-| `javascript/` | `topology_single_host.json` | `config.json` | `js` | — |
-| `java/desktop/` | `topology_single_host.json` | `config_java_desktop.json` | `jak_desktop` | — |
-| `java/webservice/` | `topology_single_host.json` | `config_java_webservice.json` | `jak_webservice` | — |
-| `multipeer_functional/` | `topology.json` | `config_multiplatform.json` | `multipeer_functional` | Expands a per-platform version map into a positional `cbl_versions` list |
-
-### QE per-platform arguments
-
-| Platform | `topology_file` | `config_file` | `platform_tag` | Extra args |
-|---|---|---|---|---|
-| `android/` | `topology_single_device.json` | `config_android.json` | `jak_android` | `setup_dir="QE"` |
-| `ios/` | `topology_single_device.json` | `config.json` | `swift_ios` | `setup_dir="QE"` |
-| `c/` | `topologies/topology_single_{platform}.json` | `config.c.json` | `c_{platform}` | `platform` + `setup_dir="QE"` |
-| `dotnet/` | `topologies/topology_single_{platform}.json` | `config_aws.json` | `dotnet_{platform}` | `platform` + `--cbs_version` + `setup_dir="QE"` |
-| `sgw/` | `topology.json` | `config.json` | `sgw` | `setup_dir="QE"` |
-| `upg-sgw/` | `topology.json` | `config.json` | `upg-sgw` | `setup_dir="QE"` |
-| `es/` | **Custom** — `generate_topology()` | `config.json` | `es` | Calls `start_backend()` directly |
-| `multiplatform/` | `topology.json` | `config_multiplatform.json` | varies | Own inline topology-composition logic, doesn't call shared `setup_test()` |
+| `functional/android/` | `topology.json` | `config.json` | `jak_android` | — |
+| `functional/c/` | `topologies/topology_single_{platform}.json` | `config.json` | `c_{platform}` | `platform` positional |
+| `functional/dotnet/` | `topologies/topology_single_{platform}.json` | `config_aws.json` | `dotnet_{platform}` | `platform` positional + `--cbs_version` |
+| `functional/ios/` | `topology_single_device.json` | `config.json` | `swift_ios` | — |
+| `functional/java/desktop/` | `topology_single_host.json` | `config_java_desktop.json` | `jak_desktop` | — |
+| `functional/java/webservice/` | `topology_single_host.json` | `config_java_webservice.json` | `jak_webservice` | — |
+| `functional/javascript/` | `topology_single_host.json` | `config.json` | `js` | — |
+| `functional/sgw/` | `topology.json` | `config.json` | `sgw` | — |
+| `upg-sgw/` | `topology.json` | `config.json` | `upg-sgw` | `setup_dir="upgrade_sgw"` |
+| `functional/es/` | **Custom** — `generate_topology()` | `config.json` | `es` | Calls `start_backend()` directly |
+| `p2p/` | `topology.json` | `config_multiplatform.json` | varies | Own inline topology-composition logic, doesn't call shared `setup_test()` |
 
 ### Exceptions to the template
 
-1. **`QE/es/setup_test.py`** — does NOT use `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly with ES-specific CLI options (`--sgw-version`, `--cbs-version`).
-2. **`dev_e2e/multipeer_functional/setup_test.py`** — builds a per-platform version map from its CLI options, then expands it (via `ts_to_topology`/`get_platform_version`) into a positional `cbl_versions` list matching its topology's `test_servers` order before calling `setup_test()`.
-3. **`QE/multiplatform/setup_test.py`** — does not call the shared `setup_test()` at all; it has its own inline topology-composition logic.
+1. **`functional/es/setup_test.py`** — does NOT use `setup_test()`. Has its own `generate_topology()` and calls `start_backend()` directly with ES-specific CLI options (`--sgw-version`, `--cbs-version`).
+2. **`p2p/setup_test.py`** — does not call the shared `setup_test()` at all; it has its own inline topology-composition logic.
 
 ## Shared Scripts (`shared/`)
 
 ### `setup_test.py` — Core Functions
 
-**`setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="dev_e2e")`**
+**`setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="functional")`**
 1. Reads the topology JSON template; rewrites `$schema` and `include` paths
 2. Resolves CBS version and each entry in `sgw_versions` (via `proget` API)
 3. Assigns `cbl_versions` positionally to `topology_file_in`'s `test_servers` (index 0 → server 0, etc.; the last entry repeats once the list is exhausted — see `distribute_versions`)
-4. Assigns resolved `sgw_versions` the same way to `sync_gateways`, **but only when `sync_gateways` is defined directly in `topology_file_in`** — topologies that pull it in via `include` (e.g. the single-test-server dev_e2e/QE pipelines) always get one SGW at `defaults.sgw.version` (the first resolved version)
+4. Assigns resolved `sgw_versions` the same way to `sync_gateways`, **but only when `sync_gateways` is defined directly in `topology_file_in`** — topologies that pull it in via `include` (e.g. the single-test-server `functional/` pipelines) always get one SGW at `defaults.sgw.version` (the first resolved version)
 5. Sets `defaults.cbs.version` / `defaults.sgw.version`, `tag`
 6. Writes final topology to `environment/aws/topology_setup/topology.json`
 7. Downloads `cbbackupmgr` for the CBS version, and `bucketpool`
@@ -135,17 +131,24 @@ if __name__ == "__main__":
 
 CLI wrappers accept comma-separated versions (`"4.0.0,4.1.0"`) via the `VersionType` click param type, which converts the argument to a `list[str]` (using `parse_versions()`) before `cli_entry` ever sees it.
 
-**`ts_to_topology(ts_platform)`** — Maps platform tags to topology names: `swift_* → ios`, `jak_android → android`, `jak_* → java`, `dotnet_* → dotnet`, `c_* → c`.
-
 ### `config.sh` (and `config.psm1` for Windows)
 
 Exports path constants used by every `test.sh` / `teardown.sh`:
 ```bash
 PIPELINES_DIR, TESTS_DIR, ENVIRONMENT_DIR, TEST_SERVER_DIR,
-SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, DEV_E2E_TESTS_DIR,
-QE_TESTS_DIR, QE_PIPELINES_DIR, AWS_ENVIRONMENT_DIR
+SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, QE_PIPELINES_DIR, AWS_ENVIRONMENT_DIR,
+FUNCTIONAL_TESTS_DIR, SYSTEM_TESTS_DIR, UPGRADE_SGW_TESTS_DIR
 ```
 Functions: `move_artifacts()`, `find_dir()`, `print_box()`.
+
+### Groovy helpers (loaded with `load`)
+
+Each is loaded inside a node context (`def x = load 'jenkins/pipelines/shared/<file>.groovy'`) and avoids default arguments, which the CPS transform does not handle reliably.
+
+- `resolveProgetVersion.groovy` — `resolveProgetVersion(product, version, label[, includePrerelease])`: blank, train or prefix → newest concrete version (prereleases included unless `false`).
+- `progetBuilds.groovy` — `resolveVersionBuild(proget, product, param, label, includePrerelease)` → `[version:, build:]` or `null` when the version has no published build yet; `fetchTrains(product)`; `getBuildNumber(product, version)`.
+- `triggerRecord.groovy` — `readRecord(name)`, `alreadyTriggered(record, version, build)`, `saveRecord(name, record)` for the `{ "<version>": "<build>" }` record each `main/*` trigger keeps per job on its pinned agent.
+- `cblSgwCompatibility.groovy` — `incompatibility(cblVersion, sgwVersion)`: a reason string, or `null` when the pair can replicate.
 
 ## The `test.sh` / `run_test.sh` Pattern
 
@@ -161,12 +164,12 @@ uv run $SCRIPT_DIR/setup_test.py $CBL_VERSION $SGW_VERSION
 popd > /dev/null
 
 # 2. Run tests
-pushd $QE_TESTS_DIR > /dev/null            # or $DEV_E2E_TESTS_DIR
+pushd $FUNCTIONAL_TESTS_DIR > /dev/null     # or $SYSTEM_TESTS_DIR / $UPGRADE_SGW_TESTS_DIR
 uv run pytest -v --no-header --config config.json [-m MARKER]
 popd > /dev/null
 ```
 
-### `QE/upg-sgw/test.sh` — unique pattern
+### `upg-sgw/test.sh` — unique pattern
 
 1. Initial setup with the first SGW version → run `upg_sgw` tests.
 2. Loop through remaining versions:
@@ -212,7 +215,7 @@ Supported platform values: `dotnet_windows`, `dotnet_macos`, `dotnet_ios`, `dotn
 
 - **`sys.path.append(str(SCRIPT_DIR.parents[3]))`** — every `setup_test.py` must add the repo root.
 - **Use `click`** for CLI argument parsing in every Python script.
-- **Use `setup_dir="QE"`** for QE pipelines (default is `"dev_e2e"`).
+- **`setup_dir`** names the `tests/` suite that receives `config.json`: omit it for `functional` (the default); `upg-sgw` passes `"upgrade_sgw"`.
 - **Topology and config JSONs are templates** — committed; final versions are generated at runtime.
 - **Always call `move_artifacts`** in `teardown.sh`.
 - **Teardown must run even on failure** — Jenkinsfile uses `post { always { … } }`.
@@ -225,9 +228,9 @@ Supported platform values: `dotnet_windows`, `dotnet_macos`, `dotnet_ios`, `dotn
 ```bash
 # Pipelines are triggered via Jenkins UI; for local testing, invoke directly:
 
-# Example: dev_e2e iOS setup
+# Example: iOS setup
 cd environment/aws
-uv run ../jenkins/pipelines/dev_e2e/ios/setup_test.py 4.0.0 4.0.0
+uv run ../jenkins/pipelines/functional/ios/setup_test.py 4.0.0 4.0.0
 
 # Source shared bash config
 source jenkins/pipelines/shared/config.sh
@@ -240,7 +243,7 @@ source jenkins/pipelines/shared/config.sh
 | AWS orchestrator | [environment/aws/start_backend.py](../environment/aws/start_backend.py) | Called by `setup_test()` |
 | AWS teardown | [environment/aws/stop_backend.py](../environment/aws/stop_backend.py) | Called by `teardown.sh` / `upg-sgw/test.sh` |
 | Shared setup | [jenkins/pipelines/shared/setup_test.py](pipelines/shared/setup_test.py) | Core function all pipelines delegate to |
-| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | What pipelines ultimately run |
+| Test suites | [tests/functional/](../tests/functional/), [tests/system/](../tests/system/), [tests/upgrade_sgw/](../tests/upgrade_sgw/) | What pipelines ultimately run |
 | Test server source | [servers/](../servers/) | Built by the prebuild pipeline |
 | Framework | [client/src/cbltest/](../client/src/cbltest/) | Consumed by the tests pipelines run |
 | Topology schema | [environment/aws/topology_setup/topology_schema.json](../environment/aws/topology_setup/topology_schema.json) | Validates generated topology |

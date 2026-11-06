@@ -207,7 +207,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 
 - Writes the TDK config path to `environment/local/topology_config` — `topology_config` holds a *path*, not the config itself, so run tests with:
   ```bash
-  cd tests/dev_e2e
+  cd tests/functional
   uv run pytest --config "$(cat ../../environment/local/topology_config)"
   ```
 - `--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests marked `min_sync_gateways(N)`. Instances are numbered from 1 and take a port block each — Sync Gateway's default ports shifted by a multiple of 10, so instance 2 is normally 4994/4995/4996 — stepping over any block already in use, so a Sync Gateway from a second checkout sitting on 4984 moves instance 1 to the next free block instead of making it fail to bind. Every file belonging to an instance shares the stem `sync_gateway_instanceN` — its config (`sync_gateway_instanceN_*.json`) and its log (`sync_gateway_instanceN.log`). All instances are listed in the generated topology config with the ports they actually got. Requires `--server cbs` when N > 1 — each rosmar instance keeps its bucket in its own process memory, so the instances would share no data.
@@ -278,7 +278,7 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
 | Test server source | [servers/](../servers/)                                                                            | Built and deployed by `topology_setup/`                               |
 | Platform bridges   | [environment/aws/topology_setup/test_server_platforms/](aws/topology_setup/test_server_platforms/) | Platform-specific install/run/stop                                    |
 | Jenkins pipelines  | [jenkins/pipelines/](../jenkins/pipelines/)                                                        | Call `start_backend.py`/`stop_backend.py` via `setup_test.py`         |
-| Test suites        | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/)                                     | Consume the `config.json` this generates                              |
+| Test suites        | [tests/functional/](../tests/functional/), [tests/system/](../tests/system/) | Consume the `config.json` this generates                              |
 | Config parser      | [client/src/cbltest/configparser.py](../client/src/cbltest/configparser.py)                        | Parses the config JSON this outputs                                   |
 | Topology schema    | [aws/topology_setup/topology_schema.json](aws/topology_setup/topology_schema.json)                 | Validates topology JSON                                               |
 | Datasets           | [dataset/](../dataset/)                                                                            | Copied into test servers during build                                 |
