@@ -431,6 +431,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
     @pytest.mark.min_test_servers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_cbl_replication(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        await self.skip_if_not_edge_server_compatible(cblpytest.test_servers[0])
         es = cblpytest.edge_servers[0]
 
         self.mark_test_step("Start Edge Server with `enforced` true and `exempt` false")

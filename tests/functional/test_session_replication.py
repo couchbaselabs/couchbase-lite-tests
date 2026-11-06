@@ -103,6 +103,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         Start Edge Server on the session config, seed `<prefix>_es_hotels` and `<prefix>_es_airlines`,
         and reset local databases `db1` and `db2` in one call (a second reset closes the first).
         """
+        await self.skip_if_not_edge_server_compatible(cblpytest.test_servers[0])
         es = cblpytest.edge_servers[0]
         await es.write_file(USERS_FILE, USERS.read_text())
         admin = await es.configure_dataset(db_name=DB, config_file=CONFIG)
