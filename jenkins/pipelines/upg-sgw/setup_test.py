@@ -10,7 +10,7 @@ import click
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
+    sys.path.append(str(SCRIPT_DIR.parents[2]))
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
@@ -42,7 +42,7 @@ def cli_entry(
         topo,
         SCRIPT_DIR / "config.json",
         "upg-sgw",
-        setup_dir="QE",
+        setup_dir="upgrade_sgw",
     )
 
 
