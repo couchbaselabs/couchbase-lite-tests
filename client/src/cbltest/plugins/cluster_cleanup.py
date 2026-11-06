@@ -1,7 +1,12 @@
 """
-Return the backend to a clean slate between tests: every Edge Server reset to its
-provisioned state, every Sync Gateway database removed, and every Couchbase Server bucket
-emptied.
+Return the backend to a clean slate between tests: Edge Servers reset to their provisioned
+state, every Sync Gateway database removed, and every Couchbase Server bucket emptied.
+
+An Edge Server reset restarts the process, so it only runs where it matters: before a test
+marked ``min_edge_servers``, and for any Edge Server something changed since its last reset.
+The second case covers a test without Edge Servers that follows one with them, so a
+replication the earlier test left running cannot write into the Sync Gateway databases that
+the cleanup deletes.
 
 ``--bucketpool`` decides how a bucket is emptied: ``delete`` drops it, ``purge`` empties it
 in place.
@@ -13,6 +18,7 @@ much harder way to diagnose.
 import asyncio
 from collections.abc import Sequence
 
+import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
@@ -23,10 +29,10 @@ from cbltest.logging import cbl_info, cbl_trace
 
 
 @pytest_asyncio.fixture(scope="function", autouse=True)
-async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
+async def cluster_cleanup(cblpytest: CBLPyTest, request: pytest.FixtureRequest) -> None:
     """
-    Reset every Edge Server, then remove all Sync Gateway databases and empty all Couchbase
-    Server buckets.
+    Reset the Edge Servers that need it (see the module docstring), then remove all Sync
+    Gateway databases and empty all Couchbase Server buckets.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -39,12 +45,19 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
     # Edge Servers first: their provisioned config declares no replications, so nothing
     # pulls from the Sync Gateway databases the next phase deletes.
-    await reset_all_edge_servers(cblpytest.edge_servers)
+    uses_edge_servers = request.node.get_closest_marker("min_edge_servers") is not None
+    await reset_all_edge_servers(cblpytest.edge_servers, only_changed=not uses_edge_servers)
     await perform_cleanup(cblpytest)
 
 
-async def reset_all_edge_servers(managers: Sequence[EdgeServerManager]) -> None:
-    """Reset every Edge Server to its provisioned state, in parallel."""
+async def reset_all_edge_servers(managers: Sequence[EdgeServerManager], only_changed: bool = False) -> None:
+    """
+    Reset Edge Servers to their provisioned state, in parallel.
+
+    :param only_changed: Skip the Edge Servers that nothing changed since their last reset
+    """
+    if only_changed:
+        managers = [manager for manager in managers if manager.changed_since_reset]
     if not managers:
         return
 
