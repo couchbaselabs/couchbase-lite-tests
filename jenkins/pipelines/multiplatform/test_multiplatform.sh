@@ -1,17 +1,18 @@
 #!/bin/bash
 
 # Multiplatform CBL test runner
-# Usage: ./test_multiplatform.sh "platform1:version1[-build1] platform2:version2[-build2]..." <sgw_version> [test_name] topology-file
+# Usage: ./test_multiplatform.sh "<platform>=<version> ..." <sgw_version> [--topology-file FILE]
+#          [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]
+# Runs every test in tests/multiplatform (all need more than one test server) unless --test-filter narrows it.
 # Examples:
-#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3
-#   ./test_multiplatform.sh "android:3.2.3 ios:3.1.5" 3.2.3 "test_no_conflicts.py::TestNoConflicts"
-# An empty or missing test_name runs every test in tests/multiplatform.
+#   ./test_multiplatform.sh "swift_ios=4.1.0 jak_android=4.1.0" 4.1.0
+#   ./test_multiplatform.sh "swift_ios=4.1.0 dotnet_macos=4.1.0-18" 4.1.0 --test-filter test_delta_sync_replication
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-source $SCRIPT_DIR/../shared/config.sh
+source "$SCRIPT_DIR"/../shared/config.sh
 
 function list_available_tests() {
   echo "📋 Available tests (found in $MULTIPLATFORM_TESTS_DIR):"
@@ -42,24 +43,16 @@ function list_available_tests() {
 }
 
 function usage() {
-  echo "Usage: $0 \"platform1:version1[-build1] platform2:version2[-build2]...\" <sgw_version> [test_name] topology-file"
-  echo ""
-  echo "Supported platforms: android, ios, dotnet, c, java"
-  echo ""
-  echo "Examples:"
-  echo "  # Auto-fetch latest builds and run every test:"
-  echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2.3"
-  echo ""
-  echo "  # With specific test:"
-  echo "  $0 \"android:3.2.3 ios:3.1.5\" 3.2.3 \"test_no_conflicts.py::TestNoConflicts::test_multiple_cbls_updates_concurrently_with_push\""
-  echo ""
-  echo "  # With explicit builds:"
-  echo "  $0 \"android:3.2.3 ios:3.1.5-6\" 3.2.3"
-  echo ""
-  echo "  # List available tests:"
-  echo "  $0 --list-tests"
-  echo ""
-  echo "test_name is a pytest path or node ID within tests/multiplatform (default: every test there)."
+  echo "Usage: $0 \"<platform>=<version> ...\" <sgw_version> [--topology-file FILE] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  <platform>=<version>: A test server platform (e.g. swift_ios, jak_android, dotnet_macos, c_windows)"
+  echo "      and the CBL version to run on it: \"4\", \"4.1.0\" or \"4.1.0-18\". Each entry uses one test server of"
+  echo "      that platform, in topology order; test servers left over are not used."
+  echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
+  echo "  --topology-file: Topology file in $SCRIPT_DIR (default: topology.json)"
+  echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --test-filter: An optional pytest -k filter expression"
+  echo "  --setup-only: Only setup the test servers and backend, skip test execution"
+  echo "  --list-tests: List the tests in tests/multiplatform and exit"
   exit 1
 }
 
@@ -69,177 +62,77 @@ if [ $# -eq 1 ] && [ "$1" = "--list-tests" ]; then
   exit 0
 fi
 
-if [ $# -lt 2 ] || [ $# -gt 4 ]; then
-  usage
-fi
+if [ "$#" -lt 2 ]; then usage; fi
 
-PLATFORM_CONFIGS="$1"
-SG_VERSION="$2"
-TEST_NAME="${3:-}" # empty: every test in tests/multiplatform
-TOPOLOGY_FILE="$SCRIPT_DIR/${4:-topology.json}"
+PLATFORM_VERSIONS="$1"
+SGW_VERSION="$2"
+shift 2
 
-# Validate inputs
-if [ -z "$PLATFORM_CONFIGS" ]; then
-  echo "❌ Error: Platform configurations cannot be empty"
-  usage
-fi
-
-if [ -z "$SG_VERSION" ]; then
-  echo "❌ Error: SG version cannot be empty"
-  usage
-fi
-
-if [ ! -f "$TOPOLOGY_FILE" ]; then
-  echo "❌ Error: Topology file not found: $TOPOLOGY_FILE"
-  exit 1
-fi
-
-echo "🚀 MULTIPLATFORM CBL TEST SETUP"
-echo "==============================="
-echo "📋 Platform configurations: $PLATFORM_CONFIGS"
-echo "🔄 SG version: $SG_VERSION"
-echo "🧪 Test: ${TEST_NAME:-every test in tests/multiplatform}"
-echo " Topology: $TOPOLOGY_FILE"
-
-# Parse platform configurations
-IFS=' ' read -ra PLATFORM_ARRAY <<<"$PLATFORM_CONFIGS"
-UNIQUE_PLATFORMS=()
-PLATFORM_VERSIONS=()
-PLATFORM_BUILDS=()
-
-for config in "${PLATFORM_ARRAY[@]}"; do
-  IFS=':' read -ra CONFIG_PARTS <<<"$config"
-
-  if [ ${#CONFIG_PARTS[@]} -lt 2 ]; then
-    echo "❌ Error: Invalid platform configuration: $config"
-    echo "   Expected format: platform:version[-build] or platform:os:version[-build]"
-    exit 1
-  fi
-
-  platform="${CONFIG_PARTS[0]}"
-
-  # Handle multi-OS platforms (dotnet, c) that can have format: platform:os:version[-build]
-  if [ ${#CONFIG_PARTS[@]} -eq 3 ] && [[ "$platform" == "dotnet" || "$platform" == "c" ]]; then
-    # Format: platform:os:version[-build]
-    target_os="${CONFIG_PARTS[1]}"
-    version_with_build="${CONFIG_PARTS[2]}"
-  else
-    # Format: platform:version[-build]
-    target_os=""
-    version_with_build="${CONFIG_PARTS[1]}"
-  fi
-
-  # Parse version and build from version_with_build (format: version-build or just version)
-  if [[ "$version_with_build" == *"-"* ]]; then
-    version="${version_with_build%-*}" # Extract version part (everything before last dash)
-    build="${version_with_build##*-}"  # Extract build part (everything after last dash)
-  else
-    version="$version_with_build"
-    build=""
-  fi
-
-  # Validate platform
-  case "$platform" in
-    android | ios | dotnet | c | java)
+# An empty --topology-file or --dataset-version (a blank Jenkins parameter) keeps these defaults.
+TOPOLOGY_FILE="topology.json"
+DATASET_VERSION="4.0"
+TEST_FILTER=""
+SETUP_ONLY=false
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --topology-file)
+      TOPOLOGY_FILE="${2:-$TOPOLOGY_FILE}"
+      shift 2
+      ;;
+    --dataset-version)
+      DATASET_VERSION="${2:-$DATASET_VERSION}"
+      shift 2
+      ;;
+    --test-filter)
+      TEST_FILTER="$2"
+      shift 2
+      ;;
+    --setup-only)
+      SETUP_ONLY=true
+      shift
       ;;
     *)
-      echo "❌ Error: Unsupported platform: $platform"
-      echo "   Supported platforms: android, ios, dotnet, c, java"
-      exit 1
+      echo "Unknown argument: $1"
+      usage
       ;;
   esac
-
-  UNIQUE_PLATFORMS+=("$platform")
-  PLATFORM_VERSIONS+=("$version")
-  PLATFORM_BUILDS+=("$build")
 done
 
-echo "Platforms to setup: ${UNIQUE_PLATFORMS[*]}"
-echo ""
+section_start "$COLOR_CYAN" "INFRA SETUP"
+# The Android test server is only built here when it is not downloaded. Add the JDK setting once, as the workspace
+# (and so this file) persists across builds.
+GRADLE_JAVA_HOME="org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
+GRADLE_PROPERTIES="$TEST_SERVER_DIR/jak/android/gradle.properties"
+grep -qxF "$GRADLE_JAVA_HOME" "$GRADLE_PROPERTIES" || echo "$GRADLE_JAVA_HOME" >>"$GRADLE_PROPERTIES"
+pushd "$SCRIPT_DIR" >/dev/null
+# setup_multiplatform.py first checks the platform versions, the Sync Gateway version and the topology, logging
+# every problem. Its exit code is passed on as is (bypassing the ERR trap's exit 1), so that the Jenkinsfile can
+# tell a failed sanity check (SANITY_CHECK_EXIT_CODE, 3) from any other failure.
+SETUP_STATUS=0
+uv run setup_multiplatform.py "$PLATFORM_VERSIONS" "$SGW_VERSION" "$TOPOLOGY_FILE" --setup-only || SETUP_STATUS=$?
+if [ "$SETUP_STATUS" -ne 0 ]; then exit "$SETUP_STATUS"; fi
+popd >/dev/null
+section_end
 
-# Phase 1: Setup all platforms using centralized multiplatform setup
-echo "🔧 PHASE 1: SETTING UP CBL TEST SERVERS"
-echo "======================================="
-echo "org.gradle.java.home=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home" >>$SCRIPT_DIR/../../../servers/jak/android/gradle.properties
-echo "🏗️ Using centralized multiplatform setup..."
-cd "$SCRIPT_DIR"
-
-# Use the centralized multiplatform setup script
-echo "🚀 Running multiplatform setup..."
-uv run setup_multiplatform.py "$PLATFORM_CONFIGS" "$SG_VERSION" "$TOPOLOGY_FILE" --setup-only
-SETUP_SUCCESS=$?
-
-if [ $SETUP_SUCCESS -ne 0 ]; then
-  echo "💥 SETUP PHASE FAILED!"
-  echo "Multiplatform setup script failed. Check the logs above for details."
-  exit 1
+# Exit early if setup-only mode
+if [ "$SETUP_ONLY" = true ]; then
+  echo "Setup completed. Exiting due to --setup-only flag."
+  exit 0
 fi
 
-echo ""
-echo "✅ ALL PLATFORMS SETUP COMPLETED!"
-echo ""
-
-# Phase 2: Run the coordinated test
-echo "🧪 PHASE 2: RUNNING COORDINATED TEST"
-echo "==================================="
-echo "🎯 Test: ${TEST_NAME:-every test in tests/multiplatform}"
-echo ""
-
-# Run tests following the same pattern as individual platform scripts
-echo "🏃 Running coordinated test across all platforms..."
-echo "========== PYTEST OUTPUT START =========="
-
-pushd "${MULTIPLATFORM_TESTS_DIR}" >/dev/null
-
+section_start "$COLOR_YELLOW" "RUN TESTS"
+pushd "$MULTIPLATFORM_TESTS_DIR" >/dev/null
 # Set environment variables to prevent output truncation
 export COLUMNS=200
-
-if uv run pytest -v --no-header -W ignore::DeprecationWarning --config config.json "${TEST_NAME:-.}"; then
-  echo "========== PYTEST OUTPUT END =========="
-  echo ""
-  echo "🎉 COORDINATED TEST PASSED!"
-  TEST_RESULT=0
-else
-  echo "========== PYTEST OUTPUT END =========="
-  echo ""
-  echo "💥 COORDINATED TEST FAILED!"
-  TEST_RESULT=1
+PYTEST_ARGS=(
+  -v --no-header -W ignore::DeprecationWarning --config config.json
+  --sgcollect-on-test-failure
+  --cbcollect-on-test-failure
+  --dataset-version "$DATASET_VERSION"
+)
+if [ -n "$TEST_FILTER" ]; then
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
-
+uv run pytest "${PYTEST_ARGS[@]}"
 popd >/dev/null
-
-# Final results
-echo ""
-echo "📊 MULTIPLATFORM TEST RESULTS:"
-echo "================================"
-echo "🔧 Setup Phase: ✅ SUCCESS (All platforms ready)"
-
-if [ $TEST_RESULT -eq 0 ]; then
-  echo "🧪 Test Phase: ✅ SUCCESS"
-  echo ""
-  echo "🎉 MULTIPLATFORM TEST COMPLETED SUCCESSFULLY!"
-  echo "All CBL test servers are running and the coordinated test passed."
-else
-  echo "🧪 Test Phase: ❌ FAILED"
-  echo ""
-  echo "💥 MULTIPLATFORM TEST FAILED!"
-  echo "CBL test servers are running but the coordinated test failed."
-fi
-
-echo ""
-echo "📋 Platform Summary:"
-for platform in "${UNIQUE_PLATFORMS[@]}"; do
-  case "$platform" in
-    android) echo "🤖 Android: CBL test server running" ;;
-    ios) echo "🍎 iOS: CBL test server running" ;;
-    dotnet) echo "🔷 .NET: CBL test server running" ;;
-    c) echo "⚙️ C: CBL test server running" ;;
-    java) echo "☕ Java: CBL test server running" ;;
-  esac
-done
-
-echo ""
-echo "💡 Tip: All CBL test servers are still running for debugging if needed."
-echo "💡 Check http_log/ and testserver.log for detailed test execution logs."
-
-exit $TEST_RESULT
+section_end
