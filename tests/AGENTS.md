@@ -119,6 +119,10 @@ class TestFeatureName(CBLTestClass):
 | `@pytest.mark.min_edge_servers(N)` | Topology: ≥ N edge servers |
 | `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test** |
 
+Never declare a topology marker with `0` (e.g. `min_test_servers(0)`). A test that needs none of a
+resource omits that marker. Pipelines select tests with `-m min_<resource>`, which matches the
+marker whatever its count, so a `0` marker pulls the test into a pipeline that it doesn't belong in.
+
 ## Suites
 
 | Suite | Contents | Run by |

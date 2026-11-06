@@ -74,7 +74,6 @@ def assert_no_untagged_sensitive_data(
 
 
 @pytest.mark.sgw
-@pytest.mark.min_test_servers(0)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestLogRedaction(CBLTestClass):
