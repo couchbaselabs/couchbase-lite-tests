@@ -11,6 +11,9 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import SyncGatewayFeature
 
+# Documents in names-sg.json, which configure_dataset loads into Sync Gateway
+NAMES_DATASET_DOC_COUNT = 100
+
 
 @pytest.mark.cbl
 @pytest.mark.min_test_servers(2)
@@ -22,6 +25,9 @@ class TestReplicationMultipleClients(CBLTestClass):
     ) -> None:
         sg = cblpytest.sync_gateways[0]
         sg_db = "names"
+
+        self.mark_test_step(f"Reset SG and load `names` dataset ({NAMES_DATASET_DOC_COUNT} documents)")
+        await cblpytest.clusters[0].configure_dataset(dataset_path, sg_db)
 
         self.mark_test_step("Create client database on test server 1")
         db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
@@ -109,9 +115,11 @@ class TestReplicationMultipleClients(CBLTestClass):
         await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
         await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
-        self.mark_test_step("""
+        expected_count = NAMES_DATASET_DOC_COUNT + 200
+        self.mark_test_step(f"""
             Verify all documents are present in Sync Gateway:
-                * Should have: 100 docs from db1 + 100 docs from db2 = 200 total
+                * Should have: {NAMES_DATASET_DOC_COUNT} `names` dataset docs + 100 docs from db1 + 100 docs from db2
+                  = {expected_count} total
         """)
         sg_all_docs = await sg.get_all_documents(sg_db)
         sg_doc_ids = {row.id for row in sg_all_docs.rows}
@@ -119,7 +127,9 @@ class TestReplicationMultipleClients(CBLTestClass):
             assert f"ls_db1_{i}" in sg_doc_ids, f"SG missing document from db1: ls_db1_{i}"
         for i in range(100):
             assert f"ls_db2_{i}" in sg_doc_ids, f"SG missing document from db2: ls_db2_{i}"
-        assert len(sg_doc_ids) == 200, f"Sync Gateway should have 200 documents, got {len(sg_doc_ids)}"
+        assert len(sg_doc_ids) == expected_count, (
+            f"Sync Gateway should have {expected_count} documents, got {len(sg_doc_ids)}"
+        )
 
         self.mark_test_step("Verify all documents have correct revision format")
         for row in sg_all_docs.rows:
@@ -135,7 +145,9 @@ class TestReplicationMultipleClients(CBLTestClass):
         self.mark_test_step("Verify documents in changes feed for Sync Gateway")
         sg_changes = await sg.get_changes(sg_db)
         sg_changes_ids = {row.id for row in sg_changes.results}
-        assert len(sg_changes_ids) == 200, f"SG changes feed should have 200 documents, got {len(sg_changes_ids)}"
+        assert len(sg_changes_ids) == expected_count, (
+            f"SG changes feed should have {expected_count} documents, got {len(sg_changes_ids)}"
+        )
 
         await cblpytest.test_servers[0].cleanup()
         await cblpytest.test_servers[1].cleanup()
@@ -144,6 +156,9 @@ class TestReplicationMultipleClients(CBLTestClass):
     async def test_replication_with_10_attachments(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         sg = cblpytest.sync_gateways[0]
         sg_db = "names"
+
+        self.mark_test_step(f"Reset SG and load `names` dataset ({NAMES_DATASET_DOC_COUNT} documents)")
+        await cblpytest.clusters[0].configure_dataset(dataset_path, sg_db)
 
         self.mark_test_step("Create client database on test server 1")
         db1 = (await cblpytest.test_servers[0].create_and_reset_db(["db1"]))[0]
@@ -261,15 +276,19 @@ class TestReplicationMultipleClients(CBLTestClass):
         await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
         await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
-        self.mark_test_step("""
+        expected_count = NAMES_DATASET_DOC_COUNT + len(all_doc_ids)
+        self.mark_test_step(f"""
             Verify all documents are present in Sync Gateway:
-                * Should have: 5 docs from db1 + 5 docs from db2 = 10 total
+                * Should have: {NAMES_DATASET_DOC_COUNT} `names` dataset docs + 5 docs from db1 + 5 docs from db2
+                  = {expected_count} total
         """)
-        sg_all_docs = await sg.wait_for_document_count(sg_db, len(all_doc_ids))
+        sg_all_docs = await sg.wait_for_document_count(sg_db, expected_count)
         sg_doc_ids = {row.id for row in sg_all_docs.rows}
         for doc_id in all_doc_ids:
             assert doc_id in sg_doc_ids, f"Document {doc_id} not found in Sync Gateway"
-        assert len(sg_doc_ids) == 10, f"Sync Gateway should have 10 documents, got {len(sg_doc_ids)}"
+        assert len(sg_doc_ids) == expected_count, (
+            f"Sync Gateway should have {expected_count} documents, got {len(sg_doc_ids)}"
+        )
 
         self.mark_test_step("Verify all documents have correct revision format")
         for row in sg_all_docs.rows:
@@ -285,7 +304,9 @@ class TestReplicationMultipleClients(CBLTestClass):
         self.mark_test_step("Verify documents in Sync Gateway changes feed")
         sg_changes = await sg.get_changes(sg_db)
         sg_changes_ids = {row.id for row in sg_changes.results}
-        assert len(sg_changes_ids) == 10, f"SG changes feed should have 10 documents, got {len(sg_changes_ids)}"
+        assert len(sg_changes_ids) == expected_count, (
+            f"SG changes feed should have {expected_count} documents, got {len(sg_changes_ids)}"
+        )
         assert all(doc_id in sg_changes_ids for doc_id in all_doc_ids), "All documents should be in SG changes feed"
 
         self.mark_test_step("Verify document content in Sync Gateway")
