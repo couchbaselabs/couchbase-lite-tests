@@ -14,22 +14,9 @@ function Move-Artifacts {
         return
     }
 
-    # Determine if we're in dev_e2e or QE based on current directory
-    $currentDir = (Get-Location).Path
-    if ($currentDir -like "*\dev_e2e*") {
-        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
-    } elseif ($currentDir -like "*\QE*") {
-        $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
-    } else {
-        # Fallback: try to detect from the script directory structure
-        $scriptDir = $PSScriptRoot
-        if ($scriptDir -like "*\QE\*") {
-            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\QE).Path
-        } else {
-            $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\dev_e2e).Path
-        }
-    }
-    
+    # Artifacts are written to the directory pytest ran from (the functional suite).
+    $SRC_DIR = (Resolve-Path $PSScriptRoot\..\..\..\tests\functional).Path
+
     $DST_DIR = "$SRC_DIR\$env:TS_ARTIFACTS_DIR"
     if (-not (Test-Path -Path $DST_DIR)) {
         New-Item -ItemType Directory -Path $DST_DIR | Out-Null
@@ -125,9 +112,8 @@ Set-Variable -Name ENVIRONMENT_DIR -Value (Find-Dir -TargetDir "environment") -O
 
 Set-Variable -Name SHARED_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "shared") -Option ReadOnly
 Set-Variable -Name DEV_E2E_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "dev_e2e") -Option ReadOnly
-Set-Variable -Name QE_TESTS_DIR -Value (Join-Path -Path $TESTS_DIR -ChildPath "QE") -Option ReadOnly
 Set-Variable -Name QE_PIPELINES_DIR -Value (Join-Path -Path $PIPELINES_DIR -ChildPath "QE") -Option ReadOnly
-Set-Variable -Name DEV_E2E_TESTS_DIR -Value (Join-Path -Path $TESTS_DIR -ChildPath "dev_e2e") -Option ReadOnly
+Set-Variable -Name FUNCTIONAL_TESTS_DIR -Value (Join-Path -Path $TESTS_DIR -ChildPath "functional") -Option ReadOnly
 Set-Variable -Name AWS_ENVIRONMENT_DIR -Value (Join-Path -Path $ENVIRONMENT_DIR -ChildPath "aws") -Option ReadOnly
 
 $content = @"
@@ -136,8 +122,7 @@ TESTS_DIR: $TESTS_DIR
 ENVIRONMENT_DIR: $ENVIRONMENT_DIR
 SHARED_PIPELINES_DIR: $SHARED_PIPELINES_DIR
 DEV_E2E_PIPELINES_DIR: $DEV_E2E_PIPELINES_DIR
-DEV_E2E_TESTS_DIR: $DEV_E2E_TESTS_DIR
-QE_TESTS_DIR: $QE_TESTS_DIR
+FUNCTIONAL_TESTS_DIR: $FUNCTIONAL_TESTS_DIR
 QE_PIPELINES_DIR: $QE_PIPELINES_DIR
 AWS_ENVIRONMENT_DIR: $AWS_ENVIRONMENT_DIR
 "@
@@ -146,5 +131,5 @@ Write-Box -Content $content -Title "Defining the following values:"
 
 Export-ModuleMember -Variable PIPELINES_DIR, TESTS_DIR, `
 ENVIRONMENT_DIR, SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, `
-DEV_E2E_TESTS_DIR, QE_PIPELINES_DIR, QE_TESTS_DIR, AWS_ENVIRONMENT_DIR `
+FUNCTIONAL_TESTS_DIR, QE_PIPELINES_DIR, AWS_ENVIRONMENT_DIR `
 -Func New-Venv, Stop-Venv, Move-Artifacts
