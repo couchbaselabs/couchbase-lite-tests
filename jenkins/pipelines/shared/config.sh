@@ -6,20 +6,9 @@ function move_artifacts() {
     return
   fi
 
-  # Determine the suite's tests dir from the CALLING script's path
-  # (${BASH_SOURCE[1]} = the teardown.sh that invoked this), NOT from the
-  # current working directory. Teardown scripts pushd into environment/aws
-  # before calling this, so pwd is unreliable and would always fall through
-  # to dev_e2e -- silently skipping QE artifacts. The caller path always
-  # lives under /QE/ or /dev_e2e/. An explicit dir may also be passed as $1.
-  local src_dir="${1:-}"
-  if [ -z "$src_dir" ]; then
-    if [[ "${BASH_SOURCE[1]:-}" == *"/QE/"* ]]; then
-      src_dir="$QE_TESTS_DIR"
-    else
-      src_dir="$DEV_E2E_TESTS_DIR"
-    fi
-  fi
+  # Artifacts are written to the directory pytest ran from. That is the
+  # functional suite unless the caller passes another suite dir as $1.
+  local src_dir="${1:-$FUNCTIONAL_TESTS_DIR}"
 
   local dst_dir="$src_dir/$TS_ARTIFACTS_DIR"
 
@@ -152,13 +141,15 @@ readonly TEST_SERVER_DIR=$(find_dir servers) || exit 1
 
 readonly SHARED_PIPELINES_DIR="$PIPELINES_DIR/shared"
 readonly DEV_E2E_PIPELINES_DIR="$PIPELINES_DIR/dev_e2e"
-readonly DEV_E2E_TESTS_DIR="$TESTS_DIR/dev_e2e"
-readonly QE_TESTS_DIR="$TESTS_DIR/QE"
+readonly FUNCTIONAL_TESTS_DIR="$TESTS_DIR/functional"
+readonly MULTIPLATFORM_TESTS_DIR="$TESTS_DIR/multiplatform"
+readonly UPGRADE_SGW_TESTS_DIR="$TESTS_DIR/upgrade_sgw"
 readonly QE_PIPELINES_DIR="$PIPELINES_DIR/QE"
 readonly AWS_ENVIRONMENT_DIR="$ENVIRONMENT_DIR/aws"
 
 export PIPELINES_DIR TESTS_DIR ENVIRONMENT_DIR TEST_SERVER_DIR
-export SHARED_PIPELINES_DIR DEV_E2E_PIPELINES_DIR DEV_E2E_TESTS_DIR AWS_ENVIRONMENT_DIR
+export SHARED_PIPELINES_DIR DEV_E2E_PIPELINES_DIR QE_PIPELINES_DIR AWS_ENVIRONMENT_DIR
+export FUNCTIONAL_TESTS_DIR MULTIPLATFORM_TESTS_DIR UPGRADE_SGW_TESTS_DIR
 
 content="PIPELINES_DIR: $PIPELINES_DIR
 TESTS_DIR: $TESTS_DIR
@@ -166,8 +157,9 @@ ENVIRONMENT_DIR: $ENVIRONMENT_DIR
 TEST_SERVER_DIR: $TEST_SERVER_DIR
 SHARED_PIPELINES_DIR: $SHARED_PIPELINES_DIR
 DEV_E2E_PIPELINES_DIR: $DEV_E2E_PIPELINES_DIR
-DEV_E2E_TESTS_DIR: $DEV_E2E_TESTS_DIR
-QE_TESTS_DIR: $QE_TESTS_DIR
+FUNCTIONAL_TESTS_DIR: $FUNCTIONAL_TESTS_DIR
+MULTIPLATFORM_TESTS_DIR: $MULTIPLATFORM_TESTS_DIR
+UPGRADE_SGW_TESTS_DIR: $UPGRADE_SGW_TESTS_DIR
 QE_PIPELINES_DIR: $QE_PIPELINES_DIR
 AWS_ENVIRONMENT_DIR: $AWS_ENVIRONMENT_DIR"
 
