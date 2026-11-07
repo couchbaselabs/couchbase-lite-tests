@@ -1,9 +1,9 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '1.0.0', description: 'Couchbase Lite Version')
-        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version under test (required): 1, 1.1, 1.1.0 or 1.1.0-25')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests (disables result upload)')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
@@ -13,13 +13,13 @@ pipeline {
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "JS CBL:${params.CBL_VERSION}-${params.CBL_BUILD} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                    def versions = load 'jenkins/pipelines/shared/productVersions.groovy'
+                    versions.resolve('cbl', 'couchbase-lite-js', params)
+                    currentBuild.displayName = "JS CBL:${env.CBL_RESOLVED} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${env.SGW_RESOLVED}, ES: ${env.ES_RESOLVED}"
                 }
             }
         }
@@ -30,8 +30,8 @@ pipeline {
                     build job: 'prebuild-test-server',
                     parameters: [
                         string(name: 'TS_PLATFORM', value: 'js'),
-                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                        string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                        string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
+                        string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD)
                     ],
                     wait: true,
                     propagate: true
@@ -46,7 +46,7 @@ pipeline {
             steps {
                 lock("${env.NODE_NAME}") {
                     timeout(time: 120, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/functional/javascript/test.sh '${params.CBL_VERSION}-${params.CBL_BUILD}' '${params.SGW_VERSION}' --test-filter '${params.TS_TEST_FILTER}'"
+                        sh "jenkins/pipelines/functional/javascript/test.sh '${env.CBL_RESOLVED}' '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --test-filter '${params.TS_TEST_FILTER}'"
                     }
                 }
             }

@@ -5,9 +5,9 @@ def US_ANDROID_NODE = 'mob-e2e-android-01'
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite version, e.g. 4.0.0')
-        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite build number (empty: latest build of CBL_VERSION)')
-        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version to download (a prefix such as 4 resolves to the latest release)')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite version under test (required): 4, 4.1, 4.1.0 or 4.1.0-18')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')
         choice(name: 'TS_DATASET_VERSION', choices: ['auto', '4.0', '3.2'], description: 'Test server dataset version (auto: 3.2 for CBL 3.x, else 4.0)')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests (disables result upload)')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
@@ -21,18 +21,14 @@ pipeline {
             agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
-                    def reason = compat.incompatibility(params.CBL_VERSION, params.SGW_VERSION)
-                    if (reason) { error reason }
-
-                    env.FULL_CBL_VERSION = params.CBL_BUILD ? "${params.CBL_VERSION}-${params.CBL_BUILD}" : params.CBL_VERSION
-                    // 'auto' picks the dataset from CBL_VERSION: 3.x uses the 3.2 dataset, else 4.0
+                    def versions = load 'jenkins/pipelines/shared/productVersions.groovy'
+                    versions.resolve('cbl', 'couchbase-lite-android', params)
+                    env.FULL_CBL_VERSION = env.CBL_RESOLVED
+                    // 'auto' picks the dataset from the CBL version: 3.x uses the 3.2 dataset, else 4.0
                     env.DATASET_VERSION = params.TS_DATASET_VERSION != 'auto' ? params.TS_DATASET_VERSION :
-                        (params.CBL_VERSION.startsWith('3.') ? '3.2' : '4.0')
+                        (env.CBL_RESOLVED.startsWith('3.') ? '3.2' : '4.0')
                     currentBuild.displayName = "Android CBL:${env.FULL_CBL_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}, DS: ${env.DATASET_VERSION}"
+                    currentBuild.description = "SGW: ${env.SGW_RESOLVED}, ES: ${env.ES_RESOLVED}, DS: ${env.DATASET_VERSION}"
                 }
             }
         }
@@ -42,8 +38,8 @@ pipeline {
                 build job: 'prebuild-test-server',
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'jak_android'),
-                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                    string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                    string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
+                    string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD)
                 ],
                 wait: true,
                 propagate: true
@@ -62,7 +58,7 @@ pipeline {
             steps {
                 timeout(time: 120, unit: 'MINUTES') {
                     sh """
-                        jenkins/pipelines/functional/android/test.sh "${env.FULL_CBL_VERSION}" "${params.SGW_VERSION}" --dataset-version ${env.DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
+                        jenkins/pipelines/functional/android/test.sh "${env.FULL_CBL_VERSION}" "${env.SGW_RESOLVED}" --es-version '${env.ES_RESOLVED}' --dataset-version ${env.DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'
                     """
                 }
             }

@@ -83,6 +83,7 @@ def setup_test(
     topology_tag: str,
     couchbase_version: str | None = None,
     setup_dir: str = "functional",
+    es_version: str | None = None,
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version(s) and Sync Gateway version(s).
@@ -95,6 +96,9 @@ def setup_test(
     `sgw_versions` positionally to its sync_gateways (only meaningful when sync_gateways
     is defined directly in that file rather than pulled in via `include`). In both cases,
     once the version list is exhausted the last entry repeats (see `distribute_versions`).
+
+    `es_version` sets the version of every Edge Server the topology has. `None` keeps the
+    topology's own default, which is the latest Edge Server release.
 
     Pass `None` for `sgw_versions` if the topology doesn't use Sync Gateway at all; a
     throwaway version is substituted internally. An empty list is rejected, since that
@@ -144,6 +148,8 @@ def setup_test(
                 "version": resolved_sgw_versions[0],
             },
         }
+        if es_version:
+            topology["defaults"]["es"] = {"version": resolved_version("couchbase-edge-server", es_version)}
         topology["tag"] = topology_tag
 
         test_servers = cast(list[dict[str, Any]], topology["test_servers"])

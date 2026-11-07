@@ -4,10 +4,11 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <version> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <version> <sgw_version> [--es-version VERSION] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
   echo "  <cbl_version>: The Couchbase Lite version to run the test against."
   echo "  <sgw_version>: Sync Gateway version to be deployed for the test."
   echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --es-version: Edge Server version (default: the latest release)"
   echo "  --test-filter: An optional pytest -k filter expression"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
   echo "  Build number will be auto-fetched for the specified version"
@@ -22,11 +23,16 @@ shift 2
 
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+ES_VERSION=""
 SETUP_ONLY=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
       DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --es-version)
+      ES_VERSION="$2"
       shift 2
       ;;
     --test-filter)
@@ -49,7 +55,7 @@ source "$SCRIPT_DIR"/../../shared/config.sh
 
 section_start "$COLOR_CYAN" "INFRA SETUP"
 pushd "$AWS_ENVIRONMENT_DIR" >/dev/null
-uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
+uv run "$SCRIPT_DIR"/setup_test.py "$CBL_VERSION" "$SGW_VERSION" ${ES_VERSION:+--es-version "$ES_VERSION"}
 popd >/dev/null
 section_end
 

@@ -4,7 +4,7 @@
 pipeline {
     agent none
     parameters {
-        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version-build, version or train (e.g. 1.1.1-5, 1.1.1 or 1.1). Leave blank for the newest build. The build number is resolved automatically.')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version under test (required): version-build, version or train (e.g. 1.1.1-5, 1.1.1 or 1.1). The build number is resolved automatically.')
         string(name: 'TEST_NAME', defaultValue: '.', description: '"." runs every tests/functional test marked min_edge_servers; anything else is passed to pytest -k')
         string(name: 'TOPOLOGY_NAME', defaultValue: 'es_sgw_topology.json', description: 'Topology file name. 3es_1sgw_1js_topology.json also runs a CBL-JS test server on the Jenkins agent (localhost).')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version-build, version or train for a topology with a JS test server (e.g. 1.1.0-25). Leave blank for the newest build. Ignored for topologies without test servers.')
@@ -26,6 +26,7 @@ pipeline {
             }
             steps {
                 script {
+                    if (!params.ES_VERSION?.trim()) { error "ES_VERSION is required: it is the version of the product under test" }
                     if (params.TEST_NAME == '') { error "TEST_NAME is required" }
                     def hasJs = params.TOPOLOGY_NAME.contains('js_topology')
                     if (params.JS_REPLICATION_TESTS_ONLY && !hasJs) {

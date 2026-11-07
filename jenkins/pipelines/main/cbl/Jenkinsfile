@@ -145,8 +145,7 @@ pipeline {
 
                             echo "Triggering '${jobName}' for ${platform} v${fullVersion} (dataset ${info.dataset})"
                             build job: jobName, parameters: [
-                                string(name: "CBL_VERSION", value: info.version),
-                                string(name: "CBL_BUILD", value: info.build),
+                                string(name: "CBL_VERSION", value: fullVersion),
                                 string(name: "SGW_VERSION", value: sgwVersion),
                                 string(name: "TS_DATASET_VERSION", value: info.dataset)
                             ], wait: false

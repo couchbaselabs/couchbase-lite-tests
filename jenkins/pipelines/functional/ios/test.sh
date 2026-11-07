@@ -4,9 +4,10 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--es-version VERSION] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
   echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
   echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --es-version: Edge Server version (default: the latest release)"
   echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
   exit 1
@@ -21,12 +22,17 @@ shift 2
 SETUP_ONLY=false
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+ES_VERSION=""
 
 # Parse optional arguments
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
       DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --es-version)
+      ES_VERSION="$2"
       shift 2
       ;;
     --test-filter)
@@ -51,7 +57,7 @@ echo "Setup backend..."
 
 export PATH="/opt/homebrew/bin:$PATH"
 
-uv run "$SCRIPT_DIR/setup_test.py" "$CBL_VERSION" "$SGW_VERSION"
+uv run "$SCRIPT_DIR/setup_test.py" "$CBL_VERSION" "$SGW_VERSION" ${ES_VERSION:+--es-version "$ES_VERSION"}
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then

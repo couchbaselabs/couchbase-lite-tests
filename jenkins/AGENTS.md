@@ -27,7 +27,8 @@ jenkins/
 │   │   ├── resolveProgetVersion.groovy # Version/train/prefix → concrete version via ProGet
 │   │   ├── progetBuilds.groovy         # Version → [version, build]; non-EOL trains (get_trains)
 │   │   ├── triggerRecord.groovy        # main/* "already triggered" record (~/.jenkins_build_info)
-│   │   └── cblSgwCompatibility.groovy  # Rejects CBL/SGW pairs that cannot replicate
+│   │   ├── cblSgwCompatibility.groovy  # Rejects CBL/SGW pairs that cannot replicate
+│   │   └── productVersions.groovy      # Product under test + optional versions → resolved CBL/SGW/ES
 │   │
 │   ├── prebuild/                       # Test server prebuild
 │   │   └── Jenkinsfile                 # Builds + uploads artifacts to latestbuilds
@@ -119,12 +120,12 @@ if __name__ == "__main__":
 
 ### `setup_test.py` — Core Functions
 
-**`setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="functional")`**
+**`setup_test(cbl_versions, sgw_versions, topology_file_in, config_file_in, topology_tag, couchbase_version="7.6", setup_dir="functional", es_version=None)`**
 1. Reads the topology JSON template; rewrites `$schema` and `include` paths
 2. Resolves CBS version and each entry in `sgw_versions` (via `proget` API)
 3. Assigns `cbl_versions` positionally to `topology_file_in`'s `test_servers` (index 0 → server 0, etc.; the last entry repeats once the list is exhausted — see `distribute_versions`)
 4. Assigns resolved `sgw_versions` the same way to `sync_gateways`, **but only when `sync_gateways` is defined directly in `topology_file_in`** — topologies that pull it in via `include` (e.g. the single-test-server `functional/` pipelines) always get one SGW at `defaults.sgw.version` (the first resolved version)
-5. Sets `defaults.cbs.version` / `defaults.sgw.version`, `tag`
+5. Sets `defaults.cbs.version` / `defaults.sgw.version` (and `defaults.es.version` when `es_version` is given; otherwise Edge Servers get the latest release), `tag`
 6. Writes final topology to `environment/aws/topology_setup/topology.json`
 7. Downloads `cbbackupmgr` for the CBS version, and `bucketpool`
 8. Creates `TopologyConfig` → calls `start_backend()`
@@ -149,6 +150,7 @@ Each is loaded inside a node context (`def x = load 'jenkins/pipelines/shared/<f
 - `progetBuilds.groovy` — `resolveVersionBuild(proget, product, param, label, includePrerelease)` → `[version:, build:]` or `null` when the version has no published build yet; `fetchTrains(product)`; `getBuildNumber(product, version)`.
 - `triggerRecord.groovy` — `readRecord(name)`, `alreadyTriggered(record, version, build)`, `saveRecord(name, record)` for the `{ "<version>": "<build>" }` record each `main/*` trigger keeps per job on its pinned agent.
 - `cblSgwCompatibility.groovy` — `incompatibility(cblVersion, sgwVersion)`: a reason string, or `null` when the pair can replicate.
+- `productVersions.groovy` — `resolve(underTest, cblProduct, params)`: requires the version of the product under test (`'cbl'`, `'sgw'` or `'es'`), resolves `CBL_VERSION`, `SGW_VERSION` and `ES_VERSION` (an empty optional one is the latest release), rejects an incompatible CBL/SGW pair, and sets `CBL_RESOLVED`, `SGW_RESOLVED`, `ES_RESOLVED`, `CBL_PREBUILD_VERSION` and `CBL_PREBUILD_BUILD`. See `pipelines/functional/AGENTS.md`.
 
 ## The `test.sh` / `run_test.sh` Pattern
 

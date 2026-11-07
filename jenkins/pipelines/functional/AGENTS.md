@@ -25,14 +25,29 @@ but you provision the infrastructure the tests need and accept the parameters th
 
 ## Shared Shape
 
-Every CBL platform pipeline follows the same contract (`sgw/` and `es/` keep their own parameters):
+Every functional pipeline has one product under test, whose version is required. The other products'
+versions are optional, and an empty one means their latest release:
 
-- **Parameters:** `CBL_VERSION` (required), `CBL_BUILD` (optional; empty means the latest build,
-  except `javascript/`, which requires it), `SGW_VERSION` (required), `TS_DATASET_VERSION`
-  (`auto` picks 3.2 for CBL 3.x, else 4.0), `TS_TEST_FILTER` (pytest `-k`; disables result
-  upload), `RUN_PREBUILD`, plus `RUN_*` checkboxes on multi-target pipelines.
-- **Init:** rejects incompatible CBL/SGW pairs via `shared/cblSgwCompatibility.groovy`
-  (not `javascript/`, whose versions are 1.x), and composes `FULL_CBL_VERSION`.
+| Pipeline | Under test (required) | Optional |
+|---|---|---|
+| CBL platforms (`android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`) | `CBL_VERSION` | `SGW_VERSION`, `ES_VERSION` |
+| `sgw/` | `SGW_VERSION` | `CBL_VERSION` (CBL C), `ES_VERSION` |
+| `es/` | `ES_VERSION` | `SGW_VERSION`, `CBS_VERSION`, and `CBL_VERSION` for its CBL-JS test server (empty: newest build) |
+
+Every version takes the same forms: `4` or `4.1` (a train), `4.1.0` (its newest build) or
+`4.1.0-18` (that build). A train resolves to its newest version, prereleases included only for the
+product under test. `shared/productVersions.groovy` does this for the CBL platform and `sgw/`
+pipelines: it requires the version under test, resolves all three versions, rejects an incompatible
+CBL/SGW pair (`shared/cblSgwCompatibility.groovy`), and sets `CBL_RESOLVED`, `SGW_RESOLVED`,
+`ES_RESOLVED`, and `CBL_PREBUILD_VERSION`/`CBL_PREBUILD_BUILD` for the prebuild job. The Edge Server
+version reaches the topology through the run scripts' `--es-version` (`-EsVersion` in PowerShell)
+and `setup_test.py --es-version`.
+
+The CBL platform pipelines also share:
+
+- **Parameters:** besides the versions, `TS_DATASET_VERSION` (`auto` picks 3.2 for CBL 3.x, else
+  4.0), `TS_TEST_FILTER` (pytest `-k`; disables result upload), `RUN_PREBUILD`, plus `RUN_*`
+  checkboxes on multi-target pipelines.
 - **Test selection:** `-m min_test_servers` on `tests/functional` (`sgw/`: `-m min_sync_gateways`;
   `es/`: `-m min_edge_servers`). Tests whose other `min_*`
   markers the topology can't satisfy are skipped by the `required_topology` plugin.

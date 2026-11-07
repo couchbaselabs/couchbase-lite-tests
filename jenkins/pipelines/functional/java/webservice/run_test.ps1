@@ -1,13 +1,15 @@
 param (
     [Parameter(Mandatory=$true)][string]$Version,
     [Parameter(Mandatory=$true)][string]$SgwVersion,
+    [Parameter()][string]$EsVersion = "",
     [Parameter()][string]$DatasetVersion = "4.0",
     [Parameter()][string]$TestFilter = "",
     [Parameter()][switch]$SetupOnly
 )
 $ErrorActionPreference = "Stop"
 Import-Module $PSScriptRoot\..\..\..\shared\config.psm1 -Force
-uv run $PSScriptRoot\setup_test.py $Version $SgwVersion
+$esArgs = if ($EsVersion) { @('--es-version', $EsVersion) } else { @() }
+uv run $PSScriptRoot\setup_test.py $Version $SgwVersion @esArgs
 if($LASTEXITCODE -ne 0) {
     throw "Setup failed!"
 }

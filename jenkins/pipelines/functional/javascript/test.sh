@@ -4,7 +4,8 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 
 function usage() {
-  echo "Usage: $0 <cbl_version-build> <sgw_version> [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--es-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  --es-version: Edge Server version (default: the latest release)"
   echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only set up the backend and test server, skip test execution"
 }
@@ -19,9 +20,14 @@ SGW_VERSION=${2}
 shift 2
 
 TEST_FILTER=""
+ES_VERSION=""
 SETUP_ONLY=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
+    --es-version)
+      ES_VERSION="$2"
+      shift 2
+      ;;
     --test-filter)
       TEST_FILTER="$2"
       shift 2
@@ -47,7 +53,7 @@ if [[ "$(uname)" != "Darwin" ]]; then
 fi
 
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SGW_VERSION"
+uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SGW_VERSION" ${ES_VERSION:+--es-version "$ES_VERSION"}
 
 echo "Install Playwright Chromium..."
 uv run playwright install chromium

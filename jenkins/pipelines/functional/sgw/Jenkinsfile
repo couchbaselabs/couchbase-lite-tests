@@ -1,11 +1,13 @@
 pipeline {
     agent none
-// CBL_VERSION, SGW_VERSION, TS_DATASET_VERSION, and TS_TEST_FILTER are UI defined params and their default values.
+// SGW_VERSION, CBL_VERSION, ES_VERSION, TS_DATASET_VERSION, and TS_TEST_FILTER are UI defined params and their default values.
 // That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
 // The default values in the UI will be used if no parameters are provided at build time.
 // But just for reference, these are the params that are used by the job :
-//         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4" for latest version-build, or "4.1.0-18" for specific version and build')
-//         string(name: 'SGW_VERSION', description: 'Sync Gateway Version to use, eg : its the same way, check out "resolveProgetVersion" function for more details)')
+//         string(name: 'SGW_VERSION', description: 'Sync Gateway version under test (required): 4, 4.1, 4.1.0 or 4.1.0-18')
+//         string(name: 'CBL_VERSION', description: 'Couchbase Lite C version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
+//         string(name: 'ES_VERSION', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')
+// See jenkins/pipelines/shared/productVersions.groovy for how they resolve.
 //         string(name: 'TS_TEST_FILTER', description: 'An optional filter for running a subset of tests')
 //         string(name: 'TS_DATASET_VERSION', description: 'An optional filter for switching the dataset version to 3.2')
     options {
@@ -17,17 +19,12 @@ pipeline {
             agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
-                    env.CBL_VERSION = proget.resolveProgetVersion("couchbase-lite-c", params.CBL_VERSION, 'CBL_VERSION')
-                    env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
-                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
-                    def reason = compat.incompatibility(env.CBL_VERSION, env.SGW_VERSION)
-                    if (reason) { error reason }
+                    def versions = load 'jenkins/pipelines/shared/productVersions.groovy'
+                    versions.resolve('sgw', 'couchbase-lite-c', params)
                     env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
                     env.TS_DATASET_VERSION = params.TS_DATASET_VERSION
-                    currentBuild.displayName = "CBL:${env.CBL_VERSION} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
+                    currentBuild.displayName = "SGW:${env.SGW_RESOLVED} CBL:${env.CBL_RESOLVED} (#${currentBuild.number})"
+                    currentBuild.description = "ES: ${env.ES_RESOLVED}"
                 }
             }
         }
@@ -36,7 +33,8 @@ pipeline {
                 build job: 'prebuild-test-server',
                 parameters: [
                     string(name: 'TS_PLATFORM', value: 'c_macos'),
-                    string(name: 'CBL_VERSION', value: env.CBL_VERSION),
+                    string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
+                    string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD),
                 ],
                 wait: true,
                 propagate: true
@@ -60,7 +58,7 @@ pipeline {
                 // Unlock keychain:
                 sh "security unlock-keychain -p '${KEYCHAIN_PASSWORD}' ~/Library/Keychains/login.keychain-db"
                 timeout(time: 210, unit: 'MINUTES') {
-                    sh "jenkins/pipelines/functional/sgw/test.sh ${env.CBL_VERSION} ${env.SGW_VERSION} --dataset-version '${env.TS_DATASET_VERSION}' --test-filter '${env.TS_TEST_FILTER}'"
+                    sh "jenkins/pipelines/functional/sgw/test.sh '${env.CBL_RESOLVED}' '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --dataset-version '${env.TS_DATASET_VERSION}' --test-filter '${env.TS_TEST_FILTER}'"
                 }
             }
             post {

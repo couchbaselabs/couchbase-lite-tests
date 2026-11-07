@@ -8,11 +8,12 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--es-version VERSION] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
   echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
   echo "  platform: The C platform to test (macos, ios, android, linux_x86_64)"
   echo "  sgw_version: Version of Sync Gateway to download and use"
   echo "  --dataset-version: Version of the CBL dataset to use (default: 4.0)"
+  echo "  --es-version: Edge Server version (default: the latest release)"
   echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only set up the backend and test server, skip test execution"
   exit 1
@@ -27,12 +28,17 @@ shift 3
 
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+ES_VERSION=""
 SETUP_ONLY=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
       DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --es-version)
+      ES_VERSION="$2"
       shift 2
       ;;
     --test-filter)
@@ -50,7 +56,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-uv run $SCRIPT_DIR/setup_test.py "$PLATFORM" "$CBL_VERSION" "$SGW_VERSION"
+uv run $SCRIPT_DIR/setup_test.py "$PLATFORM" "$CBL_VERSION" "$SGW_VERSION" ${ES_VERSION:+--es-version "$ES_VERSION"}
 
 if [ "$SETUP_ONLY" = true ]; then
   echo "Setup completed. Exiting due to --setup-only flag."

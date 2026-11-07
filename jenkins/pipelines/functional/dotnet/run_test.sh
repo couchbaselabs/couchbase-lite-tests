@@ -11,11 +11,12 @@ XHARNESS_VERSION="10.0.0-prerelease*"
 XHARNESS_SOURCE="https://pkgs.dev.azure.com/dnceng/public/_packaging/dotnet-eng/nuget/v3/index.json"
 
 function usage() {
-  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "Usage: $0 <cbl_version[-build]> <platform> <sgw_version> [--es-version VERSION] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
   echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
   echo "  platform: The .NET platform to test (macos, ios, android)"
   echo "  sgw_version: Version of Sync Gateway to download and use"
   echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
+  echo "  --es-version: Edge Server version (default: the latest release)"
   echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
   echo "  --setup-only: Only build test server and setup backend, skip test execution"
 }
@@ -48,12 +49,17 @@ shift 3
 SETUP_ONLY=false
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+ES_VERSION=""
 
 # Parse optional arguments
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
       DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --es-version)
+      ES_VERSION="$2"
       shift 2
       ;;
     --test-filter)
@@ -78,7 +84,7 @@ fi
 
 prepare_dotnet
 
-uv run "$SCRIPT_DIR/setup_test.py" "$platform" "$cbl_version" "$sgw_version"
+uv run "$SCRIPT_DIR/setup_test.py" "$platform" "$cbl_version" "$sgw_version" ${ES_VERSION:+--es-version "$ES_VERSION"}
 
 # Exit early if setup-only mode
 if [ "$SETUP_ONLY" = true ]; then
