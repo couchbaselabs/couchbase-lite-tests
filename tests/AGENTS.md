@@ -110,8 +110,6 @@ class TestFeatureName(CBLTestClass):
 
 | Marker | Use For |
 |---|---|
-| `@pytest.mark.sgw` | Sync Gateway feature |
-| `@pytest.mark.cbl` | Couchbase Lite feature only |
 | `@pytest.mark.upg_sgw` | SGW upgrade scenarios |
 | `@pytest.mark.min_test_servers(N)` | Topology: ≥ N test servers |
 | `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
@@ -183,7 +181,7 @@ cd tests/upgrade_sgw && uv run pytest -x -v --config config.json
 # Targeted runs
 cd tests/functional && uv run pytest -x -v --config config.json -k test_push
 cd tests/functional && uv run pytest -x -v --config config.json test_xattrs.py
-cd tests/functional && uv run pytest -x -v --config config.json -m sgw
+cd tests/functional && uv run pytest -x -v --config config.json -m min_sync_gateways
 
 # Lint & format
 uv run ruff check tests/
@@ -201,8 +199,8 @@ file order and `-p randomly` turns the shuffling on. `client/tests` has its own 
 cd tests/functional && uv run pytest -x -v --config config.json test_basic_replication.py -k test_push --count=20
 
 # Shuffle the order to expose leakage between tests; replay a failure with the seed it printed
-cd tests/functional && uv run pytest -v --config config.json -m sgw -p randomly
-cd tests/functional && uv run pytest -v --config config.json -m sgw -p randomly --randomly-seed=4250359956
+cd tests/functional && uv run pytest -v --config config.json -m min_sync_gateways -p randomly
+cd tests/functional && uv run pytest -v --config config.json -m min_sync_gateways -p randomly --randomly-seed=4250359956
 ```
 
 - `--count=N` repeats each selected test N times in place. `--repeat-scope=session` repeats the whole

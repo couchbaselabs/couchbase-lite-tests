@@ -7,7 +7,6 @@ from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestServerSetup(CBLTestClass):

@@ -73,7 +73,6 @@ async def wait_for_update_count(
         assert actual == expected, f"SG doc {doc_id} should have {expected} updates, got {actual}"
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestXattrs(CBLTestClass):

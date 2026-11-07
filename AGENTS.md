@@ -107,7 +107,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - Use the `cblpytest` fixture (auto-injected by `cbltest.plugins.cblpytest_fixture`).
 - Use the `dataset_path` fixture (defined per-suite in `conftest.py`).
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`, etc. `N` is always 1 or more: omit the marker instead of declaring `0`, because pipelines select tests with `-m min_<resource>`, which matches any count.
-- Behavior markers: `@pytest.mark.sgw`, `.cbl`, `.upg_sgw`.
+- Behavior marker: `@pytest.mark.upg_sgw` (SGW upgrade scenarios). Greenboard files a run under its product under test, the one prerelease build it ran, not by marker.
 - All tests auto-clean via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`).
 - `cblpytest.edge_servers` holds `EdgeServerManager` objects: state changes live there, and every `EdgeServer` REST client comes from one. `configure_dataset(...)`, `start_server(...)` and `get_admin_client()` return a client the manager closes at teardown; `get_user_client(...)` and `get_anonymous_client()` yield one that closes with the `async with`. `cluster_cleanup` resets the Edge Servers before each test marked `min_edge_servers`, and before any other test for each Edge Server changed since its last reset, so a test that uses Edge Server must carry the marker.
 

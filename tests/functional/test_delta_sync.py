@@ -34,7 +34,6 @@ async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
         return 0
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestDeltaSync(CBLTestClass):

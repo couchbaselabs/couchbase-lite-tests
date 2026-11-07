@@ -149,7 +149,6 @@ async def _pinned_replication(
     return replicator
 
 
-@pytest.mark.sgw
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(1)

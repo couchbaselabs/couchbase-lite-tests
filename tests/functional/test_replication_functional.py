@@ -13,7 +13,6 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGatewayFeature
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationFunctional(CBLTestClass):

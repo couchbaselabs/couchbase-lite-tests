@@ -34,7 +34,7 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 
 - Files: `test_<feature>.py`; Functions: `async def test_<name>(...)`
 - Use `cblpytest` fixture (auto-injected) and `dataset_path` fixture
-- Mark tests: `@pytest.mark.sgw`, `@pytest.mark.cbl`, `@pytest.mark.upg_sgw`
+- Mark tests with their topology (`@pytest.mark.min_*`); `@pytest.mark.upg_sgw` marks SGW upgrade scenarios
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`
 - All tests get auto-cleanup via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`)
 
