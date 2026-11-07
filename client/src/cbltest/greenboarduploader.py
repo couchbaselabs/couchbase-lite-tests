@@ -258,8 +258,6 @@ class GreenboardUploader:
         self.__fail_count = 0
         self.__pass_count = 0
         self.__overall_fail = False
-        self.__has_sgw_marker = False
-        self.__has_es_marker = False
         self.__failures: list[dict[str, Any]] = []
         self.__tests: dict[str, str] = {}
 
@@ -272,13 +270,6 @@ class GreenboardUploader:
             if report.failed:
                 self.__overall_fail = True
             return
-
-        # Above the short-circuit: tests that still run after the latch must
-        # set this, or an SGW run gets filed under the CBL platform.
-        if item.get_closest_marker("sgw"):
-            self.__has_sgw_marker = True
-        if item.get_closest_marker("min_edge_servers"):
-            self.__has_es_marker = True
 
         if self.__overall_fail:
             return
@@ -310,18 +301,6 @@ class GreenboardUploader:
         else:
             return  # a passing setup/teardown says nothing: the call report decides
         self.__tests[report.nodeid] = _worse(outcome, self.__tests.get(report.nodeid, PASS))
-
-    def has_sgw_marker(self) -> bool:
-        """
-        Returns True if any test in the session has @pytest.mark.sgw marker
-        """
-        return self.__has_sgw_marker
-
-    def has_es_marker(self) -> bool:
-        """
-        Returns True if any test in the session has @pytest.mark.min_edge_servers
-        """
-        return self.__has_es_marker
 
     def upload(
         self,
