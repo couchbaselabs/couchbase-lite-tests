@@ -68,8 +68,10 @@ class LogSlurpHandler(Handler):
             headers={"CBL-Log-ID": self.__id},
             stream=True,
         )
-        with open("session.log", "w") as fout:
-            fout.writelines(c.decode("utf-8") for c in resp.iter_content(8192))
+        # Save the bytes as received: writing text would encode with the platform default
+        # (cp1252 on Windows), which can't store every character in the log and leaves it empty
+        with open("session.log", "wb") as fout:
+            fout.writelines(resp.iter_content(8192))
 
 
 class LogLevel(Enum):
