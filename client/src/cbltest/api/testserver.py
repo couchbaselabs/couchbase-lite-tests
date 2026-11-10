@@ -40,6 +40,8 @@ class TestServer:
     A class for interacting with a Couchbase Lite test server
     """
 
+    __test__ = False  # Not a pytest test class, despite the name
+
     __dataset_base_url: Final[str] = (
         "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/"
     )
