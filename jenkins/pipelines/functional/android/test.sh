@@ -1,17 +1,19 @@
 #!/bin/bash
-# Build the Android test server, deploy it, and run the tests
+# Set up the backend, deploy the Android test server, and run the functional tests
 
 trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
-set -eu
+set -eu # No pipefail because piping yes always "fails" with SIGPIPE
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 source $SCRIPT_DIR/../../shared/config.sh
 
 function usage() {
-  echo "Usage: $0 <cbl_version> <sg_version> [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
-  echo "  --dataset-version: Version of CBL dataset to use (default: 4.0)"
-  echo "  --test-filter: An optional pytest -k filter expression"
-  echo "  --setup-only: Only build test server and setup backend, skip test execution"
+  echo "Usage: $0 <cbl_version[-build]> <sgw_version> [--es-version VERSION] [--dataset-version VERSION] [--test-filter EXPR] [--setup-only]"
+  echo "  cbl_version: x.y.z for the latest build, or x.y.z-build for a specific one"
+  echo "  --dataset-version: Version of the CBL dataset to use (default: 4.0)"
+  echo "  --es-version: Edge Server version (default: the latest release)"
+  echo "  --test-filter: An optional pytest -k filter expression (disables result upload)"
+  echo "  --setup-only: Only set up the backend and test server, skip test execution"
   exit 1
 }
 
@@ -20,18 +22,23 @@ if [ "$#" -lt 2 ]; then usage; fi
 CBL_VERSION="$1"
 if [ -z "$CBL_VERSION" ]; then usage; fi
 
-SG_VERSION="$2"
-if [ -z "$SG_VERSION" ]; then usage; fi
+SGW_VERSION="$2"
+if [ -z "$SGW_VERSION" ]; then usage; fi
 shift 2
 
 DATASET_VERSION="4.0"
 TEST_FILTER=""
+ES_VERSION=""
 SETUP_ONLY=false
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --dataset-version)
       DATASET_VERSION="$2"
+      shift 2
+      ;;
+    --es-version)
+      ES_VERSION="$2"
       shift 2
       ;;
     --test-filter)
@@ -51,31 +58,46 @@ done
 
 PATH="${PATH}:$ANDROID_HOME/platform-tools"
 
+# Capture the device log for the run (install, app start, crashes). CBL's own console lines
+# are left out: LogSlurp already collects them. teardown.sh stops it and archives it.
+DEVICE_SERIAL="${ANDROID_SERIAL:-}"
+if [ -z "$DEVICE_SERIAL" ]; then
+  DEVICE_SERIAL=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["test_servers"][0]["location"])' "$SCRIPT_DIR/topology.json")
+fi
+
+CBL_LOG_TAGS=()
+for domain in DATABASE QUERY REPLICATOR NETWORK LISTENER PEER_DISCOVERY MULTIPEER; do
+  CBL_LOG_TAGS+=("CouchbaseLite/$domain:S")
+done
+
+echo "Start logcat for $DEVICE_SERIAL"
+adb -s "$DEVICE_SERIAL" logcat -c || true
+adb -s "$DEVICE_SERIAL" logcat -v threadtime "${CBL_LOG_TAGS[@]}" >"$FUNCTIONAL_TESTS_DIR/logcat.txt" 2>&1 &
+echo $! >"$SCRIPT_DIR/logcat.pid"
+
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SG_VERSION"
+uv run $SCRIPT_DIR/setup_test.py "$CBL_VERSION" "$SGW_VERSION" ${ES_VERSION:+--es-version "$ES_VERSION"}
 
 if [ "$SETUP_ONLY" = true ]; then
   echo "Setup completed. Exiting due to --setup-only flag."
   exit 0
 fi
 
-echo "Start logcat"
-pushd $SCRIPT_DIR
-python3 logcat.py &
-echo $! >logcat.pid
-
 echo "Run tests..."
-pushd $QE_TESTS_DIR >/dev/null
+pushd $FUNCTIONAL_TESTS_DIR >/dev/null
+rm -rf http_log testserver.log
+
+# Every test that needs a test server. Tests whose other min_* markers this
+# topology can't satisfy are skipped by the required_topology plugin.
+PYTEST_ARGS=(
+  -v --no-header --maxfail=7 -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  -m min_test_servers
+  --sgcollect-on-test-failure
+)
 if [ -n "$TEST_FILTER" ]; then
-  uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl \
-    -k "$TEST_FILTER" \
-    --no-result-upload
-else
-  uv run pytest --maxfail=7 -W ignore::DeprecationWarning \
-    --config config.json \
-    --dataset-version "$DATASET_VERSION" \
-    -m cbl
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
+
+uv run pytest "${PYTEST_ARGS[@]}"

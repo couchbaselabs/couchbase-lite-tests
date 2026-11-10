@@ -1,11 +1,10 @@
 pipeline {
     agent none
     parameters {
-        choice(name: 'CBL_EDITION', choices: ['enterprise', 'community'], description: 'Couchbase Lite Edition')
-        string(name: 'CBL_VERSION', defaultValue: '1.0.0', description: 'Couchbase Lite Version')
-        string(name: 'CBL_BUILD', defaultValue: '', description: 'Couchbase Lite Build Number')
-        string(name: 'SGW_VERSION', defaultValue: '', description: "The version of Sync Gateway to download")
-        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version under test (required): 1, 1.1, 1.1.0 or 1.1.0-25')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests (disables result upload)')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test server. Uncheck to skip prebuild entirely and reuse existing artifacts.')
     }
     options {
@@ -14,13 +13,13 @@ pipeline {
     }
     stages {
         stage('Init') {
+            agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.CBL_BUILD == '') { error "CBL_BUILD is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    currentBuild.displayName = "${params.CBL_VERSION}-${params.CBL_BUILD}-${CBL_EDITION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                    def versions = load 'jenkins/pipelines/shared/productVersions.groovy'
+                    versions.resolve('cbl', 'couchbase-lite-js', params)
+                    currentBuild.displayName = "JS CBL:${env.CBL_RESOLVED} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${env.SGW_RESOLVED}, ES: ${env.ES_RESOLVED}"
                 }
             }
         }
@@ -31,8 +30,8 @@ pipeline {
                     build job: 'prebuild-test-server',
                     parameters: [
                         string(name: 'TS_PLATFORM', value: 'js'),
-                        string(name: 'CBL_VERSION', value: params.CBL_VERSION),
-                        string(name: 'CBL_BUILD', value: params.CBL_BUILD)
+                        string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
+                        string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD)
                     ],
                     wait: true,
                     propagate: true
@@ -46,8 +45,8 @@ pipeline {
             }
             steps {
                 lock("${env.NODE_NAME}") {
-                    timeout(time: 60, unit: 'MINUTES') {
-                        sh "jenkins/pipelines/dev_e2e/javascript/test.sh '${params.CBL_EDITION}' '${params.CBL_VERSION}' '${params.CBL_BUILD}' '${params.SGW_VERSION}' --test-filter '${params.TS_TEST_FILTER}'"
+                    timeout(time: 120, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/functional/javascript/test.sh '${env.CBL_RESOLVED}' '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --test-filter '${params.TS_TEST_FILTER}'"
                     }
                 }
             }
@@ -57,9 +56,9 @@ pipeline {
 
                     echo "Teardown JavaScript Test"
                     timeout(time: 5, unit: 'MINUTES') {
-                        sh 'jenkins/pipelines/dev_e2e/javascript/teardown.sh'
+                        sh 'jenkins/pipelines/functional/javascript/teardown.sh'
                     }
-                    archiveArtifacts artifacts: 'tests/dev_e2e/js/**', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/functional/js/**/*', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }

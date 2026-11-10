@@ -1,13 +1,21 @@
+// Functional tests for Couchbase Lite .NET on every .NET platform.
+// Merges the former dev_e2e/dotnet and QE/dotnet pipelines, using the QE hosts.
+def WINDOWS_NODE = 'net-windows'
+def IOS_NODE = 'mob-e2e-iphone-03'
+def ANDROID_NODE = 'mob-e2e-android-01'
+def MAIL_TO = 'sanjivani.patra@couchbase.com,jim.borden@couchbase.com'
+
 pipeline {
     agent none
     parameters {
-        string(name: 'CBL_VERSION', defaultValue: '3.3.0', description: 'Couchbase Lite Version (build number will be fetched if not provided)')
-        string(name: 'SGW_VERSION', defaultValue: '4', description: "The version of Sync Gateway to download")
-        string(name: 'TS_DATASET_VERSION', defaultValue: '4.0', description: 'The version of the dataset to use on the test servers')
-        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite version under test (required): 4, 4.1, 4.1.0 or 4.1.0-18')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')
+        choice(name: 'TS_DATASET_VERSION', choices: ['4.0', '3.2'], description: 'Test server dataset version. CBL 3.x needs 3.2; CBL 4.x can use either.')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests (disables result upload)')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild test servers (only for the checked platforms). Uncheck to skip prebuild entirely and reuse existing artifacts.')
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Run Windows tests')
-        booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS tests')
+        booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS (Mac Catalyst) tests')
         booleanParam(name: 'RUN_IOS',     defaultValue: true, description: 'Run iOS tests')
         booleanParam(name: 'RUN_ANDROID', defaultValue: true, description: 'Run Android tests')
     }
@@ -21,13 +29,12 @@ pipeline {
             agent any
             steps {
                 script {
-                    if (params.CBL_VERSION == '') { error "CBL_VERSION is required" }
-                    if (params.SGW_VERSION == '') { error "SGW_VERSION is required" }
-                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
-                    def reason = compat.incompatibility(params.CBL_VERSION, params.SGW_VERSION)
-                    if (reason) { error reason }
-                    currentBuild.displayName = "Dotnet CBL:${params.CBL_VERSION} (#${currentBuild.number})"
-                    currentBuild.description = "SGW: ${params.SGW_VERSION}"
+                    def versions = load 'jenkins/pipelines/shared/productVersions.groovy'
+                    versions.resolve('cbl', 'couchbase-lite-net', params)
+                    env.FULL_CBL_VERSION = env.CBL_RESOLVED
+                    env.DATASET_VERSION = params.TS_DATASET_VERSION
+                    currentBuild.displayName = "Dotnet CBL:${env.FULL_CBL_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "SGW: ${env.SGW_RESOLVED}, ES: ${env.ES_RESOLVED}, DS: ${env.DATASET_VERSION}"
                 }
             }
         }
@@ -37,20 +44,22 @@ pipeline {
                 script {
                     def platforms = []
                     if (params.RUN_WINDOWS) { platforms << 'dotnet_windows' }
+                    if (params.RUN_MACOS)   { platforms << 'dotnet_macos' }
                     if (params.RUN_IOS)     { platforms << 'dotnet_ios' }
                     if (params.RUN_ANDROID) { platforms << 'dotnet_android' }
-                    if (params.RUN_MACOS)   { platforms << 'dotnet_macos' }
                     if (platforms.isEmpty()) {
                         echo "No platforms selected — nothing to prebuild"
                     } else {
                         def parallelBuilds = [:]
-                        for(p in platforms) {
+                        for (p in platforms) {
+                            // Copy to a local so each closure keeps its own platform
                             def platform = p
                             parallelBuilds[platform] = {
                                 build job: 'prebuild-test-server',
                                 parameters: [
                                     string(name: 'TS_PLATFORM', value: platform),
-                                    string(name: 'CBL_VERSION', value: params.CBL_VERSION),
+                                    string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
+                                    string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD)
                                 ],
                                 wait: true,
                                 propagate: true
@@ -65,32 +74,27 @@ pipeline {
             parallel {
                 stage('Windows') {
                     when { beforeAgent true; expression { params.RUN_WINDOWS } }
-                    agent { label 'net-windows' }
+                    agent { label WINDOWS_NODE }
                     options {
-                        lock('net-windows')
+                        lock(WINDOWS_NODE)
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
                     }
                     steps {
-                        echo "=== Run Dotnet Windows Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            powershell "jenkins\\pipelines\\QE\\dotnet\\run_test.ps1 -Version ${params.CBL_VERSION} -SgwVersion ${params.SGW_VERSION} -DatasetVersion ${params.TS_DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
+                            powershell "jenkins\\pipelines\\functional\\dotnet\\run_test.ps1 -Version '${env.FULL_CBL_VERSION}' -SgwVersion '${env.SGW_RESOLVED}' -EsVersion '${env.ES_RESOLVED}' -DatasetVersion ${env.DATASET_VERSION} -TestFilter '${params.TS_TEST_FILTER}'"
                         }
-                        echo "=== Dotnet Windows Tests Complete"
                     }
                     post {
                         always {
                             // Publish pytest's JUnit XML so per-test failures (messages and
                             // tracebacks) are surfaced in Jenkins even if teardown fails.
                             junit testResults: '**/junit_result.xml', allowEmptyResults: true
-
-                            echo "=== Teardown Dotnet Windows Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                powershell 'jenkins\\pipelines\\QE\\dotnet\\teardown.ps1'
+                                powershell 'jenkins\\pipelines\\functional\\dotnet\\teardown.ps1'
                             }
-                            archiveArtifacts artifacts: 'tests\\QE\\dotnet_windows\\**\\*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet Windows Test Teardown Complete"
+                            archiveArtifacts artifacts: 'tests/functional/dotnet_windows/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -102,41 +106,32 @@ pipeline {
                         TS_ARTIFACTS_DIR = 'dotnet_macos'
                     }
                     steps {
-                        // Unlock keychain: the Catalyst app is signed, and the
-                        // dev_e2e Mac Catalyst stage unlocks on this same pool.
+                        // Unlock keychain: the Mac Catalyst app is signed
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "=== Run Dotnet macOS Tests"
                         // The label matches a shared pool and the test server binds
-                        // fixed localhost ports, so serialize per node as dev_e2e does.
+                        // fixed localhost ports, so serialize per node.
                         lock("${env.NODE_NAME}") {
                             timeout(time: 120, unit: 'MINUTES') {
-                                sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                                sh "jenkins/pipelines/functional/dotnet/run_test.sh '${env.FULL_CBL_VERSION}' macos '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --dataset-version ${env.DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                             }
                         }
-                        echo "=== Dotnet macOS Tests Complete"
                     }
                     post {
                         always {
-                            // Publish pytest's JUnit XML so per-test failures (messages and
-                            // tracebacks) are surfaced in Jenkins even if teardown fails.
                             junit testResults: '**/junit_result.xml', allowEmptyResults: true
-
-                            echo "=== Teardown Dotnet macOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                                sh 'jenkins/pipelines/functional/dotnet/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet macOS Test Teardown Complete"
+                            archiveArtifacts artifacts: 'tests/functional/dotnet_macos/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
                 stage('iOS') {
                     when { beforeAgent true; expression { params.RUN_IOS } }
-                    agent { label 'mob-e2e-iphone-03' }
+                    agent { label IOS_NODE }
                     options {
-                        // Lock on the node, not the device id: that is the name the
-                        // dev_e2e ios/c/dotnet jobs sharing this iPhone lock on.
-                        lock('mob-e2e-iphone-03')
+                        // Lock on the node name: every job sharing this iPhone locks on it.
+                        lock(IOS_NODE)
                     }
                     environment {
                         KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
@@ -144,58 +139,43 @@ pipeline {
                     }
                     steps {
                         sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        echo "=== Run Dotnet iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            sh "jenkins/pipelines/functional/dotnet/run_test.sh '${env.FULL_CBL_VERSION}' ios '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --dataset-version ${env.DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
-                        echo "=== Dotnet iOS Tests Complete"
                     }
                     post {
                         always {
-                            // Publish pytest's JUnit XML so per-test failures (messages and
-                            // tracebacks) are surfaced in Jenkins even if teardown fails.
                             junit testResults: '**/junit_result.xml', allowEmptyResults: true
-
-                            echo "=== Teardown Dotnet iOS Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                                sh 'jenkins/pipelines/functional/dotnet/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet iOS Test Teardown Complete"
+                            archiveArtifacts artifacts: 'tests/functional/dotnet_ios/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
                 stage('Android') {
                     when { beforeAgent true; expression { params.RUN_ANDROID } }
-                    agent { label 'mob-e2e-android-01' }
+                    agent { label ANDROID_NODE }
                     options {
-                        lock('mob-e2e-android-01')
+                        lock(ANDROID_NODE)
                     }
                     environment {
-                        // No ANDROID_SERIAL: the bridge always passes `-s <location>`
-                        // from the topology. SDK and JDK come from the node, as the
-                        // dev_e2e android jobs on this same node rely on.
+                        // No ANDROID_SERIAL: the bridge passes `-s <location>` from the
+                        // topology. SDK and JDK come from the node.
                         TS_ARTIFACTS_DIR = 'dotnet_android'
                     }
                     steps {
-                        echo "=== Run Dotnet Android Tests"
                         timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} android ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            sh "jenkins/pipelines/functional/dotnet/run_test.sh '${env.FULL_CBL_VERSION}' android '${env.SGW_RESOLVED}' --es-version '${env.ES_RESOLVED}' --dataset-version ${env.DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
                         }
-                        echo "=== Dotnet Android Tests Complete"
                     }
                     post {
                         always {
-                            // Publish pytest's JUnit XML so per-test failures (messages and
-                            // tracebacks) are surfaced in Jenkins even if teardown fails.
                             junit testResults: '**/junit_result.xml', allowEmptyResults: true
-
-                            echo "=== Teardown Dotnet Android Tests"
                             timeout(time: 5, unit: 'MINUTES') {
-                                sh 'jenkins/pipelines/QE/dotnet/teardown.sh'
+                                sh 'jenkins/pipelines/functional/dotnet/teardown.sh'
                             }
-                            archiveArtifacts artifacts: 'tests/QE/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
-                            echo "=== Dotnet Android Test Teardown Complete"
+                            archiveArtifacts artifacts: 'tests/functional/dotnet_android/**/*', fingerprint: true, allowEmptyArchive: true
                         }
                     }
                 }
@@ -204,10 +184,10 @@ pipeline {
     }
     post {
         failure {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "sanjivani.patra@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: MAIL_TO
         }
         fixed {
-            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "sanjivani.patra@couchbase.com";
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: MAIL_TO
         }
     }
 }
