@@ -25,11 +25,13 @@ from jenkins.pipelines.shared.setup_test import VersionType, setup_test
     default=None,
     help="The Couchbase Server version to use for the test (omit for latest release)",
 )
+@click.option("--es-version", default=None, help="Edge Server version (omit for the latest release)")
 def cli_entry(
     platform: str,
     cbl_versions: list[str],
     sgw_versions: list[str],
     cbs_version: str | None,
+    es_version: str | None,
 ) -> None:
     """CBL_VERSIONS and SGW_VERSIONS are comma-separated version lists, e.g. "4.0.0,4.1.0".
 
@@ -42,6 +44,7 @@ def cli_entry(
         SCRIPT_DIR / "config_aws.json",
         f"dotnet_{platform}",
         cbs_version,
+        es_version=es_version,
     )
 
 
