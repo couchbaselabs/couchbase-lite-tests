@@ -51,7 +51,7 @@ pipeline {
                     if (response.status != 200) {
                         env.BUILD_BRANCH = 'main'
                     }
-
+                    env.BUILD_BRANCH="c-testserver-headers2"
                     echo "Build will come from branch ${env.BUILD_BRANCH}"
                 }
             }
