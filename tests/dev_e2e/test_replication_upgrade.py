@@ -683,10 +683,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Check that the push replication of `{doc_id}` has the deleted flag set and no error.")
         pushed = [e for e in replicator.document_updates if e.document_id == doc_id]
@@ -754,10 +751,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Check that the pull replication of `{doc_id}` has the deleted flag set and no error.")
         pulled = [e for e in replicator.document_updates if e.document_id == doc_id]
@@ -793,10 +787,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(
             f"Check that no doc was pushed, and that SGW's `{doc_id}` is still the deletion from step 4."

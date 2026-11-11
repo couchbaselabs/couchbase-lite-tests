@@ -27,8 +27,7 @@ class TestStartReplicator(CBLTestClass):
         repl = Replicator(db, "ws://foo:4984/db")
         repl.add_default_collection()
         await repl.start()
-        status = await repl.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is not None
+        await repl.wait_for_error(ReplicatorActivityLevel.STOPPED)
 
     @pytest.mark.asyncio(loop_scope="session")
     @pytest.mark.parametrize(

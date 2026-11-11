@@ -1,4 +1,3 @@
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -11,9 +10,10 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
-    ReplicatorStatus,
     ReplicatorType,
 )
+from cbltest.responses import ServerVariant
+from shared.replicator_helpers import wait_for_no_access_error
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG = str(SCRIPT_DIR / "config" / "test_access_control.json")
@@ -42,14 +42,14 @@ async def _local_ids(db: Database, collection: str) -> set[str]:
     return {doc.id for doc in (await db.get_all_documents(collection))[collection]}
 
 
-async def _replicate(
+async def _start_replicator(
     db: Database,
     edge_server: EdgeServer,
     user: str,
     replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL,
     collections: list[str] | None = None,
-) -> ReplicatorStatus:
-    """Run a one-shot replicator against `travel` on Edge Server as `user`, until it stops."""
+) -> Replicator:
+    """Start a one-shot replicator against `travel` on Edge Server as `user`."""
     replicator = Replicator(
         db,
         edge_server.replication_url("travel"),
@@ -59,7 +59,7 @@ async def _replicate(
         collections=[ReplicatorCollectionEntry(collections or [HOTELS])],
     )
     await replicator.start()
-    return await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
+    return replicator
 
 
 @pytest.mark.min_test_servers(1)
@@ -87,12 +87,12 @@ class TestAccessControlReplication(CBLTestClass):
         self.mark_test_step("Create 3 local docs, and push and pull as `rw` (`travel.*`: read, write)")
         pushed = [f"rw_cbl_{i}" for i in range(3)]
         await _write_local(db, HOTELS, pushed)
-        status = await _replicate(db, admin, "rw")
+        replicator = await _start_replicator(db, admin, "rw")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(
             "Verify the replicator stopped without error, the docs were pushed, and the seed was pulled"
         )
-        assert status.error is None, f"Read-write replication failed: {status.error}"
         assert set(pushed) <= await _es_ids(admin, HOTELS), "The local docs did not reach Edge Server"
         assert "rw_es_hotels" in await _local_ids(db, HOTELS), "The seeded doc was not pulled"
 
@@ -103,10 +103,10 @@ class TestAccessControlReplication(CBLTestClass):
         admin, db = await self._setup(cblpytest, "ro")
 
         self.mark_test_step("Pull as `ro` (`travel.*`: read)")
-        status = await _replicate(db, admin, "ro", ReplicatorType.PULL)
+        replicator = await _start_replicator(db, admin, "ro", ReplicatorType.PULL)
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the pull stopped without error and the seed was pulled")
-        assert status.error is None, f"Read-only pull failed: {status.error}"
         assert "ro_es_hotels" in await _local_ids(db, HOTELS), "The seeded doc was not pulled"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -118,12 +118,11 @@ class TestAccessControlReplication(CBLTestClass):
         self.mark_test_step("Create 3 local docs, and push and pull as `ro`")
         pushed = [f"rop_cbl_{i}" for i in range(3)]
         await _write_local(db, HOTELS, pushed)
-        status = await _replicate(db, admin, "ro")
-
+        replicator = await _start_replicator(db, admin, "ro")
         self.mark_test_step(
             "Verify the replicator is refused as pull-only (403), and none of the docs reached Edge Server"
         )
-        assert status.error is not None and status.error.code == 10403, f"Expected a pull-only 403, got {status.error}"
+        await replicator.wait_for_error(code=10403, message="Attempting to push to a pull-only replicator")
         assert not set(pushed) & await _es_ids(admin, HOTELS), "A read-only user wrote to Edge Server"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -135,10 +134,10 @@ class TestAccessControlReplication(CBLTestClass):
         self.mark_test_step("Create a local doc in each collection, and push and pull both as `admin_user`")
         await _write_local(db, HOTELS, ["adm_cbl_hotels"])
         await _write_local(db, AIRLINES, ["adm_cbl_airlines"])
-        status = await _replicate(db, admin, "admin_user", collections=[HOTELS, AIRLINES])
+        replicator = await _start_replicator(db, admin, "admin_user", collections=[HOTELS, AIRLINES])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the replicator stopped without error and both collections synced both ways")
-        assert status.error is None, f"Admin replication failed: {status.error}"
         assert "adm_es_hotels" in await _local_ids(db, HOTELS), "travel.hotels was not pulled"
         assert "adm_es_airlines" in await _local_ids(db, AIRLINES), "travel.airlines was not pulled"
         assert "adm_cbl_hotels" in await _es_ids(admin, HOTELS), "travel.hotels was not pushed"
@@ -151,24 +150,31 @@ class TestAccessControlReplication(CBLTestClass):
         admin, db = await self._setup(cblpytest, "mix")
 
         self.mark_test_step("Pull both collections as `mixed`, and verify both seeded docs arrive")
-        status = await _replicate(db, admin, "mixed", ReplicatorType.PULL, [HOTELS, AIRLINES])
-        assert status.error is None, f"Pulling both readable collections failed: {status.error}"
+        replicator = await _start_replicator(db, admin, "mixed", ReplicatorType.PULL, [HOTELS, AIRLINES])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert "mix_es_hotels" in await _local_ids(db, HOTELS), "The readable travel.hotels was not pulled"
         assert "mix_es_airlines" in await _local_ids(db, AIRLINES), "The readable travel.airlines was not pulled"
 
         self.mark_test_step("Push a doc to `travel.hotels` as `mixed`, and verify it lands")
         await _write_local(db, HOTELS, ["mix_cbl_hotels"])
-        status = await _replicate(db, admin, "mixed", ReplicatorType.PUSH, [HOTELS])
-        assert status.error is None, f"Pushing to the writable travel.hotels failed: {status.error}"
+        replicator = await _start_replicator(db, admin, "mixed", ReplicatorType.PUSH, [HOTELS])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert "mix_cbl_hotels" in await _es_ids(admin, HOTELS), "The writable travel.hotels did not accept the push"
 
-        self.mark_test_step("Push a doc to `travel.airlines` as `mixed`, and verify it does not land")
+        self.mark_test_step(
+            "Push a doc to `travel.airlines` as `mixed`, and verify it is refused as pull-only (403) and does not land"
+        )
         await _write_local(db, AIRLINES, ["mix_cbl_airlines"])
-        await _replicate(db, admin, "mixed", ReplicatorType.PUSH, [AIRLINES])
+        replicator = await _start_replicator(db, admin, "mixed", ReplicatorType.PUSH, [AIRLINES])
+        await replicator.wait_for_error(code=10403, message="Attempting to push to a pull-only replicator")
         assert "mix_cbl_airlines" not in await _es_ids(admin, AIRLINES), "The read-only travel.airlines accepted a push"
 
     @pytest.mark.asyncio(loop_scope="session")
-    @pytest.mark.parametrize("user", ["none", "wo", "names_rw"], ids=["no_access", "write_only", "other_database"])
+    @pytest.mark.parametrize(
+        "user",
+        ["none", "wo", "names_rw"],
+        ids=["no_access", "write_only", "other_database"],
+    )
     async def test_user_without_read_access_is_refused(
         self, cblpytest: CBLPyTest, dataset_path: Path, user: str
     ) -> None:
@@ -178,9 +184,17 @@ class TestAccessControlReplication(CBLTestClass):
 
         self.mark_test_step("Create a local doc, and push and pull `travel` as the user")
         await _write_local(db, HOTELS, [f"{user}_cbl_0"])
-        status = await _replicate(db, admin, user)
+        replicator = await _start_replicator(db, admin, user)
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert status.error is not None, f"`{user}` replicated with `travel` without an error"
+        if user == "wo":
+            # Edge Server upgrades a write-only user, then drops the socket because no collection is left to
+            # sync. It should refuse the user like the others, with wait_for_no_access_error.
+            if (await cblpytest.test_servers[0].info).variant == ServerVariant.JS:
+                await replicator.wait_for_error(code=-1)
+            else:
+                await replicator.wait_for_error(ReplicatorActivityLevel.OFFLINE, code=11006)
+        else:
+            await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
         assert f"{user}_es_hotels" not in await _local_ids(db, HOTELS), f"`{user}` pulled from `travel`"
         assert f"{user}_cbl_0" not in await _es_ids(admin, HOTELS), f"`{user}` pushed to `travel`"

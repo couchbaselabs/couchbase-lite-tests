@@ -49,8 +49,7 @@ async def _one_shot_pull(
         pinned_server_cert=sync_gateway.tls_cert(),
     )
     await replicator.start()
-    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    assert status.error is None, f"Pull replicator failed: {status.error}"
+    await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     return replicator
 
 

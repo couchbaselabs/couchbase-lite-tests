@@ -57,8 +57,7 @@ class TestReplicationMultipleRemotes(CBLTestClass):
                 pinned_server_cert=sync_gateway.tls_cert(),
             )
             await replicator.start()
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-            assert status.error is None, f"Error replicating through {endpoint}: {status.error}"
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         async def assert_local_body(expected: dict) -> None:
             """Checks that the local copy of the test document has the given body."""

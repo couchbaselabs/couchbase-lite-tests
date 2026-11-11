@@ -25,6 +25,7 @@ from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 from cbltest.responses import ServerVariant
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from shared.jwt_helper import generate_jwt, generate_rsa_keypair, local_jwt_provider, public_key_to_jwk
+from shared.replicator_helpers import wait_for_refused_connection
 
 COLLECTION = "travel.airports"
 # A real `travel` channel: user1 can see it, and the JWT database's user is scoped to it.
@@ -85,26 +86,11 @@ async def _assert_sg_rejects(sync_gateway: SyncGateway, headers: dict[str, str])
         assert exc_info.value.code == 401, f"Expected SG to answer 401, got {exc_info.value.code}"
 
 
-async def _refused_upgrade_code(test_server: TestServer) -> int:
+async def _assert_auth_rejected(replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str]) -> None:
     """
-    The error code for SG refusing the WebSocket upgrade itself, as it does for a session or no credentials.
-    A browser cannot see the status of a refused upgrade, so CBL JS reports -1 "Failed to connect".
+    Asserts the replicator stopped with 10401, and that SG itself rejects the same credential.
     """
-    return -1 if (await test_server.info).variant == ServerVariant.JS else 10401
-
-
-async def _assert_auth_rejected(
-    replicator: Replicator, sync_gateway: SyncGateway, headers: dict[str, str], expected_code: int = 10401
-) -> None:
-    """
-    Asserts the replicator stopped with `expected_code`, and that SG itself rejects the same credential.
-    """
-    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    assert status.error is not None, "Replicator stopped without an error; expected an auth rejection"
-    error = f"({status.error.domain} / {status.error.code}) {status.error.message}"
-    assert status.error.code == expected_code, f"Expected {expected_code}, got {error}"
-    if expected_code == -1:
-        assert status.error.message.startswith("Failed to connect"), f"Expected a refused connection, got {error}"
+    await replicator.wait_for_error(ReplicatorActivityLevel.STOPPED, code=10401)
     await _assert_sg_rejects(sync_gateway, headers)
 
 
@@ -190,10 +176,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops and check there is no error")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all documents are replicated correctly")
         await compare_local_and_remote(db, sync_gateway, replicator_type, "travel", [COLLECTION])
@@ -225,12 +208,8 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(
-            replicator,
-            sync_gateway,
-            get_sync_gateway_session_headers(session_id),
-            await _refused_upgrade_code(cblpytest.test_servers[0]),
-        )
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
+        await _assert_sg_rejects(sync_gateway, get_sync_gateway_session_headers(session_id))
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -271,10 +250,7 @@ class TestSessionAuthReplication(CBLTestClass):
 
         self.mark_test_step("Wait until both replicators stop and check there is no error")
         for replicator in replicators:
-            status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-            assert status.error is None, (
-                f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-            )
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check `db_alice` holds only `alice-doc` and `db_bob` holds only `bob-doc`")
         for db, expected in zip(dbs, ("alice-doc", "bob-doc"), strict=True):
@@ -317,10 +293,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops and check there is no error")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all documents are replicated correctly")
         await compare_local_and_remote(db, sync_gateway, ReplicatorType.PULL, "travel", [COLLECTION])
@@ -392,9 +365,8 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await _assert_auth_rejected(
-            replicator, sync_gateway, {}, await _refused_upgrade_code(cblpytest.test_servers[0])
-        )
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
+        await _assert_sg_rejects(sync_gateway, {})
 
         await cblpytest.test_servers[0].cleanup()
 
@@ -435,10 +407,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops and check there is no error")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check `db1` holds exactly the `travel.airports` documents SG serves to the GUEST user")
         async with sync_gateway.get_user_client({}) as guest:
@@ -481,10 +450,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Delete the session and check SG rejects it for new requests")
         await sync_gateway.delete_session("travel", session_id)
@@ -532,10 +498,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Delete the user the JWT maps to and write `post-jwt-revocation-doc` on SG")
         await sync_gateway.delete_user("travel", JWT_USERNAME)
@@ -653,14 +616,11 @@ class TestSessionAuthReplication(CBLTestClass):
             enable_document_listener=True,
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Stop SG and wait until the replicator is offline")
         await sg_cluster_manager.nodes[0].stop()
-        await replicator.wait_for(ReplicatorActivityLevel.OFFLINE)
+        await replicator.wait_for_error(ReplicatorActivityLevel.OFFLINE)
 
         self.mark_test_step(f"Start SG and write `post-restart-{auth_type}` on it")
         await sg_cluster_manager.nodes[0].start()

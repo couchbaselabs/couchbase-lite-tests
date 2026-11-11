@@ -219,4 +219,4 @@ Requires a CBL test server.
 3. Push and pull `exempt` as `ruled`: its read-only rule is ignored.
 4. Pull `enforced` as `ruled`: its read rule allows it.
 5. Push and pull `enforced` as `ruled`: refused as pull-only, and nothing is pushed.
-6. Push and pull `enforced` as `restricted`: the replicator fails and nothing moves.
+6. Push and pull `enforced` as `restricted`: refused with 403 and nothing moves.

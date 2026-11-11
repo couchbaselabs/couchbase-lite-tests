@@ -17,11 +17,11 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
     ReplicatorCollectionEntry,
-    ReplicatorStatus,
     ReplicatorType,
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.asyncfile import read_json_file, write_json_file
+from shared.replicator_helpers import wait_for_no_access_error
 
 SCRIPT_DIR = str(Path(__file__).parent)
 ROOT_TRUE_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control.json"
@@ -112,10 +112,10 @@ async def _cbl_doc_ids(db: Database) -> set[str]:
     return {d.id for d in (await db.get_all_documents("_default._default"))["_default._default"]}
 
 
-async def _cbl_sync(
+async def _write_and_start_replicator(
     db: Database, url: str, user: str, replicator_type: ReplicatorType = ReplicatorType.PUSH_AND_PULL
-) -> ReplicatorStatus:
-    """Write one document to `db`, then replicate once against `url` as `user`."""
+) -> Replicator:
+    """Write one document to `db`, then start a one-shot replicator against `url` as `user`."""
     async with db.batch_updater() as updater:
         updater.upsert_document("_default._default", f"cbl_{user}_{db.name}", [{"by": user}])
     replicator = Replicator(
@@ -127,7 +127,7 @@ async def _cbl_sync(
         authenticator=ReplicatorBasicAuthenticator(user, PASSWORD),
     )
     await replicator.start()
-    return await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+    return replicator
 
 
 @pytest.mark.min_edge_servers(1)
@@ -456,30 +456,26 @@ class TestPerDatabaseAccessControl(CBLTestClass):
             )
 
             self.mark_test_step("Push and pull `exempt` as `ruled`: its read-only rule is ignored")
-            status = await _cbl_sync(exempt_db, client.replication_url("exempt"), "ruled")
-            assert status.error is None, (
-                f"ruled could not sync with exempt: ({status.error.domain} / {status.error.code}) {status.error.message}"
-            )
+            replicator = await _write_and_start_replicator(exempt_db, client.replication_url("exempt"), "ruled")
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
             assert "seed_exempt" in await _cbl_doc_ids(exempt_db), "ruled did not pull from exempt"
             assert "cbl_ruled_ruled_exempt" in await _doc_ids(client, "exempt"), "ruled could not push to exempt"
 
             self.mark_test_step("Pull `enforced` as `ruled`: its read rule allows it")
-            status = await _cbl_sync(pull_db, client.replication_url("enforced"), "ruled", ReplicatorType.PULL)
-            assert status.error is None, (
-                f"ruled could not pull enforced: ({status.error.domain} / {status.error.code}) {status.error.message}"
+            replicator = await _write_and_start_replicator(
+                pull_db, client.replication_url("enforced"), "ruled", ReplicatorType.PULL
             )
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
             assert "seed_enforced" in await _cbl_doc_ids(pull_db), "ruled did not pull from enforced"
 
             self.mark_test_step("Push and pull `enforced` as `ruled`: refused as pull-only, and nothing is pushed")
-            status = await _cbl_sync(push_db, client.replication_url("enforced"), "ruled")
-            assert status.error is not None and status.error.code == 10403, (
-                f"ruled's push to enforced was not refused with 403: {status.error}"
-            )
+            replicator = await _write_and_start_replicator(push_db, client.replication_url("enforced"), "ruled")
+            await replicator.wait_for_error(code=10403, message="Attempting to push to a pull-only replicator")
             assert "cbl_ruled_ruled_push" not in await _doc_ids(client, "enforced"), "ruled pushed to enforced"
 
-            self.mark_test_step("Push and pull `enforced` as `restricted`: the replicator fails and nothing moves")
-            status = await _cbl_sync(denied_db, client.replication_url("enforced"), "restricted")
-            assert status.error is not None, "restricted replicated with enforced without an error"
+            self.mark_test_step("Push and pull `enforced` as `restricted`: refused with 403 and nothing moves")
+            replicator = await _write_and_start_replicator(denied_db, client.replication_url("enforced"), "restricted")
+            await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
             assert "seed_enforced" not in await _cbl_doc_ids(denied_db), "restricted pulled from enforced"
             assert "cbl_restricted_restricted_enforced" not in await _doc_ids(client, "enforced"), (
                 "restricted pushed to enforced"

@@ -53,10 +53,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         lite_all_docs = await db.get_all_documents("_default.posts")
@@ -136,10 +133,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         lite_all_docs = await db.get_all_documents("_default.posts")
         assert len(lite_all_docs["_default.posts"]) == 6, (
             f"Incorrect number of initial documents replicated (expected 6; got {len(lite_all_docs['_default.posts'])}"
@@ -223,10 +217,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         lite_all_docs = await db.get_all_documents("travel.hotels")
@@ -267,10 +258,7 @@ class TestReplicatorEncryptionHook(CBLTestClass):
 
         self.mark_test_step("Start the same replicator again to pull the update")
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Record the bytes transferred after delta sync.")
         bytes_written_after = (await sync_gateway.get_db_stats("travel")).database.doc_writes_bytes_blip

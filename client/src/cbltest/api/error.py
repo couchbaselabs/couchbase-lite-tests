@@ -47,7 +47,7 @@ class CblTestServerBadResponseError(CblRemoteBadResponseError):
 
     def __init__(self, code: int, response: TestServerResponse, message: str) -> None:
         if response.error is not None:
-            message = f"{message}: ({response.error.domain} / {response.error.code}) {response.error.message}"
+            message = f"{message}: {response.error}"
 
         self.__response = response
         super().__init__(code, message, body=response.serialize())

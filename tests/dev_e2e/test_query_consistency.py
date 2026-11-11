@@ -67,10 +67,7 @@ class TestQueryConsistency(CBLTestClass):
         )
         await replicator.start()
 
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=300))
         TestQueryConsistency.__database = dbs[0]
 
     async def _test_query(

@@ -1,5 +1,4 @@
 import secrets
-from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -8,7 +7,6 @@ from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.database import Database
 from cbltest.api.edgeserver import EdgeServer
 from cbltest.api.error import CblEdgeServerBadResponseError
-from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.replicator import Replicator
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
@@ -17,12 +15,11 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorDocumentFlags,
     ReplicatorSessionAuthenticator,
-    ReplicatorStatus,
     ReplicatorType,
     WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
-from cbltest.responses import ServerVariant
+from shared.replicator_helpers import wait_for_no_access_error, wait_for_refused_connection
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG = str(SCRIPT_DIR / "config" / "test_session.json")
@@ -34,23 +31,6 @@ PASSWORD = "password"
 HOTELS = "travel.hotels"
 AIRLINES = "travel.airlines"
 DEFAULT = "_default._default"
-
-
-async def _is_auth_rejection(cblpytest: CBLPyTest, error: ErrorResponseBody | None) -> bool:
-    """
-    Whether a replicator error is the WebSocket upgrade being refused for want of credentials.
-    A browser cannot see the status of a refused upgrade, so CBL JS reports -1 "Failed to connect".
-    """
-    if error is None:
-        return False
-    if (await cblpytest.test_servers[0].info).variant == ServerVariant.JS:
-        return error.code == -1 and error.message.startswith("Failed to connect")
-    return error.code == 10401
-
-
-def _describe(error: ErrorResponseBody | None) -> str:
-    """A replicator error as ``domain/code: message``, for assertion messages."""
-    return "no error" if error is None else f"{error.domain}/{error.code}: {error.message}"
 
 
 async def _write_local(db: Database, collection: str, doc_ids: list[str]) -> None:
@@ -71,7 +51,7 @@ async def _local_ids(db: Database, collection: str = HOTELS) -> set[str]:
     return {doc.id for doc in (await db.get_all_documents(collection))[collection]}
 
 
-async def _replicate(
+async def _start_replicator(
     db: Database,
     edge_server: EdgeServer,
     authenticator: ReplicatorAuthenticator | None,
@@ -79,9 +59,8 @@ async def _replicate(
     collections: list[str] | None = None,
     db_name: str = DB,
     continuous: bool = False,
-    wait_for: ReplicatorActivityLevel = ReplicatorActivityLevel.STOPPED,
-) -> tuple[Replicator, ReplicatorStatus]:
-    """Run a replicator against `db_name` on Edge Server until it reaches `wait_for`."""
+) -> Replicator:
+    """Start a replicator against `db_name` on Edge Server."""
     replicator = Replicator(
         db,
         edge_server.replication_url(db_name),
@@ -92,7 +71,7 @@ async def _replicate(
         enable_document_listener=continuous,
     )
     await replicator.start()
-    return replicator, await replicator.wait_for(wait_for, timeout=timedelta(seconds=60))
+    return replicator
 
 
 @pytest.mark.min_test_servers(1)
@@ -127,8 +106,8 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         self.mark_test_step("Create 5 local docs, and replicate as `rw` with basic auth")
         pushed = [f"basic_cbl_{i}" for i in range(5)]
         await _write_local(db, HOTELS, pushed)
-        _, status = await _replicate(db, admin, ReplicatorBasicAuthenticator("rw", PASSWORD))
-        assert status.error is None, f"Basic auth replication failed: {_describe(status.error)}"
+        replicator = await _start_replicator(db, admin, ReplicatorBasicAuthenticator("rw", PASSWORD))
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the 5 docs are on Edge Server and the seeded doc was pulled")
         assert set(pushed) <= await _es_ids(admin), "Local docs did not reach Edge Server"
@@ -143,8 +122,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         self.mark_test_step("Create 5 local docs, and replicate with a session as `rw`")
         pushed = [f"sess_cbl_{i}" for i in range(5)]
         await _write_local(db, HOTELS, pushed)
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw")))
-        assert status.error is None, f"Session auth replication failed: {_describe(status.error)}"
+        replicator = await _start_replicator(
+            db, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw"))
+        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the 5 docs are on Edge Server and the seeded doc was pulled")
         assert set(pushed) <= await _es_ids(admin), "Local docs did not reach Edge Server"
@@ -157,27 +138,22 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         admin, db, _ = await self._setup(cblpytest, "live")
 
         self.mark_test_step("Start a continuous replicator with a session as `rw`, and wait for idle")
-        replicator, status = await _replicate(
-            db,
-            admin,
-            ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw")),
-            continuous=True,
-            wait_for=ReplicatorActivityLevel.IDLE,
+        replicator = await _start_replicator(
+            db, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw")), continuous=True
         )
-        assert status.error is None, f"Continuous session replication did not go idle: {_describe(status.error)}"
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Write a doc on Edge Server and a doc locally")
         await admin.put_document_with_id({"origin": "es"}, "live_es_after", DB, "travel", "hotels")
         await _write_local(db, HOTELS, ["live_cbl_after"])
 
         self.mark_test_step("Verify both docs cross while the replicator stays error-free")
-        status = await replicator.wait_for_all_doc_events(
+        await replicator.wait_for_all_doc_events(
             {
                 WaitForDocumentEventEntry(HOTELS, "live_es_after", ReplicatorType.PULL, ReplicatorDocumentFlags.NONE),
                 WaitForDocumentEventEntry(HOTELS, "live_cbl_after", ReplicatorType.PUSH, ReplicatorDocumentFlags.NONE),
             }
         )
-        assert status.error is None, f"Continuous session replication errored: {_describe(status.error)}"
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_one_time_false_gives_no_session(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -193,10 +169,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Create a local doc, and replicate with no credentials")
         await _write_local(db, HOTELS, ["otf_cbl_0"])
-        _, status = await _replicate(db, admin, None)
+        replicator = await _start_replicator(db, admin, None)
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "otf_cbl_0" not in await _es_ids(admin), "A doc was pushed without credentials"
         assert "otf_es_hotels" not in await _local_ids(db), "A doc was pulled without credentials"
 
@@ -208,21 +184,23 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Replicate `db1` with a session as `rw`")
         session_id = await self._mint_as(cblpytest, "rw")
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
-        assert status.error is None, f"The first replication with the session failed: {_describe(status.error)}"
+        replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Create a local doc in `db2`, and replicate `db2` with the same session")
         await _write_local(db2, HOTELS, ["reuse_cbl_db2"])
-        _, status = await _replicate(db2, admin, ReplicatorSessionAuthenticator(session_id))
+        replicator = await _start_replicator(db2, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "reuse_cbl_db2" not in await _es_ids(admin), "A doc was pushed with a consumed session"
         assert "reuse_es_hotels" not in await _local_ids(db2), "A doc was pulled with a consumed session"
 
         self.mark_test_step("Verify `db2` replicates with a new session, and its doc is pushed")
-        _, status = await _replicate(db2, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw")))
-        assert status.error is None, f"Replication with a new session failed: {_describe(status.error)}"
+        replicator = await _start_replicator(
+            db2, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "rw"))
+        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert "reuse_cbl_db2" in await _es_ids(admin), "The doc was not pushed with a new session"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -233,20 +211,20 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Replicate `travel` with a session for `names` as `admin_user`")
         session_id = await self._mint_as(cblpytest, "admin_user", OTHER_DB)
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
+        replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing was pulled")
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "xdb_es_hotels" not in await _local_ids(db), "A doc was pulled with another database's session"
 
         self.mark_test_step("Create a local doc, and push it to `names` with the same session")
         await _write_local(db, DEFAULT, ["xdb_cbl_0"])
-        _, status = await _replicate(
+        replicator = await _start_replicator(
             db, admin, ReplicatorSessionAuthenticator(session_id), ReplicatorType.PUSH, [DEFAULT], OTHER_DB
         )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the push succeeded")
-        assert status.error is None, f"The session on its own database failed: {_describe(status.error)}"
         assert "xdb_cbl_0" in await _es_ids(admin, None, OTHER_DB), f"The doc was not pushed to `{OTHER_DB}`"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -258,10 +236,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Create a local doc, and replicate with the case's session")
         await _write_local(db, HOTELS, ["bad_cbl_0"])
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
+        replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "bad_cbl_0" not in await _es_ids(admin), "A doc was pushed with an unissued session"
         assert "bad_es_hotels" not in await _local_ids(db), "A doc was pulled with an unissued session"
 
@@ -278,8 +256,8 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         admin = await es.start_server()
 
         self.mark_test_step("Verify a replicator with the session is refused and nothing was pulled")
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "restart_es_hotels" not in await _local_ids(db), (
             "A doc was pulled with a session from before the restart"
         )
@@ -292,24 +270,17 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Start a continuous replicator on `db1` with a session as `rw`, and wait for idle")
         session_id = await self._mint_as(cblpytest, "rw")
-        first, status = await _replicate(
-            db,
-            admin,
-            ReplicatorSessionAuthenticator(session_id),
-            continuous=True,
-            wait_for=ReplicatorActivityLevel.IDLE,
-        )
-        assert status.error is None, f"The continuous replicator failed: {_describe(status.error)}"
+        first = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id), continuous=True)
+        await first.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify a replicator on `db2` with the same session is refused")
-        _, status = await _replicate(db2, admin, ReplicatorSessionAuthenticator(session_id))
-        assert await _is_auth_rejection(cblpytest, status.error), f"Expected a refusal, got {_describe(status.error)}"
+        replicator = await _start_replicator(db2, admin, ReplicatorSessionAuthenticator(session_id))
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
 
         self.mark_test_step("Write a doc on Edge Server, and verify the first replicator still pulls it without error")
         await admin.put_document_with_id({"origin": "es"}, "two_es_after", DB, "travel", "hotels")
         for _ in range(10):
-            status = await first.wait_for(ReplicatorActivityLevel.IDLE)
-            assert status.error is None, f"The first replicator errored: {_describe(status.error)}"
+            await first.wait_for(ReplicatorActivityLevel.IDLE)
             if "two_es_after" in await _local_ids(db):
                 break
         assert "two_es_after" in await _local_ids(db), "The first replicator stopped pulling"
@@ -323,12 +294,13 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         self.mark_test_step("Create 3 local docs, and push and pull with a session as read-only `ro`")
         pushed = [f"ro_cbl_{i}" for i in range(3)]
         await _write_local(db, HOTELS, pushed)
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "ro")))
-
+        replicator = await _start_replicator(
+            db, admin, ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "ro"))
+        )
         self.mark_test_step(
             "Verify the replicator is refused as pull-only (403) and none of the docs reached Edge Server"
         )
-        assert status.error is not None and status.error.code == 10403, f"Expected 10403, got {_describe(status.error)}"
+        await replicator.wait_for_error(code=10403, message="Attempting to push to a pull-only replicator")
         assert not set(pushed) & await _es_ids(admin), "A read-only session wrote to Edge Server"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -339,10 +311,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Pull with a session as read-only `ro`")
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "ro"))
-        _, status = await _replicate(db, admin, session, ReplicatorType.PULL)
+        replicator = await _start_replicator(db, admin, session, ReplicatorType.PULL)
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the pull succeeded and the seeded doc was pulled")
-        assert status.error is None, f"Read-only pull failed: {_describe(status.error)}"
         assert "rop_es_hotels" in await _local_ids(db), "The seeded doc was not pulled"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -353,22 +325,26 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Pull both collections with a session as `coll`, and verify both seeded docs arrive")
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "coll"))
-        _, status = await _replicate(db, admin, session, ReplicatorType.PULL, [HOTELS, AIRLINES])
-        assert status.error is None, f"Pulling both readable collections failed: {_describe(status.error)}"
+        replicator = await _start_replicator(db, admin, session, ReplicatorType.PULL, [HOTELS, AIRLINES])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert "coll_es_hotels" in await _local_ids(db, HOTELS), "travel.hotels was not pulled"
         assert "coll_es_airlines" in await _local_ids(db, AIRLINES), "travel.airlines was not pulled"
 
         self.mark_test_step("Push a doc to `travel.hotels` with a new session, and verify it lands")
         await _write_local(db, HOTELS, ["coll_cbl_hotels"])
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "coll"))
-        _, status = await _replicate(db, admin, session, ReplicatorType.PUSH, [HOTELS])
-        assert status.error is None, f"Pushing to the writable travel.hotels failed: {_describe(status.error)}"
+        replicator = await _start_replicator(db, admin, session, ReplicatorType.PUSH, [HOTELS])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         assert "coll_cbl_hotels" in await _es_ids(admin, HOTELS), "travel.hotels did not accept the push"
 
-        self.mark_test_step("Push a doc to `travel.airlines` with a new session, and verify it does not land")
+        self.mark_test_step(
+            "Push a doc to `travel.airlines` with a new session, and verify it is refused as pull-only (403)"
+            " and does not land"
+        )
         await _write_local(db, AIRLINES, ["coll_cbl_airlines"])
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "coll"))
-        await _replicate(db, admin, session, ReplicatorType.PUSH, [AIRLINES])
+        replicator = await _start_replicator(db, admin, session, ReplicatorType.PUSH, [AIRLINES])
+        await replicator.wait_for_error(code=10403, message="Attempting to push to a pull-only replicator")
         assert "coll_cbl_airlines" not in await _es_ids(admin, AIRLINES), (
             "The read-only travel.airlines accepted a push"
         )
@@ -383,10 +359,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         await _write_local(db, HOTELS, ["adm_cbl_hotels"])
         await _write_local(db, AIRLINES, ["adm_cbl_airlines"])
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "admin_user"))
-        _, status = await _replicate(db, admin, session, collections=[HOTELS, AIRLINES])
+        replicator = await _start_replicator(db, admin, session, collections=[HOTELS, AIRLINES])
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the replicator succeeded and both collections synced both ways")
-        assert status.error is None, f"Admin session replication failed: {_describe(status.error)}"
         assert "adm_es_hotels" in await _local_ids(db, HOTELS), "travel.hotels was not pulled"
         assert "adm_es_airlines" in await _local_ids(db, AIRLINES), "travel.airlines was not pulled"
         assert "adm_cbl_hotels" in await _es_ids(admin, HOTELS), "travel.hotels was not pushed"
@@ -406,10 +382,10 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         self.mark_test_step("Create a local doc, and push it to `names` with a session as `other_db`")
         await _write_local(db, DEFAULT, ["own_cbl_0"])
         session = ReplicatorSessionAuthenticator(await self._mint_as(cblpytest, "other_db", OTHER_DB))
-        _, status = await _replicate(db, admin, session, ReplicatorType.PUSH, [DEFAULT], OTHER_DB)
+        replicator = await _start_replicator(db, admin, session, ReplicatorType.PUSH, [DEFAULT], OTHER_DB)
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the push succeeded, and the doc is on `names` and not on `travel`")
-        assert status.error is None, f"The session on the granted database failed: {_describe(status.error)}"
         assert "own_cbl_0" in await _es_ids(admin, None, OTHER_DB), f"The doc was not pushed to `{OTHER_DB}`"
         assert "own_cbl_0" not in await _es_ids(admin), f"The doc leaked into `{DB}`"
 
@@ -424,9 +400,9 @@ class TestEdgeServerSessionReplication(CBLTestClass):
             await self._mint_as(cblpytest, "none")
         assert e.value.code == 403, f"Session for a user with no grants: expected 403, got {e.value.code}"
 
-        self.mark_test_step("Verify replicating as `none` with basic auth fails, and nothing was pulled")
-        _, status = await _replicate(db, admin, ReplicatorBasicAuthenticator("none", PASSWORD))
-        assert status.error is not None, "A user with no grants replicated with basic auth"
+        self.mark_test_step("Verify replicating as `none` with basic auth is refused with 403, and nothing was pulled")
+        replicator = await _start_replicator(db, admin, ReplicatorBasicAuthenticator("none", PASSWORD))
+        await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
         assert "none_es_hotels" not in await _local_ids(db), "A user with no grants pulled a doc"
 
     @pytest.mark.asyncio(loop_scope="session")
@@ -444,9 +420,9 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Create a local doc, and push and pull with the session")
         await _write_local(db, HOTELS, ["wo_cbl_0"])
-        _, status = await _replicate(db, admin, ReplicatorSessionAuthenticator(session_id))
+        replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
+        await replicator.wait_for_error()
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        assert status.error is not None, "A write-only session replicated without an error"
         assert "wo_cbl_0" not in await _es_ids(admin), "A write-only session pushed"
         assert "wo_es_hotels" not in await _local_ids(db), "A write-only session pulled"
