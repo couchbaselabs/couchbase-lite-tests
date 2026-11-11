@@ -428,6 +428,16 @@ namespace ts::cbl {
                                               params.pinnedServerCert->size()};
         }
 
+        FLMutableDict headers = nullptr;
+        if (params.headers) {
+            headers = FLMutableDict_New();
+            for (const auto& [k, v] : params.headers.value()) {
+                FLMutableDict_SetString(headers, FLS(k), FLS(v));
+            }
+            config.headers = headers;
+        }
+        DEFER { FLMutableDict_Release(headers); };
+
         // Some stubs for encrypting and decrypting
         config.documentPropertyEncryptor = xor_encryptor;
         config.documentPropertyDecryptor = xor_decryptor;
