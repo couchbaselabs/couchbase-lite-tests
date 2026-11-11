@@ -1,33 +1,34 @@
+from datetime import timedelta
 from typing import Any
 
+import tenacity
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import AllDocumentsEntry, Database
 from cbltest.api.replicator_types import ReplicatorType
 from cbltest.api.syncgateway import AllDocumentsResponseRow, SyncGateway
+from cbltest.utils import async_retry_assert
 from cbltest.version import VERSION
+
+
+def _same_cv(cbl_cv: str, sg_cv: str | None) -> bool:
+    """
+    A CBL CV and a SG CV are the same if they match exactly.  CBL reports its own source as `*`,
+    so a CBL CV ending in `@*` matches any SG CV with the same timestamp.
+    """
+    if sg_cv is None:
+        return False
+    if not cbl_cv.endswith("@*"):
+        return cbl_cv == sg_cv
+    return cbl_cv[:-2] == sg_cv.partition("@")[0]
 
 
 def _compare_revisions(cbl_rev: str, sg_rev: list[str | None]) -> bool:
     """
-    A CBL revision and a SG revision are the same iff the cbl_rev
-    (an array of rev tree rev id and hlv cv) matches one of the sg_revs exactly
-    As a temporary workaround, if the cbl_rev ends with the string '@*"
-    the revisions are the same if the two strings preceding the @s match.
+    A CBL revision and a SG revision are the same iff the cbl_rev matches either the SG rev tree
+    rev ID or the SG CV (see :func:`_same_cv`)
     """
-    if not cbl_rev.endswith("@*"):
-        return (cbl_rev == sg_rev[0]) or (cbl_rev == sg_rev[1])
-    else:
-        # hack to be removed once CBL-6443 is fixed:
-        # if the cbl_rev ends in "@*" compare it to the substring
-        #  of the sg_cv (sg_rev[1]) preceding the "@"
-        sg_cv = sg_rev[1]
-        if sg_cv is None:
-            return False
-        i = sg_cv.find("@")
-        if i < 1:
-            return False
-        return cbl_rev[:-2] == sg_cv[0:i]
+    return cbl_rev == sg_rev[0] or _same_cv(cbl_rev, sg_rev[1])
 
 
 class DocsCompareResult:
@@ -226,3 +227,94 @@ async def compare_local_and_remote(
             compare_result = _compare_doc_results(lite_docs, sg_docs, mode)
             if not compare_result:
                 raise AssertionError(f"{compare_result} ({collection})")
+
+
+async def wait_for_converging_cvs(
+    sg1: SyncGateway,
+    sg2: SyncGateway,
+    db_name: str,
+    scope: str = "_default",
+    collection: str = "_default",
+    timeout: timedelta = timedelta(seconds=60),
+) -> None:
+    """
+    Waits until the changes feeds of two Sync Gateways, for example on clusters linked by XDCR,
+    hold the same documents and tombstones with the same current version (CV).  The changes feed
+    is what a replicator reads, so a replication started after this sees the converged versions.
+
+    :param sg1: One Sync Gateway to compare
+    :param sg2: The other Sync Gateway to compare
+    :param db_name: The name of the database on both Sync Gateways
+    :param scope: The scope to compare
+    :param collection: The collection to compare
+    :param timeout: How long to wait before raising TimeoutError
+    """
+
+    async def _versions(sg: SyncGateway) -> dict[str, tuple[str, bool]]:
+        changes = await sg.get_changes(db_name, scope, collection, version_type="cv", log_response=False)
+        return {entry.id: (entry.changes[0], entry.deleted) for entry in changes.results}
+
+    def _describe(version: tuple[str, bool] | None) -> str:
+        if version is None:
+            return "missing"
+        cv, deleted = version
+        return f"{cv} (deleted)" if deleted else cv
+
+    async def _compare_cvs() -> None:
+        versions1, versions2 = await _versions(sg1), await _versions(sg2)
+        differing = sorted(d for d in versions1.keys() | versions2.keys() if versions1.get(d) != versions2.get(d))
+        examples = ", ".join(
+            f"{d} ({_describe(versions1.get(d))} vs {_describe(versions2.get(d))})" for d in differing[:5]
+        )
+        assert not differing, (
+            f"{len(differing)} of {len(versions1.keys() | versions2.keys())} docs differ between {sg1} and {sg2} "
+            f"in {db_name}.{scope}.{collection}, for example: {examples}"
+        )
+
+    with _test_function_tracer.start_as_current_span("wait_for_converging_cvs"):
+        await async_retry_assert(
+            _compare_cvs, tenacity.wait_fixed(1), tenacity.stop_after_delay(timeout.total_seconds())
+        )
+
+
+async def wait_for_matching_cvs(
+    local: Database,
+    remote: SyncGateway,
+    db_name: str,
+    scope: str = "_default",
+    collection: str = "_default",
+    timeout: timedelta = timedelta(seconds=30),
+) -> None:
+    """
+    Waits until the local database holds exactly the live documents on a Sync Gateway's changes
+    feed, each at the same current version (CV)
+
+    :param local: The local database
+    :param remote: The Sync Gateway to compare against
+    :param db_name: The name of the Sync Gateway database
+    :param scope: The scope to compare
+    :param collection: The collection to compare
+    :param timeout: How long to wait before raising TimeoutError
+    """
+    local_collection = f"{scope}.{collection}"
+
+    async def _compare() -> None:
+        changes = await remote.get_changes(db_name, scope, collection, version_type="cv", log_response=False)
+        remote_cvs = {entry.id: entry.changes[0] for entry in changes.results if not entry.deleted}
+        local_docs = await local.get_all_documents(local_collection)
+        local_cvs = {entry.id: entry.rev for entry in local_docs.get(local_collection) or []}
+        differing = sorted(
+            d
+            for d in local_cvs.keys() | remote_cvs.keys()
+            if d not in local_cvs or not _same_cv(local_cvs[d], remote_cvs.get(d))
+        )
+        examples = ", ".join(
+            f"{d} (local {local_cvs.get(d, 'missing')} vs remote {remote_cvs.get(d, 'missing')})" for d in differing[:5]
+        )
+        assert not differing, (
+            f"{len(differing)} of {len(local_cvs.keys() | remote_cvs.keys())} docs differ between local and {remote} "
+            f"in {db_name}.{local_collection}, for example: {examples}"
+        )
+
+    with _test_function_tracer.start_as_current_span("wait_for_matching_cvs"):
+        await async_retry_assert(_compare, tenacity.wait_fixed(1), tenacity.stop_after_delay(timeout.total_seconds()))

@@ -41,7 +41,7 @@ from environment.aws.topology_setup import setup_topology
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, listen_port
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
 from environment.aws.topology_setup.test_server_platforms.js_register import DEV_SERVER_PROCESS_NAMES
-from environment.local.load_balancer import start_load_balancer, stop_load_balancer
+from environment.local.load_balancer import SYNC_GATEWAY_INTERNAL_HOSTNAME, start_load_balancer, stop_load_balancer
 
 TOPOLOGY_CONFIG_OUTPUT = SCRIPT_DIR / "topology_config"
 SYNC_GATEWAY_BIN = SCRIPT_DIR / "sync_gateway"
@@ -461,7 +461,7 @@ def main(
     else:
         instances = resolve_skipped_sync_gateway_instances(server, len(connstrs) or 1, sync_gateways)
 
-    load_balancers: list[str] = []
+    load_balancers: list[dict[str, Any]] = []
     if load_balancer:
         load_balancers.append(start_load_balancer())
     else:
@@ -1048,7 +1048,7 @@ def resolve_topology_config(
     admin_password: str,
     instances: list[SyncGatewayInstance],
     platform_key: str,
-    load_balancers: list[str],
+    load_balancers: list[dict[str, Any]],
 ) -> pathlib.Path:
     """
     Resolve the cbltest topology config to use.
@@ -1103,6 +1103,9 @@ def resolve_topology_config(
             {**template, "port": ports.public, "admin_port": ports.admin, "cluster_index": cluster}
             for cluster, ports in instances
         ]
+        if load_balancers:
+            for sgw in c["sync-gateways"]:
+                sgw["internal_hostname"] = SYNC_GATEWAY_INTERNAL_HOSTNAME
         c["test-servers"] = [test_server]
         if load_balancers:
             c["load-balancers"] = load_balancers

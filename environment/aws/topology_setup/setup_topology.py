@@ -452,6 +452,28 @@ class TestServerConfig:
         self.__platform = platform
 
 
+def _load_balancer_count(value: object, config_file: Path | str | None) -> int:
+    """
+    Reads `load_balancers`: a count, or the older list of `{"sync_gateways": [...]}` entries, one per load balancer.
+    """
+    where = f"{config_file}: " if config_file else ""
+    if isinstance(value, list):
+        if not all(isinstance(entry, dict) for entry in value):
+            raise ValueError(f"{where}each 'load_balancers' list entry must be an object, got {value!r}")
+        if value:
+            click.secho(
+                f"{where}'load_balancers' as a list is deprecated, use a count. Each test sets its own "
+                "upstreams, so the 'sync_gateways' of each entry are ignored.",
+                fg="yellow",
+            )
+        return len(value)
+
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{where}'load_balancers' must be a count of load balancers, got {value!r}")
+
+    return value
+
+
 class TopologyConfig:
     """
     A class to manage the overall topology configuration, including clusters, Sync Gateway instances, and test servers.
@@ -562,7 +584,7 @@ class TopologyConfig:
                 )
 
         if self.__load_balancers_key in config:
-            self.__load_balancer_count = cast(int, config[self.__load_balancers_key])
+            self.__load_balancer_count = _load_balancer_count(config[self.__load_balancers_key], config_file)
 
         if self.__logslurp_key in config:
             self._wants_logslurp = cast(bool, config[self.__logslurp_key])

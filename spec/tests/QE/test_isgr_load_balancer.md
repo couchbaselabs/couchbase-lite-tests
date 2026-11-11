@@ -12,9 +12,13 @@ document a backend proposes. Each pinned replication is instead judged by a Sync
 it: `num_pull_repl_since_zero` for a pull, `propose_change_count` for a push. Two more checks make sure a change in that
 counter came from CBL:
 
-- SG1's ISGR connect-attempt count must not change, since an ISGR reconnect can move the same counters. For the same
-  reason, setup returns only after a channel-less document has crossed the link in each direction, so both ISGR legs
-  have made their first connection before anything is measured.
+- The connect-attempt count of the ISGR link must not change, because an ISGR reconnect can move the same counters.
+  Sync Gateway can run the link on any node in the cluster of SG1. Only a node that runs the link reports its stats.
+  Thus the test adds up the count from every node in that cluster. For the same reason, setup returns only after a
+  channel-less document crossed the link in each direction. Thus both ISGR legs make their first connection before the
+  test measures anything.
+
+SG1 is the first node of cluster 0, and SG2 is the first node of cluster 1. Thus the tests need two clusters.
 - The backend that was not pinned must not move, so a pin that reaches the wrong backend fails as a pin-mapping error.
 
 ## test_checkpoint_divergence_behind_load_balancer

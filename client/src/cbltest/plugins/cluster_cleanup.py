@@ -36,12 +36,14 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     Tests that reuse a shared database/bucket across multiple test functions
     (e.g. `TestQueryConsistency`) can shadow this fixture with a class-scoped
     override that calls `perform_cleanup` once for the whole class instead of
-    once per test. Such a class keeps its Edge Servers between tests too.
+    once per test. Such a class keeps its Edge Servers and load balancers between tests too.
     """
-    await reset_all_load_balancers(cblpytest.load_balancers)
-    # Edge Servers first: their provisioned config declares no replications, so nothing
-    # pulls from the Sync Gateway databases the next phase deletes.
-    await reset_all_edge_servers(cblpytest.edge_servers)
+    await asyncio.gather(
+        reset_all_load_balancers(cblpytest.load_balancers),
+        reset_all_edge_servers(cblpytest.edge_servers),
+    )
+    # After the Edge Server reset: their provisioned config declares no replications,
+    # so nothing pulls from the Sync Gateway databases that this deletes.
     await perform_cleanup(cblpytest)
 
 

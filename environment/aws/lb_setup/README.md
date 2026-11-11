@@ -3,8 +3,7 @@
 This folder deploys one or more load balancers onto AWS nodes for E2E testing. For each node, `setup_load_balancers.py` does these steps:
 
 1. Copy `configure-system.sh` to the node, and run it.
-2. Remove a Traefik container that an older version of this setup left on a reused node.
-3. Start a Caddy container (`caddy:2.10.2`) with no upstreams.
+2. Start a Caddy container (`caddy:2.10.2`) with no upstreams.
 
 The topology file sets only how many load balancers to start (`"load_balancers": 1`). It does not choose upstreams.
 
@@ -21,7 +20,11 @@ The AWS node does not have Docker by default, so `configure-system.sh` does thes
 |------|-----|
 | 4984 | Sync Gateway public API |
 | 4985 | Sync Gateway admin API |
-| 4990 | Caddy's admin API, which takes a new config at `/load` |
+| 20000 | Caddy's admin API, which takes a new Caddyfile at `/load` |
+
+These are the defaults of `LoadBalancerInfo` in `cbltest.configparser`. The TDK config entry names only the `hostname`, so the tests use the same ports. Another environment can set `port`, `admin_port`, and `caddy_admin_port` in its entry, and Caddy then listens on those ports.
+
+Caddy dials each Sync Gateway by the `internal_hostname` of its `sync-gateways` entry, which falls back to `hostname`. `start_backend.py` sets it to the node's private EC2 address, so the traffic stays inside the VPC.
 
 ## Routing
 

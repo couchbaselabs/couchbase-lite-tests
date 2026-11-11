@@ -2213,6 +2213,7 @@ class SyncGateway(_SyncGatewayBase):
         port: int = 4985,
         secure: bool = False,
         public_port: int = 4984,
+        internal_hostname: str | None = None,
     ) -> None:
         """
         Initialize a SyncGateway admin client.
@@ -2223,12 +2224,19 @@ class SyncGateway(_SyncGatewayBase):
         :param port: Admin API port (default 4985)
         :param secure: Whether to use TLS/HTTPS
         :param public_port: Public API port (default 4984)
+        :param internal_hostname: The hostname other backend nodes reach it by (default: its hostname)
         """
         super().__init__(url, port, secure, public_port, get_basic_auth_headers(username, password))
+        self.__internal_hostname = internal_hostname or self.hostname
         # Cached so tests can skip_if_not(sg.has_caddy_sidecar) instead of
         # failing on a connection error.
         self.has_caddy_sidecar: bool = self.caddy.is_reachable()
         self.has_shell2http_sidecar: bool = is_sidecar_reachable(url, SHELL2HTTP_PORT)
+
+    @property
+    def internal_hostname(self) -> str:
+        """Gets the hostname that other backend nodes, such as a load balancer, reach it by"""
+        return self.__internal_hostname
 
     @asyncstdlib.cached_property(asyncio.Lock)
     async def _startup_config(self) -> StartupConfigResponse:

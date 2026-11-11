@@ -41,6 +41,7 @@ class SyncGatewayInfo:
     """The parsed Sync Gateway information from the config file"""
 
     __hostname_key: Final[str] = "hostname"
+    __internal_hostname_key: Final[str] = "internal_hostname"
     __port_key: Final[str] = "port"
     __admin_port_key: Final[str] = "admin_port"
     __rbac_user_key: Final[str] = "rbac_user"
@@ -52,6 +53,11 @@ class SyncGatewayInfo:
     def hostname(self) -> str:
         """Gets the hostname of the Sync Gateway instance"""
         return self.__hostname
+
+    @property
+    def internal_hostname(self) -> str:
+        """Gets the hostname that other backend nodes, such as a load balancer, reach it by"""
+        return self.__internal_hostname
 
     @property
     def port(self) -> int:
@@ -85,6 +91,7 @@ class SyncGatewayInfo:
 
     def __init__(self, data: dict) -> None:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
+        self.__internal_hostname: str = _get_str_or_default(data, self.__internal_hostname_key, self.__hostname)
         self.__port: int = _get_int_or_default(data, self.__port_key, 4984)
         self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, 4985)
         self.__rbac_user: str = _get_str_or_default(data, self.__rbac_user_key, "admin")
@@ -172,6 +179,51 @@ class EdgeServerInfo:
         )
 
 
+class LoadBalancerInfo:
+    """
+    The parsed load balancer information from the config file.  Caddy listens on these same ports
+    inside its container, so whatever starts the load balancer picks them.
+    """
+
+    DEFAULT_PORT: Final[int] = 4984
+    DEFAULT_ADMIN_PORT: Final[int] = 4985
+    # Opened by the AWS security group, unlike Caddy's own default of 2019.
+    DEFAULT_CADDY_ADMIN_PORT: Final[int] = 20000
+
+    __hostname_key: Final[str] = "hostname"
+    __port_key: Final[str] = "port"
+    __admin_port_key: Final[str] = "admin_port"
+    __caddy_admin_port_key: Final[str] = "caddy_admin_port"
+
+    @property
+    def hostname(self) -> str:
+        """Gets the hostname of the load balancer"""
+        return self.__hostname
+
+    @property
+    def port(self) -> int:
+        """Gets the port that forwards to the Sync Gateway public API"""
+        return self.__port
+
+    @property
+    def admin_port(self) -> int:
+        """Gets the port that forwards to the Sync Gateway admin API"""
+        return self.__admin_port
+
+    @property
+    def caddy_admin_port(self) -> int:
+        """Gets the port of Caddy's own admin API"""
+        return self.__caddy_admin_port
+
+    def __init__(self, data: dict) -> None:
+        self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
+        self.__port: int = _get_int_or_default(data, self.__port_key, self.DEFAULT_PORT)
+        self.__admin_port: int = _get_int_or_default(data, self.__admin_port_key, self.DEFAULT_ADMIN_PORT)
+        self.__caddy_admin_port: int = _get_int_or_default(
+            data, self.__caddy_admin_port_key, self.DEFAULT_CADDY_ADMIN_PORT
+        )
+
+
 class TransportType(Enum):
     HTTP = "http"
     WS = "ws"
@@ -206,7 +258,7 @@ class ParsedConfig:
         return self.__couchbase_servers
 
     @property
-    def load_balancers(self) -> list[str]:
+    def load_balancers(self) -> list[dict]:
         """The list of load balancers that can be interacted with"""
         return self.__load_balancers
 
@@ -248,7 +300,7 @@ class ParsedConfig:
         self.__test_servers = _get_typed_nonnull(json, self.__test_server_key, list[dict], [])
         self.__sync_gateways = _get_typed_nonnull(json, self.__sgw_key, list[dict], [])
         self.__couchbase_servers = _get_typed_nonnull(json, self.__cbs_key, list[dict], [])
-        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[str], [])
+        self.__load_balancers = _get_typed_nonnull(json, self.__lb_key, list[dict], [])
         self.__edge_servers = _get_typed_nonnull(json, self.__es_key, list[dict], [])
         if self.__api_version_key in json:
             warning(

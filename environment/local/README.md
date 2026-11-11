@@ -187,9 +187,10 @@ tests marked `min_load_balancers(N)`:
 uv run environment/local/start_local.py --server cbs --start-cbs --git-tag main --sync-gateways 3 --load-balancer
 ```
 
-It listens on 4884 (public), 4885 (admin), and 4890 (Caddy's admin API). The topology config lists
-it as `localhost:4884`. It starts with no upstreams. A test sets its own with
-`LoadBalancer.configure()` from `cbltest.api.loadbalancer`, the same as on AWS. See
+It listens on 4884 (public), 4885 (admin), and 19900 (Caddy's admin API), and its
+`load-balancers` entry in the topology config names those ports. Each `sync-gateways` entry also
+gets `"internal_hostname": "host.docker.internal"`, the name the container uses to reach the host.
+It starts with no upstreams. A test sets its own with `LoadBalancer.configure()` from `cbltest.api.loadbalancer`, the same as on AWS. See
 [the AWS load balancer README](../aws/lb_setup/README.md) for the routing.
 
 A run without `--load-balancer` removes the container, and so does `--stop-sync-gateway`.

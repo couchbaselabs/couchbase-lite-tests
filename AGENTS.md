@@ -158,7 +158,7 @@ For every code change provide evidence from applicable validators:
 4. Tests scoped to the changed area:
    - `client/` → `client/tests` and/or `client/smoke_tests`
    - `tests/dev_e2e` or `tests/QE` → targeted pytest with `--config`
-   - `environment/` → run the touched script with `--help` and dry-run-safe checks
+   - `environment/` → `uv run -- python -m pytest --config client/tests/empty_config.json environment/tests`, and run the touched script with `--help` and dry-run-safe checks
 
 If full integration tests are not runnable locally, state exactly what was run and what remains.
 

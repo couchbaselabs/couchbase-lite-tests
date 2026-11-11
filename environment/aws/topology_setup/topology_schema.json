@@ -151,8 +151,32 @@
         },
         "load_balancers": {
             "description": "How many load balancers to start. Each starts with no upstreams, and each test sets its own.",
-            "type": "integer",
-            "minimum": 0
+            "oneOf": [
+                {
+                    "type": "integer",
+                    "minimum": 0
+                },
+                {
+                    "description": "Deprecated: one load balancer per entry. The Sync Gateway indexes are ignored.",
+                    "deprecated": true,
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "sync_gateways": {
+                                "type": "array",
+                                "items": {
+                                    "type": "integer",
+                                    "minimum": 0
+                                },
+                                "minItems": 1
+                            }
+                        },
+                        "required": ["sync_gateways"],
+                        "additionalProperties": false
+                    }
+                }
+            ]
         },
         "logslurp": {
             "type": "boolean"

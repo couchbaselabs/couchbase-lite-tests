@@ -13,6 +13,7 @@ from .api.testserver import TestServer
 from .configparser import (
     CouchbaseServerInfo,
     EdgeServerInfo,
+    LoadBalancerInfo,
     ParsedConfig,
     SyncGatewayInfo,
     TestServerInfo,
@@ -193,6 +194,7 @@ class CBLPyTest:
                         sgw_info.admin_port,
                         sgw_info.uses_tls,
                         sgw_info.port,
+                        sgw_info.internal_hostname,
                     ),
                     sgw_info.cluster_index,
                 )
@@ -216,7 +218,7 @@ class CBLPyTest:
         if not test_server_only:
             self.__edge_servers = [EdgeServerManager(EdgeServerInfo(es)) for es in self.__config.edge_servers]
 
-        self.__load_balancers = [LoadBalancer(entry) for entry in self.__config.load_balancers]
+        self.__load_balancers = [LoadBalancer(LoadBalancerInfo(lb)) for lb in self.__config.load_balancers]
 
     async def resolve_api_version(self) -> None:
         apiVersion = 0

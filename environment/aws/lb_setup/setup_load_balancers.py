@@ -5,7 +5,7 @@ Each test sets its own with `LoadBalancer.configure` from `cbltest.api.loadbalan
 
 from pathlib import Path
 
-from cbltest.api.loadbalancer import LoadBalancer
+from cbltest.configparser import LoadBalancerInfo
 
 from environment.aws.common.docker import remote_exec, start_container
 from environment.aws.common.io import get_ec2_hostname, sftp_progress_bar
@@ -29,18 +29,11 @@ def main(topology: TopologyConfig) -> None:
     if len(topology.load_balancers) == 0:
         return
 
-    # An AWS load balancer listens on the default ports of a load balancer.
-    ports = LoadBalancer(topology.load_balancers[0].hostname)
-    docker_args = [
-        "-e",
-        f"CADDY_ADMIN=0.0.0.0:{ports.caddy_admin_port}",
-        "-p",
-        f"{ports.port}:{ports.port}",
-        "-p",
-        f"{ports.admin_port}:{ports.admin_port}",
-        "-p",
-        f"{ports.caddy_admin_port}:{ports.caddy_admin_port}",
-    ]
+    # The TDK config names only the hostname, so the client uses the default ports too.
+    caddy_admin_port = LoadBalancerInfo.DEFAULT_CADDY_ADMIN_PORT
+    docker_args = ["-e", f"CADDY_ADMIN=0.0.0.0:{caddy_admin_port}"]
+    for port in (LoadBalancerInfo.DEFAULT_PORT, LoadBalancerInfo.DEFAULT_ADMIN_PORT, caddy_admin_port):
+        docker_args += ["-p", f"{port}:{port}"]
 
     header("Setting up load balancers")
     for lb in topology.load_balancers:
@@ -50,8 +43,6 @@ def main(topology: TopologyConfig) -> None:
             sftp_progress_bar(sftp, SCRIPT_DIR / "configure-system.sh", "/tmp/configure-system.sh")
             sftp.close()
             remote_exec(ssh, "bash /tmp/configure-system.sh", fail_on_error=True)
-            # An instance reused from before the move to Caddy still runs Traefik on the same ports.
-            remote_exec(ssh, "docker rm -f traefik", fail_on_error=False)
 
         start_container(
             CONTAINER_NAME,

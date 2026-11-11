@@ -14,9 +14,6 @@
         },
         {
             "server_count": 1
-        },
-        {
-            "server_count": 1
         }
     ],
     "sync_gateways": [
@@ -31,9 +28,6 @@
         },
         {
             "cluster": 1
-        },
-        {
-            "cluster": 2
         }
     ],
     "load_balancers": 1,

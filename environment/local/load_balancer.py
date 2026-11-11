@@ -6,16 +6,24 @@ sets them with `LoadBalancer.configure` from `cbltest.api.loadbalancer`, which a
 import shutil
 import subprocess
 import time
+from typing import Any
 
 import click
 import requests
 from cbltest.api.loadbalancer import LoadBalancer, caddy_config
+from cbltest.configparser import LoadBalancerInfo
 
 CONTAINER_NAME = "cbl-tests-load-balancer"
 IMAGE = "caddy:2.10.2"
-# Host ports, chosen clear of the Sync Gateway port blocks that start at 4984.
-PUBLIC_PORT = 4884
-ENTRY = f"localhost:{PUBLIC_PORT}"
+# Clear of the Sync Gateway port blocks that start at 4984, and of the local Edge Server's 20000.
+ENTRY: dict[str, Any] = {
+    "hostname": "localhost",
+    "port": 4884,
+    "admin_port": 4885,
+    "caddy_admin_port": 19900,
+}
+# Inside the container, localhost is the container itself, so Caddy reaches the host's Sync Gateway by this name.
+SYNC_GATEWAY_INTERNAL_HOSTNAME = "host.docker.internal"
 STARTUP_TIMEOUT_SECONDS = 30
 
 
@@ -42,16 +50,17 @@ def stop_load_balancer() -> bool:
     return result.returncode == 0
 
 
-def start_load_balancer() -> str:
+def start_load_balancer() -> dict[str, Any]:
     """
     Start a fresh load balancer with no upstreams.
 
-    :return: The `host:port` entry for the topology config's `load-balancers` list
+    :return: The entry for the topology config's `load-balancers` list
     """
     stop_load_balancer()
-    lb = LoadBalancer(ENTRY)
-    # Inside the container, Caddy listens on the default ports of a load balancer.
-    container = LoadBalancer("localhost")
+    info = LoadBalancerInfo(ENTRY)
+    lb = LoadBalancer(info)
+    # Caddy listens inside the container on the same ports the host publishes.
+    ports = [f"127.0.0.1:{port}:{port}" for port in (info.port, info.admin_port, info.caddy_admin_port)]
     subprocess.run(
         [
             "docker",
@@ -62,13 +71,8 @@ def start_load_balancer() -> str:
             "--add-host",
             "host.docker.internal:host-gateway",
             "-e",
-            f"CADDY_ADMIN=0.0.0.0:{container.caddy_admin_port}",
-            "-p",
-            f"127.0.0.1:{lb.port}:{container.port}",
-            "-p",
-            f"127.0.0.1:{lb.admin_port}:{container.admin_port}",
-            "-p",
-            f"127.0.0.1:{lb.caddy_admin_port}:{container.caddy_admin_port}",
+            f"CADDY_ADMIN=0.0.0.0:{info.caddy_admin_port}",
+            *(arg for port in ports for arg in ("-p", port)),
             IMAGE,
             "caddy",
             "run",
@@ -77,8 +81,13 @@ def start_load_balancer() -> str:
         capture_output=True,
     )
     _wait_for_admin_api(lb.caddy_admin_url)
-    resp = requests.post(f"{lb.caddy_admin_url}/load", json=caddy_config([]), timeout=30)
+    resp = requests.post(
+        f"{lb.caddy_admin_url}/load",
+        data=caddy_config(info, []),
+        headers={"Content-Type": "text/caddyfile"},
+        timeout=30,
+    )
     if resp.status_code != 200:
         raise click.ClickException(f"Caddy rejected the load balancer config ({resp.status_code}): {resp.text}")
-    click.echo(f"Load balancer is up on {ENTRY}. Container logs: docker logs -f {CONTAINER_NAME}")
+    click.echo(f"Load balancer is up on {lb.hostname}:{lb.port}. Container logs: docker logs -f {CONTAINER_NAME}")
     return ENTRY

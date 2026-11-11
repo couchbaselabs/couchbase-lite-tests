@@ -1,6 +1,7 @@
 import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.database import Database
 from cbltest.api.error import CblSyncGatewayBadResponseError
 from cbltest.api.replicator import Replicator
@@ -18,7 +19,6 @@ from cbltest.api.syncgateway import (
     UnsupportedSettings,
     get_basic_auth_headers,
 )
-from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.testserver import CouchbaseLiteFeature
 
@@ -33,13 +33,15 @@ async def _setup_isgr_pair(
     user_name: str,
     user_password: str,
     revs_limit: int | None = None,
-) -> tuple[SyncGateway, SyncGateway]:
+) -> tuple[SyncGateway, SyncGateway, CouchbaseCluster]:
     """
     Gives a test two independent backends, SG1 and SG2, with the same database and user, kept in sync by ISGR. Each
     lives in its own cluster because `create_database` applies one config to every node of a cluster. Returns only once
     both ISGR legs are up, since each leg moves the counters the tests measure when it first connects.
+
+    Returns SG1, SG2, and the cluster of SG1, on any node of which Sync Gateway can run the ISGR link.
     """
-    cluster1, cluster2 = cblpytest.clusters[1], cblpytest.clusters[2]
+    cluster1, cluster2 = cblpytest.clusters[0], cblpytest.clusters[1]
     sg1, sg2 = cluster1.sync_gateways[0], cluster2.sync_gateways[0]
 
     for cluster, sg, bucket_name in (
@@ -75,7 +77,7 @@ async def _setup_isgr_pair(
     for writer, reader, doc_id in ((sg1, sg2, "isgr_push_leg_up"), (sg2, sg1, "isgr_pull_leg_up")):
         await writer.update_documents(db_name, [DocumentUpdateEntry(id=doc_id, revision=None, body={})])
         await _wait_for_propagation(reader, db_name, [doc_id], link_owner=sg1)
-    return sg1, sg2
+    return sg1, sg2, cluster1
 
 
 async def _wait_for_propagation(
@@ -103,19 +105,26 @@ async def _assert_still_deleted(sg: SyncGateway, db_name: str, doc_id: str) -> N
     raise AssertionError(f"{doc_id} was resurrected on {sg.hostname} at {doc.revid}")
 
 
-def _assert_no_isgr_reconnect(snapshot: SyncGatewayStats.PerDatabase, connects_before: int) -> None:
+async def _assert_no_isgr_reconnect(cluster: CouchbaseCluster, db_name: str, connects_before: int) -> None:
     """Fails if the ISGR link reconnected, which can move the same counters a pinned CBL call is judged by."""
-    connects_after = _connect_attempts(snapshot)
+    connects_after = await _connect_attempts(cluster, db_name)
     assert connects_after == connects_before, (
         f"ISGR link reconnected {connects_after - connects_before} time(s) during the pinned replication, so the "
         f"counters read around it are unreliable"
     )
 
 
-def _connect_attempts(stats: SyncGatewayStats.PerDatabase) -> int:
-    """Counts the ISGR link's connect attempts, both directions, on its active side."""
-    link = stats.replications[_ISGR_REPLICATION_ID]
-    return link.sgr_num_connect_attempts_pull + link.sgr_num_connect_attempts_push
+async def _connect_attempts(cluster: CouchbaseCluster, db_name: str) -> int:
+    """
+    Counts the ISGR link's connect attempts, both directions, summed over every node of the cluster that runs it. Only
+    a node that has run the link reports stats for it.
+    """
+    total = 0
+    for sg in cluster.sync_gateways:
+        link = (await sg.get_db_stats(db_name)).replications.get(_ISGR_REPLICATION_ID)
+        if link is not None:
+            total += link.sgr_num_connect_attempts_pull + link.sgr_num_connect_attempts_push
+    return total
 
 
 async def _pinned_replication(
@@ -151,7 +160,7 @@ async def _pinned_replication(
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(2)
 @pytest.mark.min_couchbase_servers(1)
-@pytest.mark.min_clusters(3)
+@pytest.mark.min_clusters(2)
 class TestISGRLoadBalancer(CBLTestClass):
     async def _skip_if_unfixed_sgw(self, cblpytest: CBLPyTest) -> None:
         await self.skip_if_sgw_not(
@@ -171,7 +180,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         user_name, user_password = "isgr_lb_user", "pass"
 
         self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
-        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+        sg1, sg2, cluster = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
         self.mark_test_step("Add a seed doc on SG1 and wait for it on SG2")
         await sg1.update_documents(
             db_name,
@@ -190,11 +199,11 @@ class TestISGRLoadBalancer(CBLTestClass):
             """
             Returns (docs transferred, `sgw`'s since-zero delta) of a pull pinned to `sgw`; fails if it hit `other`.
             """
-            connects_before = _connect_attempts(await sg1.get_db_stats(db_name))
+            connects_before = await _connect_attempts(cluster, db_name)
             before = (await sgw.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero
             other_before = (await other.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero
             replicator = await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PULL)
-            _assert_no_isgr_reconnect(await sg1.get_db_stats(db_name), connects_before)
+            await _assert_no_isgr_reconnect(cluster, db_name, connects_before)
             other_delta = (
                 await other.get_db_stats(db_name)
             ).cbl_replication_pull.num_pull_repl_since_zero - other_before
@@ -267,7 +276,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         new_doc_id = "push_doc_6"
 
         self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
-        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+        sg1, sg2, cluster = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
 
         self.mark_test_step("Create an empty local database with 5 docs in the user's channel")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
@@ -286,11 +295,11 @@ class TestISGRLoadBalancer(CBLTestClass):
             sg1_stats = await sg1.get_db_stats(db_name)
             sg2_stats = await sg2.get_db_stats(db_name)
             sg2_before = sg2_stats.cbl_replication_push.propose_change_count
-            connects = _connect_attempts(sg1_stats)
+            connects = await _connect_attempts(cluster, db_name)
             sg1_before = sg1_stats.cbl_replication_push.propose_change_count
             await _pinned_replication(db, repl_url, user_name, user_password, pin, ReplicatorType.PUSH)
             sg1_stats_after = await sg1.get_db_stats(db_name)
-            _assert_no_isgr_reconnect(sg1_stats_after, connects)
+            await _assert_no_isgr_reconnect(cluster, db_name, connects)
             sg1_delta = sg1_stats_after.cbl_replication_push.propose_change_count - sg1_before
             if sgw is sg1:
                 return sg1_delta
@@ -336,7 +345,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         doc_id = "channel_set_doc"
 
         self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
-        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
+        sg1, sg2, _ = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password)
         self.mark_test_step("Add a new doc with a channel on SG2")
         await sg2.update_documents(
             db_name, [DocumentUpdateEntry(id=doc_id, revision=None, body={"channels": channels})]
@@ -384,7 +393,9 @@ class TestISGRLoadBalancer(CBLTestClass):
         revs_limit = 5
 
         self.mark_test_step("Create the database and user on SG1 and SG2, and start the ISGR link")
-        sg1, sg2 = await _setup_isgr_pair(cblpytest, db_name, channels, user_name, user_password, revs_limit=revs_limit)
+        sg1, sg2, cluster = await _setup_isgr_pair(
+            cblpytest, db_name, channels, user_name, user_password, revs_limit=revs_limit
+        )
 
         self.mark_test_step(f"Create doc {doc_id} directly on SG1, and wait for it to reach SG2 via ISGR")
         await sg1.update_documents(
@@ -400,12 +411,12 @@ class TestISGRLoadBalancer(CBLTestClass):
         await lb.configure([sg1, sg2])
         repl_url = lb.replication_url(db_name)
         sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
-        connects_before = _connect_attempts(sg1_stats)
+        connects_before = await _connect_attempts(cluster, db_name)
         sg1_since_zero = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero
         sg2_since_zero = sg2_stats.cbl_replication_pull.num_pull_repl_since_zero
         seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, lb.pin(sg1), ReplicatorType.PULL)
         sg1_stats = await sg1.get_db_stats(db_name)
-        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        await _assert_no_isgr_reconnect(cluster, db_name, connects_before)
         sg1_delta = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero - sg1_since_zero
         assert sg1_delta == 1, f"Expected SG1's first contact to start from since=0 once, got {sg1_delta}"
         sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - sg2_since_zero
@@ -442,7 +453,7 @@ class TestISGRLoadBalancer(CBLTestClass):
             "a genuine checkpoint-404. The client still offers only the stale generation-1 revision it pulled before"
         )
         sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
-        connects_before = _connect_attempts(sg1_stats)
+        connects_before = await _connect_attempts(cluster, db_name)
         sg1_proposed = sg1_stats.cbl_replication_push.propose_change_count
         sg2_proposed = sg2_stats.cbl_replication_push.propose_change_count
         await _pinned_replication(
@@ -454,7 +465,7 @@ class TestISGRLoadBalancer(CBLTestClass):
             replicator_type=ReplicatorType.PUSH_AND_PULL,
         )
         sg1_stats = await sg1.get_db_stats(db_name)
-        _assert_no_isgr_reconnect(sg1_stats, connects_before)
+        await _assert_no_isgr_reconnect(cluster, db_name, connects_before)
         sg1_delta = sg1_stats.cbl_replication_push.propose_change_count - sg1_proposed
         assert sg1_delta == 0, (
             f"pushAndPull pinned with {lb.pin(sg2)} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin"
