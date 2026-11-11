@@ -41,6 +41,7 @@ from environment.aws.topology_setup import setup_topology
 from environment.aws.topology_setup.test_server import TEST_SERVER_DIR, TestServer, listen_port
 from environment.aws.topology_setup.test_server_platforms.exe_bridge import ExeBridge
 from environment.aws.topology_setup.test_server_platforms.js_register import DEV_SERVER_PROCESS_NAMES
+from environment.local.load_balancer import start_load_balancer, stop_load_balancer
 
 TOPOLOGY_CONFIG_OUTPUT = SCRIPT_DIR / "topology_config"
 SYNC_GATEWAY_BIN = SCRIPT_DIR / "sync_gateway"
@@ -49,6 +50,9 @@ SYNC_GATEWAY_CONFIG = {
     "rosmar": SYNC_GATEWAY_CONFIG_DIR / "basic_sync_gateway_rosmar.json",
     "cbs": SYNC_GATEWAY_CONFIG_DIR / "basic_sync_gateway_cbs.json",
 }
+SYNC_GATEWAY_GENERATED_BASE_CONFIG_GLOB = "basic_sync_gateway_cbs_*.json"
+# start_cbs.py keeps its cluster ID in its working directory, so clusters after the first each get one here.
+CBS_CLUSTER_STATE_DIR = SCRIPT_DIR / ".cbdinocluster-clusters"
 TOPOLOGY_CONFIG_DIR = SCRIPT_DIR / "topology_configs"
 TEST_CONFIG = {
     "rosmar": TOPOLOGY_CONFIG_DIR / "rosmar_config.json",
@@ -90,6 +94,13 @@ class SyncGatewayPorts(NamedTuple):
     public: int
     admin: int
     metrics: int
+
+
+class SyncGatewayInstance(NamedTuple):
+    """A Sync Gateway instance: the 0-based index of the cluster it belongs to, and its ports."""
+
+    cluster: int
+    ports: SyncGatewayPorts
 
 
 def port_block(block: int) -> SyncGatewayPorts:
@@ -196,18 +207,28 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
 @click.option(
     "--connstr",
     envvar="SG_TEST_COUCHBASE_SERVER_URL",
-    default=None,
+    multiple=True,
     help="Couchbase Server connection string to use (e.g. couchbase://127.0.0.1). "
-    "Only valid with --server cbs. Defaults to $SG_TEST_COUCHBASE_SERVER_URL.",
+    "Only valid with --server cbs. Give it once per cluster, in cluster order. "
+    "Defaults to $SG_TEST_COUCHBASE_SERVER_URL.",
 )
 @click.option(
     "--start-cbs",
     is_flag=True,
-    help="Start a local Couchbase Server cluster via cbdinocluster (using the Sync Gateway "
-    "checkout's integration-test/start_cbs.py) instead of pointing at an existing one with "
+    help="Start a local Couchbase Server cluster for each of --clusters via cbdinocluster (using the "
+    "Sync Gateway checkout's integration-test/start_cbs.py) instead of pointing at existing ones with "
     "--connstr. Only valid with --server cbs; requires Docker and Go. Reuses a previously "
     "started cluster (tracked in environment/local/) if one is still running and has the "
     "node count --couchbase-servers asks for.",
+)
+@click.option(
+    "--clusters",
+    type=int,
+    default=1,
+    show_default=True,
+    help="Number of clusters, for tests marked min_clusters(N). Each cluster has its own Couchbase "
+    "Server and its own Sync Gateway instances. Values above 1 require --server cbs, plus "
+    "either --start-cbs or one --connstr per cluster.",
 )
 @click.option(
     "--platform",
@@ -252,21 +273,27 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
     type=int,
     default=1,
     show_default=True,
-    help="Number of Couchbase Server nodes to put in the topology config, for tests marked "
+    help="Number of Couchbase Server nodes in each cluster, for tests marked "
     "min_couchbase_servers(N). Requires --server cbs, plus either --start-cbs (which allocates "
-    "a cluster of this many nodes) or a --connstr naming exactly this many nodes.",
+    "clusters of this many nodes) or --connstr values that each name exactly this many nodes.",
 )
 @click.option(
     "--sync-gateways",
     type=int,
     default=1,
     show_default=True,
-    help="Number of Sync Gateway instances to start against the same backing store. Instances are "
+    help="Number of Sync Gateway instances to start in each cluster, against that cluster's backing store. Instances are "
     f"numbered from 1 and each takes the next free block of {SG_PORT_STRIDE} ports at or above "
     f"{SG_BASE_PUBLIC_PORT}, stepping over any block already in use, and writes "
     "sync_gateway_instanceN.log; the topology config says where they landed. Values above 1 require "
     "--server cbs, since rosmar's in-memory bucket is per-process and instances would not share "
     "data.",
+)
+@click.option(
+    "--load-balancer",
+    is_flag=True,
+    help="Start a Caddy load balancer in Docker on localhost:4884, and list it in the topology config. "
+    "It starts with no upstreams: each test sets its own with LoadBalancer.configure().",
 )
 @click.option(
     "--skip-testserver",
@@ -296,8 +323,9 @@ def sync_gateway_api_config(ports: SyncGatewayPorts) -> dict[str, str]:
 )
 def main(
     server: str,
-    connstr: str | None,
+    connstr: tuple[str, ...],
     start_cbs: bool,
+    clusters: int,
     platform: str,
     build_testserver: str | None,
     cbl_version: str | None,
@@ -307,6 +335,7 @@ def main(
     admin_password: str,
     couchbase_servers: int,
     sync_gateways: int,
+    load_balancer: bool,
     skip_testserver: bool,
     skip_sync_gateway_build: bool,
     skip_sync_gateway_start: bool,
@@ -317,6 +346,7 @@ def main(
         stop_all_test_servers()
 
     if stop_sync_gateway:
+        stop_load_balancer()
         if stop_all_sync_gateways():
             forget_topology_config()
         else:
@@ -342,6 +372,9 @@ def main(
     if couchbase_servers < 1:
         raise click.UsageError(f"--couchbase-servers must be at least 1; got {couchbase_servers}.")
 
+    if clusters < 1:
+        raise click.UsageError(f"--clusters must be at least 1; got {clusters}.")
+
     if couchbase_servers > 1 and server != "cbs":
         raise click.UsageError("--couchbase-servers > 1 requires --server cbs.")
 
@@ -351,32 +384,42 @@ def main(
             "own process memory, so the instances would not share any data."
         )
 
-    if connstr and server != "cbs":
+    if clusters > 1 and server != "cbs":
+        raise click.UsageError("--clusters > 1 requires --server cbs.")
+
+    connstrs = list(connstr)
+    connstr_explicit = click.get_current_context().get_parameter_source("connstr") == ParameterSource.COMMANDLINE
+    if connstrs and server != "cbs":
         # --connstr defaults from $SG_TEST_COUCHBASE_SERVER_URL, so it may be set in the
         # environment without the user actually asking for it on this invocation. Only
         # treat it as a usage error if they passed --connstr explicitly.
-        if click.get_current_context().get_parameter_source("connstr") == (ParameterSource.COMMANDLINE):
+        if connstr_explicit:
             raise click.UsageError("--connstr is only valid with --server cbs.")
-        connstr = None
+        connstrs = []
 
     if start_cbs:
         if server != "cbs":
             raise click.UsageError("--start-cbs is only valid with --server cbs.")
-        if connstr and click.get_current_context().get_parameter_source("connstr") == (ParameterSource.COMMANDLINE):
+        if connstrs and connstr_explicit:
             raise click.UsageError("--start-cbs cannot be combined with --connstr; use one or the other.")
         # Ignore any env-var-sourced --connstr default; --start-cbs supplies its own.
-        connstr = None
+        connstrs = []
         # --start-cbs always uses these credentials; --admin-user/--admin-password are ignored.
         admin_user, admin_password = "Administrator", "password"
 
-    if couchbase_servers > 1 and not (connstr or start_cbs):
+    if (couchbase_servers > 1 or clusters > 1) and not (connstrs or start_cbs):
         raise click.UsageError(
-            "--couchbase-servers > 1 needs --start-cbs to allocate the nodes, or a --connstr "
-            "naming the nodes of a cluster you already have."
+            "--couchbase-servers > 1 and --clusters > 1 need --start-cbs to allocate the nodes, or a "
+            "--connstr for each cluster you already have."
         )
 
-    if connstr:
-        _validate_connstr_nodes(connstr, couchbase_servers)
+    if connstrs and len(connstrs) != clusters:
+        raise click.UsageError(
+            f"--connstr must be given once per cluster: --clusters {clusters} needs {clusters}, got {len(connstrs)}."
+        )
+
+    for cluster_connstr in connstrs:
+        _validate_connstr_nodes(cluster_connstr, couchbase_servers)
 
     if (not skip_sync_gateway_build or start_cbs) and bool(repo_path) == bool(git_tag):
         raise click.UsageError(
@@ -401,7 +444,7 @@ def main(
             futures.append(executor.submit(build_sync_gateway, repo_dir))
         if start_cbs:
             assert repo_dir is not None
-            cbs_future = executor.submit(start_cbs_cluster, repo_dir, couchbase_servers)
+            cbs_future = executor.submit(start_cbs_clusters, repo_dir, couchbase_servers, clusters)
             futures.append(cbs_future)
         for future in futures:
             future.result()
@@ -409,16 +452,23 @@ def main(
     if cbs_future:
         # Checked like a user-supplied --connstr: a cluster that came back with fewer nodes than
         # were asked for would otherwise silently skip the tests that need them.
-        connstr = cbs_future.result()
-        _validate_connstr_nodes(connstr, couchbase_servers, source="--start-cbs")
+        connstrs = cbs_future.result()
+        for cluster_connstr in connstrs:
+            _validate_connstr_nodes(cluster_connstr, couchbase_servers, source="--start-cbs")
 
     if not skip_sync_gateway_start:
-        instance_ports = start_sync_gateways(server, connstr, admin_user, admin_password, sync_gateways)
+        instances = start_sync_gateways(server, connstrs, admin_user, admin_password, sync_gateways)
     else:
-        instance_ports = resolve_skipped_sync_gateway_ports(server, sync_gateways)
+        instances = resolve_skipped_sync_gateway_instances(server, len(connstrs) or 1, sync_gateways)
+
+    load_balancers: list[str] = []
+    if load_balancer:
+        load_balancers.append(start_load_balancer())
+    else:
+        stop_load_balancer()
 
     topology_config_path = resolve_topology_config(
-        server, connstr, admin_user, admin_password, instance_ports, platform_key
+        server, connstrs, admin_user, admin_password, instances, platform_key, load_balancers
     )
     TOPOLOGY_CONFIG_OUTPUT.write_text(str(topology_config_path))
     click.echo(f"Topology config for pytest ({topology_config_path}) written to {TOPOLOGY_CONFIG_OUTPUT}")
@@ -557,11 +607,27 @@ def build_sync_gateway(repo_dir: str) -> str:
     return str(SYNC_GATEWAY_BIN)
 
 
-def start_cbs_cluster(repo_dir: str, nodes: int) -> str:
+def cbs_cluster_state_dir(cluster: int) -> pathlib.Path:
+    """The directory start_cbs.py records the given 0-based cluster's ID in, so a re-run reuses it."""
+    if cluster == 0:
+        return SCRIPT_DIR
+
+    state_dir = CBS_CLUSTER_STATE_DIR / f"cluster{cluster + 1}"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    return state_dir
+
+
+def start_cbs_clusters(repo_dir: str, nodes: int, clusters: int) -> list[str]:
+    """Start (or reuse) one Couchbase Server cluster per cluster, returning their connection strings in order."""
+    # One at a time, since concurrent allocations would share cbdinocluster's Docker network.
+    return [start_cbs_cluster(repo_dir, nodes, cbs_cluster_state_dir(cluster)) for cluster in range(clusters)]
+
+
+def start_cbs_cluster(repo_dir: str, nodes: int, state_dir: pathlib.Path) -> str:
     """
     Start (or reuse) a local Couchbase Server cluster of `nodes` nodes via the Sync Gateway
     checkout's integration-test/start_cbs.py (which drives cbdinocluster), returning its
-    connection string.
+    connection string. The cluster's ID is recorded in state_dir.
 
     Requires Docker and Go on PATH; cbdinocluster itself is fetched automatically via `go run`.
     """
@@ -584,7 +650,7 @@ def start_cbs_cluster(repo_dir: str, nodes: int) -> str:
         _run(
             [sys.executable, script, *node_args, "--env-file", str(env_file_path)],
             step="start_cbs.py",
-            cwd=str(SCRIPT_DIR),
+            cwd=str(state_dir),
         )
 
         for line in env_file_path.read_text().splitlines():
@@ -646,38 +712,32 @@ def _write_patched_json(
         return f.name
 
 
-def resolve_sync_gateway_config(server: str, connstr: str | None, admin_user: str, admin_password: str) -> str:
+def resolve_sync_gateway_bootstraps(
+    server: str, connstrs: list[str], admin_user: str, admin_password: str
+) -> list[dict[str, str]]:
     """
-    Resolve the sync_gateway config path to use for the given server type.
+    Return the Sync Gateway bootstrap overrides for each cluster, in cluster order. An empty override
+    keeps the template's own bootstrap block.
 
-    For --server cbs, this also downloads the matching BackupManager tool and,
-    if connstr is given, overrides the config's bootstrap server with it.
+    For --server cbs, this also downloads the BackupManager tool that matches each cluster's version.
     """
-    config_path = str(SYNC_GATEWAY_CONFIG[server])
     if server != "cbs":
-        return config_path
+        return [{}]
 
-    if connstr:
-        hostname = parse_hostname(connstr)
-        cbs_user, cbs_password = admin_user, admin_password
+    if connstrs:
+        servers = [(parse_hostname(connstr), admin_user, admin_password) for connstr in connstrs]
     else:
         cbs_info = CouchbaseServerInfo(json.loads(TEST_CONFIG["cbs"].read_text())["couchbase-servers"][0])
-        hostname = cbs_info.hostname
-        cbs_user, cbs_password = cbs_info.admin_user, cbs_info.admin_password
+        servers = [(cbs_info.hostname, cbs_info.admin_user, cbs_info.admin_password)]
 
-    cbs_version = get_cbs_version(hostname, cbs_user, cbs_password)
-    download_tool.download_tool(download_tool.ToolName.BackupManager, cbs_version)
+    for cbs_version in {get_cbs_version(*cbs_server) for cbs_server in servers}:
+        download_tool.download_tool(download_tool.ToolName.BackupManager, cbs_version)
     download_tool.download_tool(download_tool.ToolName.BucketPool)
 
-    if connstr:
-        config_path = _write_patched_json(
-            SYNC_GATEWAY_CONFIG["cbs"],
-            SYNC_GATEWAY_CONFIG_DIR,
-            "basic_sync_gateway_cbs_",
-            lambda c: c["bootstrap"].update({"server": connstr, "username": admin_user, "password": admin_password}),
-        )
+    if not connstrs:
+        return [{}]
 
-    return config_path
+    return [{"server": connstr, "username": admin_user, "password": admin_password} for connstr in connstrs]
 
 
 def _is_our_sync_gateway(proc: psutil.Process) -> bool:
@@ -819,37 +879,38 @@ def previous_topology_config() -> pathlib.Path | None:
     return config_path if config_path.is_file() else None
 
 
-def sync_gateway_ports_from_topology(config_path: pathlib.Path) -> list[SyncGatewayPorts]:
+def sync_gateway_instances_from_topology(config_path: pathlib.Path) -> list[SyncGatewayInstance]:
     """
-    The ports a topology config puts its Sync Gateway instances on.
+    The clusters and ports a topology config puts its Sync Gateway instances on.
 
-    A port absent from an entry is cbltest's default. The metrics port is in no topology config,
-    and is the admin port plus one in every block allocated here.
+    A port or cluster index absent from an entry is cbltest's default. The metrics port is in no
+    topology config, and is the admin port plus one in every block allocated here.
     """
     try:
         gateways = json.loads(config_path.read_text())["sync-gateways"]
     except (OSError, ValueError, KeyError):
         return []
 
-    ports = []
+    instances = []
     for gateway in gateways:
         admin = int(gateway.get("admin_port", SG_BASE_ADMIN_PORT))
-        ports.append(SyncGatewayPorts(int(gateway.get("port", SG_BASE_PUBLIC_PORT)), admin, admin + 1))
+        ports = SyncGatewayPorts(int(gateway.get("port", SG_BASE_PUBLIC_PORT)), admin, admin + 1)
+        instances.append(SyncGatewayInstance(int(gateway.get("cluster_index", 0)), ports))
 
-    return ports
+    return instances
 
 
-def resolve_skipped_sync_gateway_ports(server: str, requested: int) -> list[SyncGatewayPorts]:
+def resolve_skipped_sync_gateway_instances(server: str, clusters: int, requested: int) -> list[SyncGatewayInstance]:
     """
     Decide which instances to describe when --skip-sync-gateway-start started none of them.
 
     Carries the last run's own record forward rather than trusting --sync-gateways, and refuses a
-    --sync-gateways or --server that disagrees with it. An empty record is an error, since a
-    topology naming no Sync Gateway skips every test that needs one, which reads as a pass.
+    --sync-gateways, --server, or cluster count that disagrees with it. An empty record is an error,
+    since a topology naming no Sync Gateway skips every test that needs one, which reads as a pass.
     """
     config_path = previous_topology_config()
-    instance_ports = sync_gateway_ports_from_topology(config_path) if config_path else []
-    previous = len(instance_ports)
+    instances = sync_gateway_instances_from_topology(config_path) if config_path else []
+    previous = len(instances)
     if config_path is None or previous == 0:
         raise click.UsageError(
             f"{TOPOLOGY_CONFIG_OUTPUT} names no Sync Gateway instance, so this run has none to describe and "
@@ -864,65 +925,84 @@ def resolve_skipped_sync_gateway_ports(server: str, requested: int) -> list[Sync
             f"not restart them. Drop --skip-sync-gateway-start to start instances against {server} instead."
         )
 
-    explicit = click.get_current_context().get_parameter_source("sync_gateways") == ParameterSource.COMMANDLINE
-    if explicit and previous != requested:
+    previous_clusters = max(instance.cluster for instance in instances) + 1
+    if previous_clusters != clusters:
         raise click.UsageError(
-            f"--sync-gateways {requested} does not match the {previous} Sync Gateway instance(s) the last run "
-            "started, and --skip-sync-gateway-start means this run will not change that. Drop --sync-gateways "
-            f"to carry those forward, or drop --skip-sync-gateway-start to start {requested}."
+            f"The last run started Sync Gateway instances in {previous_clusters} cluster(s), but this run names "
+            f"Couchbase Server for {clusters}, and --skip-sync-gateway-start means this run will not restart them. "
+            "Pass a --connstr for each of those clusters, or --start-cbs with a matching --clusters."
+        )
+
+    per_cluster = previous // previous_clusters
+    explicit = click.get_current_context().get_parameter_source("sync_gateways") == ParameterSource.COMMANDLINE
+    if explicit and previous != requested * previous_clusters:
+        raise click.UsageError(
+            f"--sync-gateways {requested} does not match the {per_cluster} Sync Gateway instance(s) per cluster "
+            "the last run started, and --skip-sync-gateway-start means this run will not change that. Drop "
+            f"--sync-gateways to carry those forward, or drop --skip-sync-gateway-start to start {requested}."
         )
 
     click.echo(f"Carrying the last run's {previous} Sync Gateway instance(s) into the topology config")
-    return instance_ports
+    return instances
 
 
-def _pin_api_ports(ports: SyncGatewayPorts) -> Callable[[dict[str, Any]], None]:
-    """Return a patch pinning a config's `api` block to the given ports, keeping any other api keys."""
+def _instance_patch(bootstrap: dict[str, str], ports: SyncGatewayPorts) -> Callable[[dict[str, Any]], None]:
+    """Return a patch that points a config at its cluster and pins its `api` block to the given ports."""
 
     def patch(config: dict[str, Any]) -> None:
+        if bootstrap:
+            config["bootstrap"].update(bootstrap)
         config["api"] = {**config.get("api", {}), **sync_gateway_api_config(ports)}
 
     return patch
 
 
-def sync_gateway_instance_configs(base_config_path: str, instance_ports: list[SyncGatewayPorts]) -> list[str]:
+def sync_gateway_instance_configs(
+    server: str, bootstraps: list[dict[str, str]], instances: list[SyncGatewayInstance]
+) -> list[str]:
     """
-    Write one copy of base_config_path per instance, each pinned to that instance's ports.
+    Write one copy of the server's config template per instance, each pointed at the instance's
+    cluster and pinned to its ports.
 
     Every previously generated instance config is swept first: the filenames carry the instance
     number, so a run asking for fewer instances than the last would otherwise leave the surplus
     ones on disk.
     """
     _remove_generated(SYNC_GATEWAY_CONFIG_DIR, f"{SG_INSTANCE_STEM}*.json")
+    _remove_generated(SYNC_GATEWAY_CONFIG_DIR, SYNC_GATEWAY_GENERATED_BASE_CONFIG_GLOB)
 
     return [
         _write_patched_json(
-            pathlib.Path(base_config_path),
+            SYNC_GATEWAY_CONFIG[server],
             SYNC_GATEWAY_CONFIG_DIR,
             sync_gateway_config_prefix(number),
-            _pin_api_ports(ports),
+            _instance_patch(bootstraps[instance.cluster], instance.ports),
             clean_stale=False,
         )
-        for number, ports in enumerate(instance_ports, start=1)
+        for number, instance in enumerate(instances, start=1)
     ]
 
 
 def start_sync_gateways(
-    server: str, connstr: str | None, admin_user: str, admin_password: str, count: int = 1
-) -> list[SyncGatewayPorts]:
+    server: str, connstrs: list[str], admin_user: str, admin_password: str, per_cluster: int = 1
+) -> list[SyncGatewayInstance]:
     """
-    Stop any running sync_gateway processes, start `count` new ones for the given server type, and
-    return the ports each was given.
+    Stop any running sync_gateway processes, start `per_cluster` new ones in each cluster (one per
+    connection string, or a single cluster without any), and return each instance's cluster and ports.
 
     Ports are allocated after the stop, not before: the instances being replaced hold the ports this
     run wants back, and allocating first would see them taken and walk up the range every time.
     """
-    base_config_path = resolve_sync_gateway_config(server, connstr, admin_user, admin_password)
+    bootstraps = resolve_sync_gateway_bootstraps(server, connstrs, admin_user, admin_password)
 
     stop_all_sync_gateways()
 
-    instance_ports = allocate_sync_gateway_ports(count)
-    config_paths = sync_gateway_instance_configs(base_config_path, instance_ports)
+    count = len(bootstraps) * per_cluster
+    instances = [
+        SyncGatewayInstance(index // per_cluster, ports)
+        for index, ports in enumerate(allocate_sync_gateway_ports(count))
+    ]
+    config_paths = sync_gateway_instance_configs(server, bootstraps, instances)
 
     # Wipe every Sync Gateway log before launching. ExeBridge truncates the log of each instance it
     # starts anyway, so this only really matters for the logs this run has no instance for -- left
@@ -930,10 +1010,10 @@ def start_sync_gateways(
     header("Removing previous Sync Gateway logs")
     _remove_generated(SCRIPT_DIR, SG_LOG_GLOB)
 
-    for number, (config_path, ports) in enumerate(zip(config_paths, instance_ports, strict=True), start=1):
+    for number, (config_path, (cluster, ports)) in enumerate(zip(config_paths, instances, strict=True), start=1):
         click.echo(
-            f"Sync Gateway instance {number}/{count}: public {ports.public}, admin {ports.admin}, "
-            f"log {sync_gateway_log_name(number)}"
+            f"Sync Gateway instance {number}/{count}: cluster {cluster + 1}, public {ports.public}, "
+            f"admin {ports.admin}, log {sync_gateway_log_name(number)}"
         )
         ExeBridge(
             exe_path=str(SYNC_GATEWAY_BIN),
@@ -941,7 +1021,7 @@ def start_sync_gateways(
             log_filename=sync_gateway_log_name(number),
         ).run("localhost")
 
-    return instance_ports
+    return instances
 
 
 def _remove_generated_topology_configs() -> None:
@@ -963,19 +1043,21 @@ def forget_topology_config() -> None:
 
 def resolve_topology_config(
     server: str,
-    connstr: str | None,
+    connstrs: list[str],
     admin_user: str,
     admin_password: str,
-    instance_ports: list[SyncGatewayPorts],
+    instances: list[SyncGatewayInstance],
     platform_key: str,
+    load_balancers: list[str],
 ) -> pathlib.Path:
     """
     Resolve the cbltest topology config to use.
 
-    Patches in a CBS connstr override if given, and expands `couchbase-servers` and `sync-gateways`
-    to one entry per node/running instance, so tests marked `min_couchbase_servers(N)` or
-    `min_sync_gateways(N)` can see them all. The test server entry names the port and transport
-    of the platform being run.
+    Patches in the CBS connstr overrides if given, one per cluster, and expands `couchbase-servers`
+    and `sync-gateways` to one entry per node/running instance, each with its `cluster_index`, so
+    tests marked `min_couchbase_servers(N)`, `min_sync_gateways(N)`, or `min_clusters(N)` can see
+    them all. The test server entry names the port and transport of the platform being run, and
+    `load-balancers` lists the load balancers that were started.
 
     Any topology config generated by an earlier run is swept first, so that the one written here is
     this directory's only record of which instances it has and where they are.
@@ -983,7 +1065,7 @@ def resolve_topology_config(
     _remove_generated_topology_configs()
 
     config_path = TEST_CONFIG[server]
-    override_cbs = server == "cbs" and bool(connstr)
+    override_cbs = server == "cbs" and bool(connstrs)
     template_test_server = json.loads(config_path.read_text())["test-servers"][0]
     test_server = {**template_test_server, "url": f"http://localhost:{listen_port(platform_key)}"}
     if platform_key == "js":
@@ -991,29 +1073,39 @@ def resolve_topology_config(
 
     # The checked-in template only stands in for a single instance on the default ports with the
     # template's own test server entry.
-    if not override_cbs and instance_ports == [port_block(0)] and test_server == template_test_server:
+    if (
+        not override_cbs
+        and instances == [SyncGatewayInstance(0, port_block(0))]
+        and test_server == template_test_server
+        and not load_balancers
+    ):
         return config_path
 
     def patch(c: dict[str, Any]) -> None:
         if override_cbs:
-            assert connstr is not None
             # Each node gets its own entry rather than one naming them all, since the tests
             # fail over and rebalance nodes individually.
-            parsed = urlsplit(connstr)
             cbs_template = c["couchbase-servers"][0]
             c["couchbase-servers"] = [
                 {
                     **cbs_template,
-                    "hostname": urlunsplit(parsed._replace(netloc=host)),
+                    "hostname": urlunsplit(urlsplit(connstr)._replace(netloc=host)),
                     "admin_user": admin_user,
                     "admin_password": admin_password,
+                    "cluster_index": cluster,
                 }
+                for cluster, connstr in enumerate(connstrs)
                 for host in _connstr_hosts(connstr)
             ]
 
         template = c["sync-gateways"][0]
-        c["sync-gateways"] = [{**template, "port": ports.public, "admin_port": ports.admin} for ports in instance_ports]
+        c["sync-gateways"] = [
+            {**template, "port": ports.public, "admin_port": ports.admin, "cluster_index": cluster}
+            for cluster, ports in instances
+        ]
         c["test-servers"] = [test_server]
+        if load_balancers:
+            c["load-balancers"] = load_balancers
 
     return pathlib.Path(
         _write_patched_json(config_path, TOPOLOGY_CONFIG_DIR, f"{server}_config_", patch, clean_stale=False)

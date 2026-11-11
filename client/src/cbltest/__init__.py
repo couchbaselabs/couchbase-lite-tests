@@ -6,6 +6,7 @@ from cbltest.api.error import CblTestError
 from .api.cluster import CouchbaseCluster
 from .api.couchbaseserver import BucketCleanupMode, CouchbaseServer
 from .api.edgeservermanager import EdgeServerManager
+from .api.loadbalancer import LoadBalancer
 from .api.syncgateway import SyncGateway
 from .api.syncgatewaycluster import SyncGatewayCluster
 from .api.testserver import TestServer
@@ -119,9 +120,9 @@ class CBLPyTest:
         return self.__edge_servers
 
     @property
-    def load_balancers(self) -> Sequence[str]:
-        """Gets the list of Load Balancers available"""
-        return self.__config.load_balancers
+    def load_balancers(self) -> Sequence[LoadBalancer]:
+        """Gets the list of load balancers available, each fronting no node until a test configures it"""
+        return self.__load_balancers
 
     @staticmethod
     async def create(
@@ -214,6 +215,8 @@ class CBLPyTest:
         self.__edge_servers: list[EdgeServerManager] = []
         if not test_server_only:
             self.__edge_servers = [EdgeServerManager(EdgeServerInfo(es)) for es in self.__config.edge_servers]
+
+        self.__load_balancers = [LoadBalancer(entry) for entry in self.__config.load_balancers]
 
     async def resolve_api_version(self) -> None:
         apiVersion = 0

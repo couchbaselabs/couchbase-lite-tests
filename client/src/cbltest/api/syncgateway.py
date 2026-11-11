@@ -1136,18 +1136,15 @@ class _SyncGatewayBase:
 
         return ssl.get_server_certificate((self.hostname, self.port))
 
-    def replication_url(self, db_name: str, load_balancer: str | None = None) -> str:
+    def replication_url(self, db_name: str) -> str:
         """
-        Gets the replicator URL (e.g. ws://xxx) for a given db
+        Gets the replicator URL (e.g. ws://xxx) for a given db.  See `LoadBalancer.replication_url`
+        to replicate through a load balancer.
 
         :param db_name: The DB to replicate with
         """
         _assert_not_null(db_name, "db_name")
-        sgw_address = urljoin(self.__replication_url, db_name)
-        if not load_balancer:
-            return sgw_address
-
-        return sgw_address.replace("wss", "ws").replace(self.hostname, load_balancer)
+        return urljoin(self.__replication_url, db_name)
 
     async def _update_database_config(self, db_name: str, payload: DatabaseConfig) -> str:
         """

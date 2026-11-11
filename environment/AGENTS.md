@@ -48,10 +48,9 @@ environment/
 │   │   ├── setup_edge_servers.py
 │   │   ├── config/, dataset/
 │   │
-│   ├── lb_setup/                       # Load Balancer (Traefik)
+│   ├── lb_setup/                       # Load Balancer (Caddy), upstreams set per test
 │   │   ├── setup_load_balancers.py
-│   │   ├── traefik.yml
-│   │   └── http_config.yml.in
+│   │   └── configure-system.sh
 │   │
 │   ├── logslurp_setup/                 # LogSlurp provisioning
 │   │   ├── setup_logslurp.py
@@ -100,7 +99,7 @@ environment/
 2. server_setup/            → Couchbase Server (Docker container on EC2)
 3. sgw_setup/               → Sync Gateway (RPM upload + install + bootstrap)
 4. es_setup/                → Edge Server (upload + install)
-5. lb_setup/                → Load Balancer (Traefik Docker container)
+5. lb_setup/                → Load Balancer (Caddy Docker container)
 6. logslurp_setup/          → LogSlurp (Docker container)
 7. topology_setup/          → Test servers (build/download → install → run)
 8. Write TDK config.json    → Output for test suites
@@ -188,7 +187,7 @@ Abstract interface: `validate()`, `install()`, `run()`, `stop()`, `uninstall()`,
   "sync_gateways": [{ "version": "4.0.0" }],
   "test_servers": [{ "platform": "swift_ios", "cbl_version": "4.0.0" }],
   "edge_servers": [{ "version": "1.0.0" }],
-  "load_balancers": [{}],
+  "load_balancers": 1,
   "logslurp": true
 }
 ```
@@ -210,13 +209,15 @@ uv run environment/local/start_local.py --server cbs --git-tag main --start-cbs
   cd tests/dev_e2e
   uv run pytest --config "$(cat ../../environment/local/topology_config)"
   ```
-- `--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests marked `min_sync_gateways(N)`. Instances are numbered from 1 and take a port block each — Sync Gateway's default ports shifted by a multiple of 10, so instance 2 is normally 4994/4995/4996 — stepping over any block already in use, so a Sync Gateway from a second checkout sitting on 4984 moves instance 1 to the next free block instead of making it fail to bind. Every file belonging to an instance shares the stem `sync_gateway_instanceN` — its config (`sync_gateway_instanceN_*.json`) and its log (`sync_gateway_instanceN.log`). All instances are listed in the generated topology config with the ports they actually got. Requires `--server cbs` when N > 1 — each rosmar instance keeps its bucket in its own process memory, so the instances would share no data.
+- `--sync-gateways N` starts N Sync Gateway instances in each cluster, against that cluster's backing store, for tests marked `min_sync_gateways(N)`. Instances are numbered from 1 and take a port block each — Sync Gateway's default ports shifted by a multiple of 10, so instance 2 is normally 4994/4995/4996 — stepping over any block already in use, so a Sync Gateway from a second checkout sitting on 4984 moves instance 1 to the next free block instead of making it fail to bind. Every file belonging to an instance shares the stem `sync_gateway_instanceN` — its config (`sync_gateway_instanceN_*.json`) and its log (`sync_gateway_instanceN.log`). All instances are listed in the generated topology config with the ports they actually got. Requires `--server cbs` when N > 1 — each rosmar instance keeps its bucket in its own process memory, so the instances would share no data.
 - Each start wipes the previous run's Sync Gateway logs and regenerates its configs and topology config from scratch, so a run with fewer instances than the last leaves no surplus files behind to misread.
 - `--skip-testserver`, `--skip-sync-gateway-build`, `--skip-sync-gateway-start` iterate on one stage without repeating the others.
 - `--stop-sync-gateway` stops every background Sync Gateway process started from this checkout (matched on executable path, so other copies are spared) and waits for their ports to free before returning; a process it is not allowed to signal is reported rather than passed over silently. A normal start stops the previous run's instances before it picks ports, so a re-run reclaims the same ones rather than climbing the range.
 - `--platform` picks the test server to run on this host: `c` (default), `dotnet` (macOS or Windows only), `jak_desktop` or `js`. The generated topology config names that platform's port (8080, or 5555 for `dotnet` and 5173 for `js`).
 - `--stop-testserver` stops every test server process started from this checkout, so a server from another checkout is spared. It matches a native server on its executable path under `servers/`, the Java server on its `-jar` path, and the JS dev server on its `bun run dev` or vite command and working directory. A normal start does the same before it starts a new one, then refuses to continue if anything still answers on the platform's port: a second server would fail to bind while the startup check, answered by the first, reported success and the run tested the wrong build.
 - `--skip-sync-gateway-start` carries forward the instances named in the topology config the last run wrote — a run that starts nothing cannot know how many are up — which is this checkout's own record, so several checkouts each running instances do not read each other's and no port is probed. `--stop-sync-gateway` clears that record; an instance that dies on its own stays on it. Combining it with an explicit `--sync-gateways` that disagrees is a usage error. There is no `--stop-cbs` — a cluster started by `--start-cbs` is managed directly via `cbdinocluster` (reused across runs via `environment/local/.cbdinocluster-sg-cluster-id`).
+- `--clusters N` starts N clusters for tests marked `min_clusters(N)`. Each cluster has its own Couchbase Server and its own `--sync-gateways` instances. Every topology config entry gets a `cluster_index`. The flag needs `--server cbs`, and either `--start-cbs` or one `--connstr` per cluster. With `--start-cbs`, the first cluster's ID is in `.cbdinocluster-sg-cluster-id`, and the other IDs are in `.cbdinocluster-clusters/clusterN/`.
+- `--load-balancer` starts a Caddy load balancer in Docker with no upstreams. It listens on `localhost:4884` (public), 4885 (admin), and 4890 (Caddy's admin API), and the topology config lists it as `localhost:4884`. A test sets its upstreams with `LoadBalancer.configure()` from `cbltest.api.loadbalancer`, the same as on AWS. See [lb_setup/README.md](aws/lb_setup/README.md) for the routing.
 - `start_edge_server.py --version X` runs Edge Server with its Caddy and shell2http sidecars in a Docker container (`edge_server/Dockerfile`), on the AWS ports and `/home/ec2-user` layout, and writes `edge_server/topology_config.json`: the last `start_local.py` config plus the Edge Server. The container forwards each Sync Gateway public port back to the host, since test configs name Sync Gateway as `localhost`. One Edge Server only.
 - `sync_gateway_clone/` is a working checkout of the `sync-gateway` repo (has its own `AGENTS.md`) — not owned by this repo's conventions.
 

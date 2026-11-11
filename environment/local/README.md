@@ -96,8 +96,8 @@ entry naming every node cannot express.
 
 ## Multiple Sync Gateway instances
 
-`--sync-gateways N` starts N Sync Gateway instances against the same backing store, for tests
-marked `min_sync_gateways(N)`:
+`--sync-gateways N` starts N Sync Gateway instances in each cluster, against that cluster's backing
+store, for tests marked `min_sync_gateways(N)`:
 
 ```bash
 uv run environment/local/start_local.py --server cbs --connstr couchbase://127.0.0.1 --sync-gateways 2
@@ -150,6 +150,49 @@ record at all — a topology naming no Sync Gateway silently skips every test th
 
 The record is only as current as the last run left it: `--stop-sync-gateway` clears it, but an
 instance that dies on its own stays on it, and the tests then fail on connection rather than skip.
+
+## Multiple clusters
+
+`--clusters N` starts N clusters, for tests marked `min_clusters(N)`. A cluster is one Couchbase
+Server with its own Sync Gateway instances. `--couchbase-servers` and `--sync-gateways` give the
+count in each cluster. The flag requires `--server cbs`.
+
+```bash
+# Allocate 3 cbdinocluster clusters, each with 2 Sync Gateway instances
+uv run environment/local/start_local.py --server cbs --start-cbs --git-tag main --clusters 3 --sync-gateways 2
+
+# Or point at clusters you already have, with one --connstr for each cluster, in order
+uv run environment/local/start_local.py --server cbs --clusters 2 \
+  --connstr couchbase://10.0.0.1 --connstr couchbase://10.0.0.2
+```
+
+With `--start-cbs`, the script starts the clusters one at a time. It keeps the ID of the first
+cluster in `.cbdinocluster-sg-cluster-id`, and the ID of each other cluster in
+`.cbdinocluster-clusters/clusterN/` (both gitignored). A re-run reuses each cluster that is still
+up. Each node uses the memory quotas from
+[Multiple Couchbase Server nodes](#multiple-couchbase-server-nodes). Lower them if several clusters
+do not fit your Docker VM.
+
+The Sync Gateway instances are numbered across all clusters, cluster by cluster. With
+`--clusters 2 --sync-gateways 2`, instances 1 and 2 are in cluster 1, and instances 3 and 4 are in
+cluster 2. Each instance uses its own cluster's Couchbase Server. The topology config gives each
+Couchbase Server and Sync Gateway entry a `cluster_index`.
+
+## Load balancer
+
+`--load-balancer` starts a Caddy load balancer in Docker (container `cbl-tests-load-balancer`), for
+tests marked `min_load_balancers(N)`:
+
+```bash
+uv run environment/local/start_local.py --server cbs --start-cbs --git-tag main --sync-gateways 3 --load-balancer
+```
+
+It listens on 4884 (public), 4885 (admin), and 4890 (Caddy's admin API). The topology config lists
+it as `localhost:4884`. It starts with no upstreams. A test sets its own with
+`LoadBalancer.configure()` from `cbltest.api.loadbalancer`, the same as on AWS. See
+[the AWS load balancer README](../aws/lb_setup/README.md) for the routing.
+
+A run without `--load-balancer` removes the container, and so does `--stop-sync-gateway`.
 
 ## Edge Server
 

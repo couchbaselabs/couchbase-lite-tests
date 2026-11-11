@@ -476,7 +476,24 @@ class CouchbaseServer:
                 tenacity.wait_fixed(interval),
                 tenacity.stop_after_attempt(retries),
             )
+            await self.__enable_cross_cluster_versioning(name)
             return newly_created
+
+    async def __enable_cross_cluster_versioning(self, bucket_name: str) -> None:
+        """
+        Turns on cross cluster versioning for the bucket, which XDCR with Sync Gateway needs.
+        A server that does not report the setting does not support it, so it is left alone.
+        """
+        # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
+        bucket = await self.__send_request("get", f"/pools/default/buckets/{bucket_name}")
+        if bucket.get("enableCrossClusterVersioning", True):
+            return
+
+        await self.__send_request(
+            "post",
+            f"/pools/default/buckets/{bucket_name}",
+            data={"enableCrossClusterVersioning": "true"},
+        )
 
     async def _check_bucket_ready(self, name: str) -> None:
         """
@@ -1046,16 +1063,6 @@ class CouchbaseServer:
                 if "name" in cluster and cast(str, cluster["name"]) == target.__hostname:
                     remote_cluster_uuid = cluster["uuid"]
                     break
-
-            # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
-            # Set the prerequisite properties.  These return 409 is they are already set.
-            for server in (self, target):
-                await server.__send_request(
-                    "post",
-                    f"/pools/default/buckets/{bucket_name}",
-                    data={"enableCrossClusterVersioning": "true"},
-                    allowed_statuses={409},
-                )
 
             # https://docs.couchbase.com/server/current/manage/manage-xdcr/create-xdcr-replication.html#create-an-xdcr-replication-with-the-rest-api
             # Create the remote cluster, if necessary

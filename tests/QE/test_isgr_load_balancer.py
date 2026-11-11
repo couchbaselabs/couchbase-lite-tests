@@ -23,8 +23,6 @@ from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.testserver import CouchbaseLiteFeature
 
 _ISGR_REPLICATION_ID = "isgr-lb-link"
-_SG1_PIN = {"X-Backend": "sg-0"}
-_SG2_PIN = {"X-Backend": "sg-1"}
 _DEFAULT_COLLECTION = "_default._default"
 
 
@@ -162,7 +160,7 @@ class TestISGRLoadBalancer(CBLTestClass):
             "ISGR channel-loss fix: CBG-5772 (4.0.8), CBG-5773 (4.1.2); 4.1.0.1 lacks it",
         )
 
-    @pytest.mark.min_load_balancers(2)
+    @pytest.mark.min_load_balancers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
@@ -184,7 +182,9 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         self.mark_test_step("Create an empty local database")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        lb = cblpytest.load_balancers[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url(db_name)
 
         async def pinned_pull(pin: dict[str, str], sgw: SyncGateway, other: SyncGateway) -> tuple[int, int]:
             """
@@ -206,18 +206,18 @@ class TestISGRLoadBalancer(CBLTestClass):
             return len(pulled), (await sgw.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - before
 
         self.mark_test_step("Pull pinned to SG1, then to SG2, the first contact with each")
-        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
+        sg1_docs, sg1_since_zero = await pinned_pull(lb.pin(sg1), sg1, sg2)
         assert sg1_docs > 0, "Expected SG1's first-ever contact to transfer the seed doc"
         assert sg1_since_zero == 1, "Expected SG1's first-ever contact to start from since=0"
-        _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2, sg1)
+        _, sg2_since_zero = await pinned_pull(lb.pin(sg2), sg2, sg1)
         assert sg2_since_zero == 1, "Expected SG2's first-ever contact to also start from since=0"
 
         self.mark_test_step("Twice, pull pinned to SG1 then SG2 with no new writes")
         for _ in range(2):
-            sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
+            sg1_docs, sg1_since_zero = await pinned_pull(lb.pin(sg1), sg1, sg2)
             assert sg1_docs == 0, "Expected no redundant transfer"
             assert sg1_since_zero == 0, "Expected SG1 to continue, not restart from since=0"
-            sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2, sg1)
+            sg2_docs, sg2_since_zero = await pinned_pull(lb.pin(sg2), sg2, sg1)
             assert sg2_docs == 0, "Expected no redundant transfer"
             assert sg2_since_zero == 0, "Expected SG2 to continue, not restart from since=0"
 
@@ -230,17 +230,17 @@ class TestISGRLoadBalancer(CBLTestClass):
         await _wait_for_propagation(sg2, db_name, ["second_doc"], link_owner=sg1)
 
         self.mark_test_step("Pull pinned to SG1, then to SG2, after the new write")
-        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
+        sg1_docs, sg1_since_zero = await pinned_pull(lb.pin(sg1), sg1, sg2)
         assert sg1_docs > 0, "Expected SG1's next contact to transfer the new doc"
         assert sg1_since_zero == 0, "Expected SG1 to continue, not restart from since=0"
-        _, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2, sg1)
+        _, sg2_since_zero = await pinned_pull(lb.pin(sg2), sg2, sg1)
         assert sg2_since_zero == 0, "Expected SG2 to continue, not restart from since=0"
 
         self.mark_test_step("Pull pinned to SG1 then SG2 once more")
-        sg1_docs, sg1_since_zero = await pinned_pull(_SG1_PIN, sg1, sg2)
+        sg1_docs, sg1_since_zero = await pinned_pull(lb.pin(sg1), sg1, sg2)
         assert sg1_docs == 0, "Expected no redundant transfer"
         assert sg1_since_zero == 0, "Expected SG1 to continue, not restart from since=0"
-        sg2_docs, sg2_since_zero = await pinned_pull(_SG2_PIN, sg2, sg1)
+        sg2_docs, sg2_since_zero = await pinned_pull(lb.pin(sg2), sg2, sg1)
         assert sg2_docs == 0, "Expected no redundant transfer"
         assert sg2_since_zero == 0, "Expected SG2 to continue, not restart from since=0"
 
@@ -254,7 +254,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         link_status = await sg1.get_isgr_status(db_name, _ISGR_REPLICATION_ID)
         assert link_status.get("status") != "error", f"ISGR link entered an error state: {link_status}"
 
-    @pytest.mark.min_load_balancers(2)
+    @pytest.mark.min_load_balancers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_checkpoint_divergence_behind_load_balancer(self, cblpytest: CBLPyTest) -> None:
         await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_REPLICATOR_HEADERS)
@@ -274,7 +274,9 @@ class TestISGRLoadBalancer(CBLTestClass):
         async with db.batch_updater() as updater:
             for doc_id in doc_ids:
                 updater.upsert_document(_DEFAULT_COLLECTION, doc_id, [{"channels": channels}])
-        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        lb = cblpytest.load_balancers[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url(db_name)
 
         async def pinned_push(pin: dict[str, str], sgw: SyncGateway) -> int:
             """
@@ -299,23 +301,23 @@ class TestISGRLoadBalancer(CBLTestClass):
             return (await sg2.get_db_stats(db_name)).cbl_replication_push.propose_change_count - sg2_before
 
         self.mark_test_step("Push pinned to SG1, the first contact, and wait for the docs on SG2")
-        assert await pinned_push(_SG1_PIN, sg1) == 5, "Expected SG1's first-ever contact to propose all 5 local docs"
+        assert await pinned_push(lb.pin(sg1), sg1) == 5, "Expected SG1's first-ever contact to propose all 5 local docs"
         await _wait_for_propagation(sg2, db_name, doc_ids, link_owner=sg1)
 
         self.mark_test_step("Push pinned to SG2, the first contact")
-        assert await pinned_push(_SG2_PIN, sg2) == 5, "Expected SG2's first-ever contact to propose all 5 docs again"
+        assert await pinned_push(lb.pin(sg2), sg2) == 5, "Expected SG2's first-ever contact to propose all 5 docs again"
 
         self.mark_test_step("Twice, push pinned to SG1 then SG2 with no new writes")
         for _ in range(2):
-            assert await pinned_push(_SG1_PIN, sg1) == 0, "Expected SG1 to continue, not re-propose"
-            assert await pinned_push(_SG2_PIN, sg2) == 0, "Expected SG2 to continue, not re-propose"
+            assert await pinned_push(lb.pin(sg1), sg1) == 0, "Expected SG1 to continue, not re-propose"
+            assert await pinned_push(lb.pin(sg2), sg2) == 0, "Expected SG2 to continue, not re-propose"
 
         self.mark_test_step("Add a local doc, and push pinned to SG1 then SG2")
         async with db.batch_updater() as updater:
             updater.upsert_document(_DEFAULT_COLLECTION, new_doc_id, [{"channels": channels}])
-        assert await pinned_push(_SG1_PIN, sg1) == 1, "Expected SG1 to propose only the new doc"
+        assert await pinned_push(lb.pin(sg1), sg1) == 1, "Expected SG1 to propose only the new doc"
         await _wait_for_propagation(sg2, db_name, [new_doc_id], link_owner=sg1)
-        assert await pinned_push(_SG2_PIN, sg2) == 1, "Expected SG2 to propose only the new doc, not restart"
+        assert await pinned_push(lb.pin(sg2), sg2) == 1, "Expected SG2 to propose only the new doc, not restart"
 
         self.mark_test_step("Verify the local database matches SG1 and SG2 exactly")
         for sg in (sg1, sg2):
@@ -366,7 +368,7 @@ class TestISGRLoadBalancer(CBLTestClass):
         pulled = {update.document_id for update in replicator.document_updates if update.error is None}
         assert doc_id in pulled, f"Expected the pull from SG1 to transfer {doc_id}, got {pulled}"
 
-    @pytest.mark.min_load_balancers(2)
+    @pytest.mark.min_load_balancers(1)
     @pytest.mark.asyncio(loop_scope="session")
     async def test_checkpoint_404_keeps_tombstoned_doc_deleted(self, cblpytest: CBLPyTest) -> None:
         await self.skip_if_not_supports(
@@ -394,19 +396,21 @@ class TestISGRLoadBalancer(CBLTestClass):
 
         self.mark_test_step("Create an empty local CBL database, and pull once pinned to SG1, its first contact")
         db: Database = (await cblpytest.test_servers[0].create_and_reset_db([db_name]))[0]
-        repl_url = sg1.replication_url(db_name, cblpytest.load_balancers[1])
+        lb = cblpytest.load_balancers[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url(db_name)
         sg1_stats, sg2_stats = await sg1.get_db_stats(db_name), await sg2.get_db_stats(db_name)
         connects_before = _connect_attempts(sg1_stats)
         sg1_since_zero = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero
         sg2_since_zero = sg2_stats.cbl_replication_pull.num_pull_repl_since_zero
-        seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, _SG1_PIN, ReplicatorType.PULL)
+        seed_pull = await _pinned_replication(db, repl_url, user_name, user_password, lb.pin(sg1), ReplicatorType.PULL)
         sg1_stats = await sg1.get_db_stats(db_name)
         _assert_no_isgr_reconnect(sg1_stats, connects_before)
         sg1_delta = sg1_stats.cbl_replication_pull.num_pull_repl_since_zero - sg1_since_zero
         assert sg1_delta == 1, f"Expected SG1's first contact to start from since=0 once, got {sg1_delta}"
         sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_pull.num_pull_repl_since_zero - sg2_since_zero
         assert sg2_delta == 0, (
-            f"Seed pull pinned with {_SG1_PIN} moved {sg2.hostname}'s since-zero count by {sg2_delta}, so the pin"
+            f"Seed pull pinned with {lb.pin(sg1)} moved {sg2.hostname}'s since-zero count by {sg2_delta}, so the pin"
             f" reached {sg2.hostname} instead of {sg1.hostname}"
         )
         pulled = {u.document_id for u in seed_pull.document_updates if u.error is None}
@@ -446,14 +450,14 @@ class TestISGRLoadBalancer(CBLTestClass):
             repl_url,
             user_name,
             user_password,
-            _SG2_PIN,
+            lb.pin(sg2),
             replicator_type=ReplicatorType.PUSH_AND_PULL,
         )
         sg1_stats = await sg1.get_db_stats(db_name)
         _assert_no_isgr_reconnect(sg1_stats, connects_before)
         sg1_delta = sg1_stats.cbl_replication_push.propose_change_count - sg1_proposed
         assert sg1_delta == 0, (
-            f"pushAndPull pinned with {_SG2_PIN} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin"
+            f"pushAndPull pinned with {lb.pin(sg2)} moved {sg1.hostname}'s propose count by {sg1_delta}, so the pin"
             f" reached {sg1.hostname} instead of {sg2.hostname}"
         )
         sg2_delta = (await sg2.get_db_stats(db_name)).cbl_replication_push.propose_change_count - sg2_proposed

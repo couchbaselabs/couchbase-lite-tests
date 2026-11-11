@@ -150,22 +150,9 @@
             }
         },
         "load_balancers": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "sync_gateways": {
-                        "type": "array",
-                        "items": {
-                            "type": "integer",
-                            "minimum": 0
-                        },
-                        "minItems": 1
-                    }
-                },
-                "required": ["sync_gateways"],
-                "additionalProperties": false
-            }
+            "description": "How many load balancers to start. Each starts with no upstreams, and each test sets its own.",
+            "type": "integer",
+            "minimum": 0
         },
         "logslurp": {
             "type": "boolean"

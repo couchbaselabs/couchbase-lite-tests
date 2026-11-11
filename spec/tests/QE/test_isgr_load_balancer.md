@@ -4,8 +4,8 @@ Regression coverage for CBG-5867. A CBL client replicating through a load balanc
 and SG2, kept in sync by a continuous bidirectional ISGR link from SG1) uses one checkpoint ID for both, because the ID
 comes from the replication config, not from the backend that answers. ISGR never copies checkpoints, so the expected
 behavior is a one-time full resync on each backend's first contact, no redundant resync after that, and no lost
-documents. These tests pin each replication to one backend with the load balancer's `X-Backend` header (`sg-0` is SG1,
-`sg-1` is SG2) and check that this keeps holding.
+documents. Each test puts SG1 and SG2 behind the load balancer, pins each replication to one backend with the load
+balancer's `X-Backend` header, and checks that this keeps holding.
 
 A transfer count can't show a needless resync: ISGR gives both backends identical revisions, so CBL already holds every
 document a backend proposes. Each pinned replication is instead judged by a Sync Gateway counter read before and after
@@ -15,7 +15,7 @@ counter came from CBL:
 - SG1's ISGR connect-attempt count must not change, since an ISGR reconnect can move the same counters. For the same
   reason, setup returns only after a channel-less document has crossed the link in each direction, so both ISGR legs
   have made their first connection before anything is measured.
-- The backend that was not pinned must not move, so a wrong `sg-0`/`sg-1` order fails as a pin-mapping error.
+- The backend that was not pinned must not move, so a pin that reaches the wrong backend fails as a pin-mapping error.
 
 ## test_checkpoint_divergence_behind_load_balancer
 
@@ -89,13 +89,13 @@ against SGW 4.x, since the pipeline does not pair CBL 4.x with SGW 3.x.
 
 1. Create the database and user on SG1 and SG2 as in the first test, with `revs_limit` set to 5, and start the ISGR link
 2. Create doc `d1` directly on SG1, and wait for its ID on SG2's changes feed. A timeout reports the ISGR link's status
-3. Create an empty local CBL database, and pull once pinned to SG1 (`X-Backend: sg-0`), its first contact. Expect
+3. Create an empty local CBL database, and pull once pinned to SG1, its first contact. Expect
    SG1's since-zero count to grow by 1, SG2's not to move, and the pull to transfer `d1`. This is the client's only
    contact with SG1, and it holds `d1` at revision generation 1 from here on
 4. Mutate `d1` on SG1 six times, past its `revs_limit` of 5, then tombstone it. Expect the tombstone at revision
    generation 8, the generation seen in the original reproduction
 5. Wait for `d1` to appear as a tombstone on SG2's changes feed, as in step 2
-6. Run a one-shot pushAndPull replication pinned to SG2 (`X-Backend: sg-1`), SG2's first contact with this client. The
+6. Run a one-shot pushAndPull replication pinned to SG2, SG2's first contact with this client. The
    client still offers only the stale generation-1 revision from step 3. Expect SG2's propose count to grow by exactly
    1, the stale `d1`, and SG1's not to move. No document is written on SG1 after step 5, so ISGR adds no proposals to
    SG2

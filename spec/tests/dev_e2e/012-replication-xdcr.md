@@ -15,7 +15,7 @@ two SG clusters.
 4. Start XDCR between cluster 1 and cluster 2.
 5. Wait 5 secs to ensure that clusters are ready.
 6. Reset local database, and load `names` dataset.
-7. Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+7. Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
     * endpoint: `/names`
     * collections : `_default._default`
     * type: push_and_pull
@@ -53,7 +53,7 @@ data sync continues when one SG node goes offline.
 4.	Start XDCR between cluster 1 and 2.
 5.	Wait 5 seconds to ensure clusters are ready.
 6.	Reset local database and load `names` dataset.
-7.	Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+7.	Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
 	* endpoint: /names
 	* collections: _default._default
 	* type: push_and_pull
@@ -71,6 +71,6 @@ data sync continues when one SG node goes offline.
 	* Add 1 doc in default collection
 	* Update 1 doc in default collection
 	* Remove 1 doc in default collection
-14.	Start the replicator with header X-Backend=sg-1 to tell the load balancer to switch to SG2.
+14.	Start the replicator pinned to SG2, to switch the load balancer to SG2.
 15.	Wait until the replicator is stopped.
 16.	Check that all updated docs are replicated correctly at SG2.

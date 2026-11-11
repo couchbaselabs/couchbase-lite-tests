@@ -9,7 +9,7 @@ every step here is served by whichever node comes next.
 
 1. Configure database on all SGW nodes
 2. Create user 'vipul' with access to channels ['*']
-3. Create user client via load balancer
+3. Put every node behind the load balancer, and create a user client via it
 4. Add initial 100 documents via load balancer
 5. Verify all documents are visible via load balancer
 6. Start concurrent SDK writes in background
@@ -18,5 +18,4 @@ every step here is served by whichever node comes next.
 9. Wait for SDK writes to complete and verify via load balancer
 10. Bring SG2 back online, and wait for the database to be online on every node
 11. Write final documents through the load balancer, round robin over all 3 nodes
-12. For each node, force the load balancer to it with header X-Backend=sg-<index>, and
-    verify that node serves every document
+12. For each node, pin the load balancer to it, and verify that node serves every document

@@ -82,13 +82,16 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+            Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
                 * continuous: true
             """)
-        repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url("names", cblpytest.load_balancers[0])
+        lb = cblpytest.load_balancers[0]
+        sg1, sg2 = cblpytest.clusters[0].sync_gateways[0], cblpytest.clusters[1].sync_gateways[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url("names")
         replicator = Replicator(
             db,
             repl_url,
@@ -96,7 +99,7 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=True,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-0"},
+            headers=lb.pin(sg1),
         )
         await replicator.start()
 
@@ -223,13 +226,16 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+            Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
                 * continuous: false
             """)
-        repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url("names", cblpytest.load_balancers[0])
+        lb = cblpytest.load_balancers[0]
+        sg1, sg2 = cblpytest.clusters[0].sync_gateways[0], cblpytest.clusters[1].sync_gateways[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url("names")
         replicator = Replicator(
             db,
             repl_url,
@@ -237,7 +243,7 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=False,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-0"},
+            headers=lb.pin(sg1),
         )
         await replicator.start()
 
@@ -318,9 +324,7 @@ class TestReplicationXdcr(CBLTestClass):
                     .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
-        self.mark_test_step(
-            "Start the replicator with header X-Backend=sg-1 to tell the load balancer to switch to SG2."
-        )
+        self.mark_test_step("Start the replicator pinned to SG2, to switch the load balancer to SG2.")
         replicator = Replicator(
             db,
             repl_url,
@@ -328,7 +332,7 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=False,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-1"},
+            headers=lb.pin(sg2),
         )
         await replicator.start()
 
