@@ -9,6 +9,7 @@
 // software will be governed by the Apache License, Version 2.0, included in
 // the file licenses/APL2.txt.
 
+import {HTTPError} from './utils';
 import {WebSocketClient} from './webSocketClient';
 import uuid from 'react-native-uuid';
 
@@ -204,15 +205,20 @@ export class TestServer extends WebSocketClient {
     };
 
     if (error) {
-      const domain =
-        'domain' in error && typeof (error as any).domain === 'string'
-          ? (error as any).domain
-          : error.name;
-      const code =
-        'code' in error && typeof (error as any).code === 'number'
-          ? (error as any).code
-          : -1;
-      response.ts_error = {domain, code, message: error.message};
+      // The client reads a TESTSERVER code as the HTTP status, and any other failure is a 400
+      if (error instanceof HTTPError) {
+        response.ts_error = {
+          domain: error.domain,
+          code: error.code,
+          message: error.message,
+        };
+      } else {
+        response.ts_error = {
+          domain: 'TESTSERVER',
+          code: 400,
+          message: `${error.name}: ${error.message}`,
+        };
+      }
     }
 
     this.send(JSON.stringify(response));

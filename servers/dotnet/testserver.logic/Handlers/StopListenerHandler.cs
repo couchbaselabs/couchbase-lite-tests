@@ -28,7 +28,7 @@ internal static partial class HandlerList
         if (listenerObject == null) {
             var errorObject = new
             {
-                domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
+                domain = TestServerErrorDomain.CouchbaseLite,
                 code = (int)CouchbaseLiteError.NotFound,
                 message = $"listener with specified ID not registered!"
             };

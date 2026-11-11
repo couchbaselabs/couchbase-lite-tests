@@ -14,6 +14,7 @@ class TestListener(CBLTestClass):
         dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
         db = dbs[0]
         listener = Listener(db, ["_default._default"], 59840)
+        listener.set_identity()
         await listener.start()
         async with aiohttp.ClientSession() as session:
             async with session.get("https://localhost:59840", ssl=False) as response:
