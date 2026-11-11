@@ -24,6 +24,7 @@ from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 from cbltest.responses import ServerVariant
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from shared.jwt_helper import generate_jwt, generate_rsa_keypair, local_jwt_provider, public_key_to_jwk
+from shared.replicator_helpers import wait_for_refused_connection
 
 COLLECTION = "travel.airports"
 # A real `travel` channel: user1 can see it, and the JWT database's user is scoped to it.
@@ -191,7 +192,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         await _assert_sg_rejects(sync_gateway, get_sync_gateway_session_headers(session_id))
 
         await cblpytest.test_servers[0].cleanup()
@@ -348,7 +349,7 @@ class TestSessionAuthReplication(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Check the replicator stops with an auth error")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         await _assert_sg_rejects(sync_gateway, {})
 
         await cblpytest.test_servers[0].cleanup()

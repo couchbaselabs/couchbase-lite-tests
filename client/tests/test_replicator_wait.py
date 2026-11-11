@@ -23,11 +23,11 @@ def status(activity: ReplicatorActivityLevel, code: int | None = None, message: 
 
 
 def replicator(
-    monkeypatch: pytest.MonkeyPatch, *statuses: ReplicatorStatus, variant: ServerVariant = ServerVariant.C
+    monkeypatch: pytest.MonkeyPatch, *statuses: ReplicatorStatus
 ) -> tuple[Replicator, list[ReplicatorStatus]]:
     """A Replicator whose get_status returns `statuses` in order, then repeats the last one.
     Also returns the list of statuses that get_status returned."""
-    factory = SimpleNamespace(variant=lambda index: variant)
+    factory = SimpleNamespace(variant=lambda index: ServerVariant.C)
     db = cast(Database, SimpleNamespace(_index=0, _request_factory=factory, name="db1"))
     r = Replicator(db, "ws://sg:4984/travel")
     seen: list[ReplicatorStatus] = []
@@ -99,25 +99,3 @@ async def test_wait_for_error_rejects_missing_or_mismatched_error(
     r, _ = replicator(monkeypatch, status(STOPPED, error_code, "forbidden"))
     with pytest.raises(AssertionError, match=expected):
         await r.wait_for_error(code=code, message=message, interval=INTERVAL, timeout=TIMEOUT)
-
-
-@pytest.mark.parametrize(
-    ("variant", "code", "message", "helper"),
-    [
-        (ServerVariant.C, 10401, "unauthorized", "wait_for_refused_connection"),
-        (ServerVariant.JS, -1, "Failed to connect", "wait_for_refused_connection"),
-        (ServerVariant.C, 10403, "No accessible collections for sync", "wait_for_no_access_error"),
-        (ServerVariant.JS, 10403, "No read or write access to this database", "wait_for_no_access_error"),
-    ],
-)
-@pytest.mark.asyncio
-async def test_refusal_helpers_expect_platform_error(
-    monkeypatch: pytest.MonkeyPatch, variant: ServerVariant, code: int, message: str, helper: str
-) -> None:
-    r, _ = replicator(monkeypatch, status(STOPPED, code, message), variant=variant)
-    await getattr(r, helper)(interval=INTERVAL, timeout=TIMEOUT)
-
-    other = ServerVariant.JS if variant != ServerVariant.JS else ServerVariant.C
-    r, _ = replicator(monkeypatch, status(STOPPED, code, message), variant=other)
-    with pytest.raises(AssertionError, match="expected"):
-        await getattr(r, helper)(interval=INTERVAL, timeout=TIMEOUT)

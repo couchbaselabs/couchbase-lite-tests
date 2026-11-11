@@ -21,6 +21,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.asyncfile import read_json_file, write_json_file
+from shared.replicator_helpers import wait_for_no_access_error
 
 SCRIPT_DIR = str(Path(__file__).parent)
 ROOT_TRUE_CONFIG = f"{SCRIPT_DIR}/config/test_per_db_access_control.json"
@@ -464,7 +465,7 @@ class TestPerDatabaseAccessControl(CBLTestClass):
 
             self.mark_test_step("Push and pull `enforced` as `restricted`: refused with 403 and nothing moves")
             replicator = await _write_and_start_replicator(denied_db, client.replication_url("enforced"), "restricted")
-            await replicator.wait_for_no_access_error()
+            await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
             assert "seed_enforced" not in await _cbl_doc_ids(denied_db), "restricted pulled from enforced"
             assert "cbl_restricted_restricted_enforced" not in await _doc_ids(client, "enforced"), (
                 "restricted pushed to enforced"

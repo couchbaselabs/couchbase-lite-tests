@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
     WaitForDocumentEventEntry,
 )
 from cbltest.api.syncgateway import get_basic_auth_headers
+from shared.replicator_helpers import wait_for_no_access_error, wait_for_refused_connection
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG = str(SCRIPT_DIR / "config" / "test_session.json")
@@ -167,7 +168,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         replicator = await _start_replicator(db, admin, None)
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "otf_cbl_0" not in await _es_ids(admin), "A doc was pushed without credentials"
         assert "otf_es_hotels" not in await _local_ids(db), "A doc was pulled without credentials"
 
@@ -186,7 +187,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         replicator = await _start_replicator(db2, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "reuse_cbl_db2" not in await _es_ids(admin), "A doc was pushed with a consumed session"
         assert "reuse_es_hotels" not in await _local_ids(db2), "A doc was pulled with a consumed session"
 
@@ -207,7 +208,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing was pulled")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "xdb_es_hotels" not in await _local_ids(db), "A doc was pulled with another database's session"
 
         self.mark_test_step("Create a local doc, and push it to `names` with the same session")
@@ -231,7 +232,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
         replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
 
         self.mark_test_step("Verify the replicator is refused and nothing crossed in either direction")
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "bad_cbl_0" not in await _es_ids(admin), "A doc was pushed with an unissued session"
         assert "bad_es_hotels" not in await _local_ids(db), "A doc was pulled with an unissued session"
 
@@ -248,7 +249,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Verify a replicator with the session is refused and nothing was pulled")
         replicator = await _start_replicator(db, admin, ReplicatorSessionAuthenticator(session_id))
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
         assert "restart_es_hotels" not in await _local_ids(db), (
             "A doc was pulled with a session from before the restart"
         )
@@ -265,7 +266,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Verify a replicator on `db2` with the same session is refused")
         replicator = await _start_replicator(db2, admin, ReplicatorSessionAuthenticator(session_id))
-        await replicator.wait_for_refused_connection()
+        await wait_for_refused_connection(replicator, cblpytest.test_servers[0])
 
         self.mark_test_step("Write a doc on Edge Server, and verify the first replicator still pulls it without error")
         await admin.put_document_with_id({"origin": "es"}, "two_es_after", DB, "travel", "hotels")
@@ -386,7 +387,7 @@ class TestEdgeServerSessionReplication(CBLTestClass):
 
         self.mark_test_step("Verify replicating as `none` with basic auth is refused with 403, and nothing was pulled")
         replicator = await _start_replicator(db, admin, ReplicatorBasicAuthenticator("none", PASSWORD))
-        await replicator.wait_for_no_access_error()
+        await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
         assert "none_es_hotels" not in await _local_ids(db), "A user with no grants pulled a doc"
 
     @pytest.mark.asyncio(loop_scope="session")

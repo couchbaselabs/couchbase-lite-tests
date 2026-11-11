@@ -13,6 +13,7 @@ from cbltest.api.replicator_types import (
     ReplicatorType,
 )
 from cbltest.responses import ServerVariant
+from shared.replicator_helpers import wait_for_no_access_error
 
 SCRIPT_DIR = Path(__file__).parent
 CONFIG = str(SCRIPT_DIR / "config" / "test_access_control.json")
@@ -188,6 +189,6 @@ class TestAccessControlReplication(CBLTestClass):
             else:
                 await replicator.wait_for_error(ReplicatorActivityLevel.OFFLINE, code=11006)
         else:
-            await replicator.wait_for_no_access_error()
+            await wait_for_no_access_error(replicator, cblpytest.test_servers[0])
         assert f"{user}_es_hotels" not in await _local_ids(db, HOTELS), f"`{user}` pulled from `travel`"
         assert f"{user}_cbl_0" not in await _es_ids(admin, HOTELS), f"`{user}` pushed to `travel`"
