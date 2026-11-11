@@ -13,6 +13,7 @@ uv run pytest \
   --config config.json \
   --dataset-version 4.0 \
   --ignore=test_multipeer.py \
+  -k "not listener and not multipeer and not custom_conflict" \
   --tb=short \
   --timeout=300 \
   --junitxml=junit_ios.xml \

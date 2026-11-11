@@ -569,5 +569,163 @@ def main() -> int:
     return 0
 
 
+def build_single_platform_html(
+    by_file: dict[str, list[str]],
+    platform: dict[str, dict[str, TestResult]],
+    *,
+    generated: str,
+    cbl_version: str,
+    config_label: str,
+    run_summary: str,
+    platform_label: str = "React Native",
+) -> str:
+    """HTML catalog with one result column (local iOS or Android run)."""
+    ordered_files = sorted(by_file.keys(), key=file_sort_key)
+    total_tests = sum(len(tests) for tests in by_file.values())
+    passed, skipped, failed = count_outcomes(by_file, platform)
+
+    toc_lines: list[str] = []
+    sections: list[str] = []
+    for file_name in ordered_files:
+        tests = by_file[file_name]
+        collapsed = file_name in CATALOG_TAIL_COLLAPSED
+        tag = ' <span class="tag tag-na tag-inline">N/A</span>' if collapsed else ""
+        toc_class = ' class="toc-tail"' if collapsed else ""
+        toc_lines.append(
+            f'        <li{toc_class}><a href="#{html.escape(file_name)}">'
+            f"{html.escape(file_name)}</a>{tag} ({len(tests)})</li>"
+        )
+
+        rows: list[str] = []
+        for test_name in tests:
+            result = platform.get(file_name, {}).get(test_name)
+            outcome = result.get("outcome") if result else None
+            rows.append(
+                f"""        <tr>
+          <td class="test-name">{html.escape(test_name)}</td>
+          <td class="status">{badge(outcome)}</td>
+          <td class="applicable">{applicable_badge(outcome, file_name)}</td>
+          {reason_cell(result)}
+        </tr>"""
+            )
+
+        note = FILE_NOTES.get(file_name, "")
+        note_html = f'<p class="file-note">{html.escape(note)}</p>' if note else ""
+        section_class = (
+            "file-section file-section-collapsed" if collapsed else "file-section"
+        )
+        inner = f"""
+  <h2>{html.escape(file_name)}</h2>
+  <p class="file-meta">{len(tests)} tests</p>
+  {note_html}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Test</th>
+          <th class="col-sg">{html.escape(platform_label)}</th>
+          <th class="col-app">Applicable</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+      <tbody>
+{chr(10).join(rows)}
+      </tbody>
+    </table>
+  </div>"""
+
+        if collapsed:
+            sections.append(
+                f"""<section class="{section_class}" id="{html.escape(file_name)}">
+  <details class="file-details">
+    <summary class="file-summary">
+      <span class="file-summary-title">{html.escape(file_name)}<span class="tag tag-na">Tail</span></span>
+      <span class="file-meta">{len(tests)} tests</span>
+    </summary>
+    <div class="file-details-body">
+{inner}
+    </div>
+  </details>
+</section>"""
+            )
+        else:
+            sections.append(
+                f"""<section class="{section_class}" id="{html.escape(file_name)}">
+{inner}
+</section>"""
+            )
+
+    dual = build_html(
+        by_file,
+        {},
+        platform,
+        generated=generated,
+        cbl_version=cbl_version,
+        config_label=config_label,
+        run_summary=run_summary,
+    )
+    style_start = dual.index("<style>")
+    style_end = dual.index("</style>") + len("</style>")
+    styles = dual[style_start:style_end]
+    styles = styles.replace("th.col-ios { border-top: 3px solid var(--sg); }\n", "")
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dev_e2e Test Catalog · React Native</title>
+{styles}
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>dev_e2e Test Catalog · React Native</h1>
+    <p class="sub">Couchbase Lite Test Harness · {html.escape(generated)}</p>
+    <p class="sub">SDK: <code>@couchbase/couchbase-lite-react-native@{html.escape(cbl_version)}</code> · iOS Simulator · Sync Gateway (Docker)</p>
+    <p class="sub">Config: <code>{html.escape(config_label)}</code></p>
+    <div class="summary">
+      <div class="summary-card"><strong>{len(by_file)}</strong><span>test files</span></div>
+      <div class="summary-card"><strong>{total_tests}</strong><span>tests in RN selection</span></div>
+      <div class="summary-card"><strong>{passed}</strong><span>passed</span></div>
+      <div class="summary-card"><strong>{skipped}</strong><span>skipped</span></div>
+      <div class="summary-card"><strong>{failed}</strong><span>failed</span></div>
+    </div>
+    <p class="sub">{html.escape(run_summary)}</p>
+    <p class="sub">Selection: <code>--ignore=test_multipeer.py</code> · <code>-k &quot;{html.escape(RN_PYTEST_K)}&quot;</code></p>
+    <div class="legend">
+      <span class="legend-item"><span class="badge badge-pass">Passed</span></span>
+      <span class="legend-item"><span class="badge badge-skip">Skipped</span></span>
+      <span class="legend-item"><span class="badge badge-fail">Failed</span></span>
+      <span class="legend-item"><span class="badge badge-pending">Not run</span></span>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <strong>Test files</strong>
+    <ul>
+{chr(10).join(toc_lines)}
+    </ul>
+  </nav>
+
+  <div class="toolbar">
+    <input type="search" id="filter" placeholder="Filter by file or test name…" />
+  </div>
+
+{"".join(sections)}
+</div>
+<script>
+document.getElementById('filter').addEventListener('input', function() {{
+  const q = this.value.toLowerCase();
+  document.querySelectorAll('.file-section').forEach(section => {{
+    const text = section.textContent.toLowerCase();
+    section.classList.toggle('hidden', q && !text.includes(q));
+  }});
+}});
+</script>
+</body>
+</html>"""
+
+
 if __name__ == "__main__":
     sys.exit(main())
