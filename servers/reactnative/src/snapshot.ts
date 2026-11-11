@@ -212,8 +212,8 @@ export class Snapshot {
         response = {
           result: false,
           description: `had unexpected properties at ${KeyPath.componentsToString(path)}`,
-          actual: act ?? null,
-          expected: exp ?? null,
+          actual: act,
+          expected: exp,
         };
         return false;
       };

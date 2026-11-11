@@ -19,7 +19,7 @@ export type JSONObject = {[key: string]: JSONValue};
 export type JSONArray = JSONValue[];
 
 export class HTTPError extends Error {
-  public readonly domain = 'HTTP';
+  public readonly domain = 'TESTSERVER';
   constructor(
     public readonly code: number,
     message?: string,

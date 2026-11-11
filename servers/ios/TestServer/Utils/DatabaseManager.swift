@@ -157,10 +157,12 @@ class DatabaseManager {
             throw TestServerError.cblDBNotOpen
         }
         
-        guard let endpointURL = URL(string: config.endpoint)
+        // URLEndpoint aborts the process on any scheme other than ws or wss
+        guard let endpointURL = URL(string: config.endpoint),
+              ["ws", "wss"].contains(endpointURL.scheme?.lowercased())
         else {
             Log.log(level: .error, message: "Failed to start Replicator, invalid endpoint URL.")
-            throw TestServerError.badRequest("Endpoint URL is not a valid URL.")
+            throw TestServerError.badRequest("Endpoint URL is not a valid ws or wss URL.")
         }
         
         var replConfig: ReplicatorConfiguration
@@ -692,7 +694,12 @@ class DatabaseManager {
             .appendingPathComponent(filename)
             .relativePath
         
-        let blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        let blobFileURL: URL
+        do {
+            blobFileURL = try downloadDatasetFileIfNecessary(relativePath: blobRelativePath)
+        } catch FileDownloader.DownloadError.notFound {
+            throw TestServerError.badRequest("Request for nonexistent blob '\(filename)'")
+        }
         Log.log(level: .debug, message: "Load blob from \(blobFileURL.path)")
         
         let contentType: String = {

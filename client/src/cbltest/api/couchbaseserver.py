@@ -476,24 +476,16 @@ class CouchbaseServer:
                 tenacity.wait_fixed(interval),
                 tenacity.stop_after_attempt(retries),
             )
-            await self.__enable_cross_cluster_versioning(name)
+
+            # XDCR with Sync Gateway requires this, and it cannot be turned off once set
+            if newly_created:
+                await self.__send_request(
+                    "post",
+                    f"/pools/default/buckets/{name}",
+                    data={"enableCrossClusterVersioning": "true"},
+                )
+
             return newly_created
-
-    async def __enable_cross_cluster_versioning(self, bucket_name: str) -> None:
-        """
-        Turns on cross cluster versioning for the bucket, which XDCR with Sync Gateway needs.
-        A server that does not report the setting does not support it, so it is left alone.
-        """
-        # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
-        bucket = await self.__send_request("get", f"/pools/default/buckets/{bucket_name}")
-        if bucket.get("enableCrossClusterVersioning", True):
-            return
-
-        await self.__send_request(
-            "post",
-            f"/pools/default/buckets/{bucket_name}",
-            data={"enableCrossClusterVersioning": "true"},
-        )
 
     async def _check_bucket_ready(self, name: str) -> None:
         """

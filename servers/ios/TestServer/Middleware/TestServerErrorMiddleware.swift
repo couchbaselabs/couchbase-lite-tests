@@ -48,6 +48,11 @@ class TestServerErrorMiddleware : Middleware {
         next.respond(to: request).flatMapErrorThrowing { error in
             if let error = error as? TestServerError {
                 return ErrorResponseFactory.CreateErrorResponse(request, error)
+            } else if let abort = error as? AbortError {
+                let error = TestServerError(domain: .TESTSERVER, code: Int(abort.status.code), message: abort.reason)
+                return ErrorResponseFactory.CreateErrorResponse(request, error)
+            } else if (error as NSError).domain == CBLError.domain {
+                return ErrorResponseFactory.CreateErrorResponse(request, TestServerError.cblError(error))
             } else {
                 return ErrorResponseFactory.UnknownErrorResponse(request, error as NSError)
             }

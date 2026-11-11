@@ -23,24 +23,42 @@ export class KeyPath {
             if (!cond) throw new HTTPError(400, `Invalid KeyPath '${path}'`);
         }
 
-        let str = path.trim();
-        if (str.startsWith("$")) str = str.substring(1);
-        else if (!str.startsWith("[")) str = "." + str;
+        const str = path.trim();
+        let i = str.startsWith("$.") ? 2 : 0;
 
-        let i = 0;
-        while (i < str.length) {
-            const m = str.substring(i).match(/\.([^.[]*)|\[(-?\d+)\]/);
-            check(m !== null);
-            if (m[0].startsWith(".")) {
-                const key = m[1];
-                check(key.length > 0);
-                this.components.push(key);
-            } else {
-                const n = Number(m[2]);
-                check(Number.isSafeInteger(n));
-                this.components.push(n);
+        // A property runs up to the next unescaped '.', '[' or ']'; '\\' makes the next character literal
+        const parseProperty = () => {
+            let key = "";
+            while (i < str.length && !".[]".includes(str[i])) {
+                if (str[i] === "\\") {
+                    i++;
+                    check(i < str.length);
+                }
+                key += str[i++];
             }
+            check(key.length > 0);
+            this.components.push(key);
+        };
+
+        const parseIndex = () => {
+            const m = str.substring(i).match(/^\[(\d+)\]/);
+            check(m !== null);
+            const n = Number(m[1]);
+            check(Number.isSafeInteger(n));
+            this.components.push(n);
             i += m[0].length;
+        };
+
+        if (str[i] === "[") parseIndex();
+        else parseProperty();
+        while (i < str.length) {
+            if (str[i] === ".") {
+                i++;
+                parseProperty();
+            } else {
+                check(str[i] === "[");
+                parseIndex();
+            }
         }
 
         this.str = str;

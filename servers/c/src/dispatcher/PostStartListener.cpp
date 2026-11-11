@@ -12,11 +12,13 @@ int Dispatcher::handlePOSTStartListener(Request &request, Session *session) {
     }
 
     auto port = GetValue<int>(body, "port", 0);
+    // CBL-C cannot import PKCS12, so "identity" is ignored and a TLS listener uses an anonymous identity
     auto disableTLS = GetValue<bool>(body, "disableTLS", false);
 
     string id = session->cblManager()->startListener(database, collections, port, disableTLS);
 
     json result;
     result["id"] = id;
+    result["port"] = CBLURLEndpointListener_Port(session->cblManager()->listener(id));
     return request.respondWithJSON(result);
 }

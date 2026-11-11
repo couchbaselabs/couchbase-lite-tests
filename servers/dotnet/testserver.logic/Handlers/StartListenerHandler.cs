@@ -76,7 +76,7 @@ internal static partial class HandlerList
         if (dbObject == null) {
             var errorObject = new
             {
-                domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
+                domain = TestServerErrorDomain.CouchbaseLite,
                 code = (int)CouchbaseLiteError.NotFound,
                 message = $"database '{deserializedBody.database}' not registered!"
             };
@@ -103,7 +103,7 @@ internal static partial class HandlerList
             } catch (Exception e) {
                 var errorObject = new
                 {
-                    domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
+                    domain = TestServerErrorDomain.CouchbaseLite,
                     code = (int)CouchbaseLiteError.NotFound,
                     message = $"Failed to import TLS identity for label '{label}': {e.Message}"
                 };
@@ -115,7 +115,7 @@ internal static partial class HandlerList
             if (tlsIdentity == null) {
                 var errorObject = new
                 {
-                    domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
+                    domain = TestServerErrorDomain.CouchbaseLite,
                     code = (int)CouchbaseLiteError.NotFound,
                     message = $"TLS enabled but no existing TLS identity found for label '{label}'"
                 };

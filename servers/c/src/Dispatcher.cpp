@@ -37,6 +37,7 @@ namespace ts {
         addRule({"POST", "/verifyDocuments", HANDLER(handlePOSTVerifyDocuments)});
         addRule({"POST", "/performMaintenance", HANDLER(handlePOSTPerformMaintenance)});
         addRule({"POST", "/runQuery", HANDLER(handlePOSTRunQuery)});
+        addRule({"POST", "/log", HANDLER(handlePOSTLog)});
     }
 
     const TestServer *Dispatcher::server() const {

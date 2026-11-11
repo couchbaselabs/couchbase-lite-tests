@@ -122,6 +122,7 @@ class TestEdgeToEdgeMtls(CBLTestClass):
         server_format: str,
         client_format: str,
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("test_edge_to_edge_mtls_formats")
         seed_id = f"seed_{server_format}_{client_format}"
         push_id = f"push_{server_format}_{client_format}"
@@ -155,6 +156,7 @@ class TestEdgeToEdgeMtls(CBLTestClass):
     async def test_edge_to_edge_mtls_rejects_client(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, rejected_client: str
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("test_edge_to_edge_mtls_rejects_client")
         seed_id = f"seed_{rejected_client}"
 
@@ -205,6 +207,7 @@ class TestEdgeToEdgeMtls(CBLTestClass):
     async def test_edge_to_edge_mtls_rejects_identity(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, common_name: str
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         seed_id = f"seed_{common_name}"
 
         self.mark_test_step(

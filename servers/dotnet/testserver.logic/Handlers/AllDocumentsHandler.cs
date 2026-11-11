@@ -34,7 +34,7 @@ internal static partial class HandlerList
         if(dbObject == null) {
             var errorObject = new
             {
-                domain = (int)CouchbaseLiteErrorType.CouchbaseLite + 1,
+                domain = TestServerErrorDomain.CouchbaseLite,
                 code = (int)CouchbaseLiteError.NotFound,
                 message = $"database '{dbName}' not registered!"
             };

@@ -266,7 +266,12 @@ namespace ts::cbl {
     }
 
     CBLBlob *CBLManager::blob(const string &name, CBLDatabase *db) {
-        auto blobPath = downloadDatasetFileIfNecessary("blobs/" + name);
+        string blobPath;
+        try {
+            blobPath = downloadDatasetFileIfNecessary("blobs/" + name);
+        } catch (const runtime_error &e) {
+            throw logic_error("Blob '" + name + "' not found in dataset: " + e.what());
+        }
         ifstream ifs(blobPath, ios::in | ios::binary);
         if (!ifs.is_open()) {
             throw logic_error("Blob '" + name + "' not found in dataset");

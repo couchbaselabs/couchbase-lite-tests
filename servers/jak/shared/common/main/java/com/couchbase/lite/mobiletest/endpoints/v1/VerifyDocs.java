@@ -16,6 +16,7 @@
 package com.couchbase.lite.mobiletest.endpoints.v1;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -94,9 +95,9 @@ public class VerifyDocs extends UpdateItemEndpoint {
         addOneDiff(diff, resp);
 
         final StringBuilder desc = new StringBuilder("Document '");
-        desc.append(diff.docId).append("' in '").append(diff.collectionName);
-        if (diff.keyPath != null) { desc.append(" at key path ").append(diff.keyPath); }
-        desc.append(": ").append(diff.description);
+        desc.append(diff.docId).append("' in '").append(diff.collectionName).append('\'');
+        if (diff.keyPath == null) { desc.append(' ').append(diff.description); }
+        else { desc.append(" had unexpected properties at key '").append(diff.keyPath).append('\''); }
         resp.put(KEY_DESCRIPTION, desc.toString());
 
         resp.put(KEY_RESULT, false);
@@ -125,12 +126,17 @@ public class VerifyDocs extends UpdateItemEndpoint {
     private void addOneDiff(@NonNull Snapshot.Difference difference, Map<String, Object> diffs) {
         diffs.put(KEY_COLLECTION, difference.collectionName);
         diffs.put(KEY_DOC_ID, difference.docId);
-        diffs.put(KEY_PATH, difference.keyPath);
-        diffs.put(KEY_CHANGE_TYPE, difference.type);
-        diffs.put(KEY_EXPECTED, difference.expected);
-        diffs.put(KEY_ACTUAL, difference.actual);
         diffs.put(KEY_DESCRIPTION, difference.description);
-        diffs.put(KEY_DOCUMENT, difference.content);
+        // The spec omits these keys, rather than sending null, when there is no value
+        putIfNotNull(diffs, KEY_PATH, difference.keyPath);
+        putIfNotNull(diffs, KEY_CHANGE_TYPE, difference.type);
+        putIfNotNull(diffs, KEY_EXPECTED, difference.expected);
+        putIfNotNull(diffs, KEY_ACTUAL, difference.actual);
+        putIfNotNull(diffs, KEY_DOCUMENT, difference.content);
+    }
+
+    private static void putIfNotNull(@NonNull Map<String, Object> map, @NonNull String key, @Nullable Object value) {
+        if (value != null) { map.put(key, value); }
     }
 }
 

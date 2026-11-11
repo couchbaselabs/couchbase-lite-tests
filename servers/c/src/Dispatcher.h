@@ -68,6 +68,8 @@ namespace ts {
 
         int handlePOSTRunQuery(Request &request, Session *session);
 
+        int handlePOSTLog(Request &request, Session *session);
+
         // Handler Functions for Testing:
         int handlePOSTGetDocument(Request &request, Session *session);
 
