@@ -80,6 +80,7 @@ class TestAccessControlReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_read_write_user_syncs_both_ways(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, "rw")
 
@@ -97,6 +98,7 @@ class TestAccessControlReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_read_only_user_can_pull(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, "ro")
 
@@ -109,6 +111,7 @@ class TestAccessControlReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_read_only_user_cannot_push(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, "rop")
 
@@ -125,6 +128,7 @@ class TestAccessControlReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_syncs_every_collection(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, "adm")
 
@@ -142,6 +146,7 @@ class TestAccessControlReplication(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_collection_grants_apply_to_sync(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, "mix")
 
@@ -167,6 +172,7 @@ class TestAccessControlReplication(CBLTestClass):
     async def test_user_without_read_access_is_refused(
         self, cblpytest: CBLPyTest, dataset_path: Path, user: str
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on, seed one doc per collection, and reset `db1`")
         admin, db = await self._setup(cblpytest, user)
 

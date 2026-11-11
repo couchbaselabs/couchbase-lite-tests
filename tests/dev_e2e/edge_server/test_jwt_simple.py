@@ -32,6 +32,7 @@ class TestJWTSimple(CBLTestClass):
     async def test_jwt_replication_reconnect_false(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         """ES replicates with SGW using a static JWT token (reconnect_on_token_change=false)."""
         server = cblpytest.couchbase_servers[0]
         sync_gateway = cblpytest.sync_gateways[0]

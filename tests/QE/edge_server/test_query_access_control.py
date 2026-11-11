@@ -43,6 +43,7 @@ class TestQueryAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_admin_runs_every_named_query(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         admin = await self._start(cblpytest.edge_servers[0])
 
@@ -55,6 +56,7 @@ class TestQueryAccessControl(CBLTestClass):
     async def test_database_level_query_needs_read_on_any_collection(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         await self._start(es)
@@ -77,6 +79,7 @@ class TestQueryAccessControl(CBLTestClass):
     async def test_collection_restricted_query_needs_read_on_a_listed_collection(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         await self._start(es)
@@ -97,6 +100,7 @@ class TestQueryAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_no_access_user_runs_no_query(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         await self._start(es)
@@ -107,6 +111,7 @@ class TestQueryAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_access_is_per_database(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         await self._start(es)
@@ -119,6 +124,7 @@ class TestQueryAccessControl(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_query_is_checked_against_the_url_keyspace(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         es = cblpytest.edge_servers[0]
         self.mark_test_step("Start Edge Server with access control on and the named queries")
         await self._start(es)
