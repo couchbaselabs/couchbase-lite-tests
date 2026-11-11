@@ -1,0 +1,121 @@
+// Daily trigger for the Edge Server functional tests (jenkins/pipelines/functional/es,
+// Jenkins job es-functional). Edge Server is the product under test, so each non-EOL
+// train gets its newest build, prereleases included. Everything else -- the CBL-JS
+// client, Sync Gateway and Couchbase Server -- is held at its latest GA release, so a red
+// run is attributable to Edge Server.
+
+def ES_PRODUCT = "couchbase-edge-server"  // dedup key: the thing under test
+def CBL_PRODUCT = "couchbase-lite-js"     // localhost JS test server, passed through
+
+pipeline {
+    // Pinned: dedup state lives on this node's filesystem (~/.jenkins_build_info).
+    agent { label 'mac-mini-new' }
+    environment {
+        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+    }
+    parameters {
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version or train (e.g. 1.2.0 or 1.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS client version (e.g. 1.0.3). Leave blank for the latest GA release, so the client stays a fixed control. The build number is resolved automatically.')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or prefix (e.g. 4 or 4.0.3). Leave blank for the latest GA release.')
+        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the Edge Server test job even if this Edge Server version+build already ran')
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    triggers {
+        // Daily, after cbl-main and sgw-main (both 04:00 IST) have had time to run.
+        cron('''TZ=Asia/Kolkata
+30 6 * * *''')
+    }
+    stages {
+        stage('Resolve and Trigger') {
+            steps {
+                script {
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
+                    def triggers = load 'jenkins/pipelines/shared/triggerRecord.groovy'
+
+                    // The controls are shared by every Edge Server train and pinned to GA
+                    // (never a prerelease). Edge Server's setup writes the SGW version
+                    // into the topology verbatim, so it is resolved to a full version here.
+                    def cbl = builds.resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION', false)
+                    // Without the client the JS replication tests cannot run, so an
+                    // unresolved CBL-JS is fatal rather than silently narrowing the run.
+                    if (cbl == null) { error "Could not resolve a published build for ${CBL_PRODUCT}" }
+                    def cblFull = "${cbl.version}-${cbl.build}"
+                    def sgwVersion = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION', false)
+                    echo "Controls: CBL-JS ${cblFull} | SGW ${sgwVersion}"
+                    echo "FORCE: ${params.FORCE_TRIGGER}"
+
+                    // A specific ES_VERSION param targets one train/version; a blank
+                    // param fans out over every non-EOL train from get_trains.
+                    def trains
+                    if (params.ES_VERSION?.trim()) {
+                        trains = [params.ES_VERSION.trim()]
+                    } else {
+                        trains = builds.fetchTrains(ES_PRODUCT)
+                        if (!trains) { error "No Edge Server trains returned from ProGet get_trains" }
+                    }
+                    echo "Edge Server trains to process: ${trains}"
+
+                    // Dedup on the Edge Server build only; the controls are not part of the key.
+                    def buildInfo = triggers.readRecord('es')
+
+                    def triggered = []
+                    def skipped = []
+                    def failed = []
+
+                    for (train in trains) {
+                        def es
+                        try {
+                            es = builds.resolveVersionBuild(proget, ES_PRODUCT, train, 'ES_VERSION', true)
+                        } catch (Exception e) {
+                            echo "WARN: Could not resolve Edge Server train ${train}: ${e}"
+                            failed << train
+                            continue
+                        }
+                        if (es == null) {
+                            // No published build yet (new train) — normal, not a failure.
+                            echo "SKIP: Edge Server train ${train} — no published build yet"
+                            skipped << "${train} (no build)"
+                            continue
+                        }
+                        def esFull = "${es.version}-${es.build}"
+
+                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(buildInfo, es.version, es.build)) {
+                            echo "SKIP: Edge Server ${esFull} (already triggered)"
+                            skipped << esFull
+                            continue
+                        }
+
+                        echo "Triggering 'es-functional' for Edge Server ${esFull} (CBL-JS ${cblFull}, SGW ${sgwVersion})"
+                        build job: 'es-functional', parameters: [
+                            string(name: "ES_VERSION", value: esFull),
+                            string(name: "CBL_VERSION", value: cblFull),
+                            string(name: "SGW_VERSION", value: sgwVersion)
+                        ], wait: false
+
+                        buildInfo[es.version] = es.build
+                        triggered << esFull
+                    }
+
+                    // Persist dedup state once, after all trains are processed.
+                    if (triggered) { triggers.saveRecord('es', buildInfo) }
+
+                    currentBuild.displayName = "ES ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
+                    echo "Triggered: ${triggered}"
+                    echo "Skipped:   ${skipped}"
+                    echo "Failed:    ${failed}"
+
+                    if (failed) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "WARNING: ${failed.size()} train(s) failed to resolve: ${failed}"
+                    }
+                }
+            }
+        }
+    }
+}
