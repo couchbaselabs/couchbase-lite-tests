@@ -4,77 +4,58 @@ trap 'echo "$BASH_COMMAND (line $LINENO) failed, exiting..."; exit 1' ERR
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 ES_VERSION="${1:-1.0.1}"
-TEST_NAME="${2:-.}"
-TOPOLOGY_NAME="${3:-es_sgw_topology.json}"
-SGW_VERSION="${4:-}"
-CBS_VERSION="${5:-}"
-DATASET_VERSION="${6:-4.0}"
-TEST_DIR="${7:-QE}"   # QE | dev_e2e | both
-CBL_VERSION="${8:-}"  # version-build for the topology's test servers (e.g. the localhost JS test server)
-JS_ONLY="${9:-false}" # true: run only the tests that replicate with a CBL test server
-TOPOLOGY_FILE="$SCRIPT_DIR/topologies/$TOPOLOGY_NAME"
+TEST_FILTER="${2:-}"
+SGW_VERSION="${3:-}"
+CBL_VERSION="${4:?CBL_VERSION is required: the version-build of the localhost JS test server}"
+JS_ONLY="${5:-false}" # true: run only the tests that replicate with the CBL test server
+STRESS="${6:-false}"  # true: run only the stress tests (tests/functional/stress) in place of the regular ones
+# Edge Server only works with the 3.x datasets, as does the CBL JS test server.
+DATASET_VERSION="3.2"
 
 if [ -z "$SGW_VERSION" ]; then
-  echo "Skipping sync gateway and cb server provisioning"
+  echo "SGW_VERSION not set: setup uses the latest GA Sync Gateway"
 fi
 
 source $SCRIPT_DIR/../../shared/config.sh
 
-# TEST_DIR picks which edge_server test directory (or both) to run.
-case "$TEST_DIR" in
-  QE) SUITE_DIRS=("$QE_TESTS_DIR/edge_server") ;;
-  dev_e2e) SUITE_DIRS=("$DEV_E2E_TESTS_DIR/edge_server") ;;
-  both) SUITE_DIRS=("$QE_TESTS_DIR/edge_server" "$DEV_E2E_TESTS_DIR/edge_server") ;;
-  *)
-    echo "Invalid TEST_DIR '$TEST_DIR' (expected QE, dev_e2e or both)"
-    exit 1
-    ;;
-esac
-
-# TEST_NAME "." runs everything in the selected directory; anything else is
-# passed to pytest -k, which is only allowed for a single directory.
-if [ -z "$TEST_NAME" ]; then
-  echo "TEST_NAME is required (use \".\" to run all tests)"
-  exit 1
-fi
-PYTEST_FILTER=()
-if [ "$TEST_NAME" != "." ]; then
-  if [ "$TEST_DIR" = "both" ]; then
-    echo "TEST_NAME '$TEST_NAME' cannot be used with TEST_DIR=both; use \".\" or pick QE or dev_e2e"
-    exit 1
-  fi
-  PYTEST_FILTER=(-k "$TEST_NAME")
-fi
-
+# Every test that needs an Edge Server. Tests whose other min_* markers this
+# topology can't satisfy are skipped by the required_topology plugin.
+MARKER="min_edge_servers"
 if [ "$JS_ONLY" = "true" ]; then
-  SUITE_DIRS=("$QE_TESTS_DIR/edge_server")
-  PYTEST_FILTER+=(-m min_test_servers)
+  MARKER="min_edge_servers and min_test_servers"
+fi
+
+PYTEST_ARGS=(
+  -v --no-header -W ignore::DeprecationWarning
+  --config config.json
+  --dataset-version "$DATASET_VERSION"
+  # When a test fails, collect logs from every Edge Server node into the current
+  # directory (es-collect-<host>-<timestamp>.tar.gz); teardown archives them.
+  --es-collect
+  -m "$MARKER"
+)
+if [ "$STRESS" = "true" ]; then
+  PYTEST_ARGS+=(--stress)
+fi
+# An empty TEST_FILTER runs every selected test; anything else is passed to pytest -k.
+if [ -n "$TEST_FILTER" ]; then
+  PYTEST_ARGS+=(-k "$TEST_FILTER")
 fi
 
 echo "Setup backend..."
-uv run $SCRIPT_DIR/setup_test.py $ES_VERSION $TOPOLOGY_FILE --sgw-version "${SGW_VERSION:-}" --cbs-version "${CBS_VERSION:-}" --cbl-version "${CBL_VERSION:-}"
+uv run $SCRIPT_DIR/setup_test.py $ES_VERSION --sgw-version "${SGW_VERSION:-}" --cbl-version "$CBL_VERSION"
 
 export COLUMNS=200
+echo "RUNNING COORDINATED TEST (TEST_FILTER=$TEST_FILTER, JS_ONLY=$JS_ONLY, STRESS=$STRESS)"
+pushd "$FUNCTIONAL_TESTS_DIR" >/dev/null
 TEST_RESULT=0
+uv run pytest "${PYTEST_ARGS[@]}" || TEST_RESULT=1
+popd >/dev/null
 
-for suite_dir in "${SUITE_DIRS[@]}"; do
-  echo "RUNNING COORDINATED TEST ($suite_dir, TEST_NAME=$TEST_NAME, JS_ONLY=$JS_ONLY)"
-  pushd "$suite_dir" >/dev/null
-
-  # --es-collect: when a test fails, collect logs from every Edge Server node into this
-  # directory (es-collect-<host>-<timestamp>.tar.gz); teardown's move_artifacts archives them.
-  if uv run pytest -v --no-header -W ignore::DeprecationWarning --config "$QE_TESTS_DIR/config.json" --dataset-version "$DATASET_VERSION" --es-collect ${PYTEST_FILTER[@]+"${PYTEST_FILTER[@]}"} .; then
-    echo "========== PYTEST OUTPUT END =========="
-    echo ""
-    echo "🎉 COORDINATED TEST PASSED! ($suite_dir)"
-  else
-    echo "========== PYTEST OUTPUT END =========="
-    echo ""
-    echo "💥 COORDINATED TEST FAILED! ($suite_dir)"
-    TEST_RESULT=1
-  fi
-
-  popd >/dev/null
-done
-
+echo "========== PYTEST OUTPUT END =========="
+if [ "$TEST_RESULT" -eq 0 ]; then
+  echo "🎉 COORDINATED TEST PASSED!"
+else
+  echo "💥 COORDINATED TEST FAILED!"
+fi
 exit $TEST_RESULT
