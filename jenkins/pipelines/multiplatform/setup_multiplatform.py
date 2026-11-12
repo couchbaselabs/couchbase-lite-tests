@@ -2,236 +2,300 @@
 
 import json
 import os
+import re
 import subprocess
 import sys
+import tempfile
+from collections.abc import Callable
+from dataclasses import dataclass
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Any
 
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-sys.path.append(str(SCRIPT_DIR.parents[3]))
+sys.path.append(str(SCRIPT_DIR.parents[2]))
 
 import click
 import requests
 
-from environment.aws.start_backend import script_entry as start_backend
-from jenkins.pipelines.shared.setup_test import TopologyConfig, resolved_version
+from environment.aws.common.versions import find_missing_version
+from jenkins.pipelines.shared.setup_test import resolved_version, setup_test
 
 if __name__ == "__main__":
     if isinstance(sys.stdout, TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
 
-# Configuration for supported platforms
-SUPPORTED_PLATFORMS = {
-    "android": {
-        "script_path": "../android/android_tests.sh",
-        "param_format": "simple",  # version, sgw_version, [private_key], [--setup-only]
-    },
-    "ios": {
-        "script_path": "../ios/test.sh",
-        "param_format": "ios",  # edition, version, build, sgw_version, private_key, [--setup-only]
-    },
-    "dotnet": {
-        "script_path": "../dotnet/run_test.sh",
-        "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
-    },
-    "c": {
-        "script_path": "../c/run_test.sh",
-        "param_format": "target_os",  # version, target_os, sgw_version, [private_key], [--setup-only]
-    },
+
+@dataclass(frozen=True)
+class TestServerPlatform:
+    """
+    A test server platform: the CBL SDK (`sdk`) built for one OS or variant (`os`). Its `name` is the platform
+    string the prebuild job and the topology files use, e.g. "dotnet_macos".
+    """
+
+    sdk: str
+    os: str
+    proget_product: str
+
+    @property
+    def name(self) -> str:
+        return f"{self.sdk}_{self.os}"
+
+
+# Every test server platform this pipeline can run. The Jenkinsfile's progetProduct() mirrors the products.
+TEST_SERVER_PLATFORMS = {
+    p.name: p
+    for p in [
+        TestServerPlatform("swift", "ios", "couchbase-lite-ios"),
+        TestServerPlatform("jak", "android", "couchbase-lite-android"),
+        TestServerPlatform("jak", "desktop", "couchbase-lite-java"),
+        TestServerPlatform("jak", "webservice", "couchbase-lite-java"),
+        *(TestServerPlatform("dotnet", os, "couchbase-lite-net") for os in ["macos", "windows", "ios", "android"]),
+        *(
+            TestServerPlatform("c", os, "couchbase-lite-c")
+            for os in ["macos", "windows", "linux_x86_64", "ios", "android"]
+        ),
+    ]
 }
 
+# The backend a stress run gets in place of the topology's one Couchbase Server and one Sync Gateway.
+# stress/test_system_multipeer.py's test_multipeer_end_to_end is marked min_clusters(2) and min_sync_gateways(2),
+# so it needs two clusters, each with its own Sync Gateway. Regular runs keep the topology's backend.
+STRESS_BACKEND = {
+    "clusters": [{"server_count": 1}, {"server_count": 1}],
+    "sync_gateways": [{"cluster": 0}, {"cluster": 1}],
+}
 
-def fetch_latest_build(platform: str, version: str) -> str:
+# Exit code for a failed sanity check: test_multiplatform.sh passes it on and the Jenkinsfile marks the run UNSTABLE.
+SANITY_CHECK_EXIT_CODE = 3
+
+# A version as given: "4", "4.1", "4.1.0" or "4.1.0-18". An empty one means the latest release.
+VERSION_PATTERN = re.compile(r"\d+(\.\d+){0,2}(-\d+)?")
+
+
+@dataclass(frozen=True)
+class PlatformVersion:
     """
-    Fetch the latest successful build number for a platform and version.
-
-    Args:
-        platform: CBL platform (android, ios, etc.)
-        version: CBL version (e.g., 3.2.3)
-
-    Returns:
-        Build number as string
-
-    Raises:
-        Exception if API call fails or no build found
+    One "<platform>=<version>" entry of PLATFORM_VERSIONS. `position` is its 1-based place in the input. A platform
+    listed more than once gives its test servers their versions in that order.
     """
-    # Map platform names to API product names
-    platform_map = {
-        "android": "android",
-        "ios": "ios",
-        "dotnet": "net",
-        "java": "java",
-        "c": "c",
-    }
 
-    if platform not in platform_map:
-        raise ValueError(f"Unsupported platform: {platform}")
+    position: int
+    platform: TestServerPlatform
+    version: str
 
-    product_name = f"couchbase-lite-{platform_map[platform]}"
+    def __str__(self) -> str:
+        return f"#{self.position} {self.platform.name}={self.version}"
+
+
+@dataclass(frozen=True)
+class TopologyTestServer:
+    """One entry of the topology's `test_servers`, `index` being its place in that list."""
+
+    index: int
+    platform: str
+    location: str
+
+    def __str__(self) -> str:
+        return f"test_servers[{self.index}] {self.platform} at {self.location}"
+
+
+class SanityCheck:
+    """
+    Collects every problem in the input and the topology, each labelled with where it is, so that a single run
+    reports all of them before anything is set up.
+    """
+
+    def __init__(self) -> None:
+        self.problems: list[str] = []
+
+    def problem(self, source: str, message: str) -> None:
+        self.problems.append(f"[{source}] {message}")
+        click.secho(f"  ✗ [{source}] {message}", fg="red")
+
+    def existing_version(
+        self, source: str, label: str, resolve_product: str, lookup_product: str, version: str
+    ) -> str | None:
+        """
+        Resolves `version` of `label` (as `resolve_product`) to a full version and checks that it exists (as
+        `lookup_product`). Returns the full version, or None after recording why it can't be used.
+        """
+        if version and not VERSION_PATTERN.fullmatch(version):
+            self.problem(source, f"{label}: '{version}' is not a version like 4, 4.1, 4.1.0 or 4.1.0-18")
+            return None
+
+        try:
+            full_version = resolved_version(resolve_product, version or None)
+            missing = find_missing_version(lookup_product, full_version)
+        except requests.HTTPError as e:
+            if e.response is not None and e.response.status_code == 404:
+                self.problem(source, f"{label}: no release of {resolve_product} matches '{version}'")
+            else:
+                self.problem(source, f"{label}: version lookup failed: {e}")
+            return None
+        except requests.RequestException as e:
+            self.problem(source, f"{label}: version lookup failed: {e}")
+            return None
+
+        if missing:
+            self.problem(source, f"{label}: {missing}")
+            return None
+
+        click.secho(f"  ✓ {label}: {full_version}", fg="green")
+        return full_version
+
+
+def group_by_platform[T](items: list[T], platform_of: Callable[[T], str]) -> dict[str, list[T]]:
+    """Groups `items` by platform name, keeping their order within each platform."""
+    grouped: dict[str, list[T]] = {}
+    for item in items:
+        grouped.setdefault(platform_of(item), []).append(item)
+    return grouped
+
+
+def parse_platform_versions(value: str, check: SanityCheck) -> list[PlatformVersion]:
+    """Parses the space-separated "<platform>=<version>" entries, recording every malformed one."""
+    specs = value.split()
+    if not specs:
+        check.problem("PLATFORM_VERSIONS", "is empty, expected at least one <platform>=<version>")
+
+    platform_versions = []
+    for position, spec in enumerate(specs, 1):
+        name, sep, version = spec.partition("=")
+        if not sep:
+            check.problem("PLATFORM_VERSIONS", f"entry #{position} '{spec}' is not <platform>=<version>")
+        elif name not in TEST_SERVER_PLATFORMS:
+            check.problem(
+                "PLATFORM_VERSIONS",
+                f"entry #{position} '{spec}' has an unknown platform '{name}', expected one of: "
+                f"{', '.join(TEST_SERVER_PLATFORMS)}",
+            )
+        else:
+            platform_versions.append(PlatformVersion(position, TEST_SERVER_PLATFORMS[name], version))
+
+    return platform_versions
+
+
+def load_topology_test_servers(topology_file: Path, check: SanityCheck) -> list[TopologyTestServer]:
+    """Reads the topology's test servers, recording a missing or unreadable file and unknown platforms."""
+    source = f"topology {topology_file.name}"
+    if not topology_file.is_file():
+        check.problem(source, f"{topology_file} does not exist")
+        return []
 
     try:
-        # Use IP address instead of hostname to avoid DNS issues (it works while being connected to vpn.couchbase.com)
-        url = f"http://proget.build.couchbase.com:8080/api/get_version?product={product_name}&version={version}&ee=true"
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
+        with open(topology_file) as fin:
+            entries = json.load(fin).get("test_servers", [])
+    except json.JSONDecodeError as e:
+        check.problem(source, f"is not valid JSON: {e}")
+        return []
 
-        data = response.json()
-        build_number = data.get("BuildNumber")
+    if not entries:
+        check.problem(source, "has no test_servers")
 
-        if build_number is None:
-            raise ValueError(f"No BuildNumber found in response: {data}")
-
-        return str(build_number)  # Convert to string before returning
-
-    except Exception as e:
-        raise Exception(f"Failed to fetch latest build for {platform} v{version}: {e}") from e
-
-
-def parse_platform_versions(platform_versions: str, auto_fetch_builds: bool = True) -> list[dict]:
-    """
-    Parse platform version specifications.
-
-    Supports multiple formats:
-    - android:3.2.3 (auto-fetch latest build)
-    - android:3.2.3-6 (explicit build)
-    - dotnet:windows:3.2.0 (auto-fetch for specific OS)
-    - dotnet:windows:3.2.0-8 (explicit build for specific OS)
-
-    Args:
-        platform_versions: Space-separated platform specifications
-        auto_fetch_builds: Whether to auto-fetch build numbers when not specified
-
-    Returns:
-        List of platform info dictionaries
-    """
-    platforms = []
-
-    for spec in platform_versions.split():
-        parts = spec.split(":")
-
-        if len(parts) < 2:
-            raise click.BadParameter(f"Invalid platform specification: {spec}")
-
-        platform = parts[0].lower()
-
-        if platform not in SUPPORTED_PLATFORMS:
-            raise click.BadParameter(f"Unsupported platform: {platform}")
-
-        # Handle different platform specification formats
-        if platform in ["dotnet", "c"] and len(parts) >= 3:
-            # Format: platform:target_os:version[-build]
-            target_os = parts[1]
-            version_build = parts[2]
-
-            # Check if version contains build number
-            if "-" in version_build:
-                version, build = version_build.split("-", 1)
-            else:
-                version = version_build
-                build = None
-        else:
-            # Format: platform:version[-build]
-            target_os = None  # Will be set to default later
-            version_build = parts[1]
-
-            # Check if version contains build number
-            if "-" in version_build:
-                version, build = version_build.split("-", 1)
-            else:
-                version = version_build
-                build = None
-
-        # Auto-fetch build if not specified
-        if build is None:
-            if auto_fetch_builds:
-                try:
-                    build = fetch_latest_build(platform, version)
-                    build = str(build)  # Convert to string for consistency
-                except Exception as e:
-                    raise click.BadParameter(
-                        f"Failed to fetch build number for {platform} v{version}: {e}. "
-                        f"Please specify build number explicitly (e.g., {platform}:{version}-<build>)"
-                    ) from e
-            else:
-                # When auto-fetch is disabled but no explicit build provided, error
-                raise click.BadParameter(f"Platform {platform} missing build number and auto-fetch is disabled")
-
-        # Store the parsed platform info
-        platform_key = f"{platform}_{target_os}" if target_os else platform
-
-        platform_info = {
-            "platform": platform,
-            "platform_key": platform_key,
-            "version": version,
-            "build": build,
-            "target_os": target_os,
-            "script_path": SUPPORTED_PLATFORMS[platform]["script_path"],
-            "param_format": SUPPORTED_PLATFORMS[platform]["param_format"],
-        }
-
-        platforms.append(platform_info)
-
-        click.secho(f"✓ {platform_key}: CBL v{version}-{build}", fg="green")
-
-    return platforms
-
-
-def get_platform_topology_files(
-    platform_key: str,
-    target_os: str | None = None,
-    topology_file: str = "topology.json",
-) -> list[Path]:
-    """
-    Get appropriate topology files for a platform, with optional OS specification.
-
-    Args:
-        platform_key: Platform identifier (ios, android, dotnet, java, c)
-        target_os: Optional OS specification (windows, macos, linux, android, ios)
-        topology_file: Optional topology file
-
-    Returns:
-        List of topology file paths to use
-    """
-
-    # For multiplatform setup, always use the multiplatform topology file
-    multiplatform_topology = SCRIPT_DIR / Path(topology_file)
-
-    if multiplatform_topology.exists():
-        return [multiplatform_topology]
-
-    # Fallback to individual platform topology files if multiplatform topology doesn't exist
-    topology_files = []
-
-    # Base topology file patterns to search for
-    topology_patterns = [
-        f"topology_{platform_key}.json",
-        "topology_single_device.json",
-        "topology_single_host.json",
-        "topology.json",
+    test_servers = [
+        TopologyTestServer(index, str(entry.get("platform", "")), str(entry.get("location", "")))
+        for index, entry in enumerate(entries)
     ]
+    # Only a warning: a test server no entry asks for is not used, and a misspelled platform that an entry does ask
+    # for shows up as too few test servers of it.
+    for ts in test_servers:
+        if ts.platform not in TEST_SERVER_PLATFORMS:
+            click.secho(f"  ⚠ [{source}] {ts} has an unknown platform and will not be used", fg="yellow")
 
-    # Platform-specific directories to search
-    platform_dirs = []
+    return test_servers
 
-    if target_os:
-        # If target OS is specified, look in platform_targetOS directory
-        platform_dirs.append(SCRIPT_DIR.parent / f"{platform_key}_{target_os}")
-        platform_dirs.append(SCRIPT_DIR.parent / platform_key / target_os)
 
-    # Always check the base platform directory
-    platform_dirs.append(SCRIPT_DIR.parent / platform_key)
+def match_topology(
+    platform_versions: list[PlatformVersion],
+    test_servers: list[TopologyTestServer],
+    topology_file: Path,
+    check: SanityCheck,
+) -> list[tuple[TopologyTestServer, PlatformVersion]]:
+    """
+    Gives each entry its own topology test server of the same platform: a platform's Nth entry goes to its Nth
+    test server, in topology order. Test servers left over are not used. Once every platform is matched, records
+    each platform the topology has too few test servers for. Returns the test servers used, in topology order,
+    with their entries.
+    """
+    entries = group_by_platform(platform_versions, lambda pv: pv.platform.name)
+    servers = group_by_platform(test_servers, lambda ts: ts.platform)
 
-    for platform_dir in platform_dirs:
-        if platform_dir.exists():
-            for pattern in topology_patterns:
-                default_topology_file = platform_dir / Path(pattern)
-                if default_topology_file.exists():
-                    topology_files.append(default_topology_file)
-                    # Return the first match for each directory
-                    break
+    matched: list[tuple[TopologyTestServer, PlatformVersion]] = []
+    for name, platform_entries in entries.items():
+        platform_servers = servers.get(name, [])
+        if len(platform_entries) > len(platform_servers):
+            check.problem(
+                f"topology {topology_file.name}",
+                f"{name}: PLATFORM_VERSIONS gives {len(platform_entries)} "
+                f"({', '.join(map(str, platform_entries))}) but the topology has {len(platform_servers)}",
+            )
+        else:
+            matched += zip(platform_servers, platform_entries, strict=False)
 
-    return topology_files
+    return sorted(matched, key=lambda pair: pair[0].index)
+
+
+def run_sanity_checks(
+    platform_versions: str, sgw_version: str, topology_file: Path
+) -> tuple[list[tuple[TopologyTestServer, str]], str]:
+    """
+    Checks the platform versions, the Sync Gateway version and the topology together, logging the outcome of each
+    check and which version every test server gets. Exits with SANITY_CHECK_EXIT_CODE and every problem listed if
+    any check fails. Returns the test servers to use, in topology order, with their full CBL versions, and the full
+    Sync Gateway version.
+    """
+    check = SanityCheck()
+
+    click.secho(f"🔎 Checking PLATFORM_VERSIONS against {topology_file.name}", fg="cyan", bold=True)
+    entries = parse_platform_versions(platform_versions, check)
+    for pv in entries:
+        click.echo(f"  {pv}")
+
+    test_servers = load_topology_test_servers(topology_file, check)
+    # An unreadable topology is already recorded, and matching against it would only repeat that.
+    assignment = match_topology(entries, test_servers, topology_file, check) if test_servers else []
+
+    click.secho("🔎 Checking that every version exists", fg="cyan", bold=True)
+    # Each distinct version is looked up once, however many entries share it.
+    full_versions: dict[tuple[str, str], str | None] = {}
+    for pv in entries:
+        key = (pv.platform.name, pv.version)
+        if key not in full_versions:
+            product = pv.platform.proget_product
+            full_versions[key] = check.existing_version("PLATFORM_VERSIONS", str(pv), product, product, pv.version)
+
+    full_sgw_version = check.existing_version(
+        "SGW_VERSION", f"Sync Gateway {sgw_version}", "sync-gateway", "sync_gateway", sgw_version
+    )
+
+    if check.problems:
+        click.secho(f"\n💥 {len(check.problems)} problem(s) with the multiplatform input:", fg="red", bold=True)
+        for problem in check.problems:
+            click.secho(f"  {problem}", fg="red")
+        sys.exit(SANITY_CHECK_EXIT_CODE)
+
+    assert full_sgw_version is not None
+    click.secho(
+        f"\n✅ Test servers used from {topology_file.name}, with the entry and CBL version each gets:",
+        fg="green",
+        bold=True,
+    )
+    used: list[tuple[TopologyTestServer, str]] = []
+    for ts, pv in assignment:
+        version = full_versions[(pv.platform.name, pv.version)]
+        assert version is not None
+        click.echo(f"  {ts}  <-  {pv}  ->  CBL {version}")
+        used.append((ts, version))
+    click.echo(f"  Sync Gateway {full_sgw_version}")
+
+    used_indexes = {ts.index for ts, _ in used}
+    spare = [ts for ts in test_servers if ts.index not in used_indexes]
+    if spare:
+        click.secho(f"Not used ({len(spare)} spare test servers):", fg="yellow")
+        for ts in spare:
+            click.secho(f"  {ts}", fg="yellow")
+
+    return used, full_sgw_version
 
 
 def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
@@ -249,88 +313,6 @@ def parse_platform_key(platform_key: str) -> tuple[str, str | None]:
         return platform, target_os
     else:
         return platform_key, None
-
-
-def compose_multiplatform_topology(
-    platform_versions: dict[str, dict[str, str]], topology_file: str = ""
-) -> dict[str, Any]:
-    """
-    Compose a multiplatform topology from platform-specific topology files.
-
-    Args:
-        platform_versions: Dictionary of platform versions, builds, and target OS
-        topology_file: Optional topology file else it picks default topology file
-
-    Returns:
-        Composed topology dictionary
-    """
-    composed_topology: dict[str, Any] = {
-        "$schema": "topology_schema.json",
-        "test_servers": [],
-        "sync_gateways": [],
-        "clusters": [],
-        "logslurp": True,
-    }
-
-    # Create a mapping of platform names to their expected test server platforms
-    platform_to_server_map = {
-        "android": "jak_android",
-        "ios": "swift_ios",
-        "dotnet": ["dotnet_windows", "dotnet_macos", "dotnet_ios", "dotnet_android"],
-        "java": ["jak_desktop", "jak_webservice"],
-        "c": ["c_windows", "c_macos", "c_linux_x86_64", "c_ios", "c_android"],
-    }
-
-    # Process each platform
-    for platform_key, version_info in platform_versions.items():
-        click.echo(f"Loading topology for {platform_key}...")
-
-        # Get topology files for this platform
-        topology_files = get_platform_topology_files(platform_key, topology_file=topology_file)
-        if not topology_files:
-            click.secho(
-                f"Warning: No topology files found for {platform_key}, skipping...",
-                fg="yellow",
-            )
-            continue
-
-        # Use the first topology file found
-        topology_file1 = topology_files[0]
-        click.echo(f"Using topology: {topology_file1.name}")
-
-        try:
-            with open(topology_file1) as f:
-                platform_topology = json.load(f)
-
-                # Get the expected server platform(s) for this platform
-                expected_server_platforms = platform_to_server_map.get(platform_key, [platform_key])
-                if isinstance(expected_server_platforms, str):
-                    expected_server_platforms = [expected_server_platforms]
-
-                # Extract test servers from platform topology that match this platform
-                if "test_servers" in platform_topology:
-                    for server in platform_topology["test_servers"]:
-                        # Only add servers that match the current platform being processed
-                        server_platform = server.get("platform", "")
-                        if server_platform in expected_server_platforms:
-                            # Update with our version
-                            server["cbl_version"] = version_info["full_version"]
-                            composed_topology["test_servers"].append(server)
-                            click.echo(
-                                f"Added {server['platform']} server for {platform_key} with CBL {version_info['full_version']}"
-                            )
-                if "logslurp" in platform_topology:
-                    composed_topology["logslurp"] = platform_topology["logslurp"]
-                if "clusters" in platform_topology:
-                    composed_topology["clusters"] = platform_topology["clusters"]
-                if "sync_gateways" in platform_topology:
-                    composed_topology["sync_gateways"] = platform_topology["sync_gateways"]
-
-        except Exception as e:
-            click.secho(f"Error loading topology for {platform_key}: {e}", fg="red")
-            continue
-
-    return composed_topology
 
 
 def run_platform_specific_setup(
@@ -388,115 +370,54 @@ def run_platform_specific_setup(
             click.secho(f"Warning: test.sh not found in {QE_dir}", fg="yellow")
 
 
-def setup_multiplatform_test(
-    platform_versions_str: str,
-    sgw_version: str,
-    config_file_in: Path,
-    topology_tag: str,
-    couchbase_version: str | None = None,
-    setup_dir: str = "QE",
-    auto_fetch_builds: bool = True,
-    topology_file: str = "",
-) -> None:
-    """
-    Sets up a multiplatform testing environment with platform-specific CBL versions and topologies.
-    """
-    config_file_out = SCRIPT_DIR.parents[3] / "tests" / setup_dir / "config.json"
-    topology_file_out = SCRIPT_DIR.parents[3] / "environment" / "aws" / "topology_setup" / "topology.json"
-
-    assert config_file_in.exists() and config_file_in.is_file(), f"Config file {config_file_in} does not exist."
-
-    click.secho("🚀 MULTIPLATFORM CBL TEST SETUP", fg="green")
-    click.secho("===============================", fg="green")
-    click.secho(f"📋 Platform configurations: {platform_versions_str}", fg="green")
-    click.secho(f"🔄 SG version: {sgw_version}", fg="green")
-    click.echo()
-
-    # Parse platform versions
-    platforms = parse_platform_versions(platform_versions_str, auto_fetch_builds)
-
-    # Convert platforms list to the expected dictionary format
-    platform_versions_dict = {}
-    for platform_info in platforms:
-        platform_key = platform_info["platform_key"]
-        platform_versions_dict[platform_key] = {"full_version": f"{platform_info['version']}-{platform_info['build']}"}
-    topology = compose_multiplatform_topology(platform_versions_dict, topology_file=topology_file)
-
-    # Set topology defaults (use versions as-is for local testing)
-    topology["defaults"] = {
-        "cbs": {
-            "version": resolved_version("couchbase-server", couchbase_version),
-        },
-        "sgw": {
-            "version": sgw_version,
-        },
-    }
-    topology["tag"] = topology_tag
-
-    # Write composed topology
-    with open(topology_file_out, "w") as fout:
-        json.dump(topology, fout, indent=4)
-
-    topology_config = TopologyConfig(str(topology_file_out))
-
-    # Then start backend and set up devices
-    click.secho("\n🔧 PHASE 1: SETTING UP CBL TEST SERVERS", fg="green")
-    click.secho("=======================================", fg="green")
-    click.secho("🏗️ Using centralized multiplatform setup...", fg="green")
-    click.echo()
-
-    start_backend(
-        topology_config,
-        str(config_file_in),
-        str(config_file_out),
-    )
-
-
 @click.command()
 @click.argument("platform_versions")
 @click.argument("sgw_version")
-@click.argument("topology_file", required=False)
-@click.option("--no-auto-fetch", is_flag=True, help="Disable automatic build number fetching")
+@click.argument("topology_file", default="topology.json")
+@click.option("--stress", is_flag=True, help="Set up the backend the stress tests need")
 @click.option("--setup-only", is_flag=True, help="Only setup platforms, do not run tests")
 def main(
     platform_versions: str,
     sgw_version: str,
-    topology_file: str = "",
-    no_auto_fetch: bool = False,
+    topology_file: str,
+    stress: bool = False,
     setup_only: bool = False,
 ) -> None:
     """
     Setup multiplatform CBL testing environment.
 
-    PLATFORM_VERSIONS: Space-separated list of platform specifications
+    PLATFORM_VERSIONS: Space-separated "<platform>=<version>" list, one entry per test server to use, e.g.
+    "swift_ios=4.1.0 swift_ios=4.2.0 dotnet_macos=4.1.0-18"
     SGW_VERSION: Sync Gateway version to use
     Optional:
-    topology_file: Topology file to use
+    topology_file: Topology file in this directory to use (default: topology.json)
     """
-    private_key_path = os.path.expanduser("~/.ssh/jborden.pem")
+    topology_path = SCRIPT_DIR / topology_file
+    used, full_sgw_version = run_sanity_checks(platform_versions, sgw_version, topology_path)
 
-    click.secho("🚀 Multiplatform CBL Setup", fg="blue", bold=True)
-    click.secho(f"Platform specifications: {platform_versions}", fg="cyan")
-    click.secho(f"SGW version: {sgw_version}", fg="cyan")
-    click.secho(f"Private key: {private_key_path} (hardcoded)", fg="cyan")
-    click.echo()
+    # setup_test() gives versions to every test server of the topology it reads, so it reads a copy holding only
+    # the ones used.
+    with open(topology_path) as fin:
+        topology = json.load(fin)
+    topology["test_servers"] = [topology["test_servers"][ts.index] for ts, _ in used]
+    if stress:
+        topology.update(STRESS_BACKEND)
+    # TODO: Trim the backend too when the run needs none. topology.json always provisions a Couchbase Server and a
+    # Sync Gateway, which multipeer and peer-to-peer runs (e.g. TS_TEST_FILTER=multipeer) never use.
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        used_topology_path = Path(tmp_dir) / topology_path.name
+        with open(used_topology_path, "w") as fout:
+            json.dump(topology, fout, indent=4)
 
-    try:
-        # Use the proper multiplatform setup function
-        config_file_in = SCRIPT_DIR / "config_multiplatform.json"
-        setup_multiplatform_test(
-            platform_versions,
-            sgw_version,
-            config_file_in,
+        setup_test(
+            [version for _, version in used],
+            [full_sgw_version],
+            used_topology_path,
+            SCRIPT_DIR / "config_multiplatform.json",
             "multiplatform",
-            private_key_path,
-            auto_fetch_builds=not no_auto_fetch,
-            topology_file=topology_file,
+            setup_dir="multiplatform",
         )
-        click.secho("🎉 Multiplatform setup completed successfully!", fg="green", bold=True)
-    except Exception as e:
-        click.secho(f"💥 Setup failed: {e}", fg="red", bold=True)
-        sys.exit(1)
+    click.secho("🎉 Multiplatform setup completed successfully!", fg="green", bold=True)
 
 
 if __name__ == "__main__":
