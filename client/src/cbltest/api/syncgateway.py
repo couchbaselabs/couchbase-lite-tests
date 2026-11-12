@@ -1535,10 +1535,10 @@ class _SyncGatewayBase:
         scope: str = "_default",
         collection: str = "_default",
         wait_for_caching_feed: bool = False,
+        batch_size: int = _BULK_DOCS_BATCH_SIZE,
     ) -> None:
         """
-        Sends a list of documents to be updated on Sync Gateway, in `_bulk_docs` requests of at most
-        `_BULK_DOCS_BATCH_SIZE` documents each
+        Sends a list of documents to be updated on Sync Gateway in batched `_bulk_docs` requests
 
         :param db_name: The name of the DB endpoint to update
         :param updates: A list of updates to perform
@@ -1548,8 +1548,9 @@ class _SyncGatewayBase:
                                       revision this wrote, which covers the earlier ones too.  A replication
                                       started straight after would otherwise read a feed that still has the
                                       documents at their previous revisions (default False)
-        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update.  The batches before
-            the failing one stay written, and the batches after it are not sent
+        :param batch_size: The most documents to send in one `_bulk_docs` request
+        :raises CblSyncGatewayBadResponseError: if Sync Gateway rejected any update.  Documents that
+            succeeded stay written, and later batches are not sent
         :raises AssertionError: if `wait_for_caching_feed` is set and Sync Gateway answered with no usable
             entries, or the feed never reported the last revision written
         """
@@ -1562,7 +1563,7 @@ class _SyncGatewayBase:
             },
         ):
             entries: list = []
-            for batch in batched(updates, _BULK_DOCS_BATCH_SIZE, strict=False):
+            for batch in batched(updates, batch_size, strict=False):
                 response = await self._send_request(
                     "post",
                     f"/{db_name}.{scope}.{collection}/_bulk_docs",

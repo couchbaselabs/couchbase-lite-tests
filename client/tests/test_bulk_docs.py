@@ -21,7 +21,7 @@ from cbltest.api.error import (
     CblRemoteBadResponseError,
     CblSyncGatewayBadResponseError,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
+from cbltest.api.syncgateway import _BULK_DOCS_BATCH_SIZE, DocumentUpdateEntry, SyncGateway
 from conftest import fake_edge_server, fake_sync_gateways
 
 SUCCESS = {"id": "doc1", "rev": "2-abc"}
@@ -175,6 +175,28 @@ class TestSyncGatewayBulkWrites:
                 {"_id": "doc2", "_cv": "18d3331395040000@hb4cU6v8xvp8/rZO5cZ2Mg", "answer": 43},
                 {"_id": "doc3", "answer": 44},
             ]
+
+    @pytest.mark.asyncio
+    async def test_splits_updates_into_batches(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        with fake_sync_gateways(1) as (sgw,):
+            sent = stub_bulk_docs(monkeypatch, sgw, [SUCCESS])
+            updates = [DocumentUpdateEntry(f"doc{i}", None, {"i": i}) for i in range(_BULK_DOCS_BATCH_SIZE + 1)]
+
+            await sgw.update_documents("db1", updates)
+
+            assert [len(s["docs"]) for s in sent] == [_BULK_DOCS_BATCH_SIZE, 1]
+            assert sent[1]["docs"] == [{"_id": f"doc{_BULK_DOCS_BATCH_SIZE}", "i": _BULK_DOCS_BATCH_SIZE}]
+
+    @pytest.mark.asyncio
+    async def test_a_failed_batch_stops_the_later_ones(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        with fake_sync_gateways(1) as (sgw,):
+            sent = stub_bulk_docs(monkeypatch, sgw, [SUCCESS, CONFLICT])
+            updates = [DocumentUpdateEntry(f"doc{i}", None, {"i": i}) for i in range(5)]
+
+            with pytest.raises(CblSyncGatewayBadResponseError):
+                await sgw.update_documents("db1", updates, batch_size=2)
+
+            assert len(sent) == 1
 
 
 class TestEdgeServerBulkDocOp:
