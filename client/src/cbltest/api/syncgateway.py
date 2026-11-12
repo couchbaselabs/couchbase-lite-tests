@@ -2121,7 +2121,7 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return cast(dict, resp)
 
-    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 100, wait_time: int = 5) -> None:
+    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 200, wait_time: int = 5) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
         Polls up to max_attempts times, waiting wait_time seconds between each poll. If SGCollect is still running
