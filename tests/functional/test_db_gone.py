@@ -15,7 +15,6 @@ from cbltest.api.syncgateway import (
 )
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestDbGone(CBLTestClass):

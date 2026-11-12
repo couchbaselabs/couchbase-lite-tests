@@ -53,7 +53,6 @@ async def _one_shot_pull(
     return replicator
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestDocumentChannelHistoryCompaction(CBLTestClass):

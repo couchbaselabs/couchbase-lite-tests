@@ -68,7 +68,6 @@ def _channels(response: dict, scope: str = "_default", collection: str = "_defau
     return response.get(scope, {}).get(collection) or []
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestUserAccessHistoryCompaction(CBLTestClass):

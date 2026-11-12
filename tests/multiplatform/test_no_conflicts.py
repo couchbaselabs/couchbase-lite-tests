@@ -23,7 +23,6 @@ async def update_cbl(cbl_db: Database, doc_id: str, data: list[dict[str, Any]]) 
         b.upsert_document("_default.posts", doc_id, data)
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(3)
 @pytest.mark.min_sync_gateways(1)
 class TestNoConflicts(CBLTestClass):

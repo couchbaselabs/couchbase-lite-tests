@@ -94,7 +94,6 @@ async def _assert_auth_rejected(replicator: Replicator, sync_gateway: SyncGatewa
     await _assert_sg_rejects(sync_gateway, headers)
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestSessionAuthReplication(CBLTestClass):

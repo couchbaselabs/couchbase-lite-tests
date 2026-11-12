@@ -31,7 +31,6 @@ def _generate_payload(size_bytes: int, *, channels: list[str] | None = None) -> 
     return base
 
 
-@pytest.mark.sgw
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
