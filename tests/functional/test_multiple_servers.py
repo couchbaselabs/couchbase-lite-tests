@@ -72,7 +72,6 @@ async def _setup_database_and_user(
         yield client
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(2)
 class TestMultipleServers(CBLTestClass):
@@ -272,7 +271,6 @@ class TestMultipleServers(CBLTestClass):
             assert len(changes_final.results) == num_docs * 2
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(3)
 @pytest.mark.min_couchbase_servers(1)
 class TestISGRCollectionMapping(CBLTestClass):

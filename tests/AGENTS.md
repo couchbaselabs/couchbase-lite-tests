@@ -1,12 +1,14 @@
 # Test Suites — `tests/`
 
-The two Python test suites that exercise Couchbase Lite via the `cbltest` framework. Tests issue REST calls to per-platform test servers, which execute CBL operations against Sync Gateway (SGW) and Couchbase Server (CBS).
+The Python test suites that exercise Couchbase Lite via the `cbltest` framework. Tests issue REST calls to per-platform test servers, which execute CBL operations against Sync Gateway (SGW) and Couchbase Server (CBS).
 
 ## Scope
 
 You own everything under `tests/`:
-- `tests/dev_e2e/` — Developer E2E tests (plus a `test_replication_filter_data.py` data helper)
-- `tests/QE/` — QA suite, including an edge-server sub-suite
+- `tests/functional/` — functional tests (plus a `test_replication_filter_data.py` data helper); pipelines pick their slice by `min_*` marker, not by folder
+- `tests/multiplatform/` — tests that need several test servers (2–6): multipeer replicator (`test_basic_multipeer.py`, `test_multipeer.py`), listener-based replication (`test_peer_to_peer.py`, `test_peer_to_peer_topology.py`, `test_no_conflicts.py`), and several clients replicating with one Sync Gateway (`test_replication_multiple_clients.py`)
+- `stress/` in `functional/` and `multiplatform/` — that suite's long-running stress, soak and chaos tests, run only with `--stress` (see [Stress tests](#stress-tests))
+- `tests/upgrade_sgw/` — Sync Gateway upgrade tests (`upg_sgw` marker)
 - `tests/shared/` — helpers shared across suites (e.g. `upgrade_test_helpers.py`)
 - `tests/.tools/` — binary tools used during tests (`cbbackupmgr`, `bucketpool`)
 
@@ -16,64 +18,37 @@ You do **not** own `client/`, `servers/`, `environment/`, or `jenkins/`, but you
 
 ```
 tests/
-├── dev_e2e/                            # Developer E2E
+├── functional/                         # Functional tests
 │   ├── conftest.py                     # dataset_path fixture (../../dataset/sg)
 │   ├── config.json                     # Generated — DO NOT hand-edit
 │   ├── config.example.json
-│   ├── test_basic_replication.py
-│   ├── test_replication_filter.py
+│   ├── test_*.py                       # CBL, SGW and Edge Server feature tests
 │   ├── test_replication_filter_data.py # Data helper for filter tests
-│   ├── test_replication_auto_purge.py
-│   ├── test_replication_blob.py
-│   ├── test_replication_behavior.py
-│   ├── test_replication_upgrade.py
-│   ├── test_replication_xdcr.py
-│   ├── test_custom_conflict.py
-│   ├── test_encrypted_properties.py
-│   ├── test_fest.py
-│   ├── test_multipeer.py
-│   └── test_query_consistency.py
+│   ├── stress/
+│   │   └── test_system.py              # Edge Server stress and chaos tests (6 hours each)
+│   └── edge_server_config/             # Edge Server configs the tests load (SCRIPT_DIR / "edge_server_config")
 │
-├── QE/                                 # QA — broader coverage + edge cases
-│   ├── conftest.py                     # dataset_path fixture (../../dataset/sg)
+├── multiplatform/                      # Tests needing several test servers (2–6)
+│   ├── conftest.py                     # Same dataset_path fixture
 │   ├── config.json                     # Generated — DO NOT hand-edit
-│   ├── test_db_gone.py
-│   ├── test_delta_sync.py
-│   ├── test_high_availability.py
-│   ├── test_large_doc_workloads.py
-│   ├── test_log_redaction.py
+│   ├── test_basic_multipeer.py         # Multipeer replicator
 │   ├── test_multipeer.py
-│   ├── test_multiple_servers.py
-│   ├── test_no_conflicts.py
-│   ├── test_peer_to_peer.py
+│   ├── test_peer_to_peer.py            # Listener-based replication
 │   ├── test_peer_to_peer_topology.py
-│   ├── test_replication_eventing.py
-│   ├── test_replication_functional.py
-│   ├── test_replication_multiple_clients.py
-│   ├── test_replication_upgrade_delta_sync.py
-│   ├── test_replicator_encryption_hook.py
-│   ├── test_rolling_upgrade_sgw.py
-│   ├── test_server_setup.py
-│   ├── test_system_multipeer.py
-│   ├── test_ttl.py
-│   ├── test_upg_sgw.py
-│   ├── test_users_channels.py
-│   ├── test_xattrs.py
-│   └── edge_server/                    # Edge Server sub-suite
-│       ├── test_authentication.py
-│       ├── test_blobs.py
-│       ├── test_changes_feed.py
-│       ├── test_chaos_scenarios.py
-│       ├── test_crud.py
-│       ├── test_database_edge_server.py
-│       ├── test_logging.py
-│       ├── test_query_edge_server.py
-│       ├── test_replication_edge_server.py
-│       ├── test_replication_sanity.py
-│       ├── test_system.py
-│       └── test_ttl_expires.py
+│   ├── test_no_conflicts.py
+│   ├── test_replication_multiple_clients.py  # Several clients, one Sync Gateway
+│   └── stress/
+│       └── test_system_multipeer.py    # Multipeer stress tests (hours each; end-to-end needs 2 clusters)
 │
-├── shared/                              # Helpers shared across dev_e2e/QE
+├── upgrade_sgw/                        # Sync Gateway upgrade tests
+│   ├── conftest.py                     # Same dataset_path fixture
+│   ├── config.json                     # Generated — DO NOT hand-edit
+│   ├── test_upg_sgw.py
+│   └── test_rolling_upgrade_sgw.py
+│
+├── shared/                             # Helpers shared across suites
+│   ├── jwt_helper.py
+│   ├── multipeer_test_helpers.py
 │   └── upgrade_test_helpers.py
 │
 └── .tools/
@@ -126,14 +101,12 @@ class TestFeatureName(CBLTestClass):
 |---|---|---|---|
 | `cblpytest` | session (auto) | `cbltest.plugins.cblpytest_fixture` | Top-level entry: `.test_servers`, `.sync_gateways`, `.couchbase_servers`, `.edge_servers` (each an `EdgeServerManager`), `.load_balancers`, `.request_factory` |
 | `dataset_path` | session | per-suite `conftest.py` | `Path` to `dataset/sg/` |
-| `cluster_cleanup` | function (autouse) | `cbltest.plugins.cluster_cleanup` (framework-wide entry point) | Removes every load balancer's upstreams and resets every Edge Server, then removes all SGW databases + CBS/Rosmar buckets, before every test |
+| `cluster_cleanup` | function (autouse) | `cbltest.plugins.cluster_cleanup` (framework-wide entry point) | Before every test: removes every load balancer's upstreams, resets the Edge Servers if the test is marked `min_edge_servers` (otherwise only those changed since their last reset), then removes all SGW databases + CBS/Rosmar buckets |
 
 ## Markers
 
 | Marker | Use For |
 |---|---|
-| `@pytest.mark.sgw` | Sync Gateway feature (QE: triggers auto-cleanup) |
-| `@pytest.mark.cbl` | Couchbase Lite feature only |
 | `@pytest.mark.upg_sgw` | SGW upgrade scenarios |
 | `@pytest.mark.min_test_servers(N)` | Topology: ≥ N test servers |
 | `@pytest.mark.min_sync_gateways(N)` | Topology: ≥ N SGW |
@@ -142,17 +115,27 @@ class TestFeatureName(CBLTestClass):
 | `@pytest.mark.min_edge_servers(N)` | Topology: ≥ N edge servers |
 | `@pytest.mark.asyncio(loop_scope="session")` | **Required on every async test** |
 
-## dev_e2e vs QE
+Never declare a topology marker with `0` (e.g. `min_test_servers(0)`). A test that needs none of a
+resource omits that marker. Pipelines select tests with `-m min_<resource>`, which matches the
+marker whatever its count, so a `0` marker pulls the test into a pipeline that it doesn't belong in.
 
-| Aspect | dev_e2e | QE |
+## Suites
+
+| Suite | Contents | Run by |
 |---|---|---|
-| Audience | CBL release validation | QA regression |
-| Cleanup | autouse `cluster_cleanup` + manual `await ts.cleanup()` | autouse `cluster_cleanup` |
-| Markers | topology only | `sgw` / `cbl` + topology |
-| Edge Server | — | `edge_server/` sub-suite |
-| SGW upgrade | `test_replication_upgrade.py` | `test_upg_sgw.py` |
-| Multi-SGW | `test_replication_xdcr.py` (2 SGW + 2 CBS + LB) | `test_users_channels.py` (3+ SGW), `test_high_availability.py` |
-| Spec location | `spec/tests/dev_e2e/NNN-feature.md` | `spec/tests/QE/test_feature.md` |
+| `functional/` | Feature tests for CBL, SGW, P2P and Edge Server | `jenkins/pipelines/functional/`: platform pipelines (`-m min_test_servers`), `sgw` (`-m min_sync_gateways`), `es` (`-m min_edge_servers`) |
+| `multiplatform/` | Scenarios needing several test servers (2–6): multipeer replicator, listener replication, several clients against one Sync Gateway | `multiplatform` (several test servers in one topology) |
+| `upgrade_sgw/` | SGW upgrade scenarios (`upg_sgw` marker) | `upg-sgw` |
+
+### Stress tests
+
+Long-running stress, soak and chaos tests live in a `stress/` folder inside the suite whose hardware they need:
+`functional/stress/` for one test server (or none), `multiplatform/stress/` for several. The `stress_filter`
+plugin skips every `stress/` folder unless pytest gets `--stress`, and then runs only those folders, so an ordinary
+run never starts a test meant to run for hours. The `min_*` markers select within them as usual. A pipeline runs them
+when its `STRESS` checkbox is set: `functional/es` and `multiplatform` have one today. Neither is scheduled.
+
+Specs still live under `spec/tests/dev_e2e/` (`NNN-feature.md`) and `spec/tests/QE/` (`test_feature.md`), named for the suite a test came from.
 
 ## Framework Classes You'll Use Most
 
@@ -195,13 +178,14 @@ Located in `dataset/sg/`. Each has a `-sg.json` (data) and `-sg-config.json` (SG
 
 ```bash
 # Full suites
-cd tests/dev_e2e && uv run pytest -x -v --config config.json
-cd tests/QE      && uv run pytest -x -v --config config.json
+cd tests/functional  && uv run pytest -x -v --config config.json
+cd tests/functional  && uv run pytest -x -v --config config.json --stress   # only the stress/ tests
+cd tests/upgrade_sgw && uv run pytest -x -v --config config.json
 
 # Targeted runs
-cd tests/dev_e2e && uv run pytest -x -v --config config.json -k test_push
-cd tests/QE      && uv run pytest -x -v --config config.json test_xattrs.py
-cd tests/QE      && uv run pytest -x -v --config config.json -m sgw
+cd tests/functional && uv run pytest -x -v --config config.json -k test_push
+cd tests/functional && uv run pytest -x -v --config config.json test_xattrs.py
+cd tests/functional && uv run pytest -x -v --config config.json -m min_sync_gateways
 
 # Lint & format
 uv run ruff check tests/
@@ -216,11 +200,11 @@ file order and `-p randomly` turns the shuffling on. `client/tests` has its own 
 
 ```bash
 # Repeat one test 20 times, stopping at the first failure
-cd tests/dev_e2e && uv run pytest -x -v --config config.json test_basic_replication.py -k test_push --count=20
+cd tests/functional && uv run pytest -x -v --config config.json test_basic_replication.py -k test_push --count=20
 
 # Shuffle the order to expose leakage between tests; replay a failure with the seed it printed
-cd tests/QE && uv run pytest -v --config config.json -m sgw -p randomly
-cd tests/QE && uv run pytest -v --config config.json -m sgw -p randomly --randomly-seed=4250359956
+cd tests/functional && uv run pytest -v --config config.json -m min_sync_gateways -p randomly
+cd tests/functional && uv run pytest -v --config config.json -m min_sync_gateways -p randomly --randomly-seed=4250359956
 ```
 
 - `--count=N` repeats each selected test N times in place. `--repeat-scope=session` repeats the whole
@@ -236,7 +220,7 @@ cd tests/QE && uv run pytest -v --config config.json -m sgw -p randomly --random
 | Test framework | [client/src/cbltest/](../client/src/cbltest/) | Provides every fixture / API class |
 | API contract | [spec/api/api.yaml](../spec/api/api.yaml) | Defines the REST API test servers implement |
 | Test specs (dev_e2e) | [spec/tests/dev_e2e/](../spec/tests/dev_e2e/) | Behavior contracts mirroring `mark_test_step` |
-| Test specs (QE) | [spec/tests/QE/](../spec/tests/QE/) | Same, for QE tests |
+| Test specs (QE) | [spec/tests/QE/](../spec/tests/QE/) | Same, for tests that came from QE |
 | Datasets | [dataset/sg/](../dataset/sg/) | JSON data + SGW configs used in tests |
-| CI pipelines | [jenkins/pipelines/dev_e2e/](../jenkins/pipelines/dev_e2e/), [jenkins/pipelines/QE/](../jenkins/pipelines/QE/) | Drive these tests per platform |
+| CI pipelines | [jenkins/pipelines/functional/](../jenkins/pipelines/functional/), [jenkins/pipelines/upg-sgw/](../jenkins/pipelines/upg-sgw/), [jenkins/pipelines/multiplatform/](../jenkins/pipelines/multiplatform/) | Drive these tests per platform |
 | Config schema | `https://packages.couchbase.com/couchbase-lite/testserver.schema.json` | Validates `config.json` |

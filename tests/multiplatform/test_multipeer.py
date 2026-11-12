@@ -18,7 +18,6 @@ from cbltest.api.testserver import CouchbaseLiteFeature
 from shared.multipeer_test_helpers import build_group_transports
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(2)
 class TestMultipeer(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")

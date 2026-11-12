@@ -13,7 +13,6 @@ from cbltest.api.syncgateway import (
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
 
-@pytest.mark.sgw
 @pytest.mark.min_sync_gateways(3)
 @pytest.mark.min_couchbase_servers(1)
 @pytest.mark.min_load_balancers(1)

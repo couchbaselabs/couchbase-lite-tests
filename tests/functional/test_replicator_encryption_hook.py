@@ -17,7 +17,6 @@ from cbltest.api.test_functions import compare_local_and_remote
 from cbltest.api.testserver import CouchbaseLiteFeature
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(1)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicatorEncryptionHook(CBLTestClass):

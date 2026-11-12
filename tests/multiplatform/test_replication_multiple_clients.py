@@ -15,7 +15,6 @@ from cbltest.api.syncgateway import SyncGatewayFeature
 NAMES_DATASET_DOC_COUNT = 100
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(2)
 @pytest.mark.min_sync_gateways(1)
 class TestReplicationMultipleClients(CBLTestClass):

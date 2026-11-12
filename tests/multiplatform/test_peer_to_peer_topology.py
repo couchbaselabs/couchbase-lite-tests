@@ -15,7 +15,6 @@ from cbltest.api.replicator_types import (
 from cbltest.api.test_functions import compare_doc_results_p2p
 
 
-@pytest.mark.cbl
 @pytest.mark.min_test_servers(3)
 class TestPeerToPeerTopology(CBLTestClass):
     @pytest.mark.parametrize(
