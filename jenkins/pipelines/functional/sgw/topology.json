@@ -31,5 +31,6 @@
         }
     ],
     "load_balancers": 1,
+    "edge_servers": [{}, {}, {}],
     "logslurp": true
 }
