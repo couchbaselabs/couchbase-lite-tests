@@ -10,8 +10,8 @@ from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.syncgateway import get_basic_auth_headers
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = str(SCRIPT_DIR / "config" / "test_access_control.json")
-USERS = SCRIPT_DIR / "config" / "test_access_control_users.json"
+CONFIG = str(SCRIPT_DIR / "edge_server_config" / "test_access_control.json")
+USERS = SCRIPT_DIR / "edge_server_config" / "test_access_control_users.json"
 # The config reads its own users file, so the provisioned users.json never gains an access block.
 USERS_FILE = "/home/ec2-user/user/access_control_users.json"
 PASSWORD = "password"

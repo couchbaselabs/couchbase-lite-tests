@@ -16,7 +16,7 @@ class TestQueryEdgeServer(CBLTestClass):
     async def test_named_queries(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Configuring named queries")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
+            db_name="names", config_file=f"{SCRIPT_DIR}/edge_server_config/test_named_queries.json"
         )
 
         self.mark_test_step("Testing valid parameterized query")
@@ -37,7 +37,7 @@ class TestQueryEdgeServer(CBLTestClass):
     async def test_adhoc_queries(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
+            db_name="names", config_file=f"{SCRIPT_DIR}/edge_server_config/test_named_queries.json"
         )
         query = {
             "query": "SELECT name.first, name.last, gender, birthday, contact.email, contact.phone, contact.address.city, contact.address.state, likes FROM _default WHERE gender = $gender AND birthday BETWEEN $start_date AND $end_date AND ARRAY_CONTAINS(likes, $hobby) AND (ANY email IN contact.email SATISFIES email LIKE $email_filter END) AND contact.address.state = $state ORDER BY birthday ASC LIMIT 10",
@@ -72,7 +72,7 @@ class TestQueryEdgeServer(CBLTestClass):
         self.mark_test_step("Testing negative scenarios")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
             db_name="names",
-            config_file=f"{SCRIPT_DIR}/config/adhoc_disabled_config.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/adhoc_disabled_config.json",
         )
         self.mark_test_step("Testing missing parameters")
         with pytest.raises(CblEdgeServerBadResponseError, match="(?i)missing|error"):
@@ -89,7 +89,7 @@ class TestQueryEdgeServer(CBLTestClass):
     async def test_query_on_expired_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Configuring named queries")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
+            db_name="names", config_file=f"{SCRIPT_DIR}/edge_server_config/test_named_queries.json"
         )
 
         self.mark_test_step("Create document that expire after 30 seconds")
@@ -131,7 +131,7 @@ class TestQueryEdgeServer(CBLTestClass):
     async def test_adhoc_queries_incorrect_field(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         self.mark_test_step("Enabling ad-hoc queries")
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            db_name="names", config_file=f"{SCRIPT_DIR}/config/test_named_queries.json"
+            db_name="names", config_file=f"{SCRIPT_DIR}/edge_server_config/test_named_queries.json"
         )
 
         query = {

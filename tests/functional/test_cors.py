@@ -15,7 +15,7 @@ from cbltest.api.replicator_types import (
 from cbltest.responses import ServerVariant
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = SCRIPT_DIR / "config" / "test_cors.json"
+CONFIG = SCRIPT_DIR / "edge_server_config" / "test_cors.json"
 CORS_HEADERS = ["Authorization", "Content-Type"]
 
 

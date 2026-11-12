@@ -129,7 +129,7 @@ class TestLogging(CBLTestClass):
         }
         self.mark_test_step(step_descriptions[audit_mode])
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_audit.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_audit.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         AUDIT_CONFIG_APPLIERS[audit_mode](config)

@@ -19,7 +19,8 @@ from cbltest.api.syncgateway import AllDocumentsResponse, DatabaseConfig, Remote
 from cbltest.asyncfile import read_json_file, write_json_file
 from cbltest.utils import async_retry_assert
 
-SCRIPT_DIR = str(Path(__file__).parent)
+# The functional suite's Edge Server configs, one folder up.
+EDGE_SERVER_CONFIG_DIR = Path(__file__).parents[1] / "edge_server_config"
 TOTAL_TEST_TIME = timedelta(minutes=360)
 
 
@@ -88,7 +89,7 @@ class TestSystem(CBLTestClass):
 
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
+        config_path = str(EDGE_SERVER_CONFIG_DIR / "test_e2e_empty_database.json")
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         config_path = str(tmp_path / "es_config.json")

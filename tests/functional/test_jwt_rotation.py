@@ -94,7 +94,7 @@ class TestJWTReplication(CBLTestClass):
 
         # --- Step 4: Configure ES with JWT file auth ---
         self.mark_test_step("Configure ES with openid_token.path auth")
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = [
@@ -188,7 +188,7 @@ class TestJWTReplication(CBLTestClass):
         es_manager = cblpytest.edge_servers[0]
         await es_manager.write_file(JWT_FILE, token_a)
 
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         # Only sync airlines for this test
@@ -296,7 +296,7 @@ class TestJWTReplication(CBLTestClass):
         es_manager = cblpytest.edge_servers[0]
         await es_manager.write_file(JWT_FILE, token_valid)
 
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
@@ -362,7 +362,7 @@ class TestJWTReplication(CBLTestClass):
         es_manager = cblpytest.edge_servers[0]
         await es_manager.write_file(JWT_FILE, token)
 
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]
@@ -457,7 +457,7 @@ class TestJWTReplication(CBLTestClass):
         es_manager = cblpytest.edge_servers[0]
         await es_manager.write_file(JWT_FILE, token_a)
 
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_auth_sgw.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_auth_sgw.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sgw.replication_url("travel")
         config["replications"][0]["collections"] = ["travel.airlines"]

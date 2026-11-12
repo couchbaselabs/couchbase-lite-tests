@@ -79,7 +79,7 @@ class TestSessionCookie(CBLTestClass):
         self, cblpytest: CBLPyTest, tmp_path: Path, session_cookie: str, cookie_header: str | None = None
     ) -> str:
         """Write an Edge Server config that replicates with SGW using `session_cookie`."""
-        config = await read_json_file(f"{SCRIPT_DIR}/config/test_session_cookie.json")
+        config = await read_json_file(f"{SCRIPT_DIR}/edge_server_config/test_session_cookie.json")
         replication = config["replications"][0]
         replication["source"] = cblpytest.sync_gateways[0].replication_url(SG_DB)
         replication["auth"]["session_cookie"] = session_cookie

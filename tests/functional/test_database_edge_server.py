@@ -16,7 +16,7 @@ class TestDatabase(CBLTestClass):
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
         self.mark_test_step("test_edge_server_incorrect_db_config")
-        config_path = f"{SCRIPT_DIR}/config/test_edge_server_incorrect_db_config.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_edge_server_incorrect_db_config.json"
         self.mark_test_step("Edge server should fail to serve a database it is not allowed to create.")
         with pytest.raises(CblEdgeServerBadResponseError):
             edge_server = await cblpytest.edge_servers[0].configure_dataset(config_file=config_path)
