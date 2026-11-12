@@ -7,8 +7,8 @@
 #
 #   uv run environment/local/start_local.py --server rosmar --git-tag main
 #   uv run environment/local/start_edge_server.py --version 1.1.1-3
-#   cd tests/dev_e2e
-#   uv run pytest --config ../../environment/local/edge_server/topology_config.json edge_server
+#   cd tests/functional
+#   uv run pytest --config ../../environment/local/edge_server/topology_config.json -m min_edge_servers
 #
 import json
 import pathlib

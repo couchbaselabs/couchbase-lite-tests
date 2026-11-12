@@ -145,7 +145,7 @@ class TestJWTSimple(CBLTestClass):
         #   3. start_server(config) — write config and start ES binary
         # =====================================================================
         self.mark_test_step("Configuring Edge Server with JWT auth (inline token).")
-        config_path = f"{SCRIPT_DIR}/config/test_jwt_simple.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_jwt_simple.json"
         config = await read_json_file(config_path)
 
         # Set the real SGW replication URL (e.g. wss://hostname:<public_port>/travel)

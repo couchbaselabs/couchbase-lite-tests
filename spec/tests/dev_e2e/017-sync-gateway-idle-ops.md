@@ -38,10 +38,9 @@ the test checks that either stat rose only after an idle time this long. Couchba
 `n1ql_requests` series of each node's `GET /metrics`, which counts every
 request from every client.
 
-The test leaves the databases idle for 1.5 hours, so it is marked `standalone`
-and runs only when the `-m` expression names that marker, for example
-`pytest -m standalone syncgateway/test_idle_ops.py`. Any other run skips it,
-even one that names the file. A shorter
+The test leaves the databases idle for 1.5 hours, so it lives in the functional
+suite's `stress/` folder and runs only with `--stress`, for example
+`pytest --stress stress/test_idle_ops.py`. Any other run skips it. A shorter
 or longer time, in seconds, can be set with `idle_ops_seconds` in the
 `--test-props` file. The test also needs a Couchbase Server backing store,
 since rosmar has no command counts to compare against.

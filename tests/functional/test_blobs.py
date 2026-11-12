@@ -52,7 +52,7 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway; waiting for idle.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         config_path = str(tmp_path / "es_config.json")
@@ -133,7 +133,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Creating a document on Edge Server.")
@@ -198,7 +198,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Adding user to Sync Gateway.")
         await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
 
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         config_path = str(tmp_path / "es_config.json")
@@ -257,7 +257,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Create document.")
@@ -281,7 +281,7 @@ class TestBlobs(CBLTestClass):
     async def test_blob_delete_nonexistent(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         doc_id = "doc_deletion"
@@ -313,7 +313,7 @@ class TestBlobs(CBLTestClass):
     async def test_blob_update_incorrect_rev(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         doc_id = "doc_updation"
@@ -356,7 +356,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Verifying that put blob on nonexistent document fails.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         doc_id = "doc_blob"
@@ -376,7 +376,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         doc_id = "doc_blob"
@@ -429,7 +429,7 @@ class TestBlobs(CBLTestClass):
         self.mark_test_step("Creating a database on Edge Server.")
         es_db_name = "db"
         edge_server = await cblpytest.edge_servers[0].configure_dataset(
-            config_file=f"{SCRIPT_DIR}/config/test_edge_server_with_multiple_rest_clients.json",
+            config_file=f"{SCRIPT_DIR}/edge_server_config/test_edge_server_with_multiple_rest_clients.json",
         )
 
         self.mark_test_step("Create document.")
@@ -500,7 +500,7 @@ class TestBlobs(CBLTestClass):
 
         self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
         es_db_name = "db"
-        config_path = f"{SCRIPT_DIR}/config/test_e2e_empty_database.json"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_empty_database.json"
         config = await read_json_file(config_path)
         config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
         config_path = str(tmp_path / "es_config.json")

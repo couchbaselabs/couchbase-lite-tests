@@ -81,7 +81,6 @@ def _database_config(bucket: str) -> DatabaseConfig:
     )
 
 
-@pytest.mark.standalone
 @pytest.mark.min_sync_gateways(1)
 @pytest.mark.min_couchbase_servers(1)
 class TestSyncGatewayIdleOps(CBLTestClass):

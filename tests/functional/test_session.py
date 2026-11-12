@@ -9,8 +9,8 @@ from cbltest.api.error import CblEdgeServerBadResponseError
 from cbltest.api.syncgateway import get_basic_auth_headers
 
 SCRIPT_DIR = Path(__file__).parent
-CONFIG = str(SCRIPT_DIR / "config" / "test_session.json")
-USERS = SCRIPT_DIR / "config" / "test_session_users.json"
+CONFIG = str(SCRIPT_DIR / "edge_server_config" / "test_session.json")
+USERS = SCRIPT_DIR / "edge_server_config" / "test_session_users.json"
 USERS_FILE = "/home/ec2-user/user/session_users.json"
 PASSWORD = "password"
 SESSION_ID = re.compile(r"^[0-9a-fA-F]{32}$")
