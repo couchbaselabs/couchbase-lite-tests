@@ -317,6 +317,14 @@ class TestServer(ABC):
         """
         Download the test server package from the latestbuilds server.
 
+        A cached copy is reused only when the published artifact still matches it.
+        Rebuilding a test server at the same version and build number overwrites the
+        artifact in place, so the download path alone cannot tell a current copy from
+        a stale one -- a node that fetched the old binary would otherwise keep running
+        it forever, silently, however many times the server was rebuilt. The marker
+        file therefore records the artifact's identity rather than merely its
+        existence, and a mismatch re-downloads.
+
         Raises:
             FileNotFoundError: If the test server package is not found on the latestbuilds server.
         """
@@ -324,22 +332,27 @@ class TestServer(ABC):
         header(f"Downloading {url}")
         download_dir = DOWNLOADED_TEST_SERVER_DIR / self.platform / self.version
         download_dir.mkdir(parents=True, exist_ok=True)
-        if (download_dir / ".downloaded").exists():
-            click.secho("Already downloaded", fg="green")
-            click.echo()
-            self._downloaded = True
-            return
+        marker = download_dir / ".downloaded"
 
         response = requests.head(url)
         if response.status_code == 404:
             raise FileNotFoundError(f"Test server not found at {url}")
         response.raise_for_status()
 
+        # Blank when the server sends neither header, which forces a re-download
+        # rather than trusting a copy whose freshness cannot be established.
+        published = f"{response.headers.get('Last-Modified', '')}|{response.headers.get('Content-Length', '')}"
+        if published.strip("|") and marker.exists() and marker.read_text() == published:
+            click.secho("Already downloaded", fg="green")
+            click.echo()
+            self._downloaded = True
+            return
+
         response = requests.get(url, stream=True)
         file_path = download_dir / Path(url).name
         download_progress_bar(response, file_path)
         self.uncompress_package(file_path)
-        Path(download_dir / ".downloaded").touch()
+        marker.write_text(published)
         self._downloaded = True
 
     @abstractmethod
