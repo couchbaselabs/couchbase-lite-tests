@@ -343,42 +343,20 @@ class EdgeServerConfig:
         self.__internal_hostname = internal_hostname
 
 
-class LoadBalancerInput:
-    """
-    A class to parse and store input configuration for a load balancer.
-
-    Attributes:
-        sync_gateways (List[int]): The list of Sync Gateway indices associated with the load balancer.
-    """
-
-    @property
-    def sync_gateways(self) -> list[int]:
-        return self.__sync_gateways
-
-    def __init__(self, sync_gateways: list[int]) -> None:
-        self.__sync_gateways = sync_gateways
-
-
 class LoadBalancerConfig:
     """
-    A class to store the configuration of a load balancer.
+    A load balancer.  It starts with no upstreams, and each test sets its own.
 
     Attributes:
         hostname (str): The hostname of the load balancer.
-        sync_gateways (List[int]): The list of Sync Gateway indices associated with the load balancer.
     """
 
     @property
     def hostname(self) -> str:
         return self.__hostname
 
-    @property
-    def upstreams(self) -> list[str]:
-        return self.__upstreams
-
-    def __init__(self, hostname: str, upstreams: list[str]) -> None:
+    def __init__(self, hostname: str) -> None:
         self.__hostname = hostname
-        self.__upstreams = upstreams
 
 
 class TestServerInput:
@@ -474,6 +452,28 @@ class TestServerConfig:
         self.__platform = platform
 
 
+def _load_balancer_count(value: object, config_file: Path | str | None) -> int:
+    """
+    Reads `load_balancers`: a count, or the older list of `{"sync_gateways": [...]}` entries, one per load balancer.
+    """
+    where = f"{config_file}: " if config_file else ""
+    if isinstance(value, list):
+        if not all(isinstance(entry, dict) for entry in value):
+            raise ValueError(f"{where}each 'load_balancers' list entry must be an object, got {value!r}")
+        if value:
+            click.secho(
+                f"{where}'load_balancers' as a list is deprecated, use a count. Each test sets its own "
+                "upstreams, so the 'sync_gateways' of each entry are ignored.",
+                fg="yellow",
+            )
+        return len(value)
+
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ValueError(f"{where}'load_balancers' must be a count of load balancers, got {value!r}")
+
+    return value
+
+
 class TopologyConfig:
     """
     A class to manage the overall topology configuration, including clusters, Sync Gateway instances, and test servers.
@@ -526,7 +526,7 @@ class TopologyConfig:
         self.__test_server_inputs: list[TestServerInput] = []
         self.__test_servers: list[TestServerConfig] = []
         self.__load_balancers: list[LoadBalancerConfig] = []
-        self.__load_balancer_inputs: list[LoadBalancerInput] = []
+        self.__load_balancer_count: int = 0
         self._wants_logslurp: bool | None = None
         self.__logslurp: str | None = None
         self.__tag: str = ""
@@ -584,14 +584,7 @@ class TopologyConfig:
                 )
 
         if self.__load_balancers_key in config:
-            raw_balancers = cast(list[dict[str, list[int]]], config[self.__load_balancers_key])
-            for raw_balancer in raw_balancers:
-                sgw_indices = raw_balancer["sync_gateways"]
-                for sgw_index in sgw_indices:
-                    if sgw_index < 0 or sgw_index >= len(self.__sync_gateway_inputs):
-                        raise ValueError(f"Invalid Sync Gateway index '{sgw_index}'")
-
-                self.__load_balancer_inputs.append(LoadBalancerInput(sgw_indices))
+            self.__load_balancer_count = _load_balancer_count(config[self.__load_balancers_key], config_file)
 
         if self.__logslurp_key in config:
             self._wants_logslurp = cast(bool, config[self.__logslurp_key])
@@ -602,7 +595,7 @@ class TopologyConfig:
             self.__cluster_inputs.extend(sub_config.__cluster_inputs)
             self.__sync_gateway_inputs.extend(sub_config.__sync_gateway_inputs)
             self.__edge_server_inputs.extend(sub_config.__edge_server_inputs)
-            self.__load_balancer_inputs.extend(sub_config.__load_balancer_inputs)
+            self.__load_balancer_count += sub_config.__load_balancer_count
             self.__test_server_inputs.extend(sub_config.__test_server_inputs)
             if self._wants_logslurp is None:
                 self._wants_logslurp = sub_config._wants_logslurp
@@ -624,7 +617,7 @@ class TopologyConfig:
 
     @property
     def total_lb_count(self) -> int:
-        return len(self.__load_balancer_inputs)
+        return self.__load_balancer_count
 
     @property
     def clusters(self) -> list[ClusterConfig]:
@@ -824,19 +817,7 @@ class TopologyConfig:
         Args:
             hostnames (List[str]): The list of load balancer hostnames.
         """
-        if len(hostnames) == 0:
-            return
-
-        if len(self.__sync_gateways) == 0:
-            raise Exception("apply_sgw_hostnames must be called prior to apply_lb_hostnames")
-
-        for lb_input in self.__load_balancer_inputs:
-            sgw_hostnames = []
-            for sgw_index in lb_input.sync_gateways:
-                sgw_hostnames.append(self.__sync_gateways[sgw_index].internal_hostname)
-
-            lb = LoadBalancerConfig(hostnames.pop(0), sgw_hostnames)
-            self.__load_balancers.append(lb)
+        self.__load_balancers.extend(LoadBalancerConfig(hostname) for hostname in hostnames)
 
     def dump(self) -> None:
         """
@@ -868,11 +849,8 @@ class TopologyConfig:
 
         if len(self.__edge_servers) > 0:
             click.echo()
-        i = 1
-        for lb in self.__load_balancers:
+        for i, lb in enumerate(self.__load_balancers, start=1):
             click.echo(f"Load Balancer {i}: {lb.hostname}")
-            for up in lb.upstreams:
-                click.echo(f"\t{up}")
 
         if self.__logslurp is not None:
             click.echo(f"Logslurp: {self.__logslurp}")

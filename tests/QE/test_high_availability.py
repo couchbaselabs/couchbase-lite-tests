@@ -27,7 +27,7 @@ class TestHighAvailability(CBLTestClass):
             "shell2http sidecar is not reachable on every Sync Gateway host",
         )
         cbs = cblpytest.couchbase_servers[0]
-        lb_url = cblpytest.load_balancers[0]
+        lb = cblpytest.load_balancers[0]
         sg_db = "db_ha"
         bucket_name = "bucket-ha"
         num_docs = 100
@@ -45,10 +45,10 @@ class TestHighAvailability(CBLTestClass):
 
         self.mark_test_step(f"Create user '{username}' with access to channels {channels}")
         await cblpytest.sync_gateways[0].reset_user(sg_db, username, password, channels)
-        self.mark_test_step(f"Create user client via load balancer ({lb_url})")
-        # Hardcoded because `load_balancers` config carries no port of its own.
+        self.mark_test_step(f"Put every node behind the load balancer, and create a user client via it ({lb})")
+        await lb.configure(cblpytest.sync_gateways)
         lb_user = SyncGatewayUserClient(
-            lb_url, port=4984, secure=False, headers=get_basic_auth_headers(username, password)
+            lb.hostname, port=lb.port, secure=False, headers=get_basic_auth_headers(username, password)
         )
 
         self.mark_test_step(f"Add initial {num_docs} documents via load balancer")
@@ -125,16 +125,16 @@ class TestHighAvailability(CBLTestClass):
 
         await lb_user.close()
 
-        for index in range(len(cblpytest.sync_gateways)):
-            self.mark_test_step(f"Force the load balancer to node sg-{index}, and verify that node serves every doc")
+        for sg in cblpytest.sync_gateways:
+            self.mark_test_step(f"Pin the load balancer to {sg.hostname}, and verify that node serves every doc")
             async with SyncGatewayUserClient(
-                lb_url,
-                port=4984,
+                lb.hostname,
+                port=lb.port,
                 secure=False,
-                headers=get_basic_auth_headers(username, password) | {"X-Backend": f"sg-{index}"},
+                headers=get_basic_auth_headers(username, password) | lb.pin(sg),
             ) as pinned_user:
                 pinned_docs = await pinned_user.wait_for_document_count(sg_db, total_docs)
 
             pinned_ids = {row.id for row in pinned_docs.rows}
             missing_from_node = set(final_doc_ids) - pinned_ids
-            assert not missing_from_node, f"Node sg-{index} is missing {len(missing_from_node)} docs via LB"
+            assert not missing_from_node, f"{sg.hostname} is missing {len(missing_from_node)} docs via LB"

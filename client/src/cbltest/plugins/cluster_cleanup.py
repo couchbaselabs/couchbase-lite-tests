@@ -1,7 +1,7 @@
 """
-Return the backend to a clean slate between tests: every Edge Server reset to its
-provisioned state, every Sync Gateway database removed, and every Couchbase Server bucket
-emptied.
+Return the backend to a clean slate between tests: every load balancer left with no
+upstreams, every Edge Server reset to its provisioned state, every Sync Gateway database
+removed, and every Couchbase Server bucket emptied.
 
 ``--bucketpool`` decides how a bucket is emptied: ``delete`` drops it, ``purge`` empties it
 in place.
@@ -17,6 +17,7 @@ import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.cluster import CouchbaseCluster
 from cbltest.api.edgeservermanager import EdgeServerManager
+from cbltest.api.loadbalancer import LoadBalancer
 from cbltest.api.syncgateway import SyncGateway
 from cbltest.api.syncgatewaycluster import SyncGatewayCluster
 from cbltest.logging import cbl_info, cbl_trace
@@ -25,8 +26,8 @@ from cbltest.logging import cbl_info, cbl_trace
 @pytest_asyncio.fixture(scope="function", autouse=True)
 async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     """
-    Reset every Edge Server, then remove all Sync Gateway databases and empty all Couchbase
-    Server buckets.
+    Remove every load balancer's upstreams and reset every Edge Server, then remove all Sync
+    Gateway databases and empty all Couchbase Server buckets.
 
     This runs at the start of each test (rather than as a teardown) to ensure a
     clean slate even if a previous test run was interrupted and left behind a
@@ -35,12 +36,22 @@ async def cluster_cleanup(cblpytest: CBLPyTest) -> None:
     Tests that reuse a shared database/bucket across multiple test functions
     (e.g. `TestQueryConsistency`) can shadow this fixture with a class-scoped
     override that calls `perform_cleanup` once for the whole class instead of
-    once per test. Such a class keeps its Edge Servers between tests too.
+    once per test. Such a class keeps its Edge Servers and load balancers between tests too.
     """
-    # Edge Servers first: their provisioned config declares no replications, so nothing
-    # pulls from the Sync Gateway databases the next phase deletes.
-    await reset_all_edge_servers(cblpytest.edge_servers)
+    await asyncio.gather(
+        reset_all_load_balancers(cblpytest.load_balancers),
+        reset_all_edge_servers(cblpytest.edge_servers),
+    )
+    # After the Edge Server reset: their provisioned config declares no replications,
+    # so nothing pulls from the Sync Gateway databases that this deletes.
     await perform_cleanup(cblpytest)
+
+
+async def reset_all_load_balancers(load_balancers: Sequence[LoadBalancer]) -> None:
+    """Remove every load balancer's upstreams, so a test that needs one must configure it."""
+    async with asyncio.TaskGroup() as group:
+        for load_balancer in load_balancers:
+            group.create_task(load_balancer.reset())
 
 
 async def reset_all_edge_servers(managers: Sequence[EdgeServerManager]) -> None:

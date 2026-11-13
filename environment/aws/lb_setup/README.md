@@ -1,35 +1,36 @@
 # Load Balancer AWS setup
 
-The contents of this folder all have to do with deploying and setting up one or more load balancers onto one or more AWS nodes so that at the end it is ready to go for E2E testing.  The steps that it takes are as follows:
+This folder deploys one or more load balancers onto AWS nodes for E2E testing. For each node, `setup_load_balancers.py` does these steps:
 
-1. Transfer configure-system.sh and Traefik config files to the remote node
-2. Run configure-system.sh (see later section for details)
-3. Sets up a local docker context that runs over SSH to the remote node
-4. Starts a docker container of Traefik, or uses an existing one that it finds
+1. Copy `configure-system.sh` to the node, and run it.
+2. Start a Caddy container (`caddy:2.10.2`) with no upstreams.
+
+The topology file sets only how many load balancers to start (`"load_balancers": 1`). It does not choose upstreams.
 
 ## System Configuration
 
-The AWS remote node is not going to have docker installed by default, so the configure-system.sh will do the following:
+The AWS node does not have Docker by default, so `configure-system.sh` does these steps:
 
-1. If docker is not found, install docker via yum and start its systemd service
-2. If the user is not a member of the docker group, add the user to the docker group so that the user can run docker commands without sudo.
+1. If Docker is not found, install Docker with dnf, and start its systemd service.
+2. If the user is not a member of the docker group, add the user to the group. The user can then run docker commands without sudo.
+
+## Ports
+
+| Port | Use |
+|------|-----|
+| 4984 | Sync Gateway public API |
+| 4985 | Sync Gateway admin API |
+| 20000 | Caddy's admin API, which takes a new Caddyfile at `/load` |
+
+These are the defaults of `LoadBalancerInfo` in `cbltest.configparser`. The TDK config entry names only the `hostname`, so the tests use the same ports. Another environment can set `port`, `admin_port`, and `caddy_admin_port` in its entry, and Caddy then listens on those ports.
+
+Caddy dials each Sync Gateway by the `internal_hostname` of its `sync-gateways` entry, which falls back to `hostname`. `start_backend.py` sets it to the node's private EC2 address, so the traffic stays inside the VPC.
 
 ## Routing
 
-Traefik listens on 4984 (public) and 4985 (admin), and fronts every Sync Gateway node
-the topology lists as an upstream of that load balancer.
+A test sets the upstreams with `LoadBalancer.configure()` from `cbltest.api.loadbalancer`. Caddy applies the new config before it answers. `cluster_cleanup` removes every upstream before each test, so a test that needs a load balancer must configure it.
 
-- A request with no `X-Backend` header goes to the round robin pool of all nodes. A node
-  that is down refuses the connection, and Traefik then retries the request against the
-  next node in the pool, as many times as there are nodes, so the pool keeps serving while
-  nodes are down. A node that is gone rather than down black-holes the connection instead
-  of refusing it, and the request waits out `dialTimeout` before moving on. An error
-  answered by a node that is up, such as the 503 it returns while a database comes online,
-  is not retried and reaches the client.
-- A request with `X-Backend: sg-<index>` goes to that one node, where `<index>` is the
-  node's position in the load balancer's upstream list. Use this to address a single node
-  through the load balancer. Such a request is never served by another node, so it fails
-  if that node is down: 502 when the node refuses the connection, 504 when it is gone.
-- A request with an `X-Backend` value that names none of the upstreams, an empty value
-  included, gets a 500, so a stale or mistyped index fails instead of quietly falling back
-  to the round robin pool.
+- A request with no `X-Backend` header goes round robin to every upstream. If an upstream refuses the connection, Caddy retries the request on the next upstream, once for each upstream. Caddy buffers each request body, up to 20 MB, so a retried POST keeps its body. If an upstream is gone, the connection hangs, and Caddy waits 5 seconds (`dial_timeout`) before it tries the next upstream. If an upstream that is up answers with an error, Caddy does not retry. An example is the 503 that Sync Gateway returns while a database comes online.
+- A request with the header from `LoadBalancer.pin(sg)` goes to that one node, with no retry. If that node is down, the request fails with a 502.
+- A request with any other `X-Backend` value, an empty one included, gets a 500. A stale or mistyped pin then fails, and does not fall back to round robin.
+- With no upstreams, every request gets a 503.

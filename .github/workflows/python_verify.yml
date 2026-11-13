@@ -34,3 +34,7 @@ jobs:
       - name: Run test
         run: |
           uv run -- pytest --config client/tests/empty_config.json client/tests
+      - name: Run environment test
+        # python -m puts the repo root on the path, so the tests can import environment.
+        run: |
+          uv run -- python -m pytest --config client/tests/empty_config.json environment/tests

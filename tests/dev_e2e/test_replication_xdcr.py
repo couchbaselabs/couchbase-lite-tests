@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 
 import pytest
@@ -12,7 +11,7 @@ from cbltest.api.replicator import (
 )
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
-from cbltest.api.test_functions import compare_doc_ids, compare_local_and_remote
+from cbltest.api.test_functions import wait_for_converging_cvs, wait_for_matching_cvs
 from cbltest.api.testserver import CouchbaseLiteFeature
 
 
@@ -34,7 +33,7 @@ class TestReplicationXdcr(CBLTestClass):
         - Reset Sync Gateways and load the dataset on each cluster.
         - Start bidirectional XDCR.
         """
-        self.mark_test_step("Stop XDCR between cluster 1 and cluster 2 if they are active.")
+        self.mark_test_step("If XDCR between cluster 1 and cluster 2 is active, stop it.")
         await (
             cblpytest.clusters[0]
             .couchbase_servers[0]
@@ -63,8 +62,10 @@ class TestReplicationXdcr(CBLTestClass):
             .start_xdcr(cblpytest.clusters[0].couchbase_servers[0], dataset_name)
         )
 
-        self.mark_test_step("Wait 5 secs to ensure that clusters are ready.")
-        await asyncio.sleep(5)
+        self.mark_test_step("Wait until both SGs have the same CV for every doc, through XDCR.")
+        await wait_for_converging_cvs(
+            cblpytest.clusters[0].sync_gateways[0], cblpytest.clusters[1].sync_gateways[0], dataset_name
+        )
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_and_pull_with_xdcr(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -82,13 +83,16 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+            Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
                 * continuous: true
             """)
-        repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url("names", cblpytest.load_balancers[0])
+        lb = cblpytest.load_balancers[0]
+        sg1, sg2 = cblpytest.clusters[0].sync_gateways[0], cblpytest.clusters[1].sync_gateways[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url("names")
         replicator = Replicator(
             db,
             repl_url,
@@ -96,32 +100,18 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=True,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-0"},
+            headers=lb.pin(sg1),
         )
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is idle.")
         await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
-        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
-        await asyncio.sleep(5)
+        self.mark_test_step("Wait until both SGs have the same CV for every doc, through XDCR.")
+        await wait_for_converging_cvs(sg1, sg2, "names")
 
-        self.mark_test_step("Check that all docs are replicated correctly at SG1.")
-        await compare_local_and_remote(
-            db,
-            cblpytest.clusters[0].sync_gateways[0],
-            ReplicatorType.PUSH_AND_PULL,
-            bucket="names",
-            collections=["_default._default"],
-        )
-
-        self.mark_test_step("Check that all docs are replicated correctly at SG2.")
-        # Local docs from the 3.2 dataset use rev-trees, while SG2 docs replicated
-        # via XDCR use version vectors, so their revids are not comparable.
-        local_docs = await db.get_all_documents("_default._default")
-        remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
-        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
+        self.mark_test_step("Check that the local database has the same CV as SG1 for every doc.")
+        await wait_for_matching_cvs(db, sg1, "names")
 
         self.mark_test_step("""
             Update documents in the local database.
@@ -178,28 +168,13 @@ class TestReplicationXdcr(CBLTestClass):
         self.mark_test_step("Wait until the replicator is idle.")
         await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
-        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
-        await asyncio.sleep(5)
+        self.mark_test_step("Wait until both SGs have the same CV for every doc, through XDCR.")
+        await wait_for_converging_cvs(sg1, sg2, "names")
 
-        self.mark_test_step("Check that all updated docs are replicated correctly at SG1.")
-        await compare_local_and_remote(
-            db,
-            cblpytest.clusters[0].sync_gateways[0],
-            ReplicatorType.PUSH_AND_PULL,
-            "names",
-            ["_default._default"],
-            ["name_201", "name_1", "name_2", "name_301", "name_101", "name_102"],
+        self.mark_test_step(
+            "Check that the local database has the same CV as SG1 for every doc, including the updates."
         )
-
-        self.mark_test_step("Check that all updated docs are replicated correctly at SG2.")
-        await compare_local_and_remote(
-            db,
-            cblpytest.clusters[1].sync_gateways[0],
-            ReplicatorType.PUSH_AND_PULL,
-            "names",
-            ["_default._default"],
-            ["name_201", "name_1", "name_2", "name_301", "name_101", "name_102"],
-        )
+        await wait_for_matching_cvs(db, sg1, "names")
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_fail_over(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
@@ -217,13 +192,16 @@ class TestReplicationXdcr(CBLTestClass):
         db = dbs[0]
 
         self.mark_test_step("""
-            Start a replicator with header X-Backend=sg-0 to tell the load balancer to use SG1:
+            Put SG1 and SG2 behind the load balancer, and start a replicator pinned to SG1:
                 * endpoint: `/names`
                 * collections : `_default._default`
                 * type: push_and_pull
                 * continuous: false
             """)
-        repl_url = cblpytest.clusters[0].sync_gateways[0].replication_url("names", cblpytest.load_balancers[0])
+        lb = cblpytest.load_balancers[0]
+        sg1, sg2 = cblpytest.clusters[0].sync_gateways[0], cblpytest.clusters[1].sync_gateways[0]
+        await lb.configure([sg1, sg2])
+        repl_url = lb.replication_url("names")
         replicator = Replicator(
             db,
             repl_url,
@@ -231,32 +209,18 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=False,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-0"},
+            headers=lb.pin(sg1),
         )
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
         await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
-        self.mark_test_step("Wait 5 secs to ensure that the docs are sync between two SGs.")
-        await asyncio.sleep(5)
+        self.mark_test_step("Wait until both SGs have the same CV for every doc, through XDCR.")
+        await wait_for_converging_cvs(sg1, sg2, "names")
 
-        self.mark_test_step("Check that all docs are replicated correctly at SG1.")
-        await compare_local_and_remote(
-            db,
-            cblpytest.clusters[0].sync_gateways[0],
-            ReplicatorType.PUSH_AND_PULL,
-            bucket="names",
-            collections=["_default._default"],
-        )
-
-        self.mark_test_step("Check that all docs are replicated correctly at SG2.")
-        # Local docs from the 3.2 dataset use rev-trees, while SG2 docs replicated
-        # via XDCR use version vectors, so their revids are not comparable.
-        local_docs = await db.get_all_documents("_default._default")
-        remote_docs = await cblpytest.clusters[1].sync_gateways[0].get_all_documents("names", "_default", "_default")
-        self.mark_test_step("Verify that the local database and SG2 have the same document IDs")
-        compare_doc_ids(local_docs.get("_default._default") or [], remote_docs.rows)
+        self.mark_test_step("Check that the local database has the same CV as SG1 for every doc.")
+        await wait_for_matching_cvs(db, sg1, "names")
 
         self.mark_test_step("""
             Update documents in the local database.
@@ -309,9 +273,7 @@ class TestReplicationXdcr(CBLTestClass):
                     .delete_document(doc.id, doc.revid, "names", "_default", "_default")
                 )
 
-        self.mark_test_step(
-            "Start the replicator with header X-Backend=sg-1 to tell the load balancer to switch to SG2."
-        )
+        self.mark_test_step("Start the replicator pinned to SG2, to switch the load balancer to SG2.")
         replicator = Replicator(
             db,
             repl_url,
@@ -319,21 +281,16 @@ class TestReplicationXdcr(CBLTestClass):
             continuous=False,
             collections=[ReplicatorCollectionEntry(["_default._default"])],
             authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
-            headers={"X-Backend": "sg-1"},
+            headers=lb.pin(sg2),
         )
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
         await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
-        self.mark_test_step("Check that all updated docs are replicated correctly at SG2.")
-        await compare_local_and_remote(
-            db,
-            cblpytest.clusters[1].sync_gateways[0],
-            ReplicatorType.PUSH_AND_PULL,
-            "names",
-            ["_default._default"],
-            ["name_201", "name_1", "name_2", "name_301", "name_101", "name_102"],
+        self.mark_test_step(
+            "Check that the local database has the same CV as SG2 for every doc, including the updates."
         )
+        await wait_for_matching_cvs(db, sg2, "names")
 
         await cblpytest.test_servers[0].cleanup()
