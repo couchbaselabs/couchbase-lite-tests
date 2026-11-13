@@ -26,6 +26,7 @@ import platform
 import re
 import shutil
 import subprocess
+from collections.abc import Sequence
 from os import environ
 from pathlib import Path
 
@@ -56,17 +57,28 @@ class iOSBridge(PlatformBridge):
     A class to manage iOS applications on devices using either xharness or devicectl.
     """
 
-    def __init__(self, app_path: str, app_id: str) -> None:
+    def __init__(
+        self,
+        app_path: str,
+        app_id: str,
+        *,
+        launch_args: Sequence[str] = (),
+        restart_on_run: bool = False,
+    ) -> None:
         """
         Initialize the iOSBridge with the application path and whether to use devicectl.
 
         Args:
             app_path (str): The path to the application.
             app_id (bool): The bundle ID of the application.
+            launch_args (Sequence[str]): Arguments passed to the application on launch (devicectl only).
+            restart_on_run (bool): Stop any running instance before launching.
         """
         self.__app_path = app_path
         self.__has_xharness: bool = XHARNESS_PATH.is_file()
         self.__app_id = app_id
+        self.__launch_args = list(launch_args)
+        self.__restart_on_run = restart_on_run
 
     def validate(self, location: str) -> None:
         """
@@ -116,11 +128,18 @@ class iOSBridge(PlatformBridge):
         Args:
             location (str): The device location (e.g., device UUID).
         """
+        uses_xharness = location in _xharness_devices
+        if uses_xharness and self.__launch_args:
+            raise RuntimeError(f"Launch arguments need devicectl, which cannot find device '{location}'")
+
+        if self.__restart_on_run:
+            self.stop(location)
+
         header(f"Running {self.__app_path} on {location}")
-        if location not in _xharness_devices:
-            self.__run_devicectl(location)
-        else:
+        if uses_xharness:
             self.__run_xharness(location)
+        else:
+            self.__run_devicectl(location)
 
     def stop(self, location: str) -> None:
         """
@@ -225,6 +244,7 @@ class iOSBridge(PlatformBridge):
                 "--device",
                 location,
                 self.__app_id,
+                *(["--", *self.__launch_args] if self.__launch_args else []),
             ],
             check=True,
             capture_output=True,

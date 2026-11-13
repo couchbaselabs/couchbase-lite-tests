@@ -30,6 +30,7 @@ Functions:
 
 import platform
 import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import ClassVar
 
@@ -83,6 +84,8 @@ class AndroidBridge(PlatformBridge):
         activity: str = "MainActivity",
         *,
         needs_permissions: bool = True,
+        launch_extras: Mapping[str, str] | None = None,
+        restart_on_run: bool = False,
     ) -> None:
         """
         Initialize the AndroidBridge with the application path, application ID, and activity name.
@@ -91,6 +94,9 @@ class AndroidBridge(PlatformBridge):
             app_path (str): The path to the application APK file.
             app_id (str): The application ID.
             activity (str): The activity name to launch.
+            needs_permissions (bool): Whether to grant the runtime permissions after install.
+            launch_extras (Mapping[str, str] | None): String extras passed to the activity on launch.
+            restart_on_run (bool): Force-stop any running instance before launching.
 
         Raises:
             RuntimeError: If the ADB executable is not found.
@@ -100,6 +106,8 @@ class AndroidBridge(PlatformBridge):
         self.__activity = activity
         self.__adb_location = None
         self.__needs_permissions = needs_permissions
+        self.__launch_extras = dict(launch_extras or {})
+        self.__restart_on_run = restart_on_run
 
         find_command = "where" if platform.system() == "Windows" else "which"
         find_adb_result = subprocess.run([find_command, "adb"], check=False, capture_output=True, text=True)
@@ -292,16 +300,13 @@ class AndroidBridge(PlatformBridge):
         """
         header(f"Running {self.__app_id} on {location}")
         self.__wake_device(location)
+        adb = [str(self.__adb_location), "-s", location]
+        start_args = ["-S"] if self.__restart_on_run else []
+        for key, value in self.__launch_extras.items():
+            start_args += ["--es", key, value]
+
         subprocess.run(
-            [
-                str(self.__adb_location),
-                "-s",
-                location,
-                "shell",
-                "am",
-                "start",
-                f"{self.__app_id}/.{self.__activity}",
-            ],
+            [*adb, "shell", "am", "start", *start_args, f"{self.__app_id}/.{self.__activity}"],
             check=True,
             capture_output=False,
         )
