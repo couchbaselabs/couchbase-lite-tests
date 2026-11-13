@@ -25,6 +25,7 @@ from cbltest.api.syncgateway import get_basic_auth_headers
 from cbltest.configparser import EdgeServerInfo
 from cbltest.logging import cbl_warning
 from cbltest.shell2http import DEFAULT_SHELL2HTTP_TIMEOUT, Shell2HttpClient
+from cbltest.utils import async_retry_assert
 from cbltest.version import VERSION
 
 
@@ -111,7 +112,7 @@ class EdgeServerManager:
     async def __start_process(self, config_file: str | None) -> None:
         """
         Start the Edge Server on `config_file`, or on whatever the host already holds, and
-        wait for it to answer.
+        wait for it to answer and to list the replications in that config.
         """
         config = await _read_config(config_file) if config_file else {}
         await self._call_sidecar("post", "/start-edgeserver", JSONDictionary(config))
@@ -120,6 +121,27 @@ class EdgeServerManager:
 
         async with self.get_anonymous_client() as probe:
             await self.__wait_until_serving(probe)
+        await self.__wait_until_replications_listed()
+
+    async def __wait_until_replications_listed(self) -> None:
+        """
+        Poll ``GET /_replicate`` until it lists every replication in the running config.  Edge
+        Server creates them a few ms after it starts to listen.  It lists one that cannot
+        connect, but never one it rejects, such as one whose target database the config lacks.
+        """
+        expected = len(EdgeServerConfig.load(self.__config_file).replications)
+        if expected == 0:
+            return
+
+        client = self.get_admin_client()
+
+        async def _poll() -> None:
+            listed = await client.all_replication_status()
+            assert len(listed) >= expected, (
+                f"Edge Server {self} lists {len(listed)} of the {expected} replications in {self.__config_file}: {listed}"
+            )
+
+        await async_retry_assert(_poll, tenacity.wait_fixed(0.1), tenacity.stop_after_delay(10))
 
     @tenacity.retry(
         wait=tenacity.wait_fixed(1),

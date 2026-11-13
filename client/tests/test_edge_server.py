@@ -69,6 +69,58 @@ def test_defaults_where_the_config_is_silent(tmp_path: Path) -> None:
     assert not config.is_mtls
     assert not config.declares_users
     assert config.audit_log is None
+    assert config.replications == []
+
+
+def test_reads_replications(tmp_path: Path) -> None:
+    config = EdgeServerConfig.load(
+        write_config(
+            tmp_path,
+            "replications.json",
+            {
+                "replications": [
+                    {
+                        "source": "wss://sgw:4984/travel",
+                        "target": "travel",
+                        "bidirectional": True,
+                        "continuous": True,
+                        "collections": ["travel.airlines"],
+                        "pinned_cert": "/home/ec2-user/cert/sg_cert.pem",
+                        "auth": {"openid_token": {"file": "/jwt.txt"}, "reconnect_on_token_change": True},
+                    },
+                    {"source": "ws://sgw:4984/db", "target": "db", "auth": {"user": "user1", "password": "pass"}},
+                ]
+            },
+        )
+    )
+
+    first, second = config.replications
+    assert (first.source, first.target, first.bidirectional, first.continuous) == (
+        "wss://sgw:4984/travel",
+        "travel",
+        True,
+        True,
+    )
+    assert first.collections == ["travel.airlines"]
+    assert first.pinned_cert == "/home/ec2-user/cert/sg_cert.pem"
+    assert first.auth is not None
+    assert first.auth.openid_token == {"file": "/jwt.txt"}
+    assert first.auth.reconnect_on_token_change
+    assert second.auth is not None
+    assert (second.auth.user, second.auth.password) == ("user1", "pass")
+    assert second.continuous is None, "a key the config leaves out is left to Edge Server's default"
+
+
+def test_replication_keeps_the_keys_it_does_not_declare(tmp_path: Path) -> None:
+    config = EdgeServerConfig.load(
+        write_config(
+            tmp_path,
+            "future.json",
+            {"replications": [{"source": "ws://sgw/db", "target": "db", "a_key_from_a_later_release": 7}]},
+        )
+    )
+
+    assert config.replications[0].model_extra == {"a_key_from_a_later_release": 7}
 
 
 def test_tls_without_a_client_certificate_is_not_mtls(tmp_path: Path) -> None:
@@ -232,14 +284,37 @@ async def test_wait_for_replication_error_returns_the_error(tmp_path: Path, monk
 
 
 @pytest.mark.asyncio
+async def test_wait_for_replication_error_retries_a_stop_without_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    error = {"error": "Invalid login", "x-litecore-domain": 6, "x-litecore-code": 401}
+    responses = [replication("Stopped"), replication("Stopped", error=error)]
+    async with replicate_server(tmp_path, monkeypatch, responses) as client:
+        result = await client.wait_for_replication_error(
+            replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401
+        )
+    assert result.message == "Invalid login"
+
+
+@pytest.mark.asyncio
+async def test_wait_for_replication_error_times_out_on_a_stop_without_an_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with replicate_server(tmp_path, monkeypatch, [replication("Stopped")]) as client:
+        with pytest.raises(TimeoutError, match="has not stopped with an error"):
+            await client.wait_for_replication_error(
+                replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401, timeout=0.2
+            )
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "stopped",
     [
-        replication("Stopped"),
         replication("Stopped", error={"error": "Forbidden", "x-litecore-domain": 6, "x-litecore-code": 403}),
         replication("Stopped", error={"error": "SSL EOF", "x-litecore-domain": 5, "x-litecore-code": 6}),
     ],
-    ids=["no_error", "other_code", "other_domain"],
+    ids=["other_code", "other_domain"],
 )
 async def test_wait_for_replication_error_rejects_a_different_stop(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, stopped: dict
@@ -250,21 +325,27 @@ async def test_wait_for_replication_error_rejects_a_different_stop(
 
 
 @pytest.mark.asyncio
-async def test_wait_for_replication_status_retries_until_the_replication_is_listed(
+async def test_wait_for_idle_fails_fast_on_an_unlisted_replication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """The manager waits for configured replications at startup, so a 404 is a real failure."""
     async with replicate_server(tmp_path, monkeypatch, [None, replication("Idle")]) as client:
-        result = await client.wait_for_idle(replication_id=1)
-    assert result.status == ReplicationActivity.IDLE
+        with pytest.raises(CblEdgeServerBadResponseError) as e:
+            await client.wait_for_idle(replication_id=1, timeout=60)
+    assert e.value.code == 404
 
 
 @pytest.mark.asyncio
-async def test_wait_for_replication_status_times_out_on_an_unlisted_replication(
+async def test_wait_for_replication_error_fails_fast_on_an_unlisted_replication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Edge Server drops a stopped replication from the list about 8 seconds after it stops."""
     async with replicate_server(tmp_path, monkeypatch, [None]) as client:
-        with pytest.raises(TimeoutError, match="is not listed"):
-            await client.wait_for_idle(replication_id=1, timeout=0.2)
+        with pytest.raises(CblEdgeServerBadResponseError) as e:
+            await client.wait_for_replication_error(
+                replication_id=1, domain=LiteCoreErrorDomain.WEBSOCKET, code=401, timeout=60
+            )
+    assert e.value.code == 404
 
 
 @pytest.mark.asyncio

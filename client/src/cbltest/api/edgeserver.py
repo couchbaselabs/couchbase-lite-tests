@@ -65,6 +65,33 @@ class LoggingConfig(_EdgeServerModel):
     audit: AuditConfig | None = None
 
 
+class ReplicationConfig(_EdgeServerModel):
+    """One entry of ``replications``, which Edge Server starts when it starts."""
+
+    class Auth(_EdgeServerModel):
+        """The ``auth`` block, which holds one way to sign in to the remote."""
+
+        user: str | None = None
+        password: str | None = None
+        session_cookie: str | None = None
+        openid_token: str | dict[str, Any] | None = None
+        reconnect_on_token_change: bool | None = None
+        tls_client_cert: str | None = None
+        tls_client_cert_key: str | None = None
+
+    source: str
+    target: str
+    bidirectional: bool | None = None
+    continuous: bool | None = None
+    collections: list[str] | dict[str, Any] | None = None
+    channels: list[str] | None = None
+    doc_ids: list[str] | None = None
+    headers: dict[str, str] | None = None
+    pinned_cert: str | None = None
+    trusted_root_certs: str | None = None
+    auth: Auth | None = None
+
+
 class EdgeServerConfig(_EdgeServerModel):
     """One Edge Server config file."""
 
@@ -72,6 +99,7 @@ class EdgeServerConfig(_EdgeServerModel):
     https: HttpsConfig | None = None
     users: str | None = None
     logging: LoggingConfig | None = None
+    replications: list[ReplicationConfig] = []
 
     @classmethod
     def load(cls, config_file: str | Path) -> "EdgeServerConfig":
@@ -638,7 +666,7 @@ class EdgeServer:
             Configured replications usually get 1, 2, ... in config file order, but an incoming
             connection that arrives before they start takes the next ID first.
         :raises CblEdgeServerBadResponseError: 404 if no such replication is listed, which includes
-            one that finished more than 10 seconds ago
+            one that stopped about 8 seconds ago or earlier
         """
         with self.__tracer.start_as_current_span(
             "get replication status with Edge Server",
@@ -1012,16 +1040,11 @@ class EdgeServer:
         :return: The replication's status
         :raises TimeoutError: If the replication does not reach ``status`` within ``timeout``
         :raises CblEdgeServerBadResponseError: The code of the replication's error if it stops first,
-            since a stopped replication never resumes
+            since a stopped replication never resumes, or 404 if Edge Server does not list it
         """
 
         async def _poll() -> ReplicationStatus:
-            try:
-                replication = await self.replication_status(replication_id)
-            except CblEdgeServerBadResponseError as e:
-                # Edge Server lists configured replications only after its listener is up
-                assert e.code != 404, f"Replication {replication_id} on {self.hostname} is not listed"
-                raise
+            replication = await self.replication_status(replication_id)
             if replication.status == ReplicationActivity.STOPPED and status != ReplicationActivity.STOPPED:
                 raise CblEdgeServerBadResponseError(
                     replication.error.code if replication.error is not None else 500,
@@ -1050,20 +1073,28 @@ class EdgeServer:
         self, *, replication_id: int, domain: LiteCoreErrorDomain, code: int | None = None, timeout: float = 60
     ) -> ReplicationError:
         """
-        Wait for a replication to stop, and check the error it stopped with.
+        Wait for a replication to stop with an error, and check that error.
 
         :param replication_id: The task ID of the replication, see ``replication_status``
         :param domain: The domain the error must be in
         :param code: The code the error must have, or None to accept any code in ``domain``
         :param timeout: Seconds to wait in total
         :return: The replication's error
-        :raises AssertionError: If the replication stops with no error, or with a different one
+        :raises AssertionError: If the replication stops with a different error
+        :raises TimeoutError: If the replication does not stop with an error within ``timeout``
         """
-        replication = await self.wait_for_replication_status(
-            replication_id=replication_id, status=ReplicationActivity.STOPPED, timeout=timeout
-        )
-        error = replication.error
         expected = domain.name if code is None else f"{domain.name} {code}"
+
+        async def _poll() -> ReplicationStatus:
+            replication = await self.replication_status(replication_id)
+            # A task that Edge Server restarts, e.g. on a JWT change, reports Stopped before its error
+            assert replication.status == ReplicationActivity.STOPPED and replication.error is not None, (
+                f"Replication {replication_id} on {self.hostname} has not stopped with an error: {replication}"
+            )
+            return replication
+
+        replication = await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(timeout))
+        error = replication.error
         assert error is not None and error.domain == domain and (code is None or error.code == code), (
             f"Replication {replication_id} on {self.hostname} stopped without a {expected} error: {replication}"
         )
