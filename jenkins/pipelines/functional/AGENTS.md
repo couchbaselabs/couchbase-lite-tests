@@ -1,154 +1,121 @@
-# Agent: dev_e2e Test Pipelines (jenkins/pipelines/dev_e2e/)
+# Agent: Functional Test Pipelines (jenkins/pipelines/functional/)
 
 ## Identity
 
-You are a specialized agent for the Developer E2E test pipelines under `jenkins/pipelines/dev_e2e/`. 
-You focus on maintaining infrastructure-as-code for core feature testing during CBL releases,
-ensuring topology files match test requirements, and managing per-platform pipeline variations.
+You maintain the pipelines that run `tests/functional`. Each CBL platform pipeline (Jenkins job
+`e2e-functional-<platform>`) replaced a former `dev_e2e`/`QE` pair; `../main/cbl/` starts it daily for
+the latest build of every CBL train. `sgw/` and `es/` select the same suite by product instead of
+by CBL platform.
 
 ## Scope
 
-You own all code under `jenkins/pipelines/dev_e2e/`:
-- Standard platform pipelines: `android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`
-- Special pipelines: `multipeer_functional/`
+You own all code under `jenkins/pipelines/functional/`:
+- CBL platforms: `android/`, `c/`, `dotnet/`, `ios/`, `java/` (`desktop/` + `webservice/`), `javascript/`
+- `sgw/` — every test marked `min_sync_gateways`, on a multi-SGW topology (5 SGWs over 3 CBS
+  clusters, a load balancer, and a `c_macos` test server). Triggered by `../main/sgw/`. Skips
+  `test_replication_xdcr.py` (CBL-8686) and collects sgcollect/cbcollect on failure.
+- `es/` — every test marked `min_edge_servers` (or, with `JS_REPLICATION_TESTS_ONLY`, those also
+  marked `min_test_servers`). Does NOT use the shared `setup_test()`: its own
+  `generate_topology()` fills the one `topology.json` (3 Edge Servers, 1 Sync Gateway, 1 Couchbase
+  Server, a localhost JS test server) with the ES/SGW/CBL versions and the latest GA Couchbase Server.
+  Triggered by `../main/es/` (Jenkins job `es-functional`) against GA CBL-JS and Sync Gateway.
+  Its `STRESS` checkbox runs the stress tests marked `min_edge_servers` (`tests/functional/stress/`)
+  instead, with a 25-hour timeout.
 
-You do NOT own the dev_e2e test code itself (`tests/dev_e2e/`), but you are responsible for provisioning
-the infrastructure that those tests require.
+You do NOT own the test code (`tests/functional/`) or the trigger jobs (`../main/cbl/`, `../main/sgw/`, `../main/es/`),
+but you provision the infrastructure the tests need and accept the parameters the triggers send.
 
-## Your Responsibility: Topology-Test Synchronization
+## Shared Shape
 
-### The Rule
+Every functional pipeline has one product under test, whose version is required. The other products'
+versions are optional, and an empty one means their latest release:
 
-Every dev_e2e test file has `@pytest.mark.min_*` decorators that declare infrastructure requirements:
+| Pipeline | Under test (required) | Optional |
+|---|---|---|
+| CBL platforms (`android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`) | `CBL_VERSION` | `SGW_VERSION`, `ES_VERSION` |
+| `sgw/` | `SGW_VERSION` | `CBL_VERSION` (CBL C; empty: the latest release of the SGW's major version), `ES_VERSION` |
+| `es/` | `ES_VERSION` | `SGW_VERSION`, and `CBL_VERSION` for its CBL-JS test server (empty: latest GA release) |
 
-```python
-@pytest.mark.min_sync_gateways(1)  # Test REQUIRES 1 SGW node
-@pytest.mark.min_couchbase_servers(1)  # Test REQUIRES 1 CBS instance
-@pytest.mark.min_test_servers(1)  # Test REQUIRES 1 test server
-class TestBasicReplication(CBLTestClass): ...
-```
+Every version takes the same forms: `4` or `4.1` (a train), `4.1.0` (its newest build) or
+`4.1.0-18` (that build). A train resolves to its newest version, prereleases included only for the
+product under test. `shared/productVersions.groovy` does this for the CBL platform and `sgw/`
+pipelines: it requires the version under test, resolves all three versions, rejects an incompatible
+CBL/SGW pair (`shared/cblSgwCompatibility.groovy`) or CBL/dataset pair, and sets `CBL_RESOLVED`,
+`SGW_RESOLVED`, `ES_RESOLVED`, and `CBL_PREBUILD_VERSION`/`CBL_PREBUILD_BUILD` for the prebuild job.
+The Edge Server version reaches the topology through the run scripts' `--es-version` (`-EsVersion` in
+PowerShell) and `setup_test.py --es-version`.
 
-**YOUR JOB:** Ensure the corresponding `topology.json` provides **AT LEAST** these resources.
+Datasets: CBL platforms, `sgw/` and `multiplatform` take an explicit `TS_DATASET_VERSION` (`4.0` or
+`3.2`), and fail at Init when their CBL cannot open it (`shared/cblDatasetCompatibility.groovy`: CBL 3.x
+needs 3.2, CBL 4.x can use either). The daily triggers pass the dataset of the CBL major version. CBL JS
+(`javascript/`) and `es/` always use 3.2, so they have no dataset parameter.
 
-### The Failure Mode
+The CBL platform pipelines also share:
 
-If topology provisions FEWER resources than tests require:
-- Tests hang forever waiting for unavailable instances
-- CI/CD pipelines fail with timeout errors
-- Development release cycles are blocked
+- **Parameters:** besides the versions, `TS_DATASET_VERSION` (not on `javascript/`), `TS_TEST_FILTER`
+  (pytest `-k`; disables result upload), `RUN_PREBUILD`, plus `RUN_*` checkboxes on multi-target pipelines.
+- **Test selection:** `-m min_test_servers` on `tests/functional` (`sgw/`: `-m min_sync_gateways`;
+  `es/`: `-m min_edge_servers`). Tests whose other `min_*`
+  markers the topology can't satisfy are skipped by the `required_topology` plugin.
+  `java/webservice/` runs only `test_basic_replication.py`, since desktop runs the full suite.
+- **Scripts:** `test.sh`/`run_test.sh` accept `--setup-only`; the PowerShell scripts accept `-SetupOnly`.
+- **Artifacts:** each stage sets `TS_ARTIFACTS_DIR`; teardown's `move_artifacts` moves logs into
+  `tests/functional/$TS_ARTIFACTS_DIR/`, which the stage archives.
+- **Locks:** device nodes lock on the node name (`mob-e2e-iphone-03`, `mob-e2e-android-01`,
+  `net-windows`); pooled hosts (`e2e&&macos-host`, `e2e&&linux-host`, `e2e&&windows-host`) lock on
+  `env.NODE_NAME`, because the test server binds fixed localhost ports.
 
-### The Audit Process
+## CBL Backend (`cbl_topology_backend.json`)
 
-When ANY test is modified to add new `@pytest.mark.min_*` decorators:
+Every CBL platform topology (`android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`) declares only
+its test server(s) and includes `cbl_topology_backend.json`, which is sized so every `tests/functional`
+test marked `min_test_servers` can run. `sgw/` and `es/` do not use it: they select tests by a
+different marker and keep their own topologies.
 
-1. **FIRST:** Update the topology.json file
-2. **THEN:** Update the test code
-3. **VERIFY:** `pytest.mark.min_*` count ≤ topology count
+| Resource | Layout | Needed by |
+|---|---|---|
+| Clusters | 3 clusters × 1 Couchbase Server node | `test_isgr_load_balancer.py` (`min_clusters(3)`), `test_replication_xdcr.py` (2) |
+| Sync Gateways | one per cluster (0, 1, 2) | ISGR uses the SGWs of clusters 1 and 2; XDCR clusters 0 and 1 |
+| Load balancers | LB 0 → SGW 0; LB 1 → SGWs 1, 2 | XDCR replicates through LB 0; ISGR pins `sg-0`/`sg-1` behind LB 1 |
+| Edge Servers | 1 (latest GA unless the topology sets `defaults.es.version`) | Edge Server tests that replicate with a CBL test server |
 
-### Example: Basic Replication (most common dev_e2e case)
+Change the CBL backend there, not per platform. `shared/setup_test.py` re-roots any relative `include`
+for the generated topology, so the include can live outside `environment/aws/topology_setup/`.
 
-**Test requirements:**
-```python
-@pytest.mark.min_sync_gateways(1)      # 1 SGW node needed
-@pytest.mark.min_couchbase_servers(1)  # 1 CBS instance needed
-```
+Every platform topology has one test server, so tests that need more live in `tests/multiplatform`
+and run in the `multiplatform` pipeline.
 
-**Topology must provide:**
-```json
-{
-    "clusters": [
-        {"server_count": 1}            // CBS cluster 0 (1 total)
-    ],
-    "sync_gateways": [
-        {"cluster": 0}                 // SGW node 0 on cluster 0 (1 total)
-    ]
-}
-```
+## Topology-Test Synchronization
 
-## Standard dev_e2e Pipeline Template
-
-```python
-#!/usr/bin/env python3
-import os, sys
-from io import TextIOWrapper
-from pathlib import Path
-import click
-
-SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
-if __name__ == "__main__":
-    sys.path.append(str(SCRIPT_DIR.parents[3]))
-    if isinstance(sys.stdout, TextIOWrapper):
-        sys.stdout.reconfigure(encoding="utf-8")
-
-from jenkins.pipelines.shared.setup_test import VersionType, setup_test
-
-
-@click.command()
-@click.argument("cbl_versions", type=VersionType())
-@click.argument("sgw_versions", type=VersionType())
-def cli_entry(cbl_versions: list[str], sgw_versions: list[str]) -> None:
-    setup_test(
-        cbl_versions,
-        sgw_versions,
-        SCRIPT_DIR / "topology.json",  # ← platform-specific topology
-        SCRIPT_DIR / "config.json",  # ← platform-specific config
-        "platform_tag",  # ← e.g., "swift_ios", "jak_android"
-        # setup_dir omitted — defaults to "dev_e2e"
-    )
-
-
-if __name__ == "__main__":
-    cli_entry()
-```
-
-## Special Cases
-
-### Multi-Platform Multipeer Pipeline (multipeer_functional/)
-
-**Per-Platform Versions:**
-- Builds a per-platform version map from CLI options, then expands it into a positional `cbl_versions` list (via `ts_to_topology`/`get_platform_version`) matching its topology's `test_servers` order before calling `setup_test()`
-- Each platform can run different CBL version
-- Topology supports multiple test servers on different platforms
-- Tests cross-platform mesh replication (P2P)
-
-## Key Differences from QE
-
-| Aspect | dev_e2e | QE |
-|--------|---------|-----|
-| Topology | Simple: usually 1 SGW, 1 CBS | Complex: can be 2+ SGW, 2+ CBS |
-| Test scope | Core features, basic replication | Broader coverage, edge cases |
-| Infrastructure | Minimal (dev speed) | Comprehensive (regression) |
-| Multi-node testing | No (not needed for dev release) | Yes (QE/upgrade scenarios) |
+Every test declares the infrastructure it needs with `@pytest.mark.min_*` markers. The pipeline's
+topology must provide at least that much, or the test is skipped (never silently run short).
+When a test needs more than these single-test-server topologies provide, it belongs in a pipeline
+with a bigger topology (for example `sgw/` or `upg-sgw/`), not in a larger platform topology.
 
 ## Coding Rules
 
-- **Topology MUST match test requirements** — non-negotiable
-- **`setup_dir` omitted** (defaults to `"dev_e2e"`) for all dev_e2e pipelines
-- **Never hand-edit generated topology** — it's written at runtime by setup_test.py
-- **Validate topology against schema** — `jsonschema` validates against `topology_schema.json`
-- **Template placeholders** are resolved at runtime: `{{version}}`, etc.
-- **Python 3.13+**: `X | Y`, never `Union[X, Y]`
-- **⚠️ DO NOT create markdown documentation files** for changes. Markdown is for AI understanding only. The actual pipeline code is self-documenting via shared scripts and comments.
+- **`setup_dir` omitted** in `setup_test.py` (defaults to `"functional"`).
+- **Never hand-edit generated topology or `config.json`** — `setup_test.py` writes them at runtime.
+- **Validate topology against schema** — `environment/aws/topology_setup/topology_schema.json`.
+- **Python 3.13+**: `X | Y`, never `Union[X, Y]`.
+- **Do not create markdown documentation files** for changes.
 
 ## Commands
 
 ```bash
-# Run a dev_e2e pipeline
-cd environment/aws
-uv run ../jenkins/pipelines/dev_e2e/ios/setup_test.py 4.0.0 4.0.0
+# Set up the backend and test server only (no tests)
+jenkins/pipelines/functional/ios/test.sh 4.0.0 4 --setup-only
 
-# Teardown infrastructure
-cd jenkins/pipelines/dev_e2e/ios
-./teardown.sh
+# Teardown
+jenkins/pipelines/functional/ios/teardown.sh
 ```
 
 ## Cross-References
 
 | What | Where | Relationship |
 |------|-------|-------------|
-| Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline documentation |
-| dev_e2e test suites | `../../../tests/dev_e2e/` | Source of `@pytest.mark.min_*` requirements |
-| Test specifications | `../../../spec/tests/dev_e2e/` | Define expected behavior for dev_e2e tests |
-| Shared setup | `../shared/setup_test.py` | `setup_test()` function all pipelines use |
-| AWS orchestrator | `../../../environment/aws/start_backend.py` | Called by setup_test() to provision infra |
-
+| Parent pipelines docs | `../AGENTS.md`, `../../AGENTS.md` | Higher-level pipeline documentation |
+| Functional test suite | `../../../tests/functional/` | Source of `@pytest.mark.min_*` requirements |
+| Test specifications | `../../../spec/tests/` | Define expected behavior |
+| Shared setup | `../shared/setup_test.py` | `setup_test()` every pipeline delegates to |
+| Triggers | `../main/cbl/`, `../main/sgw/`, `../main/es/` | Start these jobs for new builds |

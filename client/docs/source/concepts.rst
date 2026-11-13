@@ -18,4 +18,4 @@ The second method is via AWS.  The environment/aws folder contains many details 
 Execution
 ---------
 
-This is the phase in which tests are executed using pytest.  The only input requirement is a config.json file which described where all of the relevant resources are located.  You can see an `example <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/tests/dev_e2e/config.example.json>`_ of this in the repo.  Passing this config file via ``--config`` to pytest will allow all of the tests to have direct access to any resources listed inside.
+This is the phase in which tests are executed using pytest.  The only input requirement is a config.json file which described where all of the relevant resources are located.  You can see an `example <https://github.com/couchbaselabs/couchbase-lite-tests/blob/main/tests/functional/config.example.json>`_ of this in the repo.  Passing this config file via ``--config`` to pytest will allow all of the tests to have direct access to any resources listed inside.

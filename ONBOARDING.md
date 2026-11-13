@@ -84,7 +84,7 @@ first. Full prerequisites and details live in
    file.
 3. **Run the Tests** against that config:
    ```bash
-   cd tests/dev_e2e
+   cd tests/functional
    uv run pytest -x -v --config config.json test_basic_replication.py
    ```
 4. **Tear it down** when finished:
@@ -94,7 +94,7 @@ first. Full prerequisites and details live in
    ```
 
 Starter Topology files for single-platform runs live in
-`jenkins/pipelines/dev_e2e/<platform>/topologies/` (e.g.
+`jenkins/pipelines/functional/<platform>/topologies/` (e.g.
 `topology_single_macos.json`, `topology_single_ios.json`).
 
 ## I own a Test Server
@@ -127,7 +127,7 @@ Tests are Python codelets run inside the Client. Anatomy:
 Run a single Test against an existing `config.json`:
 
 ```bash
-cd tests/dev_e2e
+cd tests/functional
 uv run pytest -x -v --config config.json test_basic_replication.py::TestBasicReplication::test_push_and_pull
 ```
 

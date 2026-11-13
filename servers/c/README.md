@@ -24,7 +24,7 @@
    build number 0. This also needs the VPN, and `jq`. Run it from the repository root:
 
    ```
-   ./jenkins/pipelines/dev_e2e/main/latest_successful_build.sh c 4.0.0
+   ./jenkins/pipelines/multiplatform/latest_successful_build.sh c 4.0.0
    ```
 
 3. Build and Run
