@@ -13,6 +13,7 @@
 import json
 import pathlib
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -62,14 +63,24 @@ READY_TIMEOUT_SECONDS = 60
     help="cbltest config to add the Edge Server to. Defaults to the one start_local.py last wrote, "
     "if any. Its Sync Gateway public ports are forwarded from the container to the host.",
 )
-@click.option("--stop", is_flag=True, help="Remove the container and exit.")
-def main(version: str | None, container_name: str, base_config: pathlib.Path | None, stop: bool) -> None:
+@click.option(
+    "--count",
+    default=1,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="Number of Edge Servers. More than one needs Linux: each container is then reached on its "
+    "Docker bridge IP rather than on localhost, and is named <container-name>-N.",
+)
+@click.option("--stop", is_flag=True, help="Remove the containers and exit.")
+def main(version: str | None, container_name: str, base_config: pathlib.Path | None, count: int, stop: bool) -> None:
     if stop:
-        remove_container(container_name)
+        remove_containers(container_name)
         return
 
     if not version:
         raise click.UsageError("--version is required unless --stop is set.")
+    if count > 1 and sys.platform != "linux":
+        raise click.UsageError("--count above 1 needs Linux, where the host can reach a container's bridge IP.")
 
     base_config = base_config or previous_topology_config()
     config = json.loads(base_config.read_text()) if base_config else {}
@@ -83,31 +94,37 @@ def main(version: str | None, container_name: str, base_config: pathlib.Path | N
         header(f"Building {IMAGE_NAME} with {rpm.name}")
         _run(["docker", "build", "-t", IMAGE_NAME, context])
 
-    remove_container(container_name)
-    header(f"Starting {container_name}")
-    _run(
-        [
-            "docker",
-            "run",
-            "-d",
-            "--init",
-            "--name",
-            container_name,
-            "--cap-add",
-            "NET_ADMIN",
-            "--add-host",
-            "host.docker.internal:host-gateway",
-            "-e",
-            f"HOST_FORWARD_PORTS={' '.join(str(p) for p in forward_ports)}",
-            *(arg for port in PORTS for arg in ("-p", f"127.0.0.1:{port}:{port}")),
-            IMAGE_NAME,
-        ]
-    )
-    wait_for_edge_server(container_name)
+    remove_containers(container_name)
+    names = [container_name] if count == 1 else [f"{container_name}-{i}" for i in range(1, count + 1)]
+    hostnames = []
+    for name in names:
+        header(f"Starting {name}")
+        publish = (arg for port in PORTS for arg in ("-p", f"127.0.0.1:{port}:{port}")) if count == 1 else ()
+        _run(
+            [
+                "docker",
+                "run",
+                "-d",
+                "--init",
+                "--name",
+                name,
+                "--cap-add",
+                "NET_ADMIN",
+                "--add-host",
+                "host.docker.internal:host-gateway",
+                "-e",
+                f"HOST_FORWARD_PORTS={' '.join(str(p) for p in forward_ports)}",
+                *publish,
+                IMAGE_NAME,
+            ]
+        )
+        hostname = "localhost" if count == 1 else container_ip(name)
+        wait_for_edge_server(name, hostname)
+        hostnames.append(hostname)
 
-    config["edge-servers"] = [{"hostname": "localhost"}]
+    config["edge-servers"] = [{"hostname": hostname} for hostname in hostnames]
     EDGE_SERVER_TOPOLOGY_CONFIG.write_text(json.dumps(config, indent=2) + "\n")
-    click.echo(f"Edge Server is up. Container logs: docker logs -f {container_name}")
+    click.echo(f"Edge Servers are up on {', '.join(hostnames)}. Container logs: docker logs -f {names[0]}")
     click.echo(f"Topology config for pytest written to {EDGE_SERVER_TOPOLOGY_CONFIG}")
 
 
@@ -148,13 +165,27 @@ def stage_build_context(context: pathlib.Path, rpm: pathlib.Path) -> None:
     shutil.copy(AWS_DIR / "sgw_setup" / "cert" / "sg_cert.pem", cert_dir / "sg_cert.pem")
 
 
-def wait_for_edge_server(container_name: str) -> None:
+def container_ip(container_name: str) -> str:
+    """The container's IP on the default Docker bridge, which the host can reach on Linux."""
+    result = subprocess.run(
+        ["docker", "inspect", "-f", "{{.NetworkSettings.Networks.bridge.IPAddress}}", container_name],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    ip = result.stdout.strip()
+    if not ip or ip == "<no value>":
+        raise click.ClickException(f"{container_name} has no IP address on the default Docker bridge network")
+    return ip
+
+
+def wait_for_edge_server(container_name: str, hostname: str) -> None:
     """Wait until Edge Server and its shell2http sidecar both answer, or fail with the container log."""
     deadline = time.monotonic() + READY_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         try:
-            requests.get("http://localhost:59840/", timeout=1)
-            requests.get("http://localhost:20001/", timeout=1)
+            requests.get(f"http://{hostname}:59840/", timeout=1)
+            requests.get(f"http://{hostname}:20001/", timeout=1)
             return
         except requests.RequestException:
             time.sleep(1)
@@ -163,8 +194,16 @@ def wait_for_edge_server(container_name: str) -> None:
     raise click.ClickException(f"Edge Server did not answer within {READY_TIMEOUT_SECONDS}s")
 
 
-def remove_container(container_name: str) -> None:
-    subprocess.run(["docker", "rm", "-f", container_name], capture_output=True)
+def remove_containers(container_name: str) -> None:
+    """Remove the container of this name and any numbered ones a --count run started."""
+    result = subprocess.run(["docker", "ps", "-a", "--format", "{{.Names}}"], capture_output=True, text=True)
+    if result.returncode != 0:
+        raise click.ClickException(f"Cannot list Docker containers: {result.stderr.strip()}")
+    listed = result.stdout.split()
+    pattern = re.compile(rf"{re.escape(container_name)}(-\d+)?")
+    names = [name for name in listed if pattern.fullmatch(name)]
+    if names:
+        subprocess.run(["docker", "rm", "-f", *names], capture_output=True)
     EDGE_SERVER_TOPOLOGY_CONFIG.unlink(missing_ok=True)
 
 

@@ -1,10 +1,10 @@
-import asyncio
 import json
 import ssl
 import tempfile
 import urllib.parse
 import uuid
 from collections.abc import Collection, Mapping
+from enum import IntEnum, StrEnum
 from json import dumps
 from pathlib import Path
 from typing import Any, cast
@@ -14,14 +14,13 @@ import pyjson5 as json5
 import tenacity
 from aiohttp import TCPConnector
 from opentelemetry.trace import get_tracer
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from cbltest.api import caddy
 from cbltest.api.bulk_docs import analyze_bulk_docs_response
 from cbltest.api.error import (
     CblEdgeServerBadResponseError,
     CblTestError,
-    CblTimeoutError,
 )
 from cbltest.api.jsonserializable import JSONDictionary, JSONSerializable
 from cbltest.api.syncgateway import (
@@ -66,6 +65,33 @@ class LoggingConfig(_EdgeServerModel):
     audit: AuditConfig | None = None
 
 
+class ReplicationConfig(_EdgeServerModel):
+    """One entry of ``replications``, which Edge Server starts when it starts."""
+
+    class Auth(_EdgeServerModel):
+        """The ``auth`` block, which holds one way to sign in to the remote."""
+
+        user: str | None = None
+        password: str | None = None
+        session_cookie: str | None = None
+        openid_token: str | dict[str, Any] | None = None
+        reconnect_on_token_change: bool | None = None
+        tls_client_cert: str | None = None
+        tls_client_cert_key: str | None = None
+
+    source: str
+    target: str
+    bidirectional: bool | None = None
+    continuous: bool | None = None
+    collections: list[str] | dict[str, Any] | None = None
+    channels: list[str] | None = None
+    doc_ids: list[str] | None = None
+    headers: dict[str, str] | None = None
+    pinned_cert: str | None = None
+    trusted_root_certs: str | None = None
+    auth: Auth | None = None
+
+
 class EdgeServerConfig(_EdgeServerModel):
     """One Edge Server config file."""
 
@@ -73,6 +99,7 @@ class EdgeServerConfig(_EdgeServerModel):
     https: HttpsConfig | None = None
     users: str | None = None
     logging: LoggingConfig | None = None
+    replications: list[ReplicationConfig] = []
 
     @classmethod
     def load(cls, config_file: str | Path) -> "EdgeServerConfig":
@@ -109,6 +136,52 @@ class EdgeServerConfig(_EdgeServerModel):
     def audit_log(self) -> str | None:
         """Where the Edge Server writes its audit log, or None if the config declares none."""
         return self.logging.audit.file if self.logging is not None and self.logging.audit is not None else None
+
+
+class ReplicationActivity(StrEnum):
+    """The ``status`` Edge Server reports for a replication."""
+
+    STOPPED = "Stopped"
+    OFFLINE = "Offline"
+    CONNECTING = "Connecting"
+    IDLE = "Idle"
+    ACTIVE = "Active"
+
+
+class LiteCoreErrorDomain(IntEnum):
+    """The ``x-litecore-domain`` of a replication error, which says how to read its code."""
+
+    LITECORE = 1
+    POSIX = 2
+    SQLITE = 3
+    FLEECE = 4
+    NETWORK = 5
+    WEBSOCKET = 6
+    """The code is an HTTP status or a WebSocket close code."""
+    MBEDTLS = 7
+
+
+class ReplicationError(_EdgeServerModel):
+    """The ``error`` of a replication that failed."""
+
+    message: str = Field(alias="error")
+    domain: LiteCoreErrorDomain = Field(alias="x-litecore-domain")
+    code: int = Field(alias="x-litecore-code")
+
+
+class ReplicationStatus(_EdgeServerModel):
+    """One replication, as ``/_replicate`` reports it."""
+
+    task_id: int
+    status: ReplicationActivity
+    source: str
+    target: str
+    error: ReplicationError | None = None
+    progress: int | None = None
+    docs_transferred: int | None = None
+
+
+_REPLICATION_LIST = TypeAdapter(list[ReplicationStatus])
 
 
 class EdgeServerVersion(CouchbaseVersion):
@@ -541,7 +614,10 @@ class EdgeServer:
         openid_token: str | None = None,
         tls_client_cert: str | None = None,
         tls_client_cert_key: str | None = None,
-    ) -> Any:
+    ) -> int:
+        """
+        :return: The task ID of the new replication, for ``replication_status`` and ``stop_replication``
+        """
         with self.__tracer.start_as_current_span(
             "Start Replication with Edge Server",
             attributes={
@@ -582,36 +658,39 @@ class EdgeServer:
             if not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server post /_replicate (not JSON)")
 
-            return cast(dict, response).get("session_id")
+            return int(cast(dict, response)["task_id"])
 
-    async def replication_status(self, replicator_id: str) -> dict:
+    async def replication_status(self, replication_id: int) -> ReplicationStatus:
+        """
+        :param replication_id: The task ID of the replication, as ``start_replication`` returns it.
+            Configured replications usually get 1, 2, ... in config file order, but an incoming
+            connection that arrives before they start takes the next ID first.
+        :raises CblEdgeServerBadResponseError: 404 if no such replication is listed, which includes
+            one that stopped about 8 seconds ago or earlier
+        """
         with self.__tracer.start_as_current_span(
             "get replication status with Edge Server",
-            attributes={"cbl.replicator.id": replicator_id},
+            attributes={"cbl.replicator.id": replication_id},
         ):
-            response = await self._send_request("get", f"/_replicate/{replicator_id}")
-            if not isinstance(response, dict):
-                raise ValueError("Inappropriate response from edge server get status /_replicate (not JSON)")
+            return ReplicationStatus.model_validate(await self._send_request("get", f"/_replicate/{replication_id}"))
 
-            return cast(dict, response)
-
-    async def all_replication_status(self) -> list:
+    async def all_replication_status(self) -> list[ReplicationStatus]:
+        """
+        :return: Every listed replication, in no particular order
+        """
         with self.__tracer.start_as_current_span("All Replication status with Edge Server"):
-            response = await self._send_request("get", "/_replicate")
-            if isinstance(response, list):
-                return response
-            raise CblEdgeServerBadResponseError(
-                500,
-                f"Unexpected response type from all_replication_status: {type(response)}",
-                body=str(response),
-            )
+            return _REPLICATION_LIST.validate_python(await self._send_request("get", "/_replicate"))
 
-    async def stop_replication(self, replicator_id: int) -> None:
+    async def stop_replication(self, replication_id: int) -> None:
+        """
+        :param replication_id: The task ID of a running replication
+        :raises CblEdgeServerBadResponseError: 404 if the replication is unknown or already finished
+        """
         with self.__tracer.start_as_current_span(
             "Stop Replication with Edge Server",
-            attributes={"cbl.replicator.id": replicator_id},
+            attributes={"cbl.replicator.id": replication_id},
         ):
-            response = await self._send_request("delete", f"/_replicate/{replicator_id}")
+            response = await self._send_request("delete", f"/_replicate/{replication_id}")
 
             if response and not isinstance(response, dict):
                 raise ValueError("Inappropriate response from edge server stop /_replicate (not JSON)")
@@ -949,38 +1028,77 @@ class EdgeServer:
             with local_path.open("rb") as f:
                 return [line.decode(errors="replace").rstrip("\r\n") for line in f if needle in line]
 
-    async def wait_for_idle(self, replicator_key: int = 0, timeout: int = 30) -> None:
-        missing_polls = 0
-        retry = 6
-        while retry > 0:
-            status = await self.all_replication_status()
-            if len(status) <= replicator_key:
-                missing_polls += 1
-                if missing_polls == 5:
-                    raise CblEdgeServerBadResponseError(
-                        404,
-                        f"Replicator {replicator_key} is not running on {self.__hostname}",
-                        body=json.dumps(status),
-                    )
-                await asyncio.sleep(2)
-                continue
+    async def wait_for_replication_status(
+        self, *, replication_id: int, status: ReplicationActivity, timeout: float = 60
+    ) -> ReplicationStatus:
+        """
+        Poll a replication until it reports ``status``.
 
-            replicator = status[replicator_key]
-            if "error" in replicator:
-                error = replicator["error"]
-                code = error.get("x-litecore-code") if isinstance(error, dict) else None
+        :param replication_id: The task ID of the replication, see ``replication_status``
+        :param status: The status that ends the wait
+        :param timeout: Seconds to wait in total
+        :return: The replication's status
+        :raises TimeoutError: If the replication does not reach ``status`` within ``timeout``
+        :raises CblEdgeServerBadResponseError: The code of the replication's error if it stops first,
+            since a stopped replication never resumes, or 404 if Edge Server does not list it
+        """
+
+        async def _poll() -> ReplicationStatus:
+            replication = await self.replication_status(replication_id)
+            if replication.status == ReplicationActivity.STOPPED and status != ReplicationActivity.STOPPED:
                 raise CblEdgeServerBadResponseError(
-                    code if isinstance(code, int) else 500,
-                    f"Replicator {replicator_key} on {self.__hostname} failed: {replicator}",
-                    body=json.dumps(replicator),
+                    replication.error.code if replication.error is not None else 500,
+                    f"Replication {replication_id} on {self.hostname} stopped before reaching {status}: {replication}",
+                    body=replication.model_dump_json(by_alias=True),
                 )
-            if replicator["status"] == "Idle":
-                return
 
-            await asyncio.sleep(timeout)
-            retry -= 1
+            assert replication.status == status, (
+                f"Replication {replication_id} on {self.hostname} is {replication.status}, expected {status}: {replication}"
+            )
+            return replication
 
-        raise CblTimeoutError("Timeout waiting for replicator status")
+        return await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(timeout))
+
+    async def wait_for_idle(self, *, replication_id: int, timeout: float = 60) -> ReplicationStatus:
+        """
+        :param replication_id: The task ID of the replication, see ``replication_status``
+        :param timeout: Seconds to wait in total
+        :return: The replication's status
+        """
+        return await self.wait_for_replication_status(
+            replication_id=replication_id, status=ReplicationActivity.IDLE, timeout=timeout
+        )
+
+    async def wait_for_replication_error(
+        self, *, replication_id: int, domain: LiteCoreErrorDomain, code: int | None = None, timeout: float = 60
+    ) -> ReplicationError:
+        """
+        Wait for a replication to stop with an error, and check that error.
+
+        :param replication_id: The task ID of the replication, see ``replication_status``
+        :param domain: The domain the error must be in
+        :param code: The code the error must have, or None to accept any code in ``domain``
+        :param timeout: Seconds to wait in total
+        :return: The replication's error
+        :raises AssertionError: If the replication stops with a different error
+        :raises TimeoutError: If the replication does not stop with an error within ``timeout``
+        """
+        expected = domain.name if code is None else f"{domain.name} {code}"
+
+        async def _poll() -> ReplicationStatus:
+            replication = await self.replication_status(replication_id)
+            # A task that Edge Server restarts, e.g. on a JWT change, reports Stopped before its error
+            assert replication.status == ReplicationActivity.STOPPED and replication.error is not None, (
+                f"Replication {replication_id} on {self.hostname} has not stopped with an error: {replication}"
+            )
+            return replication
+
+        replication = await async_retry_assert(_poll, tenacity.wait_fixed(2), tenacity.stop_after_delay(timeout))
+        error = replication.error
+        assert error is not None and error.domain == domain and (code is None or error.code == code), (
+            f"Replication {replication_id} on {self.hostname} stopped without a {expected} error: {replication}"
+        )
+        return error
 
     async def create_session(self, db_name: str, one_time: bool | str | None = True) -> dict:
         """

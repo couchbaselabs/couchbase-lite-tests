@@ -8,8 +8,10 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+import tenacity
 from aiohttp import encode_basic_auth
 from cbltest.api.caddy import Caddy
+from cbltest.api.edgeserver import EdgeServer, ReplicationStatus
 from cbltest.api.edgeservermanager import EdgeServerManager
 from cbltest.api.error import CblTestError
 from cbltest.api.jsonserializable import JSONSerializable
@@ -38,11 +40,15 @@ def no_network() -> Iterator[None]:
         yield
 
 
-def write_config(directory: Path, name: str, port: int, https: bool = False, users: bool = False) -> str:
+def write_config(
+    directory: Path, name: str, port: int, https: bool = False, users: bool = False, replications: int = 0
+) -> str:
     """Write a minimal Edge Server config, and return its path."""
     config: dict[str, Any] = {"interface": f"0.0.0.0:{port}", "databases": {"db": {"path": "db.cblite2"}}}
     if users:
         config["users"] = "/etc/users.json"
+    if replications:
+        config["replications"] = [{"source": f"ws://sgw:4984/db{i}", "target": "db"} for i in range(replications)]
     if https:
         config["https"] = {"tls_cert_path": "/cert.pem", "tls_key_path": "/key.pem"}
     path = directory / name
@@ -312,3 +318,85 @@ async def test_admin_client_sends_credentials_only_to_a_config_that_declares_use
     async with fake_session_manager(write_config(tmp_path, "initial.json", 59840, users=users)) as manager:
         headers = client_session(manager.get_admin_client()).headers
         assert ("Authorization" in headers) == users
+
+
+def replication(task_id: int, status: str, error: dict[str, Any] | None = None) -> ReplicationStatus:
+    return ReplicationStatus.model_validate(
+        {"task_id": task_id, "status": status, "source": f"ws://sgw:4984/db{task_id}", "target": "db", "error": error}
+    )
+
+
+OFFLINE = replication(1, "Offline", {"error": "Connection refused", "x-litecore-domain": 2, "x-litecore-code": 111})
+STOPPED = replication(2, "Stopped", {"error": "Login required", "x-litecore-domain": 6, "x-litecore-code": 401})
+
+
+def stub_replicate_list(monkeypatch: pytest.MonkeyPatch, *lists: list[ReplicationStatus]) -> list[int]:
+    """
+    Answer each ``GET /_replicate`` with the next of ``lists``, then keep repeating the last, and
+    poll without waiting.  Returns a list that grows by one entry per poll.
+    """
+    polls: list[int] = []
+
+    async def all_replication_status(self: EdgeServer) -> list[ReplicationStatus]:
+        polls.append(len(polls))
+        return lists[min(len(polls) - 1, len(lists) - 1)]
+
+    monkeypatch.setattr(EdgeServer, "all_replication_status", all_replication_status)
+    monkeypatch.setattr(tenacity, "wait_fixed", lambda _: tenacity.wait_none())
+    return polls
+
+
+@pytest.mark.asyncio
+async def test_start_does_not_poll_replications_for_a_config_without_any(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    polls = stub_replicate_list(monkeypatch, [])
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        stub_sidecar(monkeypatch, managers[0])
+
+        await managers[0].configure_dataset(config_file=write_config(tmp_path, "test.json", 60000))
+
+    assert polls == []
+
+
+@pytest.mark.asyncio
+async def test_start_waits_until_every_configured_replication_is_listed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A replication that cannot connect is still listed, so it ends the wait like a working one."""
+    polls = stub_replicate_list(monkeypatch, [], [OFFLINE], [OFFLINE, STOPPED])
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        stub_sidecar(monkeypatch, managers[0])
+
+        await managers[0].configure_dataset(config_file=write_config(tmp_path, "test.json", 60000, replications=2))
+
+    assert len(polls) == 3
+
+
+@pytest.mark.asyncio
+async def test_restart_on_the_running_config_waits_for_its_replications(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        stub_sidecar(monkeypatch, managers[0])
+        stub_replicate_list(monkeypatch, [OFFLINE])
+        await managers[0].configure_dataset(config_file=write_config(tmp_path, "test.json", 60000, replications=1))
+        polls = stub_replicate_list(monkeypatch, [], [OFFLINE])
+
+        await managers[0].start_server()
+
+    assert len(polls) == 2
+
+
+@pytest.mark.asyncio
+async def test_start_times_out_on_a_replication_edge_server_never_lists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Edge Server drops a replication it rejects, such as one whose target database is not in the config."""
+    stub_replicate_list(monkeypatch, [OFFLINE])
+    monkeypatch.setattr(tenacity, "stop_after_delay", lambda _: tenacity.stop_after_attempt(3))
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        stub_sidecar(monkeypatch, managers[0])
+
+        with pytest.raises(TimeoutError, match="lists 1 of the 2 replications in .*test.json"):
+            await managers[0].configure_dataset(config_file=write_config(tmp_path, "test.json", 60000, replications=2))
