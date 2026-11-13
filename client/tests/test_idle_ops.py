@@ -124,9 +124,12 @@ async def test_read_sums_every_node() -> None:
     )
 
 
-def test_unmatched_commands_leaves_out_other_commands() -> None:
-    snapshot = IdleOpSnapshot(7, 0, Counter({("probe", "GET"): 10, ("probe", "STAT"): 40}), Counter(), 0)
-    assert snapshot.unmatched_commands == 3
+def test_uncounted_ops_compares_kv_ops_and_queries() -> None:
+    # The commands are not compared, since kv_ops is what the idle checks use.
+    snapshot = IdleOpSnapshot(
+        7, 2, Counter({("probe", "GET"): 50, ("probe", "STAT"): 40}), Counter({("probe", "get"): 10}), 3
+    )
+    assert snapshot.uncounted_ops == 4
 
 
 @pytest.mark.asyncio
@@ -232,18 +235,20 @@ async def test_quiet_snapshot_kept_when_only_other_commands_ran() -> None:
 
 
 @pytest.mark.asyncio
-async def test_quiet_snapshot_keeps_sample_with_fewest_unmatched_commands() -> None:
-    # The first and last quiet readings land while a task Sync Gateway has not counted yet is paused: Couchbase
-    # Server has run its 3 commands, but the stat does not have them. Only the middle reading is settled.
+async def test_quiet_snapshot_keeps_sample_with_fewest_uncounted_ops() -> None:
+    # The first quiet reading lands while a task Sync Gateway has not counted yet is paused: Couchbase Server has
+    # run its 3 kv_ops, but the stat does not have them. The last lands while a compaction has run its query but
+    # Sync Gateway has not counted it. Only the middle reading is settled.
     sg = _sync_gateway([10, 10, 13, 13, 13, 13])
     cbs = _couchbase_server(
-        [_counts({("probe", "GET"): 23})] * 4 + [_counts({("probe", "GET"): 26})] * 2,
+        [_counts({}, {("probe", "get"): 23})] * 4 + [_counts({}, {("probe", "get"): 23}, query_requests=1)] * 2,
     )
 
     snapshot = await take_quiet_idle_op_snapshot([sg], [cbs], quiet_window=0, samples=3, sample_interval=0)
 
     assert snapshot.idle_kv_ops == 13
-    assert snapshot.commands == Counter({("probe", "GET"): 23})
+    assert snapshot.kv_ops == Counter({("probe", "get"): 23})
+    assert snapshot.query_requests == 0
     assert sg.get_stats.await_count == 6
 
 
