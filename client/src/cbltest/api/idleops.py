@@ -74,26 +74,31 @@ class IdleOpSnapshot:
     """The query requests every Couchbase Server node has run"""
 
     @property
-    def unmatched_commands(self) -> int:
-        """The document commands Couchbase Server has run beyond what Sync Gateway counted as idle"""
-        return document_commands(self.commands).total() - self.idle_kv_ops
+    def uncounted_ops(self) -> int:
+        """
+        The kv_ops and query requests Couchbase Server has run beyond what Sync Gateway counted as idle, which are
+        the counts the idle checks compare
+        """
+        return (self.kv_ops.total() - self.idle_kv_ops) + (self.query_requests - self.idle_query_ops)
 
 
 async def read_idle_op_snapshot(
     sync_gateways: Sequence[SyncGateway], couchbase_servers: Sequence[CouchbaseServer]
 ) -> IdleOpSnapshot:
-    """Reads the counters once, Sync Gateway's first."""
+    """
+    Reads the counters once. Every Sync Gateway node is read at the same time, and then every Couchbase Server node,
+    so that Couchbase Server is read after Sync Gateway counted an operation.
+    """
     idle_kv_ops = 0
     idle_query_ops = 0
-    for sg in sync_gateways:
-        resource_utilization = (await sg.get_stats()).global_stats.resource_utilization
+    for stats in await asyncio.gather(*(sg.get_stats() for sg in sync_gateways)):
+        resource_utilization = stats.global_stats.resource_utilization
         idle_kv_ops += resource_utilization.idle_kv_ops
         idle_query_ops += resource_utilization.idle_query_ops
     commands: CommandCounts = Counter()
     kv_ops: CommandCounts = Counter()
     query_requests = 0
-    for cbs in couchbase_servers:
-        counts = await cbs.get_op_counts()
+    for counts in await asyncio.gather(*(cbs.get_op_counts() for cbs in couchbase_servers)):
         commands.update(counts.commands)
         kv_ops.update(counts.ops)
         query_requests += counts.query_requests
@@ -127,7 +132,7 @@ async def take_quiet_idle_op_snapshot(
 
     A task that pauses for longer than quiet_window between its last operation and its end still looks quiet. To
     get past that, samples quiet readings are taken, sample_interval seconds apart, and the one with the fewest
-    unmatched commands is kept, since a task Sync Gateway has not counted yet can only add to them.
+    uncounted kv_ops and query requests is kept, since a task Sync Gateway has not counted yet can only add to them.
 
     :raises CblTimeoutError: If the counters did not stay still for quiet_window seconds, samples times, within
         timeout seconds
@@ -142,7 +147,7 @@ async def take_quiet_idle_op_snapshot(
             continue
         kept.append(before)
         if len(kept) == samples:
-            return min(kept, key=lambda snapshot: snapshot.unmatched_commands)
+            return min(kept, key=lambda snapshot: snapshot.uncounted_ops)
         await asyncio.sleep(sample_interval)
 
     raise CblTimeoutError(

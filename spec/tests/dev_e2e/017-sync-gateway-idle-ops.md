@@ -11,7 +11,7 @@ changes, heartbeats, checking on other nodes, and reporting the status of
 inter-Sync Gateway replications. The test sets up two databases with an idle,
 continuous replication between them, and leaves them for a long time. It then
 checks that the stat rose by exactly as much as Couchbase Server's `kv_ops` in
-the same period. It also checks that Sync Gateway's `idle_query_ops` stat is
+the same period, and, if the idle time was long enough, that it rose at all. It also checks that Sync Gateway's `idle_query_ops` stat is
 exactly the number of queries Couchbase Server ran.
 
 These are the checks that Capella's idle-cluster hibernation makes: a cluster
@@ -33,7 +33,8 @@ tombstones. The first run is one interval after the database starts. So both
 databases import documents and set `compact_interval_days` to 0.04, the lowest
 value Sync Gateway allows, which is about 58 minutes. Any idle time at least
 that long holds a run on every database, so the test then also checks that
-the stat rose. Couchbase Server counts the queries it runs in the
+the stat rose. A shorter idle time may end before any background task does, so
+the test checks that either stat rose only after an idle time this long. Couchbase Server counts the queries it runs in the
 `n1ql_requests` series of each node's `GET /metrics`, which counts every
 request from every client.
 
@@ -88,9 +89,9 @@ reading of the counters is kept only if none of them moved for a short quiet
 period around it. Each node reads `kv_ops` a moment before its command counts,
 so `kv_ops` is watched too, and so are the query counts. A task that pauses between its last operation and
 its end can still look quiet, so five quiet readings are taken at each end,
-half a second apart, and the one with the fewest commands that Sync Gateway
-has not counted is kept. A task that has not been counted can only add to
-those.
+half a second apart, and the one with the fewest `kv_ops` and queries that
+Sync Gateway has not counted is kept. A task that has not been counted can
+only add to those.
 
 ### Steps
 
@@ -114,5 +115,5 @@ those.
 9. Record the counters again. Check that the number of idle KV operations
    Sync Gateway counted is exactly the rise in Couchbase Server's `kv_ops`.
    Check that the number of idle queries Sync Gateway counted is exactly the
-   number of queries Couchbase Server ran, and, if the idle time was at least
-   one compaction interval, more than zero.
+   number of queries Couchbase Server ran. If the idle time was at least one
+   compaction interval, check that both numbers are more than zero.

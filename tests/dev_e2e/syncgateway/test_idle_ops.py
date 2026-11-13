@@ -7,7 +7,14 @@ import pytest
 from cbltest import CBLPyTest
 from cbltest.api.cbltestclass import CBLTestClass
 from cbltest.api.idleops import CommandCounts, document_commands, read_idle_op_snapshot, take_quiet_idle_op_snapshot
-from cbltest.api.syncgateway import DatabaseConfig, IndexConfig, ISGRPayload, StartupConfigResponse, SyncGateway
+from cbltest.api.syncgateway import (
+    DatabaseConfig,
+    IndexConfig,
+    ISGRPayload,
+    StartupConfigResponse,
+    SyncGateway,
+    UnsupportedSettings,
+)
 from cbltest.logging import cbl_info
 from cbltest.plugins.sgw_cluster_manager import SyncGatewayClusterManager
 
@@ -40,7 +47,7 @@ SETTLE_SECONDS = 60
 
 PROGRESS_INTERVAL_SECONDS = 300
 
-# Quiet readings to take at each end of the idle time. The one Sync Gateway is furthest behind in is left out, in case
+# Quiet readings to take at each end of the idle time. Only the one Sync Gateway is least behind in is kept, in case
 # a background task had paused before counting its operations.
 QUIET_SAMPLES = 5
 
@@ -49,11 +56,15 @@ def _format_counts(counts: CommandCounts) -> str:
     return "\n".join(f"  {bucket} {opcode}: {count}" for (bucket, opcode), count in sorted(counts.items())) or "  none"
 
 
-async def _runs_capella_pft_bootstrap(sg: SyncGateway) -> bool:
-    """Whether a node was started with the unsupported options of CAPELLA_PFT_BOOTSTRAP, which only Capella sets."""
-    expected = StartupConfigResponse.Unsupported.model_validate(
+def _capella_pft_unsupported() -> StartupConfigResponse.Unsupported:
+    """The unsupported options of CAPELLA_PFT_BOOTSTRAP, which only Capella sets."""
+    return StartupConfigResponse.Unsupported.model_validate(
         json.loads(CAPELLA_PFT_BOOTSTRAP_PATH.read_text())["unsupported"]
     )
+
+
+async def _runs_capella_pft_bootstrap(sg: SyncGateway, expected: StartupConfigResponse.Unsupported) -> bool:
+    """Whether a node was started with the unsupported options in expected."""
     actual = (await sg.get_startup_config()).unsupported
     return all(getattr(actual, field) == getattr(expected, field) for field in expected.model_fields_set)
 
@@ -65,6 +76,8 @@ def _database_config(bucket: str) -> DatabaseConfig:
         index=IndexConfig(num_replicas=0),
         import_docs=True,
         compact_interval_days=COMPACT_INTERVAL_DAYS,
+        # The ISGR connects over TLS on AWS, where Sync Gateway's certificate comes from an internal CA
+        unsupported=UnsupportedSettings(sgr_tls_skip_verify=True),
     )
 
 
@@ -89,7 +102,10 @@ class TestSyncGatewayIdleOps(CBLTestClass):
             "config of a Capella free tier App Service. If one does not, upload Couchbase Server's root CA "
             "certificate to every node, and restart every node with it."
         )
-        if not all(await asyncio.gather(*(_runs_capella_pft_bootstrap(node) for node in sync_gateways))):
+        expected_unsupported = _capella_pft_unsupported()
+        if not all(
+            await asyncio.gather(*(_runs_capella_pft_bootstrap(node, expected_unsupported) for node in sync_gateways))
+        ):
             self.skip_if_not(
                 sg_cluster_manager.has_shell2http_sidecar,
                 f"Sync Gateway does not run with the settings of '{CAPELLA_PFT_BOOTSTRAP}', and there is no shell2http "
@@ -176,8 +192,8 @@ class TestSyncGatewayIdleOps(CBLTestClass):
         self.mark_test_step(
             "Record the counters again. Check that the number of idle KV operations Sync Gateway counted is exactly "
             "the rise in Couchbase Server's kv_ops. Check that the number of idle queries Sync Gateway counted is "
-            "exactly the number of queries Couchbase Server ran, and, if the idle time was at least one compaction "
-            "interval, more than zero."
+            "exactly the number of queries Couchbase Server ran. If the idle time was at least one compaction "
+            "interval, check that both numbers are more than zero."
         )
         end = await take_quiet_idle_op_snapshot(sync_gateways, couchbase_servers, samples=QUIET_SAMPLES)
         idle_kv_ops = end.idle_kv_ops - start.idle_kv_ops
@@ -195,11 +211,13 @@ class TestSyncGatewayIdleOps(CBLTestClass):
             f"Other commands, not compared:\n{_format_counts(commands - document_ops)}"
         )
         cbl_info(summary)
-        assert idle_kv_ops > 0, summary
         # Capella hibernates an idle cluster when its kv_ops, less Sync Gateway's idle_kv_ops, did not rise. Ops Sync
         # Gateway misses keep the cluster awake, and ops it counts beyond kv_ops would hide that many real ones.
         assert idle_kv_ops == kv_ops.total(), f"kv_ops less idle_kv_ops is {kv_ops.total() - idle_kv_ops}\n{summary}"
         if idle_seconds >= COMPACT_INTERVAL_SECONDS:
-            # Each compaction runs at least one tombstone query on each collection.
+            # A short idle time may end before any background task does. One compaction interval is long enough for
+            # the tasks that run every few minutes, and each compaction runs at least one tombstone query on each
+            # collection.
+            assert idle_kv_ops > 0, summary
             assert idle_query_ops > 0, summary
         assert idle_query_ops == query_requests, summary
