@@ -8,6 +8,11 @@
 import Foundation
 
 struct FileDownloader {
+    enum DownloadError: Error {
+        case notFound(URL)
+        case badStatus(URL, Int)
+    }
+
     static func download(url: URL, to path: String) throws {
         let destUrl = URL(fileURLWithPath: path)
                 
@@ -26,6 +31,16 @@ struct FileDownloader {
                 return
             }
             
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 404 {
+                caughtError = DownloadError.notFound(url)
+                return
+            }
+            if status != 200 {
+                caughtError = DownloadError.badStatus(url, status)
+                return
+            }
+
             guard let location = location else {
                 caughtError = NSError(domain: NSURLErrorDomain, code: NSURLErrorUnknown,
                                       userInfo: [NSLocalizedDescriptionKey: "No file location returned"])

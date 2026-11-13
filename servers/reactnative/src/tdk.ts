@@ -25,6 +25,8 @@ import {
   Collection,
   CollectionConfig,
 } from 'cbl-reactnative';
+import {version as cblVersion} from 'cbl-reactnative/package.json';
+import uuid from 'react-native-uuid';
 
 import {KeyPathCache} from './keyPath';
 import {LogSlurpSender} from './logSlurpSender';
@@ -60,7 +62,6 @@ export class TDKImpl implements tdk.TDK {
   private replicators = new Map<string, ReplicatorInfo>();
   private snapshots = new Map<string, Snapshot>();
   private idCounter = 0;
-  private snapshotCounter = 0;
   private sessionID?: string;
   private logSender?: LogSlurpSender;
 
@@ -148,7 +149,7 @@ export class TDKImpl implements tdk.TDK {
     _rq: TestRequest,
   ): Promise<tdk.GetInfoResponse> {
     return {
-      version: '1.0.0',
+      version: cblVersion,
       apiVersion: APIVersion,
       cbl: 'cbl-reactnative',
       device: {
@@ -784,7 +785,7 @@ export class TDKImpl implements tdk.TDK {
   ): Promise<void> {
     const info = this.replicators.get(rq.id);
     if (!info) {
-      throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+      throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
     }
     await this.engine.replicator_Stop({replicatorId: info.replicatorId});
   }
@@ -798,7 +799,7 @@ export class TDKImpl implements tdk.TDK {
     const info = this.replicators.get(rq.id);
     if (!info) {
       this.log(`[DIAG] GetReplicatorStatus: NO INFO found for id="${rq.id}"`);
-      throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+      throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
     }
     this.log(`[DIAG] GetReplicatorStatus: info found — replicatorId="${info.replicatorId}" finished=${info.finished} hasDocuments=${info.documents !== undefined}`);
 
@@ -974,7 +975,7 @@ export class TDKImpl implements tdk.TDK {
     for (const d of rq.documents) {
       await snap.record(d.collection, d.id);
     }
-    const snapID = `snap-${++this.snapshotCounter}`;
+    const snapID = uuid.v4() as string;
     this.snapshots.set(snapID, snap);
     return {id: snapID};
   }
@@ -987,7 +988,7 @@ export class TDKImpl implements tdk.TDK {
     const uniqueName = this.getDatabase(rq.database);
     const snap = this.snapshots.get(rq.snapshot);
     if (snap === undefined) {
-      throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+      throw new HTTPError(400, `No such snapshot ${rq.snapshot}`);
     }
     if (snap.dbName !== uniqueName) {
       throw new HTTPError(

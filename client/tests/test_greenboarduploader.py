@@ -3,7 +3,7 @@
 import inspect
 import json
 from collections.abc import AsyncGenerator, Callable, Container, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, cast
@@ -39,8 +39,8 @@ from cbltest.greenboarduploader import (
     resolve_job_url,
 )
 from cbltest.plugins import greenboard_fixture
-from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
+from conftest import NestedPytest
 from couchbase.cluster import Cluster
 from couchbase.collection import Collection
 
@@ -126,10 +126,9 @@ def finish_item(config: pytest.Config, nodeid: str) -> None:
 
 
 class FakeSyncGateway(SyncGateway):
-    """Test-only SyncGateway that returns a fixed version without network calls."""
+    """Test-only SyncGateway that returns a fixed version, skipping the real constructor's sessions and probes."""
 
     def __init__(self, version_str: str, *, rosmar: bool = False, rosmar_error: bool = False) -> None:
-        super().__init__("localhost", "admin", "password")
         self._version_str = version_str
         self._rosmar = rosmar
         self._rosmar_error = rosmar_error
@@ -181,11 +180,14 @@ class FakeEdgeServerManager(EdgeServerManager):
 
 
 class FakeTestServer(testserver.TestServer):
-    """Test-only TestServer whose info comes from get_info_fn."""
+    """Test-only TestServer whose info comes from get_info_fn, skipping the real constructor."""
 
     def __init__(self, get_info_fn: Callable[[], GetRootResponse]) -> None:
-        super().__init__(RequestFactory(ParsedConfig({})), 0, "http://localhost:8080", "1")
         self._get_info_fn = get_info_fn
+
+    @property
+    def dataset_version(self) -> str:
+        return "1"
 
     @asyncstdlib.cached_property
     async def info(self) -> GetRootResponse:
@@ -265,7 +267,7 @@ def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") 
     # Resolve relative to this test file so the helper works regardless of
     # pytest's cwd. A cwd-relative "tests/empty_config.json" only worked
     # when pytest was invoked from the client/ directory.
-    args = ["--config", str(Path(__file__).with_name("empty_config.json"))]
+    args = ["--config", str(Path(__file__).with_name("empty_config.json")), "--capture=no"]
     if no_upload:
         args.append("--no-result-upload")
     # Default to the 'main' branch so the greenboard branch gate lets the
@@ -275,6 +277,7 @@ def _make_pytestconfig(*, no_upload: bool = False, branch: str | None = "main") 
     if branch is not None:
         args += ["--branch", branch]
     config = pytest.Config.fromdictargs({}, args)
+    # --capture=no: a synthetic Config is never unconfigured, so capture's temp files would never close.
     # pytest_configure doesn't fire for a synthetic Config, so install what it would.
     greenboard_fixture.track_finished_items(config)
     return config
@@ -648,7 +651,9 @@ class TestFinishedItemsTracking:
         assert config.stash[greenboard_fixture._finished_key].nodeids == set()
 
     def test_configure_hook_installs_tracker_before_any_fixture(self) -> None:
-        config = pytest.Config.fromdictargs({}, ["--config", str(Path(__file__).with_name("empty_config.json"))])
+        config = pytest.Config.fromdictargs(
+            {}, ["--config", str(Path(__file__).with_name("empty_config.json")), "--capture=no"]
+        )
         greenboard_fixture.pytest_configure(config)
         assert config.stash[greenboard_fixture._finished_key] in config.pluginmanager.get_plugins()
 
@@ -1420,9 +1425,7 @@ from pathlib import Path
 import asyncstdlib
 import pytest_asyncio
 from cbltest.api import testserver
-from cbltest.configparser import ParsedConfig
 from cbltest.greenboarduploader import GreenboardUploader
-from cbltest.requests import RequestFactory
 from cbltest.responses import GetRootResponse
 
 CAPTURED_PATH = Path(__file__).parent / "captured_doc.json"
@@ -1443,7 +1446,11 @@ class _FakeConfig:
 
 class _FakeTestServer(testserver.TestServer):
     def __init__(self):
-        super().__init__(RequestFactory(ParsedConfig({})), 0, "http://localhost:8080", "1")
+        pass
+
+    @property
+    def dataset_version(self):
+        return "1"
 
     @asyncstdlib.cached_property
     async def info(self):
@@ -1456,9 +1463,6 @@ class _FakeTestServer(testserver.TestServer):
 
 class _FakeCBLPyTest:
     def __init__(self):
-        # Built here, not as a class attribute: _FakeTestServer() needs a
-        # running event loop (aiohttp.ClientSession), which only exists once
-        # the async fixture body below starts executing.
         self.config = _FakeConfig()
         self.test_servers = [_FakeTestServer()]
         self.sync_gateways = []
@@ -1471,18 +1475,13 @@ async def cblpytest():
     yield _FakeCBLPyTest()
 """
 
-_LIFECYCLE_ARGS = (
-    "--config",
-    str(Path(__file__).with_name("empty_config.json")),
-    "--branch",
-    "main",
-    "-p",
-    "no:randomly",
+
+@pytest.fixture
+def lifecycle_pytest(nested_pytest: NestedPytest) -> NestedPytest:
+    nested_pytest.pytester.makeconftest(_LIFECYCLE_CONFTEST)
     # cluster_cleanup is autouse and expects a real CBLPyTest.clusters;
     # irrelevant to what's under test here (incomplete/collected detection).
-    "-p",
-    "no:cluster_cleanup",
-)
+    return replace(nested_pytest, args=(*nested_pytest.args, "--branch", "main", "-p", "no:cluster_cleanup"))
 
 
 class TestRealPytestLifecycle:
@@ -1499,8 +1498,8 @@ class TestRealPytestLifecycle:
     leak into this file's own process.
     """
 
-    def test_complete_run_not_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+    def test_complete_run_not_flagged_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -1519,7 +1518,7 @@ class TestRealPytestLifecycle:
             async def test_three():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args)
         result.assert_outcomes(passed=3)
 
         captured_path = pytester.path / "captured_doc.json"
@@ -1529,11 +1528,11 @@ class TestRealPytestLifecycle:
         doc = json.loads(captured_path.read_text())
         assert (doc["passCount"], doc["failCount"], doc["incomplete"], doc["collected"]) == (3, 0, False, 3)
 
-    def test_maxfail_stops_early_flags_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_maxfail_stops_early_flags_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """``--maxfail=1`` stops the session after the first failure via the
         same ``session.shouldfail`` early-exit path a session-timeout uses --
         a real, genuinely truncated session."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -1552,7 +1551,7 @@ class TestRealPytestLifecycle:
             async def test_three():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args, "--maxfail=1")
         result.assert_outcomes(passed=1, failed=1)
 
         captured_path = pytester.path / "captured_doc.json"
@@ -2000,10 +1999,10 @@ class TestSiblingDocuments:
         assert collection.upsert.call_args[0][0] == run_key
         assert "details" not in collection.upsert.call_args[0][1]
 
-    def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_leading_skips_do_not_flag_a_complete_run_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """Regression: skips raised before fixture setup (``@pytest.mark.skip``, topology/cbse skips) used to finish
         before the ``greenboard`` fixture registered its counter, so a run that finished cleanly read as incomplete."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -2027,15 +2026,15 @@ class TestSiblingDocuments:
             async def test_two():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS)
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args)
         result.assert_outcomes(passed=2, skipped=2)
 
         doc = json.loads((pytester.path / "captured_doc.json").read_text())
         assert (doc["passCount"], doc["skipCount"], doc["incomplete"], doc["collected"]) == (2, 2, False, 4)
 
-    def test_real_truncation_after_leading_skip_still_flagged_incomplete(self, pytester: pytest.Pytester) -> None:
+    def test_real_truncation_after_leading_skip_still_flagged_incomplete(self, lifecycle_pytest: NestedPytest) -> None:
         """The fix must not lose true positives: a genuinely cut-short session is still incomplete."""
-        pytester.makeconftest(_LIFECYCLE_CONFTEST)
+        pytester = lifecycle_pytest.pytester
         pytester.makepyfile("""
             import pytest
 
@@ -2054,7 +2053,7 @@ class TestSiblingDocuments:
             async def test_two():
                 pass
         """)
-        result = pytester.runpytest_subprocess(*_LIFECYCLE_ARGS, "--maxfail=1")
+        result = pytester.runpytest_subprocess(*lifecycle_pytest.args, "--maxfail=1")
         result.assert_outcomes(failed=1, skipped=1)
 
         doc = json.loads((pytester.path / "captured_doc.json").read_text())

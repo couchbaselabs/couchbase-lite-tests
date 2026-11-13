@@ -1,6 +1,6 @@
 import { ReplicatorError } from "@couchbase/lite-js";
 import { describe, expect, test } from "vitest";
-import { errorInfo } from "./utils";
+import { browserInfo, errorInfo } from "./utils";
 
 // CBL JS does not export these classes, so the fakes copy the name and properties it sets.
 function blipError(name: string, code: number, message = "BLIP error"): Error {
@@ -45,6 +45,37 @@ describe("errorInfo", () => {
         ];
         for (const error of testCases) {
             expect(errorInfo(error), error.message).toEqual({ domain: "CBL-JS", code: -1, message: error.message });
+        }
+    });
+});
+
+describe("browserInfo", () => {
+    test("names the browser and its version", () => {
+        const testCases: Array<[string, string, string]> = [
+            [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.8010.12 Safari/537.36",
+                "Chrome",
+                "153.0.8010.12",
+            ],
+            [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.2849.68",
+                "Edge",
+                "130.0.2849.68",
+            ],
+            [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:132.0) Gecko/20100101 Firefox/132.0",
+                "Firefox",
+                "132.0",
+            ],
+            [
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Safari/605.1.15",
+                "Safari",
+                "18.1",
+            ],
+            ["curl/8.7.1", "Unknown", "Unknown"],
+        ];
+        for (const [userAgent, systemName, systemVersion] of testCases) {
+            expect(browserInfo(userAgent), userAgent).toEqual({ systemName, systemVersion });
         }
     });
 });

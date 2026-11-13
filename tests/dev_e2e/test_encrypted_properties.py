@@ -11,7 +11,7 @@ from cbltest.api.replicator_types import (
     ReplicatorCollectionEntry,
     ReplicatorType,
 )
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -19,7 +19,7 @@ from cbltest.responses import ServerVariant
 class TestEncryptedProperties(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_encrypted_push(self, dataset_path: Path, cblpytest: CBLPyTest) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.C)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.PROPERTY_ENCRYPTION)
 
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
@@ -60,10 +60,7 @@ class TestEncryptedProperties(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the document in SG is not in plaintext")
         pushed_doc = await sync_gateway.get_document("names", "secret")

@@ -15,7 +15,7 @@ from cbltest.api.replicator import (
 from cbltest.api.replicator_types import ReplicatorBasicAuthenticator
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 from cbltest.utils import assert_not_null
 
 
@@ -27,7 +27,7 @@ class TestReplicationBlob(CBLTestClass):
     async def test_pull_non_blob_changes_with_delta_sync_and_compact(
         self, cblpytest: CBLPyTest, dataset_path: Path
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.ALL & ~ServerVariant.JS)
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
 
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
@@ -59,10 +59,7 @@ class TestReplicationBlob(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -111,10 +108,7 @@ class TestReplicationBlob(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -165,10 +159,7 @@ class TestReplicationBlob(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -223,10 +214,7 @@ class TestReplicationBlob(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the document with the ID from step 3 contains a valid `watermelon` property")
         remote_doc = await sync_gateway.get_document("names", "fruits")

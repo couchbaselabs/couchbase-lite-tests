@@ -14,7 +14,7 @@
 
 import { KeyPathCache } from "./keyPath";
 import { LogSlurpSender } from "./logSlurpSender";
-import { check, docToJSON, errorInfo, HTTPError, normalizeCollectionID } from "./utils";
+import { browserInfo, check, docToJSON, errorInfo, HTTPError, normalizeCollectionID } from "./utils";
 import { Snapshot } from "./snapshot";
 import type { TestRequest } from "./testServer";
 import * as tdk from "./tdkSchema";
@@ -38,6 +38,23 @@ interface CollectionUpdates {
     bestEffort?: boolean;
     onConflict?: cbl.ConflictHandler;
 }
+
+/** Statuses worth another attempt: server errors, plus the two "come back later" codes.
+ *
+ *  403 is deliberately absent.  GitHub uses it for some secondary rate limits, but it is
+ *  also the ordinary answer for a file you may not read, and retrying that would triple
+ *  the cost of every genuine permission error.
+ */
+function isRetryableStatus(status: number): boolean {
+    return status >= 500 || status === 408 || status === 429;
+}
+
+/** How many times to attempt a dataset/blob fetch before giving up. */
+const kFetchAttempts = 3;
+/** Per-attempt fetch timeout, generous enough for the largest (50 MB) blob. */
+const kFetchTimeoutMs = 60_000;
+/** Base delay between fetch attempts; multiplied by the attempt number. */
+const kFetchRetryDelayMs = 1_000;
 
 export const APIVersion = 1;
 
@@ -83,6 +100,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
             apiVersion: APIVersion,
             cbl: "couchbase-lite-js",
             device: {
+                ...browserInfo(navigator.userAgent),
                 "User-Agent": navigator.userAgent,
             },
         };
@@ -270,7 +288,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     //////// STOP REPLICATOR:
     async [tdk.StopReplicatorCommand](rq: tdk.StopReplicatorRequest): Promise<void> {
         const info = this.#replicators.get(rq.id);
-        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
         info.replicator.stop();
     }
 
@@ -279,7 +297,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         rq: tdk.GetReplicatorStatusRequest,
     ): Promise<tdk.GetReplicatorStatusResponse> {
         const info = this.#replicators.get(rq.id);
-        if (!info) throw new HTTPError(404, `No replicator with ID "${rq.id}"`);
+        if (!info) throw new HTTPError(400, `No replicator with ID "${rq.id}"`);
         const status = info.replicator.status;
         const documents = info.documents;
         info.documents = undefined;
@@ -301,6 +319,11 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         };
     }
 
+    //////// LOG:
+    async [tdk.LogCommand](rq: tdk.LogRequest): Promise<void> {
+        this.#logger.info(rq.message);
+    }
+
     //////// PERFORM MAINTENANCE:
     async [tdk.PerformMaintenanceCommand](rq: tdk.PerformMaintenanceRequest): Promise<void> {
         const db = this.#getDatabase(rq.database);
@@ -318,7 +341,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         const db = this.#getDatabase(rq.database);
         const snap = new Snapshot(db);
         for (const d of rq.documents) await snap.record(d.collection, d.id);
-        const snapID = `snap-${++this.#snapshotCounter}`;
+        const snapID = crypto.randomUUID();
         this.#snapshots.set(snapID, snap);
         return { id: snapID };
     }
@@ -327,7 +350,7 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async [tdk.VerifyDocumentsCommand](rq: tdk.VerifyDocumentsRequest): Promise<tdk.VerifyDocumentsResponse> {
         const db = this.#getDatabase(rq.database);
         const snap = this.#snapshots.get(rq.snapshot);
-        if (snap === undefined) throw new HTTPError(404, `No such snapshot ${rq.snapshot}`);
+        if (snap === undefined) throw new HTTPError(400, `No such snapshot ${rq.snapshot}`);
         if (snap.db !== db) throw new HTTPError(400, `Snapshot is of a different database, ${db.name}`);
         return await snap.verify(rq.changes, this.#downloadBlob.bind(this));
     }
@@ -360,15 +383,15 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     async #loadDataset(dbName: string, datasetName: string) {
         const url = tdk.kDatasetBaseURL + datasetName + "/";
 
-        const fetchRelative = async (suffix: string): Promise<string> => {
-            const response = await fetch(url + suffix);
-            if (response.status !== 200)
-                throw new HTTPError(
-                    502,
-                    `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
-                );
-            return await response.text();
-        };
+        const fetchRelative = async (suffix: string): Promise<string> =>
+            this.#fetchWithRetry(url + suffix, async (response) => {
+                if (response.status !== 200)
+                    throw new HTTPError(
+                        502,
+                        `Unable to load dataset <${url + suffix}>: ${response.status} ${response.statusText}`,
+                    );
+                return await response.text();
+            });
 
         this.#logger.info`Loading database ${dbName} from dataset ${datasetName} at ${url} ...`;
         const config = JSON.parse(await fetchRelative("index.json")) as tdk.DatasetIndex;
@@ -447,22 +470,57 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
         return new cbl.NewBlob(contents, type);
     }
 
-    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
-        const absURL = new URL(blobURL, tdk.kBlobBaseURL);
-        const response = await fetch(absURL);
-        if (response.status !== 200) {
-            let status = 502;
-            if (response.status === 404) {
-                status = 400;
+    /** Fetches `url` and reads its body via `consume`, retrying transient failures.
+     *
+     *  Dataset and blob fixtures are fetched over the network, so a single dropped
+     *  connection or 5xx would otherwise fail the test outright.  `consume` runs inside
+     *  the retry so that a connection lost partway through the body is retried too, and
+     *  so the per-attempt timeout covers the whole transfer rather than just the headers.
+     *  A response the caller considers final -- a 404, say -- is signalled by throwing
+     *  HTTPError from `consume`, which is passed straight through: retrying a
+     *  deterministic answer only wastes time.
+     */
+    async #fetchWithRetry<T>(url: string | URL, consume: (response: Response) => Promise<T>): Promise<T> {
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= kFetchAttempts; attempt++) {
+            try {
+                const response = await fetch(url, { signal: AbortSignal.timeout(kFetchTimeoutMs) });
+                if (!isRetryableStatus(response.status)) return await consume(response);
+                lastError = new Error(`${response.status} ${response.statusText}`);
+            } catch (error) {
+                if (error instanceof HTTPError) throw error;
+                lastError = error;
             }
-
-            throw new HTTPError(
-                status,
-                `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
-            );
+            if (attempt < kFetchAttempts) {
+                this.#logger
+                    .warn`Fetch of ${String(url)} failed (attempt ${attempt} of ${kFetchAttempts}): ${String(lastError)}; retrying ...`;
+                await new Promise((resolve) => setTimeout(resolve, kFetchRetryDelayMs * attempt));
+            }
         }
-        const data = await response.arrayBuffer();
-        return new Uint8Array(data);
+        throw new HTTPError(
+            502,
+            `Unable to fetch <${String(url)}> after ${kFetchAttempts} attempts: ${String(lastError)}`,
+        );
+    }
+
+    async #downloadBlobContents(blobURL: string): Promise<Uint8Array> {
+        // kBlobBaseURL may be relative (local fixtures), which new URL() rejects as a base.
+        const absURL = new URL(blobURL, new URL(tdk.kBlobBaseURL, location.href));
+        return this.#fetchWithRetry(absURL, async (response) => {
+            if (response.status !== 200) {
+                let status = 502;
+                if (response.status === 404) {
+                    status = 400;
+                }
+
+                throw new HTTPError(
+                    status,
+                    `Unable to load blob from <${absURL}>: ${response.status} ${response.statusText}`,
+                );
+            }
+            const data = await response.arrayBuffer();
+            return new Uint8Array(data);
+        });
     }
 
     readonly #databases = new Map<string, cbl.Database>();
@@ -470,7 +528,6 @@ export class TDKImpl implements tdk.TDK, AsyncDisposable {
     readonly #snapshots = new Map<string, Snapshot>();
     readonly #logger = logtape.getLogger("TDK");
     #idCounter = 0;
-    #snapshotCounter = 0;
     #sessionID?: string;
     #logSender?: LogSlurpSender;
 }

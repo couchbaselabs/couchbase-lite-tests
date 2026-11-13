@@ -16,6 +16,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 @pytest.mark.min_test_servers(1)
@@ -28,6 +29,7 @@ class TestCustomConflict(CBLTestClass):
         conflict_resolver: ReplicatorConflictResolver,
         setup_snapshot: Callable[[SnapshotUpdater], str],
     ) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -56,10 +58,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -107,16 +106,14 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(verify_description)
         await db.verify_documents(snapshot_updater)
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_push_pull_resolved_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.CUSTOM_CONFLICT_RESOLVER)
         self.mark_test_step("Reset SG and load `names` dataset")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -145,10 +142,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -214,10 +208,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that the name_101, name_102, and name_103 document `name.last` == 'Smith'")
         await db.verify_documents(snapshot_updater)
@@ -247,10 +238,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -301,10 +289,7 @@ class TestCustomConflict(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(

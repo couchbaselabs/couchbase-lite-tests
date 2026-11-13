@@ -19,6 +19,7 @@ import json
 import subprocess
 import sys
 from enum import Flag, auto
+from io import StringIO
 from pathlib import Path
 from typing import IO, Any, cast
 
@@ -317,8 +318,16 @@ def main(
         click.secho("Skipping test server install and run...", fg="yellow")
 
     if tdk_config_out is not None:
-        with open(tdk_config_out, "w") as fout:
-            write_config(tdk_config_in, topology, fout)
+        out_path = Path(tdk_config_out)
+        if out_path.exists() and Path(tdk_config_in).samefile(out_path):
+            # Updating the config in place.  open(..., "w") truncates, so the output has
+            # to be rendered before the input is opened for writing.
+            rendered = StringIO()
+            write_config(tdk_config_in, topology, rendered)
+            out_path.write_text(rendered.getvalue())
+        else:
+            with open(tdk_config_out, "w") as fout:
+                write_config(tdk_config_in, topology, fout)
     else:
         write_config(tdk_config_in, topology, sys.stdout)
 

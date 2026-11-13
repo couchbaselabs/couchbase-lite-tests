@@ -19,6 +19,7 @@ from cbltest.api.replicator_types import (
 from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway, get_basic_auth_headers
 from cbltest.api.syncgatewaystats import StatNotPresentError
 from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
 
 
 async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
@@ -40,6 +41,8 @@ async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
 class TestDeltaSync(CBLTestClass):
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -69,10 +72,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -111,10 +111,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
         events = await replicator.wait_for_doc_events(
             {
                 WaitForDocumentEventEntry(
@@ -148,6 +145,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -177,10 +176,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -230,10 +226,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
@@ -260,6 +253,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -289,10 +284,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Check that all docs are replicated correctly.")
         await compare_local_and_remote(
@@ -343,10 +335,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
@@ -369,6 +358,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -398,10 +389,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
@@ -445,10 +433,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
@@ -494,10 +479,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify docs are replicated correctly")
         await compare_local_and_remote(
@@ -545,10 +527,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the document was updated correctly in CBL")
         updated_cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1"))
@@ -565,6 +544,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("""
             Reset SG and load `short_expiry` dataset with delta sync enabled.
                 * has a `old_rev_expiry_seconds` of 10 seconds.
@@ -622,10 +603,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Record the number of deltas SGW has sent.")
         deltas_sent_before = await _deltas_sent(sync_gateway, "short_expiry")
@@ -669,10 +647,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Verify:
@@ -689,6 +664,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -717,10 +694,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Record the delta sync stats before update")
         deltas_sent_before = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent
@@ -747,10 +721,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify SGW sent the update as a delta")
         deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before
@@ -760,6 +731,8 @@ class TestDeltaSync(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
         self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -789,10 +762,7 @@ class TestDeltaSync(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify docs are replicated correctly")
         lite_all_docs = await db.get_all_documents("travel.hotels")
@@ -831,10 +801,7 @@ class TestDeltaSync(CBLTestClass):
         assert events, "Expected documents to be processed"
 
         self.mark_test_step("Wait until the replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify SGW sent the update as a delta")
         deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before

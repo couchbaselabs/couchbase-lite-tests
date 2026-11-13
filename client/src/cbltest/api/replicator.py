@@ -1,13 +1,14 @@
 import asyncio
 from datetime import timedelta
 from itertools import islice
-from time import time
 from typing import cast
 
+import tenacity
 from opentelemetry.trace import get_tracer
 
 from cbltest.api.database import Database
 from cbltest.api.error import CblTestError, CblTimeoutError
+from cbltest.api.error_types import ErrorResponseBody
 from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorAuthenticator,
@@ -25,7 +26,12 @@ from cbltest.response_types import (
     PostStartReplicatorResponseMethods,
 )
 from cbltest.responses import ServerVariant
+from cbltest.utils import async_retry_assert
 from cbltest.version import VERSION
+
+
+def _error_text(error: ErrorResponseBody | None) -> str:
+    return "" if error is None else f", error: {error}"
 
 
 class Replicator:
@@ -177,6 +183,30 @@ class Replicator:
             self.__document_updates.extend(cast_resp.documents)
             return ReplicatorStatus(cast_resp.progress, cast_resp.activity, cast_resp.replicator_error)
 
+    def __str__(self) -> str:
+        return f"Replicator {self.__database.name} -> {self.__endpoint}"
+
+    async def _wait_for_activity(
+        self,
+        activity: ReplicatorActivityLevel,
+        interval: timedelta,
+        timeout: timedelta,
+    ) -> ReplicatorStatus:
+        assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
+        assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
+
+        async def check() -> ReplicatorStatus:
+            status = await self.get_status()
+            # A stopped replicator with an error never restarts on its own, so stop waiting
+            if status.activity != activity and status.activity == ReplicatorActivityLevel.STOPPED and status.error:
+                raise CblTestError(f"{self} stopped while waiting for {activity.value}{_error_text(status.error)}")
+            assert status.activity == activity, (
+                f"{self} is {status.activity.value}, not {activity.value}{_error_text(status.error)}"
+            )
+            return status
+
+        return await async_retry_assert(check, tenacity.wait_fixed(interval), tenacity.stop_after_delay(timeout))
+
     async def wait_for(
         self,
         activity: ReplicatorActivityLevel,
@@ -184,29 +214,50 @@ class Replicator:
         timeout: timedelta = timedelta(seconds=30),
     ) -> ReplicatorStatus:
         """
-        Waits for a given timeout, polling at a set interval, until the Replicator changes to a desired state
+        Waits for a given timeout, polling at a set interval, until the Replicator changes to a desired state,
+        and asserts that the Replicator has no error.  Use wait_for_error when an error is expected.
 
         :param activity: The activity level to wait for
         :param interval: The polling interval (default 1s)
         :param timeout: The time limit to wait for the state change (default 30s)
         """
         with self.__tracer.start_as_current_span("wait_for"):
-            assert interval.total_seconds() > 0.0, "Zero interval makes no sense, try again"
-            assert timeout.total_seconds() >= 1.0, "Timeout too short, must be at least 1 second"
+            status = await self._wait_for_activity(activity, interval, timeout)
+            assert status.error is None, f"{self} reached {activity.value}{_error_text(status.error)}"
+            return status
 
-            status_matches = False
-            start = time()
-            while not status_matches:
-                elapsed = time() - start
-                if elapsed > timeout.total_seconds():
-                    raise CblTimeoutError("Timeout waiting for replicator status")
+    async def wait_for_error(
+        self,
+        activity: ReplicatorActivityLevel = ReplicatorActivityLevel.STOPPED,
+        interval: timedelta = timedelta(seconds=1),
+        timeout: timedelta = timedelta(seconds=30),
+        *,
+        code: int | None = None,
+        message: str | None = None,
+    ) -> ReplicatorStatus:
+        """
+        Waits for a given timeout, polling at a set interval, until the Replicator changes to a desired state,
+        and asserts that the Replicator has an error.  Pass message as well as code when the code alone is
+        ambiguous: Edge Server, for example, refuses an unsupported protocol and an unauthorized user both
+        with 10403.
 
-                next_status = await self.get_status()
-                status_matches = next_status.activity == activity
-                if not status_matches:
-                    await asyncio.sleep(interval.total_seconds())
-
-            return next_status
+        :param activity: The activity level to wait for (default STOPPED)
+        :param interval: The polling interval (default 1s)
+        :param timeout: The time limit to wait for the state change (default 30s)
+        :param code: The error code to expect, such as 10403 for HTTP 403
+        :param message: Text that the error message must contain
+        """
+        with self.__tracer.start_as_current_span("wait_for_error"):
+            status = await self._wait_for_activity(activity, interval, timeout)
+            err = status.error
+            assert err is not None, f"{self} reached {activity.value} without the expected error"
+            expected = [f"code {code}"] if code is not None else []
+            if message is not None:
+                expected.append(f"a message containing {message!r}")
+            assert (code is None or err.code == code) and (message is None or message in err.message), (
+                f"{self} reached {activity.value}{_error_text(err)}; expected {' and '.join(expected)}"
+            )
+            return status
 
     async def wait_for_doc_events(
         self,
@@ -231,7 +282,7 @@ class Replicator:
             while True:
                 status = await self.get_status()
                 repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                assert repl_err is None, f"Replicator error: {repl_err}"
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -290,8 +341,6 @@ class Replicator:
             iteration = 0
             while iteration < max_retries:
                 status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
-                repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
 
                 # Skip the ones we previously looked at to save time
                 for event in islice(self.document_updates, processed, None):
@@ -346,9 +395,7 @@ class Replicator:
 
             iteration = 0
             while iteration < max_retries:
-                status = await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
-                repl_err = status.error
-                assert repl_err is None, f"Replicator error: ({repl_err.domain} / {repl_err.code}) {repl_err.message}"
+                await self.wait_for(ReplicatorActivityLevel.IDLE, ping_interval, idle_timeout)
 
                 # Skip the ones we looked at, previously, to save time
                 for event in islice(self.document_updates, processed, None):

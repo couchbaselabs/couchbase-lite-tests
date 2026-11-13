@@ -193,7 +193,7 @@ class TestLogRedaction(CBLTestClass):
             )
 
             self.mark_test_step("Wait for SGCollect to complete")
-            await sg.wait_for_sgcollect_to_complete(max_attempts=60, wait_time=5)
+            await sg.wait_for_sgcollect_to_complete()
 
             self.mark_test_step("Discover redacted SGCollect zip file via Caddy")
             try:

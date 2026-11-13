@@ -49,8 +49,7 @@ async def _one_shot_pull(
         pinned_server_cert=sync_gateway.tls_cert(),
     )
     await replicator.start()
-    status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-    assert status.error is None, f"Pull replicator failed: {status.error}"
+    await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
     return replicator
 
 
@@ -226,11 +225,6 @@ class TestDocumentChannelHistoryCompaction(CBLTestClass):
                 JSONDictionary({"seq": "not-a-number"}),
             )
         assert non_integer_seq_exc.value.code == 400
-
-    @pytest.mark.skip(reason="https://jira.issues.couchbase.com/browse/CBG-5796")
-    @pytest.mark.asyncio(loop_scope="session")
-    async def test_get_and_compact_require_application_rbac_role(self, cblpytest: CBLPyTest) -> None:
-        pass
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_all_keyspace_forms_behave_identically(self, cblpytest: CBLPyTest) -> None:

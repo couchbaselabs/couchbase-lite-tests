@@ -349,7 +349,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     none      |   [100@SGW1]  |  3-ghi 2-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3", reason="needs the CBL-8954 fix")
         doc_id = "nonconflict_2"
         db = await setup_upgrade_env(self, cblpytest, dataset_path, empty_local_db=True)
         sg = cblpytest.sync_gateways[0]
@@ -450,7 +450,7 @@ class TestReplicationUpgrade(CBLTestClass):
         +------------------+---------------+---------------+---------------+---------------+
         All other documents keep the revid and HLV they had after the first pull.
         """
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3", reason="needs the CBL-8954 fix")
         doc_id = "nonconflict_2"
         doc_ids = [f"nonconflict_{i}" for i in range(1, 7)]
         db = await setup_upgrade_env(self, cblpytest, dataset_path, empty_local_db=True)
@@ -553,7 +553,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     none      |   [100@SGW1]  |  3-ghi 2-abc  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3", reason="needs the CBL-8954 fix")
         doc_id = "nonconflict_3"
         db = await setup_upgrade_env(self, cblpytest, dataset_path)
         sg = cblpytest.sync_gateways[0]
@@ -683,10 +683,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Check that the push replication of `{doc_id}` has the deleted flag set and no error.")
         pushed = [e for e in replicator.document_updates if e.document_id == doc_id]
@@ -754,10 +751,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(f"Check that the pull replication of `{doc_id}` has the deleted flag set and no error.")
         pulled = [e for e in replicator.document_updates if e.document_id == doc_id]
@@ -793,10 +787,7 @@ class TestReplicationUpgrade(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the replicator is stopped.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step(
             f"Check that no doc was pushed, and that SGW's `{doc_id}` is still the deletion from step 4."
@@ -1357,7 +1348,7 @@ class TestReplicationUpgrade(CBLTestClass):
         | Expected Result  |     none      |   [100@SGW1]  |  4-ghi 3-def  |   [100@SGW1]  |
         +------------------+---------------+---------------+---------------+---------------+
         """
-        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3")
+        await self.skip_if_cbl_not(cblpytest.test_servers[0], ">= 4.1.3", reason="needs the CBL-8954 fix")
         doc_id = "conflict_2"
         db = await setup_upgrade_env(self, cblpytest, dataset_path)
         sg = cblpytest.sync_gateways[0]

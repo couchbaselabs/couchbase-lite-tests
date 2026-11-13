@@ -10,7 +10,7 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from cbltest.api.syncgateway import DocumentUpdateEntry
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGatewayFeature
 
 
 @pytest.mark.cbl
@@ -139,10 +139,7 @@ class TestReplicationFunctional(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the initial replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Verify docs got replicated from only group1 channel:
@@ -247,10 +244,7 @@ class TestReplicationFunctional(CBLTestClass):
         await replicator.start()
 
         self.mark_test_step("Wait until the second replicator stops.")
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("""
             Verify all docs got replicated from both channels:
@@ -353,10 +347,7 @@ class TestReplicationFunctional(CBLTestClass):
         await push_replicator.start()
 
         self.mark_test_step("Wait for initial push replication to complete.")
-        status = await push_replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for push replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await push_replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify doc_1 exists in SGW.")
         sgw_doc = await sync_gateway.get_document("short_expiry", "doc_1", "_default", "_default")
@@ -408,10 +399,7 @@ class TestReplicationFunctional(CBLTestClass):
 
         self.mark_test_step("Wait for new documents to be pushed to SGW.")
         push_replicator.clear_document_updates()  # Clear previous updates to track new ones
-        status = await push_replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for push replicator after new docs: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await push_replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify documents exist in SGW.")
         all_docs_after = await sync_gateway.get_all_documents("short_expiry")
@@ -446,9 +434,6 @@ class TestReplicationFunctional(CBLTestClass):
 
         self.mark_test_step("Wait for pull replication to finish.")
         status = await pull_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for pull replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
 
         self.mark_test_step("Verify replication completed successfully")
         if channel == "*" and await sync_gateway.is_using_views("short_expiry"):
@@ -568,10 +553,7 @@ class TestReplicationFunctional(CBLTestClass):
         await pull_replicator.start()
 
         self.mark_test_step("Wait for initial pull replication to complete")
-        status = await pull_replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for pull replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await pull_replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify initial docs got replicated to CBL:
@@ -649,10 +631,7 @@ class TestReplicationFunctional(CBLTestClass):
         await asyncio.sleep(5)  # Give SG time to process the change
 
         self.mark_test_step("Wait for replicator to finish pulling.")
-        status = await pull_replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator to become idle: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await pull_replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify CBL did NOT get new docs from group1 channel after role change:
@@ -699,7 +678,7 @@ class TestReplicationFunctional(CBLTestClass):
 
     @pytest.mark.asyncio(loop_scope="session")
     async def test_default_conflict_withConflicts_withChannels(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
-        await self.skip_if_sgw_not(cblpytest.sync_gateways[0], "<=4.0.0")
+        await self.skip_if_sgw_not_supports(cblpytest.sync_gateways[0], SyncGatewayFeature.ALLOW_CONFLICTS)
         self.mark_test_step("Reset SG and load `posts` dataset.")
         cloud = cblpytest.clusters[0]
         sync_gateway = cloud.sync_gateways[0]
@@ -776,10 +755,7 @@ class TestReplicationFunctional(CBLTestClass):
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error waiting for seed replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify the shared documents replicated into CBL.")
         seeded_doc1 = await db.get_document(DocumentEntry("_default.posts", "shared_doc1"))
@@ -845,10 +821,7 @@ class TestReplicationFunctional(CBLTestClass):
             resolve them automatically, without a replication error.
         """)
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Default conflict resolution failed: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify each conflict resolved to a single revision.")
         doc1_result = await db.get_document(DocumentEntry("_default.posts", "shared_doc1"))
@@ -902,10 +875,7 @@ class TestReplicationFunctional(CBLTestClass):
             pinned_server_cert=sync_gateway.tls_cert(),
         )
         await push_replicator.start()
-        status = await push_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
-        assert status.error is None, (
-            f"Error pushing resolved documents: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await push_replicator.wait_for(ReplicatorActivityLevel.STOPPED)
 
         self.mark_test_step("Verify Sync Gateway converged on the CBL updates.")
         sgw_doc1 = await sync_gateway.get_document("posts", "shared_doc1", "_default", "posts")

@@ -7,6 +7,7 @@ dependencies = [
   "bcrypt==4.2.1",
   "cbltest",
   "click==8.1.8",
+  "dotnetenv",
   "paramiko==3.5.0",
   "psutil==7.0.0",
   "pyyaml==6.0.2",
@@ -38,17 +39,14 @@ exclude = [".venv", ".vscode", ".idea", ".github", ".git"]
 
 [tool.uv.sources]
 cbltest = { workspace = true }
-dotnetenv = { index = "cbl-py" }
-
-[[tool.uv.index]]
-name = "cbl-py"
-url = "https://proget.sc.couchbase.com/pypi/cbl-py/simple"
-explicit = true
+dotnetenv = { git = "https://github.com/couchbaselabs/couchbase-mobile-tools", subdirectory = "dotnet_testing_env", rev = "c7b7b451c31b1faff91730372ec554f907edcaf9" }
 
 [dependency-groups]
 lint = ["ty>=0.0.72", "ruff>=0.16.3", "types-netifaces==0.11.0.20241025"]
-dotnet-build = ["dotnetenv"]
-dev = ["pytest-randomly==5.0.0", "pytest-repeat==0.9.4"]
+# Intentionally empty: the prebuild Jenkinsfile passes --group dotnet-build for every branch, and
+# release branches still need this group to pull in dotnetenv, which is a default dependency here.
+dotnet-build = []
+dev = ["pytest-randomly==5.0.0", "pytest-repeat==0.9.4", "schemathesis==4.32.7"]
 
 [tool.uv.workspace]
 members = ["client"]
@@ -64,6 +62,7 @@ asyncio_default_fixture_loop_scope = "session"
 # "tests" puts tests/shared on the path
 pythonpath = ["tests"]
 filterwarnings = [
+  "error::pytest.PytestCollectionWarning",
   "ignore:Class property max_ttl is deprecated.*:couchbase.logic.supportability.CouchbaseDeprecationWarning",
 ]
 markers = [

@@ -36,7 +36,10 @@ class TestCors(CBLTestClass):
     async def test_cbl_js_replication_needs_cors(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path, origin: list[str] | None, pull_allowed: bool
     ) -> None:
-        await self.skip_if_not_platform(cblpytest.test_servers[0], ServerVariant.JS)
+        await self.skip_if_not_platform(
+            cblpytest.test_servers[0], ServerVariant.JS, reason="only a browser sends CORS requests"
+        )
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
 
         self.mark_test_step("Start Edge Server with the case's CORS origins, and seed a doc in `travel.hotels`")
         config = json.loads(CONFIG.read_text())
@@ -60,17 +63,14 @@ class TestCors(CBLTestClass):
             collections=[ReplicatorCollectionEntry(["travel.hotels"], document_ids=["cors_seed"])],
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
+        if pull_allowed:
+            await replicator.wait_for(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
+        else:
+            await replicator.wait_for_error(ReplicatorActivityLevel.STOPPED, timeout=timedelta(seconds=60))
         pulled = {doc.id for doc in (await db.get_all_documents("travel.hotels"))["travel.hotels"]}
 
         self.mark_test_step("Verify the pull succeeds only when CORS allows the test server's origin")
         if pull_allowed:
-            assert status.error is None, (
-                f"Pull failed: {status.error.domain}/{status.error.code}: {status.error.message}"
-            )
             assert "cors_seed" in pulled, "The seed doc was not pulled"
         else:
-            assert status.error is not None, (
-                "A browser replicated with Edge Server although CORS does not allow its origin"
-            )
             assert "cors_seed" not in pulled, "A browser pulled a doc although CORS does not allow its origin"

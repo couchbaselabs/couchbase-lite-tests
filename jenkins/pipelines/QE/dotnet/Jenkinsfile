@@ -65,9 +65,9 @@ pipeline {
             parallel {
                 stage('Windows') {
                     when { beforeAgent true; expression { params.RUN_WINDOWS } }
-                    agent { label 'mob-e2e-win-02' }
+                    agent { label 'net-windows' }
                     options {
-                        lock('mob-e2e-win-02')
+                        lock('net-windows')
                     }
                     environment {
                         TS_ARTIFACTS_DIR = 'dotnet_windows'
@@ -96,18 +96,22 @@ pipeline {
                 }
                 stage('macOS') {
                     when { beforeAgent true; expression { params.RUN_MACOS } }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'e2e&&macos-host' }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        DEVELOPER_DIR = "/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'dotnet_macos'
                     }
                     steps {
+                        // Unlock keychain: the Catalyst app is signed, and the
+                        // dev_e2e Mac Catalyst stage unlocks on this same pool.
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run Dotnet macOS Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                        // The label matches a shared pool and the test server binds
+                        // fixed localhost ports, so serialize per node as dev_e2e does.
+                        lock("${env.NODE_NAME}") {
+                            timeout(time: 120, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/QE/dotnet/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            }
                         }
                         echo "=== Dotnet macOS Tests Complete"
                     }
@@ -128,15 +132,14 @@ pipeline {
                 }
                 stage('iOS') {
                     when { beforeAgent true; expression { params.RUN_IOS } }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mob-e2e-iphone-03' }
                     options {
-                        lock('00008110-000E544201D1401E')
+                        // Lock on the node, not the device id: that is the name the
+                        // dev_e2e ios/c/dotnet jobs sharing this iPhone lock on.
+                        lock('mob-e2e-iphone-03')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        DEVELOPER_DIR = "/Applications/Xcode.app"
-                        MD_APPLE_SDK_ROOT = "/Applications/Xcode.app"
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'dotnet_ios'
                     }
                     steps {
@@ -164,15 +167,14 @@ pipeline {
                 }
                 stage('Android') {
                     when { beforeAgent true; expression { params.RUN_ANDROID } }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mob-e2e-android-01' }
                     options {
-                        lock('56141JEBF18456')
+                        lock('mob-e2e-android-01')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        ANDROID_HOME = "/Users/couchbase/Library/Android/sdk"
-                        JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        // No ANDROID_SERIAL: the bridge always passes `-s <location>`
+                        // from the topology. SDK and JDK come from the node, as the
+                        // dev_e2e android jobs on this same node rely on.
                         TS_ARTIFACTS_DIR = 'dotnet_android'
                     }
                     steps {

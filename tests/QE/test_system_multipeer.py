@@ -19,7 +19,7 @@ from cbltest.api.replicator_types import (
 )
 from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway
 from cbltest.api.test_functions import compare_doc_results_p2p, compare_local_and_remote
-from cbltest.responses import ServerVariant
+from cbltest.api.testserver import CouchbaseLiteFeature
 from shared.multipeer_test_helpers import build_group_transports
 
 
@@ -45,8 +45,7 @@ class TestSystemMultipeer(CBLTestClass):
         docs_per_crud: int,
     ) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         NUM_DEVICES = len(cblpytest.test_servers)
         TEST_DURATION = timedelta(hours=test_duration)
         CRUD_INTERVAL = timedelta(seconds=crud_interval)
@@ -200,8 +199,7 @@ class TestSystemMultipeer(CBLTestClass):
     )
     async def test_volume_with_blobs(self, cblpytest: CBLPyTest, transport: str, doc_count: int) -> None:
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         NO_OF_DOCS = doc_count
         NUM_DEVICES = len(cblpytest.test_servers)
         docgen = JSONGenerator(10, NO_OF_DOCS, format="key-value")
@@ -298,8 +296,7 @@ class TestSystemMultipeer(CBLTestClass):
         #    /                       \
         # CBL1 <--> CBL2<--->CBL3<--->CBL4
         for ts in cblpytest.test_servers:
-            await self.skip_if_cbl_not(ts, ">= 3.3.0")
-            await self.skip_if_not_platform(ts, ServerVariant.ANDROID | ServerVariant.IOS)
+            await self.skip_if_not_supports(ts, CouchbaseLiteFeature.MULTIPEER)
         DOC_COUNT = doc_count
 
         self.mark_test_step("Reset SG and load `names` dataset")
@@ -445,18 +442,9 @@ class TestSystemMultipeer(CBLTestClass):
             assert all(r.status.replicator_error is None for r in status.replicators), (
                 "Multipeer replicator should not have any errors"
             )
-        repl1_status = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert repl1_status.error is None, (
-            f"Error waiting for replicator: ({repl1_status.error.domain} / {repl1_status.error.code}) {repl1_status.error.message}"
-        )
-        repl2_status = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert repl2_status.error is None, (
-            f"Error waiting for replicator: ({repl2_status.error.domain} / {repl2_status.error.code}) {repl2_status.error.message}"
-        )
-        repl3_status = await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
-        assert repl3_status.error is None, (
-            f"Error waiting for replicator: ({repl3_status.error.domain} / {repl3_status.error.code}) {repl3_status.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator3.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verifying that all devices have identical document content")
         all_docs_collection = [db.get_all_documents("_default._default") for db in all_dbs]

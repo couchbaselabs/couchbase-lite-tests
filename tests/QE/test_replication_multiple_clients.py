@@ -9,7 +9,7 @@ from cbltest.api.replicator_types import (
     ReplicatorActivityLevel,
     ReplicatorBasicAuthenticator,
 )
-from packaging.version import Version
+from cbltest.api.syncgateway import SyncGatewayFeature
 
 
 @pytest.mark.cbl
@@ -68,14 +68,8 @@ class TestReplicationMultipleClients(CBLTestClass):
         await replicator2.start()
 
         self.mark_test_step("Wait for both replicators to reach idle state")
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error waiting for replicator1: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Add 100 documents to db1 (test server 1) with prefix 'ls_db1'")
         async with db1.batch_updater() as updater:
@@ -112,14 +106,8 @@ class TestReplicationMultipleClients(CBLTestClass):
                 )
 
         self.mark_test_step("Wait for replicators to sync all documents")
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error during replication from db1: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error during replication from db2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify all documents are present in Sync Gateway:
@@ -138,8 +126,7 @@ class TestReplicationMultipleClients(CBLTestClass):
             assert len(row.revid) > 0, f"Document {row.id} has no revision"
             assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
-        supports_version_vectors = await sg.supports_version_vectors()
-        if supports_version_vectors:
+        if await sg.supports(SyncGatewayFeature.VERSION_VECTORS):
             self.mark_test_step("Verify all documents have correct version vector format (SGW 4.0+)")
             for row in sg_all_docs.rows:
                 assert row.cv is not None and len(row.cv) > 0, f"Document {row.id} has no version vector"
@@ -203,14 +190,8 @@ class TestReplicationMultipleClients(CBLTestClass):
         await replicator2.start()
 
         self.mark_test_step("Wait for both replicators to reach idle state")
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error waiting for replicator1: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error waiting for replicator2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Create 5 documents with multiple 2MB attachments in db1 (test server 1):
@@ -277,14 +258,8 @@ class TestReplicationMultipleClients(CBLTestClass):
             assert attachment_count == 20, f"Document {doc_id} should have 20 attachments, got {attachment_count}"
 
         self.mark_test_step("Wait for replication to push all documents to Sync Gateway")
-        status1 = await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status1.error is None, (
-            f"Error during replication from db1: ({status1.error.domain} / {status1.error.code}) {status1.error.message}"
-        )
-        status2 = await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status2.error is None, (
-            f"Error during replication from db2: ({status2.error.domain} / {status2.error.code}) {status2.error.message}"
-        )
+        await replicator1.wait_for(ReplicatorActivityLevel.IDLE)
+        await replicator2.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("""
             Verify all documents are present in Sync Gateway:
@@ -301,9 +276,7 @@ class TestReplicationMultipleClients(CBLTestClass):
             assert len(row.revid) > 0, f"Document {row.id} has no revision"
             assert "-" in row.revid, f"Invalid revision format for {row.id}: {row.revid}"
 
-        sgw_version_obj = await sg.get_version()
-        sgw_version = Version(sgw_version_obj.version)
-        if sgw_version >= Version("4.0.0"):
+        if await sg.supports(SyncGatewayFeature.VERSION_VECTORS):
             self.mark_test_step("Verify all documents have correct version vector format (SGW 4.0+)")
             for row in sg_all_docs.rows:
                 assert row.cv is not None and len(row.cv) > 0, f"Document {row.id} has no version vector"

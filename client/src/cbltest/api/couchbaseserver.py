@@ -476,6 +476,15 @@ class CouchbaseServer:
                 tenacity.wait_fixed(interval),
                 tenacity.stop_after_attempt(retries),
             )
+
+            # XDCR with Sync Gateway requires this, and it cannot be turned off once set
+            if newly_created:
+                await self.__send_request(
+                    "post",
+                    f"/pools/default/buckets/{name}",
+                    data={"enableCrossClusterVersioning": "true"},
+                )
+
             return newly_created
 
     async def _check_bucket_ready(self, name: str) -> None:
@@ -1046,16 +1055,6 @@ class CouchbaseServer:
                 if "name" in cluster and cast(str, cluster["name"]) == target.__hostname:
                     remote_cluster_uuid = cluster["uuid"]
                     break
-
-            # https://docs.couchbase.com/server/current/learn/clusters-and-availability/xdcr-active-active-sgw.html#xdcr-active-active-sgw-prerequisites
-            # Set the prerequisite properties.  These return 409 is they are already set.
-            for server in (self, target):
-                await server.__send_request(
-                    "post",
-                    f"/pools/default/buckets/{bucket_name}",
-                    data={"enableCrossClusterVersioning": "true"},
-                    allowed_statuses={409},
-                )
 
             # https://docs.couchbase.com/server/current/manage/manage-xdcr/create-xdcr-replication.html#create-an-xdcr-replication-with-the-rest-api
             # Create the remote cluster, if necessary

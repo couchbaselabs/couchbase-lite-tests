@@ -20,7 +20,7 @@ int Dispatcher::handlePOSTSnapshotDocuments(Request &request, Session *session) 
         }
     } catch (const std::exception &e) {
         cblManager->deleteSnapshot(snapshot->id());
-        throw e;
+        throw;
     }
 
     json result;

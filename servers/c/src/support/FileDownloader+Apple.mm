@@ -20,16 +20,20 @@ namespace ts::support {
 
             dispatch_semaphore_t sema = dispatch_semaphore_create(0);
 
-            __block NSError* error = nil;
+            // Copied out of the handler: its autoreleased objects are freed before the wait returns.
+            __block std::string errorMessage;
             NSURLSessionConfiguration* config = [NSURLSessionConfiguration ephemeralSessionConfiguration];
             NSURLSession* session = [NSURLSession sessionWithConfiguration: config];
             NSURLSessionDownloadTask* task = [session downloadTaskWithURL: nsUrl completionHandler:
                                               ^(NSURL *location, NSURLResponse* response, NSError* err) {
+                NSInteger status = [response isKindOfClass: [NSHTTPURLResponse class]] ? ((NSHTTPURLResponse*)response).statusCode : 0;
+                NSError* moveError = nil;
                 if (err) {
-                    error = err;
-                } else {
-                    NSFileManager* fileManager = [NSFileManager defaultManager];
-                    [fileManager moveItemAtURL: location toURL: destUrl error: &error];
+                    errorMessage = err.localizedDescription.UTF8String;
+                } else if (status != 200) {
+                    errorMessage = "Failed to download file from URL '" + url + "' : " + std::to_string(status);
+                } else if (![[NSFileManager defaultManager] moveItemAtURL: location toURL: destUrl error: &moveError]) {
+                    errorMessage = moveError.localizedDescription.UTF8String;
                 }
                 dispatch_semaphore_signal(sema);
             }];
@@ -38,8 +42,8 @@ namespace ts::support {
 
             [session finishTasksAndInvalidate];
 
-            if (error) {
-                throw std::runtime_error([error.localizedDescription UTF8String]);
+            if (!errorMessage.empty()) {
+                throw std::runtime_error(errorMessage);
             }
         }
     }

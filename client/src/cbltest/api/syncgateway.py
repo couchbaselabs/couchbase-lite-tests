@@ -1,6 +1,7 @@
 import asyncio
 import re
 import ssl
+import time
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Collection, Mapping
@@ -9,7 +10,7 @@ from enum import Enum
 from json import dumps, loads
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self, cast
+from typing import Any, Self, assert_never, cast
 from urllib.parse import urlencode, urljoin
 from uuid import uuid4
 
@@ -31,7 +32,7 @@ from cbltest.api.syncgatewaystats import SyncGatewayStats
 from cbltest.assertions import _assert_not_null
 from cbltest.httpclient import AsyncHTTPClient
 from cbltest.httplog import get_next_writer
-from cbltest.logging import cbl_error, cbl_trace, cbl_warning
+from cbltest.logging import cbl_error, cbl_info, cbl_trace, cbl_warning
 from cbltest.utils import SHELL2HTTP_PORT, assert_not_null, async_retry_assert, is_sidecar_reachable
 from cbltest.version import VERSION
 
@@ -667,6 +668,15 @@ class SyncGatewayStatusResponse(BaseModel):
     vendor: SyncGatewayStatusVendor
 
 
+class SyncGatewayFeature(Enum):
+    """SGW features that not every version supports. Each value names the feature in skip messages."""
+
+    # SGW from 4.0.0.
+    VERSION_VECTORS = "version vectors"
+    # SGW before 4.0.0, which removed the option. It is on by default.
+    ALLOW_CONFLICTS = "allow conflicts"
+
+
 class DatabaseState(str, Enum):
     """
     The state of a Sync Gateway database.
@@ -855,13 +865,6 @@ class StartupConfigResponse(BaseModel):
     couchbase_keepalive_interval: int | None = None
     heap_profile_collection_threshold: int | None = None
     heap_profile_disable_collection: bool | None = None
-
-
-class ResyncAction(str, Enum):
-    """The action to perform via POST /{db}/_resync"""
-
-    START = "start"
-    STOP = "stop"
 
 
 class ResyncState(str, Enum):
@@ -1076,13 +1079,23 @@ class _SyncGatewayBase:
 
             return ret_val, resp
 
-    async def supports_version_vectors(self) -> bool:
-        """Returns whether the Sync Gateway instance supports version vectors (i.e. is 4.0 or later)"""
-        version = await self.get_version()
-        return packaging.version.parse(version.version) >= packaging.version.parse("4.0")
+    async def supports(self, feature: SyncGatewayFeature) -> bool:
+        """Returns whether this Sync Gateway supports the given feature."""
+        version = packaging.version.parse((await self.get_version()).version)
+        match feature:
+            case SyncGatewayFeature.VERSION_VECTORS:
+                return version >= packaging.version.parse("4.0.0")
+            case SyncGatewayFeature.ALLOW_CONFLICTS:
+                return version < packaging.version.parse("4.0.0")
+            case _:
+                assert_never(feature)
 
     async def get_version(self) -> SyncGatewayVersion:
-        """Return version of Sync Gateway"""
+        """Return version of Sync Gateway (fetched once)"""
+        return await self._version
+
+    @asyncstdlib.cached_property(asyncio.Lock)
+    async def _version(self) -> SyncGatewayVersion:
         resp = await self._send_request("get", "/_status")
         assert isinstance(resp, dict)
         model = SyncGatewayStatusResponse.model_validate(resp)
@@ -1112,7 +1125,7 @@ class _SyncGatewayBase:
             packaging.version.parse(sg_version.version)
         except packaging.version.InvalidVersion as exc:
             raise CblTestError(
-                f"Failed to parse Sync Gateway version from /_status response: {{resp}}\nversion={model.version}"
+                f"Failed to parse Sync Gateway version from /_status response: {resp}\nversion={model.version}"
             ) from exc
         return sg_version
 
@@ -1969,6 +1982,17 @@ class _SyncGatewayBase:
         await self.__session.close()
         await self._caddy.close()
 
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        await self.close()
+
     async def get_database_config(self, db_name: str) -> DatabaseConfig:
         """
         Gets the configuration for a specific database from the admin API.
@@ -2097,22 +2121,34 @@ class _SyncGatewayBase:
             assert isinstance(resp, dict)
             return cast(dict, resp)
 
-    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 100, wait_time: int = 5) -> None:
+    async def wait_for_sgcollect_to_complete(self, max_attempts: int = 200, wait_time: int = 5) -> None:
         """
         Waits for SGCollect to complete, polling until the status is 'stopped' or 'completed'.
-        Polls 60 times, waiting 2 seconds between each poll.
+        Polls up to max_attempts times, waiting wait_time seconds between each poll. If SGCollect is still running
+        after that, keeps polling a few more times only to report how long it actually took, then fails either way.
 
         :param max_attempts: Maximum number of attempts to wait for SGCollect to complete
         :param wait_time: Time to wait between attempts
         """
-        for _ in range(max_attempts):
+        start = time.monotonic()
+        limit = max_attempts * wait_time
+        grace_attempts = 12
+        for attempt in range(1, max_attempts + grace_attempts + 1):
             status_resp = await self.get_sgcollect_status()
             if status_resp.get("status") in ["stopped", "completed"]:
-                return
+                elapsed = time.monotonic() - start
+                if attempt <= max_attempts:
+                    cbl_info(f"SGCollect on {self.hostname} completed after {elapsed:.1f}s ({attempt} polls)")
+                    return
+                raise Exception(
+                    f"SGCollect was observed complete after {elapsed:.1f}s ({attempt} polls, {wait_time}s apart); "
+                    f"completion was not observed within the {max_attempts} polls budgeted for {limit}s"
+                )
             await asyncio.sleep(wait_time)
 
         raise Exception(
-            f"SGCollect did not complete after {max_attempts * wait_time} seconds.\n"
+            f"SGCollect completion was not observed after {time.monotonic() - start:.1f}s "
+            f"(including {grace_attempts} grace polls).\n"
             f"Status: {status_resp.get('status')}.\n"
             f"Error: {status_resp.get('error')}"
         )
@@ -2574,32 +2610,6 @@ class SyncGateway(_SyncGatewayBase):
             )
             return await self._update_database_config(db_name, DatabaseConfig(offline=True, scopes=scopes))
 
-    async def _put_resync(
-        self,
-        db_name: str,
-        *,
-        action: ResyncAction,
-        reset: bool = False,
-    ) -> ResyncStatusResponse:
-        """
-        Starts or stops a resync operation via POST /{db}/_resync. The database
-        must be offline (see `SyncGatewayCluster.take_database_offline`) before
-        starting a resync.
-
-        :param db_name: The name of the database to resync.
-        :param action: Whether to start or stop the resync operation.
-        :param reset: Whether to discard previous resync progress before starting.
-            Only meaningful when ``action`` is :attr:`ResyncAction.START`.
-        """
-        with self._tracer.start_as_current_span(
-            "put_resync",
-            attributes={"sg.database.name": db_name, "sg.resync.action": action.value},
-        ):
-            params = {"action": action.value, "reset": "true" if reset else "false"}
-            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
-            assert isinstance(resp, dict)
-            return ResyncStatusResponse.model_validate(resp)
-
     async def start_resync(self, db_name: str, *, reset: bool = False) -> ResyncStatusResponse:
         """
         Starts a resync operation via POST /{db}/_resync. The database must be
@@ -2609,15 +2619,11 @@ class SyncGateway(_SyncGatewayBase):
         :param db_name: The name of the database to resync.
         :param reset: Whether to discard previous resync progress before starting.
         """
-        return await self._put_resync(db_name, action=ResyncAction.START, reset=reset)
-
-    async def stop_resync(self, db_name: str) -> ResyncStatusResponse:
-        """
-        Stops a running resync operation via POST /{db}/_resync.
-
-        :param db_name: The name of the database whose resync operation to stop.
-        """
-        return await self._put_resync(db_name, action=ResyncAction.STOP)
+        with self._tracer.start_as_current_span("start_resync", attributes={"sg.database.name": db_name}):
+            params = {"action": "start", "reset": "true" if reset else "false"}
+            resp = await self._send_request("post", f"/{db_name}/_resync", params=params)
+            assert isinstance(resp, dict)
+            return ResyncStatusResponse.model_validate(resp)
 
     async def get_resync_status(self, db_name: str) -> ResyncStatusResponse:
         """
@@ -2652,28 +2658,6 @@ class SyncGateway(_SyncGatewayBase):
             tenacity.stop_after_attempt(max_retries),
         )
 
-    async def wait_for_resync_running(
-        self,
-        db_name: str,
-        *,
-        max_retries: int = 30,
-        retry_delay: int = 1,
-    ) -> ResyncStatusResponse:
-        """
-        Wait until the resync operation on this node reports Running, then
-        return its status.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        """
-        return await self._wait_for_resync_state(
-            db_name,
-            ResyncState.RUNNING,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-        )
-
     async def wait_for_resync_completed(
         self,
         db_name: str,
@@ -2692,28 +2676,6 @@ class SyncGateway(_SyncGatewayBase):
         return await self._wait_for_resync_state(
             db_name,
             ResyncState.COMPLETED,
-            max_retries=max_retries,
-            retry_delay=retry_delay,
-        )
-
-    async def wait_for_resync_stopped(
-        self,
-        db_name: str,
-        *,
-        max_retries: int = 30,
-        retry_delay: int = 2,
-    ) -> ResyncStatusResponse:
-        """
-        Wait until the resync operation on this node reports Stopped, then
-        return its final status.
-
-        :param db_name: Database name to poll.
-        :param max_retries: Number of polls before timing out.
-        :param retry_delay: Seconds between polls.
-        """
-        return await self._wait_for_resync_state(
-            db_name,
-            ResyncState.STOPPED,
             max_retries=max_retries,
             retry_delay=retry_delay,
         )
@@ -3059,14 +3021,3 @@ class SyncGatewayUserClient(_SyncGatewayBase):
         """
         with self._tracer.start_as_current_span("delete_public_session", attributes={"sg.database.name": db_name}):
             await self._send_request("delete", f"/{db_name}/_session")
-
-    async def __aenter__(self) -> Self:
-        return self
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        await self.close()

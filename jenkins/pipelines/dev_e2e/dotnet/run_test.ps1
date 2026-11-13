@@ -8,7 +8,7 @@ param (
 Import-Module $PSScriptRoot/../../shared/config.psm1 -Force
 $ErrorActionPreference = "Stop"
 
-uv run --group dotnet-build dotnetenv install "10.0"
+uv run dotnetenv install "10.0"
 
 uv run $PSScriptRoot\setup_test.py "windows" $Version $SgwVersion
 if($LASTEXITCODE -ne 0) {

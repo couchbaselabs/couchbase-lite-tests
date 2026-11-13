@@ -75,6 +75,10 @@ c/
 
 Build: `./scripts/build_macos.sh <version> <build_num>` → `build/out/bin/`
 
+Known gap: `/startListener` ignores `identity`. CBL-C cannot import PKCS12, so a TLS listener always
+uses an anonymous self-signed identity that CBL creates. A test that checks the listener's certificate
+fails on C.
+
 ### .NET (`dotnet/`)
 
 ```

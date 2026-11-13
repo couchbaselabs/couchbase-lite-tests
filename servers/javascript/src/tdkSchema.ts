@@ -238,10 +238,18 @@ export interface LogRequest extends TestRequest {
 
 //-------- Loading datasets:
 
-/** Base URL for our JSON datasets. */
+/** Base URL for our JSON datasets.
+ *
+ *  Defaults to the repo's own `dataset/server` tree, served by the dev server (see
+ *  vite.config.js), falling back to GitHub when no checkout is found.  Set
+ *  VITE_DATASET_BASE_URL / VITE_BLOB_BASE_URL to override, e.g. when the test server
+ *  does not run alongside the fixtures.  May be relative to the page.
+ */
 export const kDatasetBaseURL =
+    import.meta.env.VITE_DATASET_BASE_URL ??
     "https://raw.githubusercontent.com/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/dbs/js/";
 export const kBlobBaseURL =
+    import.meta.env.VITE_BLOB_BASE_URL ??
     "https://media.githubusercontent.com/media/couchbaselabs/couchbase-lite-tests/refs/heads/main/dataset/server/blobs/";
 
 /** Schema of `index.json` */

@@ -114,8 +114,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
             pinned_server_cert=sg_nodes[0].tls_cert(),
         )
         await replicator.start()
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, f"Error waiting for replicator: {status.error}"
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step(f"Add {num_docs_per_iteration} new docs for this phase")
         new_docs: list[DocumentUpdateEntry] = []
@@ -136,10 +135,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         await sg_nodes[0].update_documents(sg_db, new_docs)
 
         self.mark_test_step("Wait for replicator to sync new docs")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Save current revisions before update")
         docs_before = await sg_nodes[0].get_all_documents(sg_db, scope, collection, True)
@@ -165,10 +161,7 @@ class TestSgwRollingUpgrade(CBLTestClass):
         await sg_nodes[0].update_documents(sg_db, updated_docs)
 
         self.mark_test_step("Wait for replicator to sync updates")
-        status = await replicator.wait_for(ReplicatorActivityLevel.IDLE)
-        assert status.error is None, (
-            f"Error waiting for replicator: ({status.error.domain} / {status.error.code}) {status.error.message}"
-        )
+        await replicator.wait_for(ReplicatorActivityLevel.IDLE)
 
         self.mark_test_step("Verify revisions have progressed on SGW via changes feed")
         changes = await sg_nodes[0].get_changes(sg_db, scope, collection)

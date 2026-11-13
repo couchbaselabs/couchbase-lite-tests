@@ -67,15 +67,18 @@ pipeline {
             parallel {
                 stage('macOS') {
                     when { beforeAgent true; expression { params.RUN_MACOS } }
-                    agent { label 'mac-mini-new' }
+                    agent { label 'e2e&&macos-host' }
                     environment {
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                         TS_ARTIFACTS_DIR = 'c_macos'
                     }
                     steps {
                         echo "=== Run C macOS Tests"
-                        timeout(time: 120, unit: 'MINUTES') {
-                            sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                        // The label matches a shared pool and the test server binds
+                        // fixed localhost ports, so serialize per node as dev_e2e does.
+                        lock("${env.NODE_NAME}") {
+                            timeout(time: 120, unit: 'MINUTES') {
+                                sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} macos ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
+                            }
                         }
                         echo "=== C macOS Tests Complete"
                     }
@@ -102,19 +105,19 @@ pipeline {
                 }
                 stage('iOS') {
                     when { beforeAgent true; expression { params.RUN_IOS } }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mob-e2e-iphone-03' }
                     options {
-                        lock('23ee833a5d402a3c05ca7e1e366fd50dedd0c1e5')
+                        // Lock on the node, not the device id: that is the name the
+                        // dev_e2e ios/c/dotnet jobs sharing this iPhone lock on.
+                        lock('mob-e2e-iphone-03')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        KEYCHAIN_PASSWORD = credentials("${env.NODE_NAME}-keychain-password")
                         TS_ARTIFACTS_DIR = 'c_ios'
                     }
                     steps {
-                        withCredentials([string(credentialsId: 'mobile-qe-india', variable: 'KEYCHAIN_PASSWORD')]) {
-                            sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
-                        }
+                        // Unlock keychain:
+                        sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
                         echo "=== Run C iOS Tests"
                         timeout(time: 120, unit: 'MINUTES') {
                             sh "jenkins/pipelines/QE/c/run_test.sh ${params.CBL_VERSION} ios ${params.SGW_VERSION} --dataset-version ${params.TS_DATASET_VERSION} --test-filter '${params.TS_TEST_FILTER}'"
@@ -144,16 +147,14 @@ pipeline {
                 }
                 stage('Android') {
                     when { beforeAgent true; expression { params.RUN_ANDROID } }
-                    agent { label 'qe-mac-india' }
+                    agent { label 'mob-e2e-android-01' }
                     options {
-                        lock('56141JEBF18456')
+                        lock('mob-e2e-android-01')
                     }
                     environment {
-                        KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
-                        ANDROID_HOME = "${env.HOME}/Library/Android/sdk"
-                        ANDROID_SERIAL = "56141JEBF18456"
-                        JAVA_HOME = "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
-                        PATH = "\$JAVA_HOME/bin:\$ANDROID_HOME/platform-tools:\$ANDROID_HOME/tools:\$ANDROID_HOME/tools/bin:/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                        // No ANDROID_SERIAL: the bridge always passes `-s <location>`
+                        // from the topology. SDK and JDK come from the node, as the
+                        // dev_e2e android jobs on this same node rely on.
                         TS_ARTIFACTS_DIR = 'c_android'
                     }
                     steps {

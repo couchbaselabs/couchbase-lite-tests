@@ -30,7 +30,7 @@ class TestJWTReplication(CBLTestClass):
         4. Start ES with openid_token.path pointing to that file
         5. Verify replication syncs documents correctly
         """
-
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         # --- Step 1: Generate JWT credentials ---
         self.mark_test_step("Generate RSA key pair and JWT token")
         private_key, public_key = generate_rsa_keypair()
@@ -142,7 +142,7 @@ class TestJWTReplication(CBLTestClass):
         4. Reconnect using Token-B
         5. Continue replicating successfully
         """
-
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         # --- Step 1: Generate TWO RSA key pairs (simulating key rotation) ---
         self.mark_test_step("Generate two RSA key pairs for token rotation")
         private_key_a, public_key_a = generate_rsa_keypair()
@@ -251,7 +251,7 @@ class TestJWTReplication(CBLTestClass):
         3. ES detects token change → disconnects → reconnects with invalid token
         4. SGW rejects invalid token → replication status = Stopped with 401
         """
-
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         # --- Step 1: Setup SGW + CBS ---
         self.mark_test_step("Setup SGW with local_jwt for invalid token rotation test")
         private_key, public_key = generate_rsa_keypair()
@@ -323,6 +323,7 @@ class TestJWTReplication(CBLTestClass):
     async def test_corrupt_token_file_content_mid_replication(
         self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path
     ) -> None:
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         # --- Step 1: Setup ---
         self.mark_test_step("Setup SGW for file deletion test")
         private_key, public_key = generate_rsa_keypair()
@@ -406,7 +407,7 @@ class TestJWTReplication(CBLTestClass):
                  _replicate must be re-triggered manually →
                  new replication with Token-C → docs sync
         """
-
+        await self.skip_if_es_not(cblpytest.edge_servers[0].get_admin_client(), ">= 1.1")
         # --- Step 1: Generate keys ---
         self.mark_test_step("Generate valid key pair A, invalid key, and valid key pair C")
         # ...existing code through Step 3 and initial replication verify...
