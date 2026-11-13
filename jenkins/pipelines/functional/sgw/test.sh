@@ -71,7 +71,6 @@ pushd "$FUNCTIONAL_TESTS_DIR" >/dev/null
 # topology can't satisfy (e.g. a second test server) are skipped by the required_topology plugin.
 PYTEST_ARGS=(
   -v --no-header --config config.json
-  --ignore=test_replication_xdcr.py
   --ignore=test_query_consistency.py
   --dataset-version "$DATASET_VERSION"
   --sgcollect-on-test-failure
