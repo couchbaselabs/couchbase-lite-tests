@@ -20,6 +20,7 @@ from cbltest.api.testserver import CouchbaseLiteFeature
 @pytest.mark.min_couchbase_servers(2)
 @pytest.mark.min_clusters(2)
 @pytest.mark.min_load_balancers(1)
+@pytest.mark.skip(reason="CBL-9359")
 class TestReplicationXdcr(CBLTestClass):
     async def setup_xdcr_clusters(
         self,
