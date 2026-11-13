@@ -11,11 +11,11 @@ platforms (C, .NET, iOS/Swift, JVM/Kotlin, JavaScript).
 ```
 Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS/JVM/JS)
                                     ↓
-                             Tests (dev_e2e / QE)
+                             Tests (functional / system / upgrade_sgw)
 ```
 
 - `client/` — Python `cbltest` package: test framework, pytest plugins, request/response types
-- `tests/dev_e2e/` — Developer E2E tests; `tests/QE/` — QA tests
+- `tests/functional/` — functional tests; `tests/multiplatform/` — tests needing several test servers (long-running stress tests sit in each suite's `stress/` folder); `tests/upgrade_sgw/` — SGW upgrade tests
 - `servers/{c,dotnet,ios,jak,javascript}/` — Per-platform test server implementations
 - `environment/{aws,docker}/` — Infrastructure (Terraform, Docker Compose)
 - `jenkins/pipelines/` — Per-platform CI/CD pipelines
@@ -34,7 +34,7 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 
 - Files: `test_<feature>.py`; Functions: `async def test_<name>(...)`
 - Use `cblpytest` fixture (auto-injected) and `dataset_path` fixture
-- Mark tests: `@pytest.mark.sgw`, `@pytest.mark.cbl`, `@pytest.mark.upg_sgw`
+- Mark tests with their topology (`@pytest.mark.min_*`); `@pytest.mark.upg_sgw` marks SGW upgrade scenarios
 - Topology markers: `@pytest.mark.min_test_servers(N)`, `@pytest.mark.min_sync_gateways(N)`
 - All tests get auto-cleanup via the autouse `cluster_cleanup` fixture (`cbltest.plugins.cluster_cleanup`)
 
@@ -46,7 +46,7 @@ Environment (CBS + SGW)  →  Client/TDK (Python)  →  Test Servers (C/.NET/iOS
 
 ### Jenkins Pipelines (Highly Repetitive)
 
-- `jenkins/pipelines/{dev_e2e,QE}/{platform}/setup_test.py` — all near-identical
+- `jenkins/pipelines/functional/{platform}/setup_test.py` — all near-identical
 - They import `setup_test` from `jenkins/pipelines/shared/setup_test.py`
 - Differ only in: platform name string, topology file path, config file path
 

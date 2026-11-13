@@ -1,6 +1,6 @@
 # cbltest Framework — `client/`
 
-The `cbltest` Python package is the test framework that drives platform test servers via HTTP. It is an async request factory + pytest plugin suite. Tests in `tests/dev_e2e/` and `tests/QE/` consume this package; per-platform servers in `servers/` implement the API it calls.
+The `cbltest` Python package is the test framework that drives platform test servers via HTTP. It is an async request factory + pytest plugin suite. Tests in `tests/functional/`, `tests/multiplatform/` and `tests/upgrade_sgw/` consume this package; per-platform servers in `servers/` implement the API it calls.
 
 ## Scope
 
@@ -76,6 +76,7 @@ client/
         ├── cblpytest_fixture.py        # session-scoped `cblpytest` fixture
         ├── required_topology.py        # min_test_servers / min_sync_gateways / … markers
         ├── cbse_filter.py              # CBSE (CBS Edition) test filtering
+        ├── stress_filter.py            # --stress: collect only the `stress/` folders (skipped otherwise)
         ├── greenboard_fixture.py
         ├── span_generation_fixture.py  # OpenTelemetry spans
         ├── sgcollect_fixture.py        # sgcollect on failure
@@ -129,6 +130,7 @@ Registered in `client/pyproject.toml`:
 [project.entry-points.pytest11]
 required_topology       = "cbltest.plugins.required_topology"
 cbse_filter             = "cbltest.plugins.cbse_filter"
+stress_filter           = "cbltest.plugins.stress_filter"
 cblpytest_fixture       = "cbltest.plugins.cblpytest_fixture"
 greenboard_fixture      = "cbltest.plugins.greenboard_fixture"
 span_generation_fixture = "cbltest.plugins.span_generation_fixture"
@@ -145,6 +147,7 @@ CLI options added by `cblpytest_fixture`:
 | `--test-props PATH` | Extra test properties JSON |
 | `--otel-endpoint HOST` | OpenTelemetry collector |
 | `--dataset-version VERSION` | Default `"4.0"` |
+| `--stress` *(stress_filter)* | Run only the tests in `stress/` folders; without it those folders are not collected |
 | `--bucketpool MODE` | How to empty a CBS bucket between tests: `purge` (default) or `delete` |
 
 ## How To Add Things
@@ -181,7 +184,7 @@ cd client/smoke_tests && uv run pytest -x -v --config config_in.json
 | What | Where | Relationship |
 |---|---|---|
 | API contract | [spec/api/api.yaml](../spec/api/api.yaml) | Defines what test servers implement |
-| Test suites | [tests/dev_e2e/](../tests/dev_e2e/), [tests/QE/](../tests/QE/) | Consume this framework |
+| Test suites | [tests/functional/](../tests/functional/), [tests/upgrade_sgw/](../tests/upgrade_sgw/) | Consume this framework |
 | Platform servers | [servers/](../servers/) (c, dotnet, ios, jak, javascript) | Implement the API this calls |
 | Infrastructure | [environment/](../environment/) (aws, docker) | Deploys the test environment |
 | CI | [jenkins/pipelines/](../jenkins/pipelines/) | Drives tests using this framework |

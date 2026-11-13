@@ -1,13 +1,5 @@
 @AGENTS.md
 
-#### SGW Pipeline (sgw/)
-
-The `sgw/` pipeline is unique:
-- **No specific CBL platform** — tests SGW itself, not platform-specific CBL features
-- Tests: user/role management, database replication, advanced SGW features
-- Single SGW node, single CBS instance
-- Topology: `topology.json`
-
 #### SGW Upgrade Pipeline (upg-sgw/) — MOST CRITICAL
 
 The `upg-sgw/` pipeline:
@@ -28,21 +20,11 @@ Topology must provide:
   "sync_gateways": [{"cluster": 0}, {"cluster": 1}]          // 2 SGW
 ```
 
-#### Edge Server Pipeline (es/)
-
-The `es/` pipeline:
-- **Custom `setup_test.py`** — NOT using shared `setup_test()`
-- Has own `generate_topology()` function
-- CLI: `--sgw-version`, `--cbs-version` (programmatic topology generation)
-- Tests Edge Server-specific functionality
-
 #### Multi-Platform Pipeline (multiplatform/)
 
-The `multiplatform/` pipeline:
-- **Cross-platform replication tests** — C, .NET, iOS, Java all syncing together
-- Does not call the shared `setup_test()` — has its own inline topology-composition logic with per-platform version maps
-- Single topology, multiple test servers
-- Complex topology with multiple platforms and topologies
+The `multiplatform/` pipeline (runs `tests/multiplatform`):
+- **Tests needing several test servers** — C, .NET, iOS, Android, Java, each on its own CBL version
+- `setup_multiplatform.py` checks `PLATFORM_VERSIONS` against `topology.json` (every test server the agent can reach) and ProGet, then calls the shared `setup_test()` on just the test servers the entries use.
 
 ## Important Files
 
@@ -69,15 +51,15 @@ Current (correct) structure:
 ## Commands
 
 ```bash
-# Run QE pipeline for specific platform
+# Run a platform pipeline's setup (platform pipelines live in ../functional/)
 cd environment/aws
-uv run ../jenkins/pipelines/QE/{platform}/setup_test.py 4.0.0 4.0.0
+uv run ../jenkins/pipelines/functional/{platform}/setup_test.py 4.0.0 4.0.0
 
 # Run SGW upgrade tests
-uv run ../jenkins/pipelines/QE/upg-sgw/setup_test.py 4.0.0 4.0.0
+uv run ../jenkins/pipelines/upg-sgw/setup_test.py 4.0.0 4.0.0
 
 # Teardown infrastructure
-cd jenkins/pipelines/QE/{platform}
+cd jenkins/pipelines/functional/{platform}
 ./teardown.sh
 ```
 
@@ -86,7 +68,7 @@ cd jenkins/pipelines/QE/{platform}
 | What | Where | Relationship |
 |------|-------|-------------|
 | Parent pipelines docs | `../CLAUDE.md`, `../AGENTS.md` | Higher-level pipeline guidance |
-| QE test suites | `../../../tests/QE/` | Source of `@pytest.mark.min_*` requirements |
+| Test suites | `../../../tests/functional/`, `../../../tests/upgrade_sgw/` | Source of `@pytest.mark.min_*` requirements |
 | Test specifications | `../../../spec/tests/QE/` | Define expected behavior for QE tests |
 | Shared setup logic | `../shared/setup_test.py` | Core function all QE pipelines delegate to |
 | AWS orchestrator | `../../../environment/aws/start_backend.py` | Called to provision infrastructure |

@@ -33,7 +33,7 @@ with `--server cbs` (defaults to `$SG_TEST_COUCHBASE_SERVER_URL`).
 `environment/local/topology_config`, so it can be passed straight to pytest:
 
 ```bash
-cd tests/dev_e2e
+cd tests/functional
 uv run pytest --config "$(cat ../../environment/local/topology_config)"
 ```
 
@@ -70,7 +70,7 @@ no `--stop-cbs` equivalent to `--stop-sync-gateway`.
 ## Multiple Couchbase Server nodes
 
 `--couchbase-servers N` puts N Couchbase Server nodes in the topology config, for tests marked
-`min_couchbase_servers(N)` — `tests/QE/test_multiple_servers.py` needs 2, since it fails over,
+`min_couchbase_servers(N)` — `tests/functional/test_multiple_servers.py` needs 2, since it fails over,
 rebalances and recovers the second node. The flag requires `--server cbs` and a source of nodes:
 
 ```bash
@@ -204,8 +204,8 @@ keeps the AWS layout under `/home/ec2-user`, so test configs that name those pat
 ```bash
 uv run environment/local/start_local.py --server rosmar --git-tag main
 uv run environment/local/start_edge_server.py --version 1.1.1-3
-cd tests/QE
-uv run pytest --config ../../environment/local/edge_server/topology_config.json edge_server
+cd tests/functional
+uv run pytest --config ../../environment/local/edge_server/topology_config.json -m min_edge_servers
 ```
 
 The script does these steps:
@@ -307,6 +307,6 @@ After starting the environment, run tests against the config path `start_local.p
 directly, since those don't reflect a `--connstr`/`--start-cbs` override:
 
 ```bash
-cd tests/dev_e2e
+cd tests/functional
 uv run pytest --config "$(cat ../../environment/local/topology_config)"
 ```

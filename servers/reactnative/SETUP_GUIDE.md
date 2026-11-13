@@ -385,11 +385,10 @@ source .venv/bin/activate
 Run pytest in the background, redirecting output to a log file:
 
 ```bash
-python -m pytest tests/dev_e2e/ \
+python -m pytest tests/functional/ \
   --config environment/aws/config.json \
   -v \
   --timeout=120 \
-  --ignore=tests/dev_e2e/test_multipeer.py \
   -k "not listener and not multipeer and not filter and not custom_conflict" \
   --tb=short \
   2>&1 | tee /tmp/rn_test_results.log &
@@ -526,7 +525,7 @@ To debug a specific failure:
 
 ```bash
 # Start pytest with just one test
-python -m pytest tests/dev_e2e/test_basic_replication.py::TestBasicReplication::test_push_and_pull \
+python -m pytest tests/functional/test_basic_replication.py::TestBasicReplication::test_push_and_pull \
   --config environment/aws/config.json \
   -v --timeout=120 -s \
   2>&1 | tee /tmp/rn_single_test.log &
@@ -563,12 +562,11 @@ The React Native server does **not** support all features of the native test ser
 To skip all known-unsupported tests:
 
 ```bash
-python -m pytest tests/dev_e2e/ \
+python -m pytest tests/functional/ \
   --config environment/aws/config.json \
   -v --timeout=300 \
-  --ignore=tests/dev_e2e/test_multipeer.py \
-  --ignore=tests/dev_e2e/test_custom_conflict.py \
-  --ignore=tests/dev_e2e/test_replication_upgrade.py \
+  --ignore=tests/functional/test_custom_conflict.py \
+  --ignore=tests/functional/test_replication_upgrade.py \
   -k "not listener and not multipeer and not filter and not custom_conflict and not filter_removed_access" \
   --tb=short
 ```
@@ -703,10 +701,9 @@ EOF
 # ──────────────────────────────────────────────
 source .venv/bin/activate
 
-python -m pytest tests/dev_e2e/ \
+python -m pytest tests/functional/ \
   --config environment/aws/config.json \
   -v --timeout=120 \
-  --ignore=tests/dev_e2e/test_multipeer.py \
   -k "not listener and not multipeer and not filter and not custom_conflict" \
   --tb=short \
   2>&1 | tee /tmp/rn_test_results.log &
