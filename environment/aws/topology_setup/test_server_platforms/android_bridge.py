@@ -13,7 +13,7 @@ Functions:
         Validate that the device is connected and accessible via ADB.
 
     install(self, location: str) -> None:
-        Install the application on the specified device.
+        Install the application on the specified device, uninstalling a conflicting existing copy if needed.
 
     run(self, location: str) -> None:
         Run the application on the specified device.
@@ -65,6 +65,16 @@ class AndroidBridge(PlatformBridge):
         ("android.permission.BLUETOOTH_ADVERTISE", 31, None),  # API 31+
         ("android.permission.NEARBY_WIFI_DEVICES", 31, None),  # API 31+
     ]
+
+    # adb install failures that a clean uninstall of the package already on the
+    # device resolves (e.g. an APK signed with a different key, or a build whose
+    # version code is older than the installed one).
+    __conflict_failures: ClassVar[tuple[str, ...]] = (
+        "INSTALL_FAILED_UPDATE_INCOMPATIBLE",
+        "INSTALL_FAILED_VERSION_DOWNGRADE",
+        "INSTALL_FAILED_ALREADY_EXISTS",
+        "signatures do not match",
+    )
 
     def __init__(
         self,
@@ -131,17 +141,72 @@ class AndroidBridge(PlatformBridge):
         """
         Install the application on the specified device.
 
+        If the APK conflicts with the copy already on the device (a different
+        signing key, or a lower version code) the existing package is
+        uninstalled and the install retried once.
+
         Args:
             location (str): The device location (e.g., device serial number).
+
+        Raises:
+            RuntimeError: If the application cannot be installed.
         """
         header(f"Installing {self.__app_path} to {location}")
-        subprocess.run(
-            [str(self.__adb_location), "-s", location, "install", self.__app_path],
-            check=True,
-            capture_output=False,
-        )
+        output = self.__try_install(location)
+        if output is not None and self.__conflicts_with_existing(output):
+            click.secho(
+                f"Install conflicts with the {self.__app_id} already on {location}, uninstalling and retrying...",
+                fg="yellow",
+            )
+            subprocess.run(
+                [str(self.__adb_location), "-s", location, "uninstall", self.__app_id],
+                check=False,
+                capture_output=False,
+            )
+            output = self.__try_install(location)
+
+        if output is not None:
+            raise RuntimeError(f"Failed to install {self.__app_path} to {location}: {output}")
+
         if self.__needs_permissions:
             self.__grant_runtime_permissions(location)
+
+    def __try_install(self, location: str) -> str | None:
+        """
+        Run a single adb install, echoing whatever adb reports.
+
+        Args:
+            location (str): The device location (e.g., device serial number).
+
+        Returns:
+            str | None: None if the install succeeded, otherwise adb's output.
+        """
+        result = subprocess.run(
+            [str(self.__adb_location), "-s", location, "install", self.__app_path],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        output = f"{result.stdout}\n{result.stderr}".strip()
+        if output:
+            click.echo(output)
+
+        # Some adb versions report a failed install with an exit status of 0,
+        # so the output has to be inspected as well.
+        if result.returncode == 0 and "Failure [" not in output:
+            return None
+
+        return output or f"adb install exited with status {result.returncode}"
+
+    def __conflicts_with_existing(self, output: str) -> bool:
+        """
+        Determine whether a failed install can be fixed by uninstalling the
+        package that is already on the device.
+
+        Args:
+            output (str): The output of the failed adb install.
+        """
+        return any(failure in output for failure in self.__conflict_failures)
 
     def __get_api_level(self, location: str) -> int:
         """
