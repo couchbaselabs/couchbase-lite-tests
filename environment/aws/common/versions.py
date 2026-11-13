@@ -33,7 +33,9 @@ def find_missing_version(product: str, version: str) -> str | None:
         return f"{product} {base_version} does not exist on proget"
     r.raise_for_status()
 
-    # Build 0 stands for the release itself (see TestServer.__normalize_version), which has no build folder.
+    # Build 0 denotes the release itself, which must already have been released.
+    if build == "0" and not r.json().get("IsRelease", False):
+        return f"{product} {base_version} has no release to use for build 0"
     if build and build != "0":
         r = requests.head(f"{_LATESTBUILDS_BASE}/{product}/{base_version}/{build}/", timeout=30)
         if r.status_code == 404:
