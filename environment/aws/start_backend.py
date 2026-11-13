@@ -155,7 +155,14 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         if len(topology.sync_gateways) > 0:
             sgw_instances = []
             for sgw in topology.sync_gateways:
-                sgw_instances.append({"hostname": sgw.hostname, "tls": True, "cluster_index": sgw.cluster_index})
+                sgw_instances.append(
+                    {
+                        "hostname": sgw.hostname,
+                        "internal_hostname": sgw.internal_hostname,
+                        "tls": True,
+                        "cluster_index": sgw.cluster_index,
+                    }
+                )
 
             config_json["sync-gateways"] = sgw_instances
 
@@ -189,7 +196,7 @@ def write_config(in_config_file: str, topology: TopologyConfig, output: IO[str])
         if len(topology.load_balancers) > 0:
             load_balancers = []
             for lb in topology.load_balancers:
-                load_balancers.append(lb.hostname)
+                load_balancers.append({"hostname": lb.hostname})
 
             config_json["load-balancers"] = load_balancers
 
