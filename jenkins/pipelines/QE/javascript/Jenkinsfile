@@ -44,7 +44,7 @@ pipeline {
         stage('Run Test') {
             agent { label 'mac-mini-new' }
             environment {
-                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                PATH = "/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'js'
             }
             steps {
