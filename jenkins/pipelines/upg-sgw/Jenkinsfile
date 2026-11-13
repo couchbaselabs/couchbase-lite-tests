@@ -60,7 +60,7 @@ pipeline {
                     timeout(time: 5, unit: 'MINUTES') {
                         sh "jenkins/pipelines/upg-sgw/teardown.sh"
                     }
-                    archiveArtifacts artifacts: 'tests/upgrade_sgw/upg-sgw/**/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'tests/upgrade_sgw/sgw/**/*', fingerprint: true, allowEmptyArchive: true
                     echo "=== SGW Upgrades Teardown Complete"
                 }
             }

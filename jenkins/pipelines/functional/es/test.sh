@@ -39,7 +39,7 @@ if [ "$STRESS" = "true" ]; then
 fi
 # An empty TEST_FILTER runs every selected test; anything else is passed to pytest -k.
 if [ -n "$TEST_FILTER" ]; then
-  PYTEST_ARGS+=(-k "$TEST_FILTER")
+  PYTEST_ARGS+=(-k "$TEST_FILTER" --no-result-upload)
 fi
 
 echo "Setup backend..."
