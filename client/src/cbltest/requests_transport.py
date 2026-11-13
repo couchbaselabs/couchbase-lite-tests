@@ -130,8 +130,8 @@ class _RequestWebSocketTransport(RequestTransport):
         except TimeoutError:
             self.__ws_router.unregister(message_no)
             if self.__is_native_ws:
-                # React Native test servers (ws:// URLs) can be left stuck after a timeout,
-                # so drop the connection and relaunch the app before the next request.
+                # A native WebSocket test server (ws:// URL, e.g. React Native) that misses
+                # a response is dropped, so it reconnects before the next request.
                 self.__ws_router.begin_reconnect(self.__url)
             raise CblTimeoutError(f"No response to {data['ts_command']} from {self.__url} after 120 seconds") from None
 

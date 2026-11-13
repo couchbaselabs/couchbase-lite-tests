@@ -34,8 +34,10 @@ interface AutoConnectParams {
 
 const MAX_LOG_LINES = 200;
 const AUTO_CONNECT_DELAY_MS = 1000;
+// The app is launched while the environment is set up, which can be minutes
+// before pytest starts the WebSocket router, and pytest restarts the router for
+// every test. So keep retrying until the router answers instead of giving up.
 const AUTO_CONNECT_RETRY_INTERVAL_MS = 2000;
-const MAX_AUTO_CONNECT_RETRIES = 30;
 
 const App: React.FC = () => {
   const [deviceID, setDeviceID] = useState('ws0');
@@ -126,20 +128,15 @@ const App: React.FC = () => {
               const ac = autoConnectRef.current;
               if (ac && state === WebSocketState.Closed) {
                 ac.retryCount++;
-                if (ac.retryCount <= MAX_AUTO_CONNECT_RETRIES) {
-                  const delaySec = AUTO_CONNECT_RETRY_INTERVAL_MS / 1000;
-                  addLog(
-                    `Auto-reconnect in ${delaySec}s (attempt ${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`,
-                  );
-                  setStatus(`Retrying (${ac.retryCount}/${MAX_AUTO_CONNECT_RETRIES})...`);
-                  setTimeout(
-                    () => connectToServer(ac.id, ac.url),
-                    AUTO_CONNECT_RETRY_INTERVAL_MS,
-                  );
-                } else {
-                  addLog('Auto-connect failed: max retries exceeded');
-                  setStatus('Auto-connect failed');
-                }
+                const delaySec = AUTO_CONNECT_RETRY_INTERVAL_MS / 1000;
+                addLog(
+                  `Auto-reconnect in ${delaySec}s (attempt ${ac.retryCount})...`,
+                );
+                setStatus(`Retrying (${ac.retryCount})...`);
+                setTimeout(
+                  () => connectToServer(ac.id, ac.url),
+                  AUTO_CONNECT_RETRY_INTERVAL_MS,
+                );
               }
             }
           };

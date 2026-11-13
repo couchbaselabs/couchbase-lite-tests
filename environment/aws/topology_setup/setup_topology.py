@@ -783,30 +783,6 @@ class TopologyConfig:
             if not success:
                 raise RuntimeError(f"Test server failed to start at {test_server_input.location}")
 
-    def relaunch_test_servers(self) -> None:
-        """
-        Relaunch React Native test servers without reinstalling them.
-
-        The app is installed and launched once during setup, but it can give up
-        reconnecting before pytest binds its WebSocket port. The WebSocket router
-        calls this (via CBL_NATIVE_WS_RELAUNCH_SCRIPT) once the port is bound.
-        """
-        TestServer.initialize()
-        device_ids = websocket_device_ids([ts.platform for ts in self.__test_server_inputs])
-        for test_server_input, device_id in zip(self.__test_server_inputs, device_ids, strict=True):
-            if not test_server_input.platform.startswith("reactnative"):
-                continue
-
-            test_server = TestServer.create(test_server_input.platform, test_server_input.cbl_version)
-            if test_server_input.download:
-                # Uses the cached download if it is already present
-                test_server.download()
-
-            bridge = test_server.create_bridge(device_id=device_id)
-            bridge.validate(test_server_input.location)
-            bridge.run(test_server_input.location)
-            click.echo(f"Relaunched {test_server_input.platform} on {test_server_input.location}")
-
     def stop_test_servers(self) -> None:
         """
         Stop the running test servers.

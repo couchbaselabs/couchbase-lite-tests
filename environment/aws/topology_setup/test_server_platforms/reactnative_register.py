@@ -15,6 +15,7 @@ from environment.aws.topology_setup.test_server import (
     TestServer,
 )
 from environment.aws.topology_setup.test_server_platforms.android_bridge import AndroidBridge
+from environment.aws.topology_setup.test_server_platforms.ios_bridge import iOSBridge
 from environment.aws.topology_setup.test_server_platforms.platform_bridge import (
     PlatformBridge,
 )
@@ -28,9 +29,9 @@ WS_PORT = 8765
 APP_BUNDLE_ID = "com.cbltestserver"
 
 
-def _get_host_ip_for_ios() -> str:
-    """Determine the host IP that a physical iOS device can reach: the first
-    non-loopback, non-link-local IPv4 address of this machine."""
+def _host_ws_url() -> str:
+    """The URL of the pytest WebSocket router as a device on the host's network sees it:
+    the first non-loopback, non-link-local IPv4 address of this machine."""
     import netifaces
 
     for iface in netifaces.interfaces():
@@ -40,168 +41,9 @@ def _get_host_ip_for_ios() -> str:
         if netifaces.AF_INET in addrs:
             ip = addrs[netifaces.AF_INET][0].get("addr", "")
             if ip and not ip.startswith("169.254") and not ip.startswith("127."):
-                return ip
+                return f"ws://{ip}:{WS_PORT}"
 
-    raise RuntimeError("Cannot determine host IP reachable from iOS device")
-
-
-# ---------------------------------------------------------------------------
-# iOS Bridge
-# ---------------------------------------------------------------------------
-
-
-class ReactNativeIOSBridge(PlatformBridge):
-    def __init__(self, app_path: str, device_id: str | None) -> None:
-        self.__app_path = app_path
-        self.__device_id = device_id
-
-    def validate(self, location: str) -> None:
-        result = subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "info",
-                "details",
-                "--device",
-                location,
-            ],
-            check=False,
-            capture_output=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(f"iOS device {location} not found via devicectl!")
-
-    def install(self, location: str) -> None:
-        header(f"Installing React Native app to iOS device {location}")
-        subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "install",
-                "app",
-                "--device",
-                location,
-                self.__app_path,
-            ],
-            check=True,
-            capture_output=False,
-        )
-
-    def run(self, location: str) -> None:
-        if self.__device_id is None:
-            raise RuntimeError("A WebSocket device ID is required to launch the React Native test server")
-
-        # Stop any instance left over from a previous launch so the new launch
-        # starts fresh and connects back with the arguments below.
-        self.stop(location)
-
-        header(f"Launching React Native app on iOS device {location}")
-        host_ip = _get_host_ip_for_ios()
-        ws_url = f"ws://{host_ip}:{WS_PORT}"
-        click.echo(f"Auto-connect URL: {ws_url}  deviceID: {self.__device_id}")
-
-        result = subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "process",
-                "launch",
-                "--device",
-                location,
-                APP_BUNDLE_ID,
-                "--",
-                "-deviceID",
-                self.__device_id,
-                "-wsURL",
-                ws_url,
-            ],
-            check=True,
-            capture_output=True,
-        )
-        click.echo(result.stdout.decode("utf-8", errors="replace"))
-
-    def stop(self, location: str) -> None:
-        header(f"Stopping React Native app on iOS device {location}")
-        try:
-            result = subprocess.run(
-                [
-                    "xcrun",
-                    "devicectl",
-                    "device",
-                    "info",
-                    "apps",
-                    "--device",
-                    location,
-                    "--bundle-id",
-                    APP_BUNDLE_ID,
-                    "--hide-headers",
-                    "--hide-default-columns",
-                    "--columns",
-                    "path",
-                ],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError:
-            click.secho("App not found on device; skipping termination.", fg="yellow")
-            return
-
-        stdout = result.stdout.decode("utf-8").splitlines()
-        if not stdout:
-            click.secho("App not in device list; skipping termination.", fg="yellow")
-            return
-
-        app_path = stdout[-1].strip()
-        try:
-            result = subprocess.run(
-                [
-                    "xcrun",
-                    "devicectl",
-                    "device",
-                    "info",
-                    "processes",
-                    "--device",
-                    location,
-                ],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError:
-            click.secho("Failed to list processes; skipping termination.", fg="yellow")
-            return
-
-        proc_lines = result.stdout.decode("utf-8").splitlines()
-        pid_line = next((l for l in proc_lines if app_path in l), None)
-        if not pid_line:
-            click.echo("App process not running.")
-            return
-
-        pid = pid_line.split(" ")[0]
-        click.echo(f"Terminating PID {pid}")
-        subprocess.run(
-            [
-                "xcrun",
-                "devicectl",
-                "device",
-                "process",
-                "terminate",
-                "--device",
-                location,
-                "--pid",
-                pid,
-            ],
-            check=False,
-            capture_output=True,
-        )
-
-    def uninstall(self, location: str) -> None:
-        click.echo("iOS app uninstall deliberately not implemented")
-
-    def _get_ip(self, location: str) -> str | None:
-        return None
+    raise RuntimeError("Cannot determine a host IP address that the test device can reach")
 
 
 # ---------------------------------------------------------------------------
@@ -284,16 +126,14 @@ class ReactNativeAndroidTestServer(_ReactNativeTestServerBase):
             apk_path = (
                 RN_TEST_SERVER_DIR / "android" / "app" / "build" / "outputs" / "apk" / "release" / "app-release.apk"
             )
-        # The app connects back to the pytest WebSocket router through an adb reverse
-        # tunnel, so it reaches the host on 127.0.0.1 regardless of the device's network.
+        # The app connects back to the pytest WebSocket router with these launch arguments.
         device_id = kwargs.get("device_id")
-        launch_extras = {"deviceID": device_id, "wsURL": f"ws://127.0.0.1:{WS_PORT}"} if device_id else None
+        launch_extras = {"deviceID": device_id, "wsURL": _host_ws_url()} if device_id else None
         return AndroidBridge(
             str(apk_path),
             APP_BUNDLE_ID,
             needs_permissions=False,
             launch_extras=launch_extras,
-            reverse_ports=[WS_PORT],
             restart_on_run=True,
         )
 
@@ -479,4 +319,7 @@ class ReactNativeIOSTestServer(_ReactNativeTestServerBase):
             app_path = (
                 RN_TEST_SERVER_DIR / "ios" / "build" / "Build" / "Products" / "Release-iphoneos" / "CblTestServer.app"
             )
-        return ReactNativeIOSBridge(str(app_path), kwargs.get("device_id"))
+        # The app connects back to the pytest WebSocket router with these launch arguments.
+        device_id = kwargs.get("device_id")
+        launch_args = ["-deviceID", device_id, "-wsURL", _host_ws_url()] if device_id else []
+        return iOSBridge(str(app_path), APP_BUNDLE_ID, launch_args=launch_args, restart_on_run=True)

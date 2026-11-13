@@ -30,7 +30,7 @@ Functions:
 
 import platform
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from pathlib import Path
 from typing import ClassVar
 
@@ -85,7 +85,6 @@ class AndroidBridge(PlatformBridge):
         *,
         needs_permissions: bool = True,
         launch_extras: Mapping[str, str] | None = None,
-        reverse_ports: Sequence[int] = (),
         restart_on_run: bool = False,
     ) -> None:
         """
@@ -97,8 +96,6 @@ class AndroidBridge(PlatformBridge):
             activity (str): The activity name to launch.
             needs_permissions (bool): Whether to grant the runtime permissions after install.
             launch_extras (Mapping[str, str] | None): String extras passed to the activity on launch.
-            reverse_ports (Sequence[int]): Host ports to expose on the device with `adb reverse`
-                while the app runs, for test servers that connect back to the host.
             restart_on_run (bool): Force-stop any running instance before launching.
 
         Raises:
@@ -110,7 +107,6 @@ class AndroidBridge(PlatformBridge):
         self.__adb_location = None
         self.__needs_permissions = needs_permissions
         self.__launch_extras = dict(launch_extras or {})
-        self.__reverse_ports = list(reverse_ports)
         self.__restart_on_run = restart_on_run
 
         find_command = "where" if platform.system() == "Windows" else "which"
@@ -305,9 +301,6 @@ class AndroidBridge(PlatformBridge):
         header(f"Running {self.__app_id} on {location}")
         self.__wake_device(location)
         adb = [str(self.__adb_location), "-s", location]
-        for port in self.__reverse_ports:
-            subprocess.run([*adb, "reverse", f"tcp:{port}", f"tcp:{port}"], check=True)
-
         start_args = ["-S"] if self.__restart_on_run else []
         for key, value in self.__launch_extras.items():
             start_args += ["--es", key, value]
@@ -339,12 +332,6 @@ class AndroidBridge(PlatformBridge):
             check=True,
             capture_output=False,
         )
-        for port in self.__reverse_ports:
-            subprocess.run(
-                [str(self.__adb_location), "-s", location, "reverse", "--remove", f"tcp:{port}"],
-                check=False,
-                capture_output=True,
-            )
 
     def uninstall(self, location: str) -> None:
         """
