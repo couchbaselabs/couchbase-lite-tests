@@ -1417,7 +1417,9 @@ class TestBranchGate:
 # Overrides the real `cblpytest` fixture by name to avoid real network I/O,
 # while still exercising the real greenboard_fixture module end to end.
 # `_upload_document` writes the captured RunResult to a JSON file, since
-# the subprocess can't hand a Python object back to the outer test.
+# the subprocess can't hand a Python object back to the outer test, and
+# `is_prerelease` treats the one fake build as the product under test
+# instead of asking ProGet, which CI cannot reach.
 _LIFECYCLE_CONFTEST = """
 import json
 from pathlib import Path
@@ -1426,6 +1428,7 @@ import asyncstdlib
 import pytest_asyncio
 from cbltest.api import testserver
 from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.plugins import greenboard_fixture
 from cbltest.responses import GetRootResponse
 
 CAPTURED_PATH = Path(__file__).parent / "captured_doc.json"
@@ -1435,7 +1438,12 @@ def _fake_upload_document(self, test_run, *_):
     CAPTURED_PATH.write_text(json.dumps(test_run.model_dump(by_alias=True)))
 
 
+async def _fake_is_prerelease(product):
+    return True
+
+
 GreenboardUploader._upload_document = _fake_upload_document
+greenboard_fixture.is_prerelease = _fake_is_prerelease
 
 
 class _FakeConfig:
