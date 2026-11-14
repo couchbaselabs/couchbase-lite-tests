@@ -325,6 +325,21 @@ async def fake_session_manager(config_file: str) -> AsyncIterator[EdgeServerMana
 
 
 @pytest.mark.asyncio
+async def test_changed_since_reset_follows_clients_handed_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
+        stub_shell2http(monkeypatch, manager)
+        await manager.reset_to_initial_state()
+        assert not manager.changed_since_reset, "The client a reset probes with must not count"
+
+        manager.get_admin_client()
+        assert manager.changed_since_reset, "A test may start a replication with it, which outlives the test"
+
+        await manager.reset_to_initial_state()
+        async with manager.get_anonymous_client():
+            assert manager.changed_since_reset
+
+
+@pytest.mark.asyncio
 async def test_create_user_client_adds_the_user_and_authenticates_as_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

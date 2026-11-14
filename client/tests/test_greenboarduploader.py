@@ -1438,7 +1438,7 @@ def _fake_upload_document(self, test_run, *_):
     CAPTURED_PATH.write_text(json.dumps(test_run.model_dump(by_alias=True)))
 
 
-async def _fake_is_prerelease(product):
+async def _fake_is_prerelease(session, product):
     return True
 
 
@@ -2197,7 +2197,7 @@ class TestProductUnderTest:
     async def _find(
         running: Sequence[greenboard_fixture.RunningProduct], prereleases: set[str]
     ) -> greenboard_fixture.RunningProduct | None:
-        async def fake_is_prerelease(product: greenboard_fixture.RunningProduct) -> bool:
+        async def fake_is_prerelease(session: object, product: greenboard_fixture.RunningProduct) -> bool:
             return product.product in prereleases
 
         with patch.object(greenboard_fixture, "is_prerelease", fake_is_prerelease):
@@ -2219,11 +2219,21 @@ class TestProductUnderTest:
 
     @pytest.mark.asyncio
     async def test_failed_lookup_means_no_product_under_test(self) -> None:
-        async def unreachable(product: greenboard_fixture.RunningProduct) -> bool:
+        async def unreachable(session: object, product: greenboard_fixture.RunningProduct) -> bool:
             raise OSError("ProGet unreachable")
 
         with patch.object(greenboard_fixture, "is_prerelease", unreachable):
             assert await _real_find_product_under_test([CBL_420]) is None
+
+    @pytest.mark.asyncio
+    async def test_failed_lookup_does_not_drop_the_prerelease_the_others_found(self) -> None:
+        async def sgw_unreachable(session: object, product: greenboard_fixture.RunningProduct) -> bool:
+            if product == SGW_412:
+                raise OSError("ProGet unreachable")
+            return product == CBL_420
+
+        with patch.object(greenboard_fixture, "is_prerelease", sgw_unreachable):
+            assert await _real_find_product_under_test([CBL_420, SGW_412, ES_111]) == CBL_420
 
     def test_cbl_build_parsed_from_library_version(self) -> None:
         assert greenboard_fixture.cbl_running_product("couchbase-lite-net", "4.2.0-b0019") == CBL_420
@@ -2232,5 +2242,13 @@ class TestProductUnderTest:
         running = greenboard_fixture.cbl_running_product("couchbase-lite-swift", "4.1.0-b0018")
         assert running == _running("couchbase-lite-swift", "couchbase-lite-ios", "4.1.0", 18)
 
-    def test_unparseable_library_version_gives_none(self) -> None:
-        assert greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0") is None
+    def test_react_native_test_server_maps_to_its_proget_product(self) -> None:
+        running = greenboard_fixture.cbl_running_product("cbl-reactnative", "1.2.0-10")
+        assert running == _running("cbl-reactnative", "couchbase-lite-react-native", "1.2.0", 10)
+
+    def test_library_version_without_a_build_is_build_zero(self) -> None:
+        running = greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0")
+        assert running == _running("couchbase-lite-c", "couchbase-lite-c", "4.2.0", 0)
+
+    def test_unparseable_build_gives_none(self) -> None:
+        assert greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0-bogus") is None

@@ -138,7 +138,7 @@ CLI wrappers accept comma-separated versions (`"4.0.0,4.1.0"`) via the `VersionT
 Exports path constants used by every `test.sh` / `teardown.sh`:
 ```bash
 PIPELINES_DIR, TESTS_DIR, ENVIRONMENT_DIR, TEST_SERVER_DIR,
-SHARED_PIPELINES_DIR, DEV_E2E_PIPELINES_DIR, QE_PIPELINES_DIR, AWS_ENVIRONMENT_DIR,
+SHARED_PIPELINES_DIR, AWS_ENVIRONMENT_DIR,
 FUNCTIONAL_TESTS_DIR, MULTIPLATFORM_TESTS_DIR, UPGRADE_SGW_TESTS_DIR
 ```
 Functions: `move_artifacts()`, `find_dir()`, `print_box()`.
