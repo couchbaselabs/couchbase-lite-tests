@@ -4,7 +4,8 @@ upstreams, Edge Servers reset to their provisioned state, every Sync Gateway dat
 removed, and every Couchbase Server bucket emptied.
 
 An Edge Server reset restarts the process, so it only runs where it matters: before a test
-marked ``min_edge_servers``, and for any Edge Server something changed since its last reset.
+marked ``min_edge_servers``, and for any Edge Server something changed since its last reset,
+through its sidecar or by taking a client for it.
 The second case covers a test without Edge Servers that follows one with them, so a
 replication the earlier test left running cannot write into the Sync Gateway databases that
 the cleanup deletes.

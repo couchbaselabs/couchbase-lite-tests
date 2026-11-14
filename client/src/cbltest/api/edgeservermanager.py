@@ -60,8 +60,13 @@ class EdgeServerManager:
     def changed_since_reset(self) -> bool:
         """
         Whether anything may have changed the host since :func:`reset_to_initial_state`
-        last finished: every sidecar call but log collection counts, e.g. a restart, a
-        new config or a firewall rule.  True until the first reset.
+        last finished.  True until the first reset.
+
+        Every sidecar call but log collection counts, e.g. a restart, a new config or a
+        firewall rule.  So does handing out a client, whatever is done with it: a test
+        that takes one is expected to write to the Edge Server, by adding documents or
+        starting a replication, and requests are not tracked to tell.  A test that only
+        reads is unlikely to exist, and one that does pays for a reset it did not need.
         """
         return self.__changed
 
@@ -79,6 +84,14 @@ class EdgeServerManager:
         """
         A client that authenticates as the admin user, or sends no credentials if the running
         config declares no users.  Closed when the manager is.
+        """
+        self.__changed = True
+        return self.__admin_client()
+
+    def __admin_client(self) -> EdgeServer:
+        """
+        :func:`get_admin_client` for the manager's own reads, which change nothing and so
+        leave :attr:`changed_since_reset` alone.
         """
         headers = (
             get_basic_auth_headers(self.__info.admin_user, self.__info.admin_password)
@@ -150,7 +163,7 @@ class EdgeServerManager:
         if expected == 0:
             return
 
-        client = self.get_admin_client()
+        client = self.__admin_client()
 
         async def _poll() -> None:
             listed = await client.all_replication_status()
@@ -231,6 +244,7 @@ class EdgeServerManager:
                 f"Edge Server [{self.__info.hostname}] is running a config that declares no users, "
                 "so it would reject any user client"
             )
+        self.__changed = True
         client = EdgeServer(self.__info.hostname, self.__config_file, headers)
         try:
             yield client
@@ -240,6 +254,7 @@ class EdgeServerManager:
     @asynccontextmanager
     async def get_anonymous_client(self) -> AsyncIterator[EdgeServer]:
         """Yields a client that sends no credentials, closing it on exit."""
+        self.__changed = True
         client = EdgeServer(self.__info.hostname, config_file=self.__config_file)
         try:
             yield client
@@ -302,7 +317,7 @@ class EdgeServerManager:
                 if warnings := json.loads(response).get("warnings"):
                     cbl_warning(f"Edge Server [{self.__info.hostname}] archived its logs with warnings: {warnings}")
 
-            client = self.get_admin_client()
+            client = self.__admin_client()
             return await client.caddy.download(f"collect/{filename}", output_dir / filename)
 
     async def set_firewall_rules(self, allow: list[str] | None = None, deny: list[str] | None = None) -> None:

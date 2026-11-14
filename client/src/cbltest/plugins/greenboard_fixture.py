@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +9,7 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
+from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, parse_cbl_version, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
 # Edge Server only runs on the 3.x datasets and has no dataset version of its own to report.
@@ -17,8 +18,11 @@ EDGE_SERVER_DATASET_VERSION: Final[str] = "3.x"
 SYNC_GATEWAY_PLATFORM: Final[str] = "sync-gateway"
 PROGET_GET_VERSION_URL: Final[str] = "http://proget.build.couchbase.com:8080/api/get_version"
 
-# Test servers report their CBL as the ProGet product, except the iOS one.
-_PROGET_PRODUCT_OF_CBL: Final[dict[str, str]] = {"couchbase-lite-swift": "couchbase-lite-ios"}
+# Test servers report their CBL as the ProGet product, except these.
+_PROGET_PRODUCT_OF_CBL: Final[dict[str, str]] = {
+    "couchbase-lite-swift": "couchbase-lite-ios",
+    "cbl-reactnative": "couchbase-lite-react-native",
+}
 
 # Automatic fixture that uploads results to greenboard, if configured in config.json and --no-result-upload isn't set.
 # The actual RunResult upload is deferred to pytest_sessionfinish() below, not done in the fixture's own teardown.
@@ -74,21 +78,20 @@ class RunningProduct:
 
 
 def cbl_running_product(cbl: str, library_version: str) -> RunningProduct | None:
-    """The test server's CBL build, from its ``cbl`` and ``x.y.z-b<build>`` version, or None if unparseable."""
-    version, _, build = library_version.partition("-")
-    try:
-        return RunningProduct(cbl, _PROGET_PRODUCT_OF_CBL.get(cbl, cbl), version, int(build.lstrip("b")))
-    except ValueError:
+    """The test server's CBL build, from its ``cbl`` and library version (see ``parse_cbl_version``), or None if
+    the build is unparseable."""
+    version, build = parse_cbl_version(library_version)
+    if build is None:
         return None
+    return RunningProduct(cbl, _PROGET_PRODUCT_OF_CBL.get(cbl, cbl), version, build)
 
 
-async def is_prerelease(product: RunningProduct) -> bool:
+async def is_prerelease(session: aiohttp.ClientSession, product: RunningProduct) -> bool:
     """Whether ``product`` runs a prerelease build: one of a version not yet released, or not the release build.
     Raises if ProGet cannot answer."""
-    async with (
-        aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session,
-        session.get(PROGET_GET_VERSION_URL, params={"product": product.product, "version": product.version}) as resp,
-    ):
+    async with session.get(
+        PROGET_GET_VERSION_URL, params={"product": product.product, "version": product.version}
+    ) as resp:
         resp.raise_for_status()
         info = await resp.json(content_type=None)
     return not (info["IsRelease"] and int(info["BuildNumber"]) == product.build)
@@ -96,15 +99,19 @@ async def is_prerelease(product: RunningProduct) -> bool:
 
 async def find_product_under_test(running: Sequence[RunningProduct]) -> RunningProduct | None:
     """The product under test: the only one of ``running`` that is a prerelease build. Every greenboard upload has
-    exactly one, so None (logged) when there are none, several, or a build cannot be checked."""
-    prereleases: list[RunningProduct] = []
-    for product in running:
+    exactly one, so None (logged) when there are none or several. A build ProGet cannot check is logged and taken
+    for a release, so one failed lookup does not drop a run whose prerelease the other lookups identify."""
+
+    async def check(session: aiohttp.ClientSession, product: RunningProduct) -> bool:
         try:
-            if await is_prerelease(product):
-                prereleases.append(product)
+            return await is_prerelease(session, product)
         except Exception as e:
-            cbl_warning(f"Greenboard upload skipped: could not check whether {product} is a prerelease: {e}")
-            return None
+            cbl_warning(f"Could not check whether {product} is a prerelease, so taking it for a release: {e}")
+            return False
+
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        checks = await asyncio.gather(*(check(session, product) for product in running))
+    prereleases = [product for product, prerelease in zip(running, checks, strict=True) if prerelease]
     if len(prereleases) != 1:
         builds = ", ".join(map(str, prereleases)) or "none"
         cbl_warning(
