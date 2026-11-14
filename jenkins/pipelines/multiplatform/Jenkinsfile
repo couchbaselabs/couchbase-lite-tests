@@ -1,0 +1,188 @@
+// ProGet product of a test server platform, mirroring TEST_SERVER_PLATFORMS in setup_multiplatform.py.
+def progetProduct(String platform) {
+    if (platform == 'swift_ios') { return 'couchbase-lite-ios' }
+    if (platform == 'jak_android') { return 'couchbase-lite-android' }
+    if (platform in ['jak_desktop', 'jak_webservice']) { return 'couchbase-lite-java' }
+    if (platform in ['dotnet_macos', 'dotnet_windows', 'dotnet_ios', 'dotnet_android']) { return 'couchbase-lite-net' }
+    if (platform in ['c_macos', 'c_windows', 'c_linux_x86_64', 'c_ios', 'c_android']) { return 'couchbase-lite-c' }
+    error "Unsupported platform '${platform}' in PLATFORM_VERSIONS"
+}
+
+// Splits "swift_ios=4 c_macos=4.1.0-18" into [platform, version] pairs, in input order. setup_multiplatform.py
+// checks the entries and logs every problem with them.
+def platformVersions(String value) {
+    def result = []
+    for (spec in value.trim().split(/\s+/)) {
+        def parts = spec.split('=', 2)
+        result.add([parts[0], parts.size() > 1 ? parts[1] : ''])
+    }
+    return result
+}
+
+// Returns a line for each platform the topology has fewer test servers of than PLATFORM_VERSIONS gives entries,
+// matching by platform whatever order the topology lists them in. Spare test servers are fine. setup_multiplatform.py
+// repeats this at setup along with its version checks; checking here as well stops the run before prebuilding.
+def topologyShortfalls(List entries) {
+    def path = 'jenkins/pipelines/multiplatform/topology.json'
+    if (!fileExists(path)) { return ["${path} does not exist"] }
+
+    def available = [:]
+    for (ts in (readJSON(file: path, returnPojo: true).test_servers ?: [])) {
+        available[ts.platform] = (available[ts.platform] ?: 0) + 1
+    }
+    def wanted = [:]
+    for (pv in entries) { wanted[pv[0]] = (wanted[pv[0]] ?: 0) + 1 }
+
+    def shortfalls = []
+    for (platform in wanted.keySet()) {
+        def have = available[platform] ?: 0
+        if (wanted[platform] > have) {
+            shortfalls.add("${platform}: PLATFORM_VERSIONS gives ${wanted[platform]} but topology.json has ${have}")
+        }
+    }
+    return shortfalls
+}
+
+pipeline {
+    agent none
+    parameters {
+        string(name: 'PLATFORM_VERSIONS', defaultValue: 'swift_ios=4 swift_ios=4', description: 'Space-separated <platform>=<version> list, one entry per test server, e.g. "swift_ios=4.1.0 swift_ios=4.2.0 jak_android=4.1.0-18". <platform> is a test server platform (swift_ios, jak_android, jak_desktop, jak_webservice, dotnet_macos, dotnet_windows, dotnet_ios, dotnet_android, c_macos, c_windows, c_linux_x86_64, c_ios, c_android); each entry uses the next test server of that platform in the topology, and test servers left over are not used. <version> is "4", "4.1", "4.1.0" or "4.1.0-18".')
+        booleanParam(name: 'STRESS', defaultValue: false, description: 'Run only the stress tests (tests/multiplatform/stress), which take over a day, in place of the regular ones. Provisions two Couchbase Server clusters, each with its own Sync Gateway.')
+        string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version, eg : "4" for the latest 4.x, or "4.1.3-18" for a specific version and build')
+        choice(name: 'TS_DATASET_VERSION', choices: ['4.0', '3.2'], description: 'Test server dataset version, used by every test server. Any CBL 3.x entry needs 3.2; CBL 4.x can use either.')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test servers. Uncheck to skip prebuild entirely and reuse existing artifacts.')
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
+    stages {
+        stage('Init') {
+            agent any
+            steps {
+                script {
+                    if (!params.PLATFORM_VERSIONS?.trim()) { error "PLATFORM_VERSIONS is required" }
+                    if (!params.SGW_VERSION?.trim()) { error "SGW_VERSION is required" }
+
+                    def shortfalls = topologyShortfalls(platformVersions(params.PLATFORM_VERSIONS))
+                    if (shortfalls) {
+                        env.SKIP_RUN = 'true'
+                        currentBuild.result = 'UNSTABLE'
+                        currentBuild.description = "PLATFORM_VERSIONS does not fit topology.json"
+                        echo "PLATFORM_VERSIONS does not fit topology.json, skipping the run:\n  ${shortfalls.join('\n  ')}"
+                        return
+                    }
+
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    def datasets = load 'jenkins/pipelines/shared/cblDatasetCompatibility.groovy'
+                    env.SGW_VERSION = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION')
+                    def resolved = []
+                    def incompatible = []
+                    for (pv in platformVersions(params.PLATFORM_VERSIONS)) {
+                        def version = proget.resolveProgetVersion(progetProduct(pv[0]), pv[1], pv[0])
+                        def reason = compat.incompatibility(version, env.SGW_VERSION)
+                        if (reason) { incompatible.add("${pv[0]}=${pv[1]}: ${reason}") }
+                        reason = datasets.incompatibility(version, params.TS_DATASET_VERSION)
+                        if (reason) { incompatible.add("${pv[0]}=${pv[1]}: ${reason}") }
+                        resolved.add("${pv[0]}=${version}")
+                    }
+                    if (incompatible) { error "Incompatible versions:\n  ${incompatible.join('\n  ')}" }
+
+                    env.PLATFORM_VERSIONS = resolved.join(' ')
+                    env.TS_TEST_FILTER = params.TS_TEST_FILTER ?: ''
+                    // Hours the run may take before Jenkins stops it. The stress test_system alone loops for 27
+                    // hours across its parameters, with the volume and end-to-end tests on top.
+                    env.RUN_TIMEOUT_HOURS = params.STRESS ? '49' : '25'
+                    env.TS_DATASET_VERSION = params.TS_DATASET_VERSION
+                    currentBuild.displayName = "${params.STRESS ? 'STRESS ' : ''}${env.PLATFORM_VERSIONS} SGW:${env.SGW_VERSION} (#${currentBuild.number})"
+                    currentBuild.description = "DS: ${env.TS_DATASET_VERSION}"
+                }
+            }
+        }
+        stage('Prebuild Servers') {
+            when { beforeAgent true; expression { env.SKIP_RUN != 'true' && params.RUN_PREBUILD } }
+            steps {
+                script {
+                    // Prebuild each requested test server platform once per version it runs.
+                    def parallelBuilds = [:]
+                    for (pv in platformVersions(env.PLATFORM_VERSIONS)) {
+                        def platform = pv[0]
+                        def version = pv[1]
+                        parallelBuilds["${platform}=${version}"] = {
+                            build job: 'prebuild-test-server',
+                            parameters: [
+                                string(name: 'TS_PLATFORM', value: platform),
+                                string(name: 'CBL_VERSION', value: version),
+                            ],
+                            wait: true,
+                            propagate: true
+                        }
+                    }
+                    parallel parallelBuilds
+                }
+            }
+        }
+        stage('Setup and Run Tests') {
+            when { beforeAgent true; expression { env.SKIP_RUN != 'true' } }
+            agent { label 'qe-mac-india' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe-india')
+                DOTNET_ROOT = "/opt/homebrew/opt/dotnet/libexec"
+                PATH = "/Users/qe_mobile_india/.local/bin:/Library/Java/JavaVirtualMachines/temurin-11.jdk/Contents/Home/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/Library/Apple/usr/bin:/Users/qe_mobile_india/.dotnet/tools:/opt/homebrew/opt/dotnet:${DOTNET_ROOT}:/Users/qe_mobile_india/Library/Android/sdk/cmdline-tools/latest/bin:/Users/qe_mobile_india/Library/Android/sdk/platform-tools:/Users/qe_mobile_india/Library/Android/sdk/emulator:${PATH}"
+                AWS_PROFILE = "default"
+                ANDROID_HOME = "/Users/qe_mobile_india/Library/Android/sdk"
+                TS_ARTIFACTS_DIR = 'multiplatform'
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p "$KEYCHAIN_PASSWORD" ~/Library/Keychains/login.keychain-db'
+                // CBL_PYTEST_SESSION_TIMEOUT is pytest's graceful stop budget (seconds), applied by the
+                // timeout_fixture plugin via --session-timeout. Kept 1 hour below the stage timeout so pytest stops
+                // itself gracefully -- with a runway to finish junit/greenboard/sgcollect/cbcollect -- before
+                // Jenkins' hard SIGTERM. The sgcollect and cbcollect session fixtures tear down one after the other,
+                // not in parallel, so the runway must cover both: up to ~8.5m of sgcollect polling plus up to 21m
+                // for cbcollect (the 1260s _COLLECT_LOGS_TIMEOUT in couchbaseserver.py), plus archive downloads.
+                timeout(time: env.RUN_TIMEOUT_HOURS.toInteger(), unit: 'HOURS') {
+                    withEnv(["CBL_PYTEST_SESSION_TIMEOUT=${(env.RUN_TIMEOUT_HOURS.toInteger() - 1) * 3600}"]) {
+                        script {
+                            def status = sh(
+                                script: "jenkins/pipelines/multiplatform/test_multiplatform.sh '${env.PLATFORM_VERSIONS}' '${env.SGW_VERSION}' --dataset-version '${env.TS_DATASET_VERSION}' ${params.STRESS ? '--stress ' : ''}--test-filter '${env.TS_TEST_FILTER}'",
+                                returnStatus: true
+                            )
+                            // The input not fitting the topology is not a test failure: the sanity check above lists
+                            // every problem, and no test ran.
+                            // 3 is SANITY_CHECK_EXIT_CODE in setup_multiplatform.py
+                            if (status == 3) {
+                                unstable "PLATFORM_VERSIONS or SGW_VERSION does not fit topology.json, see the sanity check problems above"
+                            } else if (status != 0) {
+                                error "test_multiplatform.sh failed with exit code ${status}"
+                            }
+                        }
+                    }
+                }
+            }
+            post {
+                always {
+                    junit testResults: 'tests/multiplatform/junit_result.xml', allowEmptyResults: true
+
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh 'jenkins/pipelines/multiplatform/teardown.sh'
+                    }
+                    // Archived after teardown because teardown's move_artifacts is what moves pytest's
+                    // output in tests/multiplatform into its TS_ARTIFACTS_DIR subfolder.
+                    archiveArtifacts artifacts: 'tests/multiplatform/multiplatform/**/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+    }
+    post {
+        failure {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> has failed!", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} failed", to: "vipul.bhardwaj@couchbase.com";
+        }
+        fixed {
+            mail bcc: '', body: "Project: <a href='${env.BUILD_URL}'>${env.JOB_NAME}</a> is back to normal (fixed).", cc: '', charset: 'UTF-8', from: 'jenkins@couchbase.com', mimeType: 'text/html', replyTo: 'no-reply@couchbase.com', subject: "${env.JOB_NAME} fixed", to: "vipul.bhardwaj@couchbase.com";
+        }
+    }
+}

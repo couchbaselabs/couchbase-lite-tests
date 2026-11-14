@@ -16,9 +16,8 @@ the stricter per-method bar, since a one-off override is presumably there
 because that specific method needs something extra.
 
 A marker declared with an explicit ``0`` (e.g. ``min_test_servers(0)``) is
-excluded: that's self-documentation ("this test explicitly needs none"),
-never something usage could "require" -- usage only ever implies a minimum
-of 1 or more.
+not allowed: pipelines select tests with ``-m min_<resource>``, which matches
+any count, so a test that needs none of a resource omits the marker.
 
 A marker showing up here means one of two things, and telling them apart is
 manual: either check_topology_markers.py has a blind spot (a legitimate
@@ -43,7 +42,7 @@ assert _spec is not None and _spec.loader is not None
 ctm = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ctm)
 
-TEST_DIRS = [REPO_ROOT / "tests" / "dev_e2e", REPO_ROOT / "tests" / "QE"]
+TEST_DIRS = [REPO_ROOT / "tests" / d for d in ("functional", "multiplatform", "system", "upgrade_sgw")]
 
 
 def _iter_test_files() -> Iterator[Path]:

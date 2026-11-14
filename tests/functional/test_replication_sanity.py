@@ -1,0 +1,160 @@
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.syncgateway import DatabaseConfig, ScopeConfig
+from cbltest.asyncfile import read_json_file, write_json_file
+
+SCRIPT_DIR = str(Path(__file__).parent)
+
+
+@pytest.mark.min_sync_gateways(1)
+@pytest.mark.min_couchbase_servers(1)
+@pytest.mark.min_edge_servers(1)
+class TestReplicationSanity(CBLTestClass):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_replication_sanity(self, cblpytest: CBLPyTest, dataset_path: Path, tmp_path: Path) -> None:
+        server = cblpytest.couchbase_servers[0]
+        sync_gateway = cblpytest.sync_gateways[0]
+
+        self.mark_test_step("Creating a bucket on server.")
+        bucket_name = "bucket-1"
+        await server.create_bucket(bucket_name)
+        self.mark_test_step("Adding 10 documents to bucket.")
+        for i in range(1, 11):
+            doc_id = f"doc_{i}"
+            doc = {
+                "id": doc_id,
+                "channels": ["public"],
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+            server.upsert_document(bucket_name, doc_id, doc)
+
+        self.mark_test_step("Creating a database on Sync Gateway.")
+        sg_db_name = "db-1"
+        payload = DatabaseConfig(
+            bucket="bucket-1",
+            scopes={
+                "_default": ScopeConfig(collections={"_default": {"sync": "function(doc){channel(doc.channels);}"}})
+            },
+            num_index_replicas=0,
+        )
+        await cblpytest.sync_gateway_cluster.create_database(sg_db_name, payload)
+
+        self.mark_test_step("Adding role and user to Sync Gateway.")
+        input_data = {"_default._default": ["public"]}
+        access_dict = sync_gateway.create_collection_access_dict(input_data)
+        await sync_gateway.add_role(sg_db_name, "stdrole", access_dict)
+        await sync_gateway.add_user(sg_db_name, "sync_gateway", "password", access_dict)
+
+        self.mark_test_step("Creating a database on Edge Server with replication to Sync Gateway.")
+        es_db_name = "db"
+        config_path = f"{SCRIPT_DIR}/edge_server_config/test_e2e_empty_database.json"
+        config = await read_json_file(config_path)
+        config["replications"][0]["source"] = sync_gateway.replication_url(sg_db_name)
+        config_path = str(tmp_path / "es_config.json")
+        await write_json_file(config_path, config)
+        edge_server = await cblpytest.edge_servers[0].configure_dataset(db_name=es_db_name, config_file=config_path)
+        await edge_server.wait_for_idle(replication_id=1)
+
+        self.mark_test_step("Verifying that Sync Gateway has 10 documents.")
+        response = await sync_gateway.get_all_documents(sg_db_name, "_default", "_default")
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+
+        self.mark_test_step("Waiting for replication to Edge Server to be idle.")
+        await edge_server.wait_for_idle(replication_id=1)
+
+        self.mark_test_step("Verifying that Edge Server has 10 documents.")
+        response = await edge_server.get_all_documents(es_db_name)
+        assert len(response.rows) == 10, f"Expected 10 documents, but got {len(response.rows)} documents."
+
+        # Single replication cycle: SG → ES and ES → SG (create, update, delete both ways)
+        doc_id_sg = "doc_11"  # Sync Gateway cycle: create on SG, update/delete via ES
+        doc_id_es = "doc_12"  # Edge Server cycle: create on ES, update/delete via SG
+
+        # --- Sync Gateway Cycle ---
+        self.mark_test_step(f"Creating document {doc_id_sg} via Sync Gateway.")
+        doc = {
+            "id": doc_id_sg,
+            "channels": ["public"],
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+        created_doc = await sync_gateway.create_document(sg_db_name, doc_id_sg, doc)
+        assert created_doc is not None, f"Failed to create document {doc_id_sg} via Sync Gateway."
+
+        self.mark_test_step(f"Validating document {doc_id_sg} on Edge Server.")
+        remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id_sg, doc)
+
+        rev_id = remote_doc.revid
+
+        self.mark_test_step(f"Updating document {doc_id_sg} via Edge Server.")
+        updated_doc_body = {
+            "id": doc_id_sg,
+            "channels": ["public"],
+            "timestamp": datetime.now(UTC).isoformat(),
+            "changed": "yes",
+        }
+
+        updated_doc = await edge_server.put_document_with_id(updated_doc_body, doc_id_sg, es_db_name, rev=rev_id)
+
+        assert updated_doc is not None, f"Failed to update document {doc_id_sg} via Edge Server"
+
+        self.mark_test_step(f"Validating update for {doc_id_sg} on Sync Gateway.")
+        sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id_sg, {"changed": "yes"})
+        assert rev_id != sg_doc.revid, f"Document {doc_id_sg} update not reflected on Sync Gateway"
+        rev_id = sg_doc.revid
+
+        self.mark_test_step(f"Deleting document {doc_id_sg} via Sync Gateway.")
+        assert rev_id is not None, "rev_id required for delete"
+        await sync_gateway.delete_document(doc_id_sg, rev_id, sg_db_name)
+
+        self.mark_test_step(f"Validating deletion of {doc_id_sg} on Edge Server.")
+        await edge_server.wait_for_documents(es_db_name, [doc_id_sg], deleted=True)
+
+        # --- Edge Server Cycle ---
+        self.mark_test_step(f"Creating document {doc_id_es} via Edge Server.")
+        doc = {
+            "id": doc_id_es,
+            "channels": ["public"],
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
+        created_doc = await edge_server.put_document_with_id(doc, doc_id_es, es_db_name)
+        assert created_doc is not None, f"Failed to create document {doc_id_es} via Edge Server."
+
+        self.mark_test_step(f"Validating document {doc_id_es} on Sync Gateway.")
+        sg_doc = await sync_gateway.wait_for_document_body(sg_db_name, doc_id_es, doc)
+
+        rev_id = sg_doc.revid
+        assert rev_id is not None, "Failed to retrieve rev_id"
+
+        self.mark_test_step(f"Updating document {doc_id_es} via Sync Gateway.")
+        updated_doc_body = {
+            "id": doc_id_es,
+            "channels": ["public"],
+            "timestamp": datetime.now(UTC).isoformat(),
+            "changed": "yes",
+        }
+        updated_doc = await sync_gateway.update_document(sg_db_name, doc_id_es, updated_doc_body, rev_id)
+        assert updated_doc is not None, f"Failed to update document {doc_id_es} via Sync Gateway."
+
+        self.mark_test_step(f"Validating update for {doc_id_es} on Edge Server.")
+        remote_doc = await edge_server.wait_for_document_body(es_db_name, doc_id_es, {"changed": "yes"})
+
+        assert remote_doc is not None, f"Document {doc_id_es} does not exist on the edge server."
+        assert remote_doc.id == doc_id_es, f"Document ID mismatch: {remote_doc.id}"
+
+        rev_id = remote_doc.revid
+        assert rev_id is not None, f"Document {doc_id_es} has no revision ID."
+
+        self.mark_test_step(f"Deleting document {doc_id_es} via Edge Server.")
+        delete_resp = await edge_server.delete_document(doc_id_es, rev_id, es_db_name)
+
+        assert isinstance(delete_resp, dict) and delete_resp.get("ok"), (
+            f"Failed to delete document {doc_id_es} via Edge Server."
+        )
+
+        self.mark_test_step(f"Validating deletion of {doc_id_es} on Sync Gateway.")
+        await sync_gateway.wait_for_documents(sg_db_name, [doc_id_es], deleted=True)

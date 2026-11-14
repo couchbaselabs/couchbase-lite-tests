@@ -1,0 +1,117 @@
+def SGW_PRODUCT = "sync-gateway"          // dedup key: the thing under test
+
+pipeline {
+    // Pinned: dedup state lives on this node's filesystem (~/.jenkins_build_info).
+    agent { label 'mac-mini-new' }
+    environment {
+        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+    }
+    parameters {
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or train (e.g. 4.2.0 or 4.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL C client version (e.g. 4.2.0), passed to every triggered run. Leave blank for each run to use the latest CBL C release of its Sync Gateway major version (3.x for SGW 3.x, 4.x for SGW 4.x). SGW trains an explicit version cannot sync with are skipped.')
+        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the SGW test job even if this SGW version+build already ran')
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    triggers {
+        cron('''TZ=Asia/Kolkata
+0 4 * * *''')
+    }
+    stages {
+        stage('Resolve and Trigger') {
+            steps {
+                script {
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
+                    def triggers = load 'jenkins/pipelines/shared/triggerRecord.groovy'
+                    def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
+                    def datasets = load 'jenkins/pipelines/shared/cblDatasetCompatibility.groovy'
+
+                    // Blank: sgw-functional picks the latest CBL C release of each SGW's major
+                    // version (see productVersions.groovy).
+                    def cblVersion = params.CBL_VERSION?.trim() ?: ''
+                    echo "CBL (client): ${cblVersion ?: 'latest release of each SGW major version'}"
+                    echo "FORCE: ${params.FORCE_TRIGGER}"
+
+                    // A specific SGW_VERSION param targets one train/version; a blank
+                    // param fans out over every non-EOL train from get_trains.
+                    def trains
+                    if (params.SGW_VERSION?.trim()) {
+                        trains = [params.SGW_VERSION.trim()]
+                    } else {
+                        trains = builds.fetchTrains(SGW_PRODUCT)
+                        if (!trains) { error "No SGW trains returned from ProGet get_trains" }
+                    }
+                    echo "SGW trains to process: ${trains}"
+
+                    // Dedup on the SGW build only; the CBL client is not part of the key.
+                    def buildInfo = triggers.readRecord('sgw')
+
+                    def triggered = []
+                    def skipped = []
+                    def failed = []
+
+                    for (train in trains) {
+                        def sgw
+                        try {
+                            sgw = builds.resolveVersionBuild(proget, SGW_PRODUCT, train, 'SGW_VERSION', true)
+                        } catch (Exception e) {
+                            echo "WARN: Could not resolve SGW train ${train}: ${e}"
+                            failed << train
+                            continue
+                        }
+                        if (sgw == null) {
+                            // No published build yet (new train) — normal, not a failure.
+                            echo "SKIP: SGW train ${train} — no published build yet"
+                            skipped << "${train} (no build)"
+                            continue
+                        }
+                        def sgwFull = "${sgw.version}-${sgw.build}"
+
+                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(buildInfo, sgw.version, sgw.build)) {
+                            echo "SKIP: SGW ${sgwFull} (already triggered)"
+                            skipped << sgwFull
+                            continue
+                        }
+
+                        def reason = cblVersion ? compat.incompatibility(cblVersion, sgwFull) : null
+                        if (reason) {
+                            echo "SKIP: ${reason}"
+                            skipped << "${sgwFull} (incompatible with CBL ${cblVersion})"
+                            continue
+                        }
+
+                        // The dataset of the client's major version; a blank client has the SGW's.
+                        def dataset = datasets.datasetFor(cblVersion ?: sgwFull)
+                        echo "Triggering 'sgw-functional' for SGW ${sgwFull} (dataset ${dataset})"
+                        build job: 'sgw-functional', parameters: [
+                            string(name: "SGW_VERSION", value: sgwFull),
+                            string(name: "CBL_VERSION", value: cblVersion),
+                            string(name: "TS_DATASET_VERSION", value: dataset)
+                        ], wait: false
+
+                        buildInfo[sgw.version] = sgw.build
+                        triggered << sgwFull
+                    }
+
+                    // Persist dedup state once, after all trains are processed.
+                    if (triggered) { triggers.saveRecord('sgw', buildInfo) }
+
+                    currentBuild.displayName = "SGW ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
+                    echo "Triggered: ${triggered}"
+                    echo "Skipped:   ${skipped}"
+                    echo "Failed:    ${failed}"
+
+                    if (failed) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "WARNING: ${failed.size()} train(s) failed to resolve: ${failed}"
+                    }
+                }
+            }
+        }
+    }
+}

@@ -52,6 +52,29 @@ FIXED_UNIX_TS = (FIXED_NOW - datetime(1970, 1, 1, tzinfo=UTC)).total_seconds()
 # Importing `greenboard` directly into module scope would expose it as an autouse
 # fixture to pytest. Access via the module and unwrap to get the raw async generator.
 _raw_greenboard = inspect.unwrap(greenboard_fixture.greenboard)
+_real_find_product_under_test = greenboard_fixture.find_product_under_test
+
+
+class _UnderTest:
+    """Stands in for ``find_product_under_test``, which asks ProGet: picks the running product filed under
+    ``platform``, or the first running one (CBL, then Sync Gateway, then Edge Server) when ``platform`` is None."""
+
+    def __init__(self) -> None:
+        self.platform: str | None = None
+
+    async def __call__(
+        self, running: Sequence[greenboard_fixture.RunningProduct]
+    ) -> greenboard_fixture.RunningProduct | None:
+        if self.platform is not None:
+            return next((product for product in running if product.platform == self.platform), None)
+        return running[0] if running else None
+
+
+@pytest.fixture(autouse=True)
+def under_test(monkeypatch: pytest.MonkeyPatch) -> _UnderTest:
+    fake = _UnderTest()
+    monkeypatch.setattr(greenboard_fixture, "find_product_under_test", fake)
+    return fake
 
 
 @pytest.fixture(autouse=True)
@@ -693,14 +716,6 @@ class TestOverallFailureGuard:
 
         mock_upload.assert_not_called()
 
-    def test_sgw_marker_still_recorded(self) -> None:
-        """The marker picks the greenboard platform, so the latch must not stop it."""
-        uploader = make_uploader()
-        drive_hook(uploader, make_report("setup", passed=False))
-        drive_hook(uploader, make_report("call", passed=True), make_item(["sgw"]))
-
-        assert uploader.has_sgw_marker()
-
 
 def write_junit_xml(path: Path, *, tests: int, failures: int, errors: int, skipped: int = 0) -> Path:
     """Write a minimal pytest-shaped JUnit XML carrying the given tallies."""
@@ -814,7 +829,7 @@ class TestGreenboardFixture:
 
     @pytest.mark.asyncio
     async def test_cbl_platform_and_os_from_test_server(self) -> None:
-        """Platform and OS come from test server info when no SGW markers are present."""
+        """Platform and OS come from test server info when CBL is the product under test."""
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001", os_name="iOS")
         cblpytest = _make_cblpytest(test_servers=[server])
         config = _make_pytestconfig()
@@ -837,28 +852,23 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_sgw_marker_keeps_sync_gateway_platform(self) -> None:
-        """When a test carries @pytest.mark.sgw the platform stays 'sync-gateway'."""
+    async def test_sgw_under_test_files_under_sync_gateway(self, under_test: _UnderTest) -> None:
+        """With Sync Gateway as the product under test, the run is filed under 'sync-gateway' and keyed on the SGW
+        build, even though a test server drove it."""
+        under_test.platform = "sync-gateway"
         server = _make_server(cbl="couchbase-lite-ios", library_version="3.2.0-b0001")
-        cblpytest = _make_cblpytest(test_servers=[server])
+        cblpytest = _make_cblpytest(test_servers=[server], sync_gateways=[FakeSyncGateway("4.0.0(350;def)")])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config)
-            await gen.__anext__()
-            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["sgw"]))
-            try:
-                await gen.__anext__()
-            except StopAsyncIteration:
-                pass
+            await _run_fixture(_raw_greenboard(cblpytest, config))
             finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
-            build=1,
-            version="3.2.0",
-            sgwVersion="n/a",
+            build=350,
+            version="4.0.0",
+            sgwVersion="4.0.0-350",
             esVersion="n/a",
             failCount=0,
-            passCount=1,
+            passCount=0,
             platform="sync-gateway",
             os="iOS",
             jobUrl="local",
@@ -949,21 +959,14 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_es_marker_sets_edge_server_platform(self) -> None:
-        """@pytest.mark.min_edge_servers plus a live Edge Server switches the platform
-        to edge-server and keys the doc on the ES build."""
+    async def test_es_under_test_sets_edge_server_platform(self) -> None:
+        """With Edge Server as the product under test, the platform is edge-server and the doc is keyed on the ES
+        build."""
         es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
         with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
-            gen = _raw_greenboard(cblpytest, config)
-            await gen.__anext__()
-            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
-            try:
-                await gen.__anext__()
-            except StopAsyncIteration:
-                pass
+            await _run_fixture(_raw_greenboard(cblpytest, config))
             finish_session(config)
         assert mock_upload.call_args[0][0] == RunResult(
             build=45,
@@ -971,7 +974,7 @@ class TestGreenboardFixture:
             sgwVersion="n/a",
             esVersion="1.1.0-45",
             failCount=0,
-            passCount=1,
+            passCount=0,
             platform="edge-server",
             os="n/a",
             jobUrl="local",
@@ -979,9 +982,9 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_edge_server_present_without_es_marker_keeps_cbl_platform(self) -> None:
-        """An Edge Server in the config is not on its own enough to retarget the
-        doc: without @pytest.mark.min_edge_servers the run stays a CBL run."""
+    async def test_cbl_under_test_with_edge_server_keeps_cbl_platform(self) -> None:
+        """An Edge Server in the run does not retarget the doc when CBL is the product under test; its version is
+        still recorded."""
         server = _make_server()
         es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[server], edge_servers=[es])
@@ -993,7 +996,7 @@ class TestGreenboardFixture:
             build=1,
             version="3.2.0",
             sgwVersion="n/a",
-            esVersion="n/a",
+            esVersion="1.1.0-45",
             failCount=0,
             passCount=0,
             platform="couchbase-lite-ios",
@@ -1005,11 +1008,10 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_edge_server_only_without_es_marker_skips_upload(self) -> None:
-        """An Edge-Server-only topology whose tests never carried
-        @pytest.mark.min_edge_servers has no version to key a doc on: there is
-        no CBL library version and no SGW version. Skip rather than file the
-        run under the default sync-gateway platform."""
+    async def test_no_product_under_test_skips_upload(self, under_test: _UnderTest) -> None:
+        """A run without exactly one prerelease build has no product under test to file it under, so nothing is
+        uploaded, and the uploader is still unregistered."""
+        under_test.platform = "no-such-platform"
         es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[], edge_servers=[es])
         config = _make_pytestconfig()
@@ -1029,10 +1031,9 @@ class TestGreenboardFixture:
         assert not config.pluginmanager.is_registered(uploader)
 
     @pytest.mark.asyncio
-    async def test_sync_gateway_with_unmarked_edge_server_still_uploads(self) -> None:
-        """The Edge-Server-only skip must not swallow a plain SGW run that
-        happens to have an Edge Server in the topology: the SGW version is a
-        valid key, so the doc is uploaded under sync-gateway."""
+    async def test_sgw_under_test_with_edge_server_uploads_under_sync_gateway(self) -> None:
+        """A Sync Gateway run with an Edge Server in the topology is filed under sync-gateway and keyed on the SGW
+        build; the ES version is recorded alongside."""
         sgw = FakeSyncGateway("4.0.0(350;def)")
         es = FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))
         cblpytest = _make_cblpytest(test_servers=[], sync_gateways=[sgw], edge_servers=[es])
@@ -1044,7 +1045,7 @@ class TestGreenboardFixture:
             build=350,
             version="4.0.0",
             sgwVersion="4.0.0-350",
-            esVersion="n/a",
+            esVersion="1.1.0-45",
             failCount=0,
             passCount=0,
             platform="sync-gateway",
@@ -1053,10 +1054,9 @@ class TestGreenboardFixture:
         )
 
     @pytest.mark.asyncio
-    async def test_es_marker_with_unreachable_edge_server_skips_upload(self) -> None:
-        """An ES-marked run whose get_version() fails has no ES build to key on;
-        the platform is still edge-server, and upload() skips instead of
-        publishing a 0.0.0 doc."""
+    async def test_unreachable_edge_server_skips_upload(self) -> None:
+        """An Edge-Server-only run whose get_version() fails has no build at all, so no product under test, and
+        nothing is uploaded rather than a 0.0.0 doc."""
 
         class UnreachableEdgeServer(FakeEdgeServer):
             async def get_version(self) -> CouchbaseVersion:
@@ -1070,7 +1070,7 @@ class TestGreenboardFixture:
             gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(uploader, make_report("call", passed=True), make_item(markers=["min_edge_servers"]))
+            drive_hook(uploader, make_report("call", passed=True), make_item())
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -1417,7 +1417,9 @@ class TestBranchGate:
 # Overrides the real `cblpytest` fixture by name to avoid real network I/O,
 # while still exercising the real greenboard_fixture module end to end.
 # `_upload_document` writes the captured RunResult to a JSON file, since
-# the subprocess can't hand a Python object back to the outer test.
+# the subprocess can't hand a Python object back to the outer test, and
+# `is_prerelease` treats the one fake build as the product under test
+# instead of asking ProGet, which CI cannot reach.
 _LIFECYCLE_CONFTEST = """
 import json
 from pathlib import Path
@@ -1426,6 +1428,7 @@ import asyncstdlib
 import pytest_asyncio
 from cbltest.api import testserver
 from cbltest.greenboarduploader import GreenboardUploader
+from cbltest.plugins import greenboard_fixture
 from cbltest.responses import GetRootResponse
 
 CAPTURED_PATH = Path(__file__).parent / "captured_doc.json"
@@ -1435,7 +1438,12 @@ def _fake_upload_document(self, test_run, *_):
     CAPTURED_PATH.write_text(json.dumps(test_run.model_dump(by_alias=True)))
 
 
+async def _fake_is_prerelease(session, product):
+    return True
+
+
 GreenboardUploader._upload_document = _fake_upload_document
+greenboard_fixture.is_prerelease = _fake_is_prerelease
 
 
 class _FakeConfig:
@@ -2111,7 +2119,6 @@ class TestDatasetAndCblVersion:
         test_servers: Sequence[testserver.TestServer] = (),
         sync_gateways: Sequence[SyncGateway] = (),
         edge_servers: Sequence[EdgeServerManager] = (),
-        markers: list[str] | None = None,
     ) -> RunResult:
         cblpytest = _make_cblpytest(test_servers=test_servers, sync_gateways=sync_gateways, edge_servers=edge_servers)
         config = _make_pytestconfig()
@@ -2119,7 +2126,7 @@ class TestDatasetAndCblVersion:
             gen = _raw_greenboard(cblpytest, config)
             await gen.__anext__()
             uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
-            drive_hook(uploader, make_report("call", passed=True), make_item(markers=markers))
+            drive_hook(uploader, make_report("call", passed=True), make_item())
             try:
                 await gen.__anext__()
             except StopAsyncIteration:
@@ -2139,11 +2146,11 @@ class TestDatasetAndCblVersion:
         )
 
     @pytest.mark.asyncio
-    async def test_sgw_run_driven_by_a_test_server_carries_its_cbl_version(self) -> None:
+    async def test_sgw_run_driven_by_a_test_server_carries_its_cbl_version(self, under_test: _UnderTest) -> None:
+        under_test.platform = "sync-gateway"
         doc = await self._fixture_doc(
             test_servers=[_make_server(library_version="3.2.0-b0136")],
             sync_gateways=[FakeSyncGateway("4.0.0(350;def)")],
-            markers=["sgw"],
         )
 
         # Filed under sync-gateway, but cblPlatform still names the CBL client that drove it.
@@ -2158,9 +2165,7 @@ class TestDatasetAndCblVersion:
 
     @pytest.mark.asyncio
     async def test_edge_server_run_alone_uses_3x_dataset(self) -> None:
-        doc = await self._fixture_doc(
-            edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))], markers=["min_edge_servers"]
-        )
+        doc = await self._fixture_doc(edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))])
 
         assert doc.platform == "edge-server"
         assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("3.x", "n/a", "n/a")
@@ -2170,8 +2175,80 @@ class TestDatasetAndCblVersion:
         doc = await self._fixture_doc(
             test_servers=[_make_server(library_version="3.2.0-b0136")],
             edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))],
-            markers=["min_edge_servers"],
         )
 
-        # A mixed run keeps the test server's platform, so this is a CBL run that also used an Edge Server.
+        # CBL is the product under test, so this is a CBL run that also used an Edge Server.
         assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("1", "3.2.0-136", "couchbase-lite-ios")
+
+
+def _running(platform: str, product: str, version: str, build: int) -> greenboard_fixture.RunningProduct:
+    return greenboard_fixture.RunningProduct(platform, product, version, build)
+
+
+CBL_420 = _running("couchbase-lite-net", "couchbase-lite-net", "4.2.0", 19)
+SGW_412 = _running("sync-gateway", "sync_gateway", "4.1.2", 2)
+ES_111 = _running("edge-server", "couchbase-edge-server", "1.1.1", 5)
+
+
+class TestProductUnderTest:
+    """``find_product_under_test`` with ProGet stubbed: exactly one prerelease build, or no upload."""
+
+    @staticmethod
+    async def _find(
+        running: Sequence[greenboard_fixture.RunningProduct], prereleases: set[str]
+    ) -> greenboard_fixture.RunningProduct | None:
+        async def fake_is_prerelease(session: object, product: greenboard_fixture.RunningProduct) -> bool:
+            return product.product in prereleases
+
+        with patch.object(greenboard_fixture, "is_prerelease", fake_is_prerelease):
+            return await _real_find_product_under_test(running)
+
+    @pytest.mark.asyncio
+    async def test_the_one_prerelease_is_under_test(self) -> None:
+        assert await self._find([CBL_420, SGW_412, ES_111], {"couchbase-lite-net"}) == CBL_420
+        assert await self._find([CBL_420, SGW_412, ES_111], {"sync_gateway"}) == SGW_412
+        assert await self._find([CBL_420, SGW_412, ES_111], {"couchbase-edge-server"}) == ES_111
+
+    @pytest.mark.asyncio
+    async def test_no_prerelease_means_no_product_under_test(self) -> None:
+        assert await self._find([CBL_420, SGW_412], set()) is None
+
+    @pytest.mark.asyncio
+    async def test_two_prereleases_mean_no_product_under_test(self) -> None:
+        assert await self._find([CBL_420, SGW_412], {"couchbase-lite-net", "sync_gateway"}) is None
+
+    @pytest.mark.asyncio
+    async def test_failed_lookup_means_no_product_under_test(self) -> None:
+        async def unreachable(session: object, product: greenboard_fixture.RunningProduct) -> bool:
+            raise OSError("ProGet unreachable")
+
+        with patch.object(greenboard_fixture, "is_prerelease", unreachable):
+            assert await _real_find_product_under_test([CBL_420]) is None
+
+    @pytest.mark.asyncio
+    async def test_failed_lookup_does_not_drop_the_prerelease_the_others_found(self) -> None:
+        async def sgw_unreachable(session: object, product: greenboard_fixture.RunningProduct) -> bool:
+            if product == SGW_412:
+                raise OSError("ProGet unreachable")
+            return product == CBL_420
+
+        with patch.object(greenboard_fixture, "is_prerelease", sgw_unreachable):
+            assert await _real_find_product_under_test([CBL_420, SGW_412, ES_111]) == CBL_420
+
+    def test_cbl_build_parsed_from_library_version(self) -> None:
+        assert greenboard_fixture.cbl_running_product("couchbase-lite-net", "4.2.0-b0019") == CBL_420
+
+    def test_ios_test_server_maps_to_its_proget_product(self) -> None:
+        running = greenboard_fixture.cbl_running_product("couchbase-lite-swift", "4.1.0-b0018")
+        assert running == _running("couchbase-lite-swift", "couchbase-lite-ios", "4.1.0", 18)
+
+    def test_react_native_test_server_maps_to_its_proget_product(self) -> None:
+        running = greenboard_fixture.cbl_running_product("cbl-reactnative", "1.2.0-10")
+        assert running == _running("cbl-reactnative", "couchbase-lite-react-native", "1.2.0", 10)
+
+    def test_library_version_without_a_build_is_build_zero(self) -> None:
+        running = greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0")
+        assert running == _running("couchbase-lite-c", "couchbase-lite-c", "4.2.0", 0)
+
+    def test_unparseable_build_gives_none(self) -> None:
+        assert greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0-bogus") is None

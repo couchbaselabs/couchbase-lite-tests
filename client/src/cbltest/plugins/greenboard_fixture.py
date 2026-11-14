@@ -1,17 +1,28 @@
-from collections.abc import AsyncGenerator
+import asyncio
+from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Final
 
+import aiohttp
 import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, resolve_branch
+from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, parse_cbl_version, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
 # Edge Server only runs on the 3.x datasets and has no dataset version of its own to report.
 EDGE_SERVER_DATASET_VERSION: Final[str] = "3.x"
+
+SYNC_GATEWAY_PLATFORM: Final[str] = "sync-gateway"
+PROGET_GET_VERSION_URL: Final[str] = "http://proget.build.couchbase.com:8080/api/get_version"
+
+# Test servers report their CBL as the ProGet product, except these.
+_PROGET_PRODUCT_OF_CBL: Final[dict[str, str]] = {
+    "couchbase-lite-swift": "couchbase-lite-ios",
+    "cbl-reactnative": "couchbase-lite-react-native",
+}
 
 # Automatic fixture that uploads results to greenboard, if configured in config.json and --no-result-upload isn't set.
 # The actual RunResult upload is deferred to pytest_sessionfinish() below, not done in the fixture's own teardown.
@@ -51,6 +62,64 @@ class FinishedItems:
 
     def pytest_runtest_logfinish(self, nodeid: str) -> None:
         self.nodeids.add(nodeid)
+
+
+@dataclass(frozen=True)
+class RunningProduct:
+    """A product build the run used: CBL (from the test server), Sync Gateway or Edge Server."""
+
+    platform: str  # the greenboard platform the run is filed under when this is the product under test
+    product: str  # its ProGet product
+    version: str  # x.y.z
+    build: int
+
+    def __str__(self) -> str:
+        return f"{self.product} {self.version}-{self.build}"
+
+
+def cbl_running_product(cbl: str, library_version: str) -> RunningProduct | None:
+    """The test server's CBL build, from its ``cbl`` and library version (see ``parse_cbl_version``), or None if
+    the build is unparseable."""
+    version, build = parse_cbl_version(library_version)
+    if build is None:
+        return None
+    return RunningProduct(cbl, _PROGET_PRODUCT_OF_CBL.get(cbl, cbl), version, build)
+
+
+async def is_prerelease(session: aiohttp.ClientSession, product: RunningProduct) -> bool:
+    """Whether ``product`` runs a prerelease build: one of a version not yet released, or not the release build.
+    Raises if ProGet cannot answer."""
+    async with session.get(
+        PROGET_GET_VERSION_URL, params={"product": product.product, "version": product.version}
+    ) as resp:
+        resp.raise_for_status()
+        info = await resp.json(content_type=None)
+    return not (info["IsRelease"] and int(info["BuildNumber"]) == product.build)
+
+
+async def find_product_under_test(running: Sequence[RunningProduct]) -> RunningProduct | None:
+    """The product under test: the only one of ``running`` that is a prerelease build. Every greenboard upload has
+    exactly one, so None (logged) when there are none or several. A build ProGet cannot check is logged and taken
+    for a release, so one failed lookup does not drop a run whose prerelease the other lookups identify."""
+
+    async def check(session: aiohttp.ClientSession, product: RunningProduct) -> bool:
+        try:
+            return await is_prerelease(session, product)
+        except Exception as e:
+            cbl_warning(f"Could not check whether {product} is a prerelease, so taking it for a release: {e}")
+            return False
+
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=30)) as session:
+        checks = await asyncio.gather(*(check(session, product) for product in running))
+    prereleases = [product for product, prerelease in zip(running, checks, strict=True) if prerelease]
+    if len(prereleases) != 1:
+        builds = ", ".join(map(str, prereleases)) or "none"
+        cbl_warning(
+            f"Greenboard upload skipped: a run must have exactly one prerelease build, the product under test, "
+            f"but has {len(prereleases)} ({builds}) among {', '.join(map(str, running)) or 'no builds'}"
+        )
+        return None
+    return prereleases[0]
 
 
 _finished_key: Final[pytest.StashKey[FinishedItems]] = pytest.StashKey()
@@ -118,46 +187,50 @@ async def greenboard(cblpytest: CBLPyTest, pytestconfig: pytest.Config) -> Async
 
     yield
 
+    # The run is filed under its product under test: the one prerelease build among those it ran.
+    running: list[RunningProduct] = []
     sgw_version: CouchbaseVersion | None = None
     es_version: CouchbaseVersion | None = None
-    test_platform: str = "sync-gateway"
     os_name: str = "n/a"
     library_version: str = "n/a"
     dataset_version: str = "n/a"
     cbl_platform: str = "n/a"
     if len(cblpytest.test_servers) > 0:
         test_server_info = await cblpytest.test_servers[0].info
-        # A test carrying an sgw marker belongs to SGW, not the CBL platform, even though it also drives a
-        # test server.
         library_version = test_server_info.library_version
         dataset_version = cblpytest.test_servers[0].dataset_version
         cbl_platform = test_server_info.cbl
-        if not uploader.has_sgw_marker():
-            test_platform = cbl_platform
         if "systemName" in test_server_info.device:
             os_name = test_server_info.device["systemName"]
+        if (cbl := cbl_running_product(cbl_platform, library_version)) is not None:
+            running.append(cbl)
+        else:
+            cbl_warning(f"Could not parse the CBL version '{library_version}' for greenboard doc")
     if len(cblpytest.sync_gateways) > 0:
         try:
             sgw_version = await cblpytest.sync_gateways[0].get_version()
+            running.append(
+                RunningProduct(SYNC_GATEWAY_PLATFORM, "sync_gateway", sgw_version.version, sgw_version.build_number)
+            )
         except Exception as e:
             cbl_warning(f"Could not fetch SGW version for greenboard doc: {e}")
-    # A mixed run keeps the test server's platform, so its CBL results are not filed under edge-server.
-    if uploader.has_es_marker() and len(cblpytest.edge_servers) > 0:
-        if len(cblpytest.test_servers) == 0:
-            test_platform = EDGE_SERVER_PLATFORM
-            dataset_version = EDGE_SERVER_DATASET_VERSION
+    if len(cblpytest.edge_servers) > 0:
         try:
             es_version = await cblpytest.edge_servers[0].get_admin_client().get_version()
+            running.append(
+                RunningProduct(
+                    EDGE_SERVER_PLATFORM, "couchbase-edge-server", es_version.version, es_version.build_number
+                )
+            )
         except Exception as e:
             cbl_warning(f"Could not fetch ES version for greenboard doc: {e}")
-    # Edge-Server-only, no min_edge_servers marker: no CBL or SGW version to key the doc on. Skip rather than file
-    # it under sync-gateway.
-    if test_platform == "sync-gateway" and len(cblpytest.sync_gateways) == 0 and len(cblpytest.test_servers) == 0:
-        cbl_warning(
-            "Greenboard upload skipped: only Edge Servers are configured but no test "
-            "carried the min_edge_servers marker, so the run has no platform to file under"
-        )
+
+    under_test = await find_product_under_test(running)
+    if under_test is None:
         return
+    test_platform = under_test.platform
+    if test_platform == EDGE_SERVER_PLATFORM and len(cblpytest.test_servers) == 0:
+        dataset_version = EDGE_SERVER_DATASET_VERSION
 
     # Upload itself is deferred to pytest_sessionfinish -- see its docstring.
     pytestconfig.stash[_pending_key] = _PendingRunResult(
@@ -263,7 +336,7 @@ def pytest_configure(config: pytest.Config) -> None:
     """Default ``--junitxml=junit_result.xml`` so pytest_sessionfinish can read pass/fail counts from the XML.
 
     Done here rather than ``addopts`` in ``client/pyproject.toml``: pytest's rootdir discovery walks up from the cwd
-    and picks the repo-root ``pyproject.toml`` for production runs from ``tests/QE``/``tests/dev_e2e``, never reaching
+    and picks the repo-root ``pyproject.toml`` for production runs from ``tests/functional``/``tests/multiplatform``/``tests/upgrade_sgw``, never reaching
     ``client/pyproject.toml``. An explicit ``--junitxml=<path>`` on the CLI still wins (pytest's last-wins behavior).
     """
     if not getattr(config.option, "xmlpath", None):

@@ -185,6 +185,11 @@ resource "aws_instance" "load_balancer" {
     vpc_security_group_ids = [data.aws_security_group.main.id]
     associate_public_ip_address = true
 
+    root_block_device {
+        volume_size = 30  # 30 GiB (minimum required by AMI)
+        volume_type = "gp2"
+    }
+
     tags = {
         Name = "lb"
         Type = "loadbalancer"

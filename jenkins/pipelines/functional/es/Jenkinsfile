@@ -1,0 +1,105 @@
+// Runs every tests/functional test marked min_edge_servers against one Edge Server build.
+// jenkins/pipelines/main/es triggers it daily for new builds; it can also be run by hand.
+// With STRESS it runs the stress tests marked min_edge_servers (tests/functional/stress) instead.
+
+pipeline {
+    agent none
+    parameters {
+        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version under test (required): version-build, version or train (e.g. 1.1.1-5, 1.1.1 or 1.1). The build number is resolved automatically.')
+        string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests. Empty runs every tests/functional test marked min_edge_servers')
+        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version-build, version or train for the JS test server on the Jenkins agent (e.g. 1.1.0-25). Leave blank for the latest GA release.')
+        booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the JS test server for CBL_VERSION. Uncheck to reuse existing artifacts.')
+        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty for the latest GA release)')
+        booleanParam(name: 'STRESS', defaultValue: false, description: 'Run only the stress tests marked min_edge_servers (tests/functional/stress), which take about a day, in place of the regular ones.')
+        booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: false, description: 'Run only the tests that replicate with the CBL-JS test server (those marked both min_edge_servers and min_test_servers). TS_TEST_FILTER still narrows them with -k.')
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+    }
+    stages {
+        stage('Resolve Versions') {
+            agent { label 'mac-mini-new' }
+            environment {
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+            }
+            steps {
+                script {
+                    if (!params.ES_VERSION?.trim()) { error "ES_VERSION is required: it is the version of the product under test" }
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
+                    def es = builds.resolveVersionBuild(proget, 'couchbase-edge-server', params.ES_VERSION, 'ES_VERSION', true)
+                    if (es == null) { error "ES_VERSION: couchbase-edge-server ${params.ES_VERSION} has no published build yet" }
+                    env.ES_FULL = "${es.version}-${es.build}"
+                    // Prereleases only for the product under test: CBL-JS is the latest GA unless pinned.
+                    def cbl = builds.resolveVersionBuild(proget, 'couchbase-lite-js', params.CBL_VERSION, 'CBL_VERSION', false)
+                    if (cbl == null) { error "CBL_VERSION: couchbase-lite-js ${params.CBL_VERSION ?: '(latest GA)'} has no published build yet" }
+                    env.CBL_FULL = "${cbl.version}-${cbl.build}"
+                    echo "Edge Server: ${env.ES_FULL}  |  CBL-JS: ${env.CBL_FULL}"
+
+                    def scope = params.JS_REPLICATION_TESTS_ONLY ? "JS replication only" : "all"
+                    currentBuild.displayName = "${params.STRESS ? 'STRESS ' : ''}ES:${env.ES_FULL} (#${currentBuild.number})"
+                    currentBuild.description = "${scope}: ${params.TS_TEST_FILTER ?: 'all tests'} | SGW: ${params.SGW_VERSION ?: 'latest GA'} | CBL-JS: ${env.CBL_FULL}"
+                }
+            }
+        }
+        stage('Prebuild JS Test Server') {
+            when { beforeAgent true; expression { params.RUN_PREBUILD } }
+            steps {
+                script {
+                    def (cblVersion, cblBuild) = env.CBL_FULL.tokenize('-')
+                    build job: 'prebuild-test-server',
+                    parameters: [
+                        string(name: 'TS_PLATFORM', value: 'js'),
+                        string(name: 'CBL_VERSION', value: cblVersion),
+                        string(name: 'CBL_BUILD', value: cblBuild)
+                    ],
+                    wait: true,
+                    propagate: true
+                }
+            }
+        }
+        stage('Run Test') {
+            agent { label 'mac-mini-new' }
+            environment {
+                KEYCHAIN_PASSWORD = credentials('mobile-qe')
+                PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+                TS_ARTIFACTS_DIR = 'es'
+            }
+            steps {
+                // Unlock keychain:
+                sh 'security unlock-keychain -p ${KEYCHAIN_PASSWORD} ~/Library/Keychains/login.keychain-db'
+                echo "=== Run Edge server Tests"
+                lock("mac-mini-new") {
+                    // The stress tests run for 6 hours each.
+                    timeout(time: params.STRESS ? 25 * 60 : 90, unit: 'MINUTES') {
+                        sh """
+                            jenkins/pipelines/functional/es/test.sh \
+                                "${env.ES_FULL}" \
+                                "${params.TS_TEST_FILTER}" \
+                                "${params.SGW_VERSION}" \
+                                "${env.CBL_FULL}" \
+                                "${params.JS_REPLICATION_TESTS_ONLY}" \
+                                "${params.STRESS}"
+                        """
+                    }
+                }
+                echo "=== Edge server Tests Complete"
+            }
+            post {
+                always {
+                    // Publish pytest's JUnit XML so per-test failures (messages and
+                    // tracebacks) are surfaced in Jenkins even if teardown fails.
+                    junit testResults: '**/junit_result.xml', allowEmptyResults: true
+
+                    echo "=== Teardown Edge server Tests"
+                    timeout(time: 5, unit: 'MINUTES') {
+                        sh "jenkins/pipelines/functional/es/teardown.sh"
+                    }
+                    archiveArtifacts artifacts: 'tests/functional/es/**', fingerprint: true, allowEmptyArchive: true
+                    echo "=== Edge server Test Teardown Complete"
+                }
+            }
+        }
+    }
+}

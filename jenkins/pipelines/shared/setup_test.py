@@ -25,28 +25,6 @@ from environment.aws.topology_setup.setup_topology import TopologyConfig
 SCRIPT_DIR = Path(os.path.dirname(os.path.realpath(__file__)))
 
 
-def ts_to_topology(ts_platform: str) -> str:
-    if ts_platform.startswith("swift"):
-        return "ios"
-
-    if ts_platform == "jak_android":
-        return "android"
-
-    if ts_platform.startswith("jak_"):
-        return "java"
-
-    if ts_platform.startswith("dotnet_"):
-        return "dotnet"
-
-    if ts_platform.startswith("c_"):
-        return "c"
-
-    if ts_platform == "js":
-        return "js"
-
-    raise ValueError(f"Unknown test server platform: {ts_platform}")
-
-
 def resolved_version(product: str, version: str | None) -> str:
     """
     Resolves `version` to a concrete released version of `product`. A full
@@ -60,11 +38,24 @@ def resolved_version(product: str, version: str | None) -> str:
     return resolve_latest_version(product, version)
 
 
-def get_platform_version(version_map: dict[str, str], platform: str) -> str:
-    if platform in version_map:
-        return version_map[platform]
+def _version_tuple(version: str) -> tuple[int, ...]:
+    """Numeric parts of "x.y.z" or "x.y.z-<build>", ignoring the build."""
+    return tuple(int(part) for part in version.split("-")[0].split("."))
 
-    raise ValueError(f"Platform {platform} not found in version map: {version_map}")
+
+def sgw_cbs_incompatibility(sgw_version: str, cbs_version: str) -> str | None:
+    """
+    Returns why Sync Gateway `sgw_version` cannot run against Couchbase Server
+    `cbs_version`, or None when the pair is supported. Sync Gateway 4.0 and later
+    require Couchbase Server 7.6.1 or later. Source:
+    https://docs.couchbase.com/sync-gateway/current/product-notes/compatibility.html
+    """
+    if _version_tuple(sgw_version)[0] >= 4 and _version_tuple(cbs_version) < (7, 6, 1):
+        return (
+            f"Sync Gateway {sgw_version} needs Couchbase Server 7.6.1 or later, but Couchbase Server is {cbs_version}"
+        )
+
+    return None
 
 
 def parse_versions(value: str) -> list[str]:
@@ -111,7 +102,8 @@ def setup_test(
     config_file_in: Path,
     topology_tag: str,
     couchbase_version: str | None = None,
-    setup_dir: str = "dev_e2e",
+    setup_dir: str = "functional",
+    es_version: str | None = None,
 ) -> None:
     """
     Sets up a testing environment with the specified CBL version(s) and Sync Gateway version(s).
@@ -124,6 +116,9 @@ def setup_test(
     `sgw_versions` positionally to its sync_gateways (only meaningful when sync_gateways
     is defined directly in that file rather than pulled in via `include`). In both cases,
     once the version list is exhausted the last entry repeats (see `distribute_versions`).
+
+    `es_version` sets the version of every Edge Server the topology has. `None` keeps the
+    topology's own default, which is the latest Edge Server release.
 
     Pass `None` for `sgw_versions` if the topology doesn't use Sync Gateway at all; a
     throwaway version is substituted internally. An empty list is rejected, since that
@@ -155,28 +150,24 @@ def setup_test(
 
     couchbase_server_version = resolved_version("couchbase-server", couchbase_version)
     resolved_sgw_versions = [resolved_version("sync-gateway", version) for version in sgw_versions]
+    incompatible = [
+        reason
+        for version in resolved_sgw_versions
+        if (reason := sgw_cbs_incompatibility(version, couchbase_server_version))
+    ]
+    if incompatible:
+        raise ValueError("\n".join(incompatible))
 
     with open(topology_file_in) as fin:
         topology = cast(dict[str, Any], json.load(fin))
         topology["$schema"] = "topology_schema.json"
-        if "include" in topology and str(topology["include"]).endswith("default_topology.json"):
+        if "include" in topology:
+            # The include is relative to the template, but the topology is written (and read
+            # back) from topology_file_out's directory, so re-root it there.
             old_include = Path(str(topology["include"]))
             if not old_include.is_absolute():
                 absolute_include = (topology_file_in.parent / old_include).resolve()
-                if not absolute_include.is_relative_to(topology_file_out.parent):
-                    click.secho(f"When requesting include '{old_include}'", fg="yellow")
-                    click.secho(
-                        f"Resolved path {absolute_include} is not relative to {topology_file_out.parent}",
-                        fg="yellow",
-                    )
-                    click.secho(
-                        "Setting include to absolute path instead of adjusted relative",
-                        fg="yellow",
-                    )
-                    topology["include"] = str(absolute_include)
-                else:
-                    new_include = absolute_include.relative_to(topology_file_out.parent)
-                    topology["include"] = str(new_include)
+                topology["include"] = Path(os.path.relpath(absolute_include, topology_file_out.parent)).as_posix()
 
         topology["defaults"] = {
             "cbs": {"version": couchbase_server_version},
@@ -184,6 +175,8 @@ def setup_test(
                 "version": resolved_sgw_versions[0],
             },
         }
+        if es_version:
+            topology["defaults"]["es"] = {"version": resolved_version("couchbase-edge-server", es_version)}
         topology["tag"] = topology_tag
 
         test_servers = cast(list[dict[str, Any]], topology["test_servers"])
