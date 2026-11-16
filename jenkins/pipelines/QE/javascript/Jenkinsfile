@@ -42,14 +42,11 @@ pipeline {
             }
         }
         stage('Run Test') {
-            agent { label 'mac-mini-new' }
+            agent { label 'e2e&&macos-host' }
             environment {
-                PATH = "/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
                 TS_ARTIFACTS_DIR = 'js'
             }
             steps {
-                // The JS test server runs on this agent at localhost:5173, so take the node lock that
-                // every other pipeline running a JS test server here takes too.
                 lock("${env.NODE_NAME}") {
                     echo "=== Run JS Tests"
                     timeout(time: 120, unit: 'MINUTES') {
