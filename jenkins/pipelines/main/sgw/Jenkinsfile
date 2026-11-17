@@ -31,7 +31,7 @@ pipeline {
                     def compat = load 'jenkins/pipelines/shared/cblSgwCompatibility.groovy'
                     def datasets = load 'jenkins/pipelines/shared/cblDatasetCompatibility.groovy'
 
-                    // Blank: sgw-functional picks the latest CBL C release of each SGW's major
+                    // Blank: functional-e2e-sgw picks the latest CBL C release of each SGW's major
                     // version (see productVersions.groovy).
                     def cblVersion = params.CBL_VERSION?.trim() ?: ''
                     echo "CBL (client): ${cblVersion ?: 'latest release of each SGW major version'}"
@@ -85,8 +85,8 @@ pipeline {
 
                         // The dataset of the client's major version; a blank client has the SGW's.
                         def dataset = datasets.datasetFor(cblVersion ?: sgwFull)
-                        echo "Triggering 'sgw-functional' for SGW ${sgwFull} (dataset ${dataset})"
-                        build job: 'sgw-functional', parameters: [
+                        echo "Triggering 'functional-e2e-sgw' for SGW ${sgwFull} (dataset ${dataset})"
+                        build job: 'functional-e2e-sgw', parameters: [
                             string(name: "SGW_VERSION", value: sgwFull),
                             string(name: "CBL_VERSION", value: cblVersion),
                             string(name: "TS_DATASET_VERSION", value: dataset)

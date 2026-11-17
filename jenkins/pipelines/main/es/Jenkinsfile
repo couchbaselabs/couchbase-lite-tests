@@ -1,5 +1,5 @@
 // Daily trigger for the Edge Server functional tests (jenkins/pipelines/functional/es,
-// Jenkins job es-functional). Edge Server is the product under test, so each non-EOL
+// Jenkins job functional-e2e-edgeserver). Edge Server is the product under test, so each non-EOL
 // train gets its newest build, prereleases included. Everything else -- the CBL-JS
 // client, Sync Gateway and Couchbase Server -- is held at its latest GA release, so a red
 // run is attributable to Edge Server.
@@ -89,8 +89,8 @@ pipeline {
                             continue
                         }
 
-                        echo "Triggering 'es-functional' for Edge Server ${esFull} (CBL-JS ${cblFull}, SGW ${sgwVersion})"
-                        build job: 'es-functional', parameters: [
+                        echo "Triggering 'functional-e2e-edgeserver' for Edge Server ${esFull} (CBL-JS ${cblFull}, SGW ${sgwVersion})"
+                        build job: 'functional-e2e-edgeserver', parameters: [
                             string(name: "ES_VERSION", value: esFull),
                             string(name: "CBL_VERSION", value: cblFull),
                             string(name: "SGW_VERSION", value: sgwVersion)

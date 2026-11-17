@@ -7,7 +7,7 @@ All Jenkins pipelines for building test servers, provisioning AWS environments, 
 You own everything under `jenkins/`:
 - `jenkins/pipelines/shared/` — scripts used by **all** pipelines
 - `jenkins/pipelines/functional/` — pipelines that run `tests/functional`: one per CBL platform (`android`, `c`, `dotnet`, `ios`, `java`, `javascript`) plus `sgw` (`-m min_sync_gateways`) and `es` (`-m min_edge_servers`)
-- `jenkins/pipelines/main/` — daily triggers: `cbl/` starts `e2e-functional-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw` for new Sync Gateway builds; `es/` starts `functional/es` for new Edge Server builds
+- `jenkins/pipelines/main/` — daily triggers: `cbl/` starts `functional-e2e-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw` for new Sync Gateway builds; `es/` starts `functional/es` for new Edge Server builds
 - `jenkins/pipelines/upg-sgw/` — SGW upgrade pipelines (`tests/upgrade_sgw`)
 - `jenkins/pipelines/multiplatform/` — multi-platform pipeline: runs `tests/multiplatform` with several test servers in one topology (`STRESS` runs its `stress/` tests instead)
 - `jenkins/pipelines/prebuild/` — test server prebuild pipeline
@@ -45,7 +45,7 @@ jenkins/
 │   │   └── es/                         #   Every min_edge_servers test (own generate_topology(), topology.json)
 │   │
 │   ├── main/                           # Daily triggers
-│   │   ├── cbl/                        #   e2e-functional-<platform> for every CBL train
+│   │   ├── cbl/                        #   functional-e2e-<platform> for every CBL train
 │   │   ├── sgw/                        #   functional/sgw for new Sync Gateway builds
 │   │   └── es/                         #   functional/es for new Edge Server builds
 │   │

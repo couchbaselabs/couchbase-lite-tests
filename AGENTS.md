@@ -148,7 +148,7 @@ AWS orchestrator scripts run from the root workspace — there is **no** separat
 - `.github/workflows/python_verify.yml` — runs `client/tests` on Python changes.
 - `.github/workflows/openapi.yml` — Redocly lint + yamllint on `spec/api/` changes; posts PR preview link.
 - `jenkins/pipelines/prebuild/` — builds test-server artifacts.
-- `jenkins/pipelines/functional/{platform}/` — per-platform CI runs, triggered by `jenkins/pipelines/main/cbl/` (Jenkins jobs `e2e-functional-<platform>`).
+- `jenkins/pipelines/functional/{platform}/` — per-platform CI runs, triggered by `jenkins/pipelines/main/cbl/` (Jenkins jobs `functional-e2e-<platform>`).
 
 ## Validation Before Completion
 

@@ -3,7 +3,7 @@
 ## Identity
 
 You maintain the pipelines that run `tests/functional`. Each CBL platform pipeline (Jenkins job
-`e2e-functional-<platform>`) replaced a former `dev_e2e`/`QE` pair; `../main/cbl/` starts it daily for
+`functional-e2e-<platform>`) replaced a former `dev_e2e`/`QE` pair; `../main/cbl/` starts it daily for
 the latest build of every CBL train. `sgw/` and `es/` select the same suite by product instead of
 by CBL platform.
 
@@ -18,7 +18,7 @@ You own all code under `jenkins/pipelines/functional/`:
   marked `min_test_servers`). Does NOT use the shared `setup_test()`: its own
   `generate_topology()` fills the one `topology.json` (3 Edge Servers, 1 Sync Gateway, 1 Couchbase
   Server, a localhost JS test server) with the ES/SGW/CBL versions and the latest GA Couchbase Server.
-  Triggered by `../main/es/` (Jenkins job `es-functional`) against GA CBL-JS and Sync Gateway.
+  Triggered by `../main/es/` (Jenkins job `functional-e2e-edgeserver`) against GA CBL-JS and Sync Gateway.
   Its `STRESS` checkbox runs the stress tests marked `min_edge_servers` (`tests/functional/stress/`)
   instead, with a 25-hour timeout.
 

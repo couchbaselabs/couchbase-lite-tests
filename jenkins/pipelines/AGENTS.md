@@ -7,7 +7,7 @@ This file covers the per-pipeline structure and the **topology-test synchronizat
 You own everything under `jenkins/pipelines/`:
 - `shared/` — `setup_test.py` (`setup_test`), `config.sh`, `config.psm1`, and the Groovy helpers `resolveProgetVersion`, `progetBuilds`, `triggerRecord`, `cblSgwCompatibility`, `cblDatasetCompatibility`
 - `functional/` — pipelines that run `tests/functional`: one per CBL platform (`android/`, `c/`, `dotnet/`, `ios/`, `java/`, `javascript/`) plus `sgw/` and `es/`
-- `main/` — daily triggers: `cbl/` starts `e2e-functional-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw`; `es/` starts `functional/es`
+- `main/` — daily triggers: `cbl/` starts `functional-e2e-<platform>` for the latest build of every CBL train; `sgw/` starts `functional/sgw`; `es/` starts `functional/es`
 - `upg-sgw/` — SGW upgrade pipelines
 - `multiplatform/` — multi-platform pipeline (`tests/multiplatform`, several test servers)
 - `prebuild/` — test server artifact prebuild pipeline
