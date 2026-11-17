@@ -13,12 +13,6 @@ pipeline {
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
-    parameters {
-        string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version or train (e.g. 1.2.0 or 1.2). Leave blank to auto-resolve and test the latest build of EVERY non-EOL train from ProGet get_trains. The build number is resolved automatically.')
-        string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS client version (e.g. 1.0.3). Leave blank for the latest GA release, so the client stays a fixed control. The build number is resolved automatically.')
-        string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version or prefix (e.g. 4 or 4.0.3). Leave blank for the latest GA release.')
-        booleanParam(name: 'FORCE_TRIGGER', defaultValue: false, description: 'Force triggering the Edge Server test job even if this Edge Server version+build already ran')
-    }
     options {
         ansiColor('xterm')
         timestamps()
@@ -41,24 +35,16 @@ pipeline {
                     // The controls are shared by every Edge Server train and pinned to GA
                     // (never a prerelease). Edge Server's setup writes the SGW version
                     // into the topology verbatim, so it is resolved to a full version here.
-                    def cbl = builds.resolveVersionBuild(proget, CBL_PRODUCT, params.CBL_VERSION, 'CBL_VERSION', false)
+                    def cbl = builds.resolveVersionBuild(proget, CBL_PRODUCT, '', 'CBL_VERSION', false)
                     // Without the client the JS replication tests cannot run, so an
                     // unresolved CBL-JS is fatal rather than silently narrowing the run.
                     if (cbl == null) { error "Could not resolve a published build for ${CBL_PRODUCT}" }
                     def cblFull = "${cbl.version}-${cbl.build}"
-                    def sgwVersion = proget.resolveProgetVersion('sync-gateway', params.SGW_VERSION, 'SGW_VERSION', false)
+                    def sgwVersion = proget.resolveProgetVersion('sync-gateway', '', 'SGW_VERSION', false)
                     echo "Controls: CBL-JS ${cblFull} | SGW ${sgwVersion}"
-                    echo "FORCE: ${params.FORCE_TRIGGER}"
 
-                    // A specific ES_VERSION param targets one train/version; a blank
-                    // param fans out over every non-EOL train from get_trains.
-                    def trains
-                    if (params.ES_VERSION?.trim()) {
-                        trains = [params.ES_VERSION.trim()]
-                    } else {
-                        trains = builds.fetchTrains(ES_PRODUCT)
-                        if (!trains) { error "No Edge Server trains returned from ProGet get_trains" }
-                    }
+                    def trains = builds.fetchTrains(ES_PRODUCT)
+                    if (!trains) { error "No Edge Server trains returned from ProGet get_trains" }
                     echo "Edge Server trains to process: ${trains}"
 
                     // Dedup on the Edge Server build only; the controls are not part of the key.
@@ -83,7 +69,7 @@ pipeline {
                         }
                         def esFull = "${es.version}-${es.build}"
 
-                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(ES_PRODUCT, es.version, es.build)) {
+                        if (triggers.alreadyTriggered(ES_PRODUCT, es.version, es.build)) {
                             echo "SKIP: Edge Server ${esFull} (already triggered)"
                             skipped << esFull
                             continue
@@ -109,7 +95,7 @@ pipeline {
 
                     if (failed) {
                         currentBuild.result = 'UNSTABLE'
-                        echo "WARNING: ${failed.size()} train(s) failed to resolve: ${failed}"
+                        echo "WARNING: ${failed.size()} problem(s): ${failed}"
                     }
                 }
             }
