@@ -3,10 +3,11 @@
 // Alembic's latest_tested API does not already list as tested. Each run uses the latest
 // Sync Gateway release.
 
-def PLATFORMS = ['c', 'android', 'java', 'ios', 'dotnet']
+def PLATFORMS = ['c', 'android', 'java', 'ios', 'dotnet', 'javascript']
 
 def progetProductFor(String platform) {
-    return "couchbase-lite-" + ((platform == "dotnet") ? "net" : platform)
+    def suffix = [dotnet: "net", javascript: "js"][platform] ?: platform
+    return "couchbase-lite-" + suffix
 }
 
 pipeline {
@@ -63,13 +64,16 @@ pipeline {
                                     continue
                                 }
 
-                                def dataset = datasets.datasetFor(fullVersion)
-                                echo "Triggering 'functional-e2e-${platform}' for ${platform} v${fullVersion} (dataset ${dataset})"
-                                build job: "functional-e2e-${platform}", parameters: [
+                                def params = [
                                     string(name: "CBL_VERSION", value: fullVersion),
-                                    string(name: "SGW_VERSION", value: ''),
-                                    string(name: "TS_DATASET_VERSION", value: dataset)
-                                ], wait: false
+                                    string(name: "SGW_VERSION", value: '')
+                                ]
+                                // The JS pipeline has no dataset parameter.
+                                if (platform != 'javascript') {
+                                    params << string(name: "TS_DATASET_VERSION", value: datasets.datasetFor(fullVersion))
+                                }
+                                echo "Triggering 'functional-e2e-${platform}' for ${platform} v${fullVersion}"
+                                build job: "functional-e2e-${platform}", parameters: params, wait: false
                                 triggered[platform] = (triggered[platform] ?: []) + [fullVersion]
 
                                 if (!triggers.record(product, info.version, info.build)) {
