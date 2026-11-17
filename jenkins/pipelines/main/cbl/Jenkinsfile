@@ -10,7 +10,7 @@ def progetProductFor(String platform) {
 }
 
 pipeline {
-    agent { label 'qe-mac-india' }
+    agent { label 'macos-host || linux-host' }
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }

@@ -6,8 +6,7 @@
 def SGW_PRODUCT = "sync-gateway"
 
 pipeline {
-    // Dedup state lives in Alembic's latest_tested API, so the node is not significant.
-    agent { label 'mac-mini-new' }
+    agent { label 'macos-host || linux-host' }
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
     }
