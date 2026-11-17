@@ -13,7 +13,7 @@ def progetProductFor(String platform) {
 }
 
 pipeline {
-    // Dedup state lives on this node's filesystem (~/.jenkins_build_info).
+    // Dedup state lives in Alembic's latest_tested API, so the node is not significant.
     agent { label 'qe-mac-india' }
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -124,14 +124,13 @@ pipeline {
                         }
                         def jobName = "e2e-functional-${platform}"
 
-                        // Dedup per build, shared across all trains of this platform.
-                        def buildInfo = triggers.readRecord(platform)
+                        def product = progetProductFor(platform)
 
                         def triggered = []
                         def skipped = []
                         for (info in entries) {
                             def fullVersion = "${info.version}-${info.build}"
-                            if (!force && triggers.alreadyTriggered(buildInfo, info.version, info.build)) {
+                            if (!force && triggers.alreadyTriggered(product, info.version, info.build)) {
                                 echo "SKIP: ${platform} v${fullVersion} (already triggered)"
                                 skipped << fullVersion
                                 continue
@@ -151,15 +150,14 @@ pipeline {
                                 string(name: "TS_DATASET_VERSION", value: dataset)
                             ], wait: false
 
-                            buildInfo[info.version] = info.build
                             triggered << fullVersion
+                            if (!triggers.record(product, info.version, info.build)) {
+                                failed << "${platform} ${fullVersion} (not recorded)"
+                                currentBuild.result = 'UNSTABLE'
+                            }
                         }
 
-                        // Persist dedup state once, after all trains are processed.
-                        if (triggered) {
-                            triggers.saveRecord(platform, buildInfo)
-                            triggeredByPlatform[platform] = triggered
-                        }
+                        if (triggered) { triggeredByPlatform[platform] = triggered }
 
                         echo "${platform} triggered: ${triggered}"
                         echo "${platform} skipped:   ${skipped}"

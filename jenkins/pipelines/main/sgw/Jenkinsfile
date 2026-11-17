@@ -1,7 +1,7 @@
 def SGW_PRODUCT = "sync-gateway"          // dedup key: the thing under test
 
 pipeline {
-    // Pinned: dedup state lives on this node's filesystem (~/.jenkins_build_info).
+    // Dedup state lives in Alembic's latest_tested API, so the node is not significant.
     agent { label 'mac-mini-new' }
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -49,8 +49,6 @@ pipeline {
                     echo "SGW trains to process: ${trains}"
 
                     // Dedup on the SGW build only; the CBL client is not part of the key.
-                    def buildInfo = triggers.readRecord('sgw')
-
                     def triggered = []
                     def skipped = []
                     def failed = []
@@ -72,7 +70,7 @@ pipeline {
                         }
                         def sgwFull = "${sgw.version}-${sgw.build}"
 
-                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(buildInfo, sgw.version, sgw.build)) {
+                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(SGW_PRODUCT, sgw.version, sgw.build)) {
                             echo "SKIP: SGW ${sgwFull} (already triggered)"
                             skipped << sgwFull
                             continue
@@ -94,12 +92,11 @@ pipeline {
                             string(name: "TS_DATASET_VERSION", value: dataset)
                         ], wait: false
 
-                        buildInfo[sgw.version] = sgw.build
                         triggered << sgwFull
+                        if (!triggers.record(SGW_PRODUCT, sgw.version, sgw.build)) {
+                            failed << "${sgwFull} (not recorded)"
+                        }
                     }
-
-                    // Persist dedup state once, after all trains are processed.
-                    if (triggered) { triggers.saveRecord('sgw', buildInfo) }
 
                     currentBuild.displayName = "SGW ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
                     echo "Triggered: ${triggered}"

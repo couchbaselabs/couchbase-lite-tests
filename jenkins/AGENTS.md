@@ -26,7 +26,7 @@ jenkins/
 │   │   ├── config.psm1                 # PowerShell equivalent (Windows pipelines)
 │   │   ├── resolveProgetVersion.groovy # Version/train/prefix → concrete version via ProGet
 │   │   ├── progetBuilds.groovy         # Version → [version, build]; non-EOL trains (get_trains)
-│   │   ├── triggerRecord.groovy        # main/* "already triggered" record (~/.jenkins_build_info)
+│   │   ├── triggerRecord.groovy        # main/* "already triggered" record (Alembic latest_tested)
 │   │   ├── cblSgwCompatibility.groovy  # Rejects CBL/SGW pairs that cannot replicate
 │   │   ├── cblDatasetCompatibility.groovy # Rejects datasets a CBL version cannot open
 │   │   └── productVersions.groovy      # Product under test + optional versions → resolved CBL/SGW/ES
@@ -149,7 +149,7 @@ Each is loaded inside a node context (`def x = load 'jenkins/pipelines/shared/<f
 
 - `resolveProgetVersion.groovy` — `resolveProgetVersion(product, version, label[, includePrerelease])`: blank, train or prefix → newest concrete version (prereleases included unless `false`).
 - `progetBuilds.groovy` — `resolveVersionBuild(proget, product, param, label, includePrerelease)` → `[version:, build:]` or `null` when the version has no published build yet; `fetchTrains(product)`; `getBuildNumber(product, version)`.
-- `triggerRecord.groovy` — `readRecord(name)`, `alreadyTriggered(record, version, build)`, `saveRecord(name, record)` for the `{ "<version>": "<build>" }` record each `main/*` trigger keeps per job on its pinned agent.
+- `triggerRecord.groovy` — `alreadyTriggered(product, version, build)` and `record(product, version, build)` (false and a warning when not accepted) keep the latest tested build of each product + X.Y.Z version in Alembic's `latest_tested` API (`proget.build.couchbase.com:8080`, see `/swagger`), shared by every agent, so the `main/*` triggers need no pinned node.
 - `cblSgwCompatibility.groovy` — `incompatibility(cblVersion, sgwVersion)`: a reason string, or `null` when the pair can replicate.
 - `cblDatasetCompatibility.groovy` — `incompatibility(cblVersion, dataset)`: a reason string, or `null` when that CBL can open the dataset (CBL 3.x needs 3.2); `datasetFor(cblVersion)`: the dataset of its major version, which the daily triggers pass.
 - `productVersions.groovy` — `resolve(underTest, cblProduct, params)`: requires the version of the product under test (`'cbl'`, `'sgw'` or `'es'`), resolves `CBL_VERSION`, `SGW_VERSION` and `ES_VERSION` (an empty optional one is the latest release), rejects an incompatible CBL/SGW pair or, when the pipeline has `TS_DATASET_VERSION`, CBL/dataset pair, and sets `CBL_RESOLVED`, `SGW_RESOLVED`, `ES_RESOLVED`, `CBL_PREBUILD_VERSION` and `CBL_PREBUILD_BUILD`. See `pipelines/functional/AGENTS.md`.

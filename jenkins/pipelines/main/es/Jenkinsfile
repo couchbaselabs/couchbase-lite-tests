@@ -8,7 +8,7 @@ def ES_PRODUCT = "couchbase-edge-server"  // dedup key: the thing under test
 def CBL_PRODUCT = "couchbase-lite-js"     // localhost JS test server, passed through
 
 pipeline {
-    // Pinned: dedup state lives on this node's filesystem (~/.jenkins_build_info).
+    // Dedup state lives in Alembic's latest_tested API, so the node is not significant.
     agent { label 'mac-mini-new' }
     environment {
         PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
@@ -62,8 +62,6 @@ pipeline {
                     echo "Edge Server trains to process: ${trains}"
 
                     // Dedup on the Edge Server build only; the controls are not part of the key.
-                    def buildInfo = triggers.readRecord('es')
-
                     def triggered = []
                     def skipped = []
                     def failed = []
@@ -85,7 +83,7 @@ pipeline {
                         }
                         def esFull = "${es.version}-${es.build}"
 
-                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(buildInfo, es.version, es.build)) {
+                        if (!params.FORCE_TRIGGER && triggers.alreadyTriggered(ES_PRODUCT, es.version, es.build)) {
                             echo "SKIP: Edge Server ${esFull} (already triggered)"
                             skipped << esFull
                             continue
@@ -98,12 +96,11 @@ pipeline {
                             string(name: "SGW_VERSION", value: sgwVersion)
                         ], wait: false
 
-                        buildInfo[es.version] = es.build
                         triggered << esFull
+                        if (!triggers.record(ES_PRODUCT, es.version, es.build)) {
+                            failed << "${esFull} (not recorded)"
+                        }
                     }
-
-                    // Persist dedup state once, after all trains are processed.
-                    if (triggered) { triggers.saveRecord('es', buildInfo) }
 
                     currentBuild.displayName = "ES ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
                     echo "Triggered: ${triggered}"
