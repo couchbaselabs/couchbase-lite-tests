@@ -4,6 +4,7 @@ pipeline {
         skipDefaultCheckout()
     }
     parameters {
+        string(name: 'BRANCH', defaultValue: 'main', description: 'The branch of couchbase-lite-tests to load this pipeline from (the test server source branch is still chosen from CBL_VERSION)')
         choice(
             name: 'TS_PLATFORM',
             choices: ['dotnet_windows', 'dotnet_macos', 'dotnet_ios', 'dotnet_android', 'jak_android', 'jak_desktop', 'jak_webservice', 'swift_ios', 'c_ios', 'c_android', 'c_linux_x86_64', 'c_macos', 'c_windows', 'js'],

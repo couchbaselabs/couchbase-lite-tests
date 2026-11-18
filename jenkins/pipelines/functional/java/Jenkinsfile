@@ -5,6 +5,7 @@ def MAIL_TO = 'blake.meike@couchbase.com,barkha.goyal@couchbase.com'
 pipeline {
     agent none
     parameters {
+        string(name: 'BRANCH', defaultValue: 'main', description: 'The branch of couchbase-lite-tests to run this pipeline and its tests from')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'Couchbase Lite version under test (required): 4, 4.1, 4.1.0 or 4.1.0-18')
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version: 4, 4.1, 4.1.0 or 4.1.0-18 (empty: the latest release)')
         string(name: 'ES_VERSION', defaultValue: '', description: 'Edge Server version: 1, 1.1, 1.1.1 or 1.1.1-5 (empty: the latest release)')

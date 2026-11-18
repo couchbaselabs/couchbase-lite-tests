@@ -46,6 +46,7 @@ def topologyShortfalls(List entries) {
 pipeline {
     agent none
     parameters {
+        string(name: 'BRANCH', defaultValue: 'main', description: 'The branch of couchbase-lite-tests to run this pipeline and its tests from')
         string(name: 'PLATFORM_VERSIONS', defaultValue: 'swift_ios=4 swift_ios=4', description: 'Space-separated <platform>=<version> list, one entry per test server, e.g. "swift_ios=4.1.0 swift_ios=4.2.0 jak_android=4.1.0-18". <platform> is a test server platform (swift_ios, jak_android, jak_desktop, jak_webservice, dotnet_macos, dotnet_windows, dotnet_ios, dotnet_android, c_macos, c_windows, c_linux_x86_64, c_ios, c_android); each entry uses the next test server of that platform in the topology, and test servers left over are not used. <version> is "4", "4.1", "4.1.0" or "4.1.0-18".')
         booleanParam(name: 'STRESS', defaultValue: false, description: 'Run only the stress tests (tests/multiplatform/stress), which take over a day, in place of the regular ones. Provisions two Couchbase Server clusters, each with its own Sync Gateway.')
         string(name: 'SGW_VERSION', defaultValue: '4', description: 'Sync Gateway Version, eg : "4" for the latest 4.x, or "4.1.3-18" for a specific version and build')
