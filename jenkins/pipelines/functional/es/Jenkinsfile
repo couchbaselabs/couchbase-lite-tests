@@ -10,6 +10,7 @@ pipeline {
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests. Empty runs every tests/functional test marked min_edge_servers')
         string(name: 'CBL_VERSION', defaultValue: '', description: 'CBL-JS version-build, version or train for the JS test server on the Jenkins agent (e.g. 1.1.0-25). Leave blank for the latest GA release.')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the JS test server for CBL_VERSION. Uncheck to reuse existing artifacts.')
+        booleanParam(name: 'FORCE_PREBUILD', defaultValue: false, description: 'Rebuild and re-upload the test server even if one already exists for this platform and CBL version/build (passes FORCE to prebuild-test-server). Ignored when RUN_PREBUILD is unchecked.')
         string(name: 'SGW_VERSION', defaultValue: '', description: 'Sync Gateway version (leave empty for the latest GA release)')
         booleanParam(name: 'STRESS', defaultValue: false, description: 'Run only the stress tests marked min_edge_servers (tests/functional/stress), which take about a day, in place of the regular ones.')
         booleanParam(name: 'JS_REPLICATION_TESTS_ONLY', defaultValue: false, description: 'Run only the tests that replicate with the CBL-JS test server (those marked both min_edge_servers and min_test_servers). TS_TEST_FILTER still narrows them with -k.')
@@ -51,6 +52,7 @@ pipeline {
                     def (cblVersion, cblBuild) = env.CBL_FULL.tokenize('-')
                     build job: 'prebuild-test-server',
                     parameters: [
+                        booleanParam(name: 'FORCE', value: params.FORCE_PREBUILD == true),
                         string(name: 'TS_PLATFORM', value: 'js'),
                         string(name: 'CBL_VERSION', value: cblVersion),
                         string(name: 'CBL_BUILD', value: cblBuild)

@@ -15,6 +15,7 @@ pipeline {
         choice(name: 'TS_DATASET_VERSION', choices: ['4.0', '3.2'], description: 'Test server dataset version. CBL 3.x needs 3.2; CBL 4.x can use either.')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional pytest -k filter for running a subset of tests (disables result upload)')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild test servers (only for the checked platforms). Uncheck to skip prebuild entirely and reuse existing artifacts.')
+        booleanParam(name: 'FORCE_PREBUILD', defaultValue: false, description: 'Rebuild and re-upload the test server even if one already exists for this platform and CBL version/build (passes FORCE to prebuild-test-server). Ignored when RUN_PREBUILD is unchecked.')
         booleanParam(name: 'RUN_WINDOWS', defaultValue: true, description: 'Run Windows tests')
         booleanParam(name: 'RUN_MACOS',   defaultValue: true, description: 'Run macOS (Mac Catalyst) tests')
         booleanParam(name: 'RUN_IOS',     defaultValue: true, description: 'Run iOS tests')
@@ -58,6 +59,7 @@ pipeline {
                             parallelBuilds[platform] = {
                                 build job: 'prebuild-test-server',
                                 parameters: [
+                                    booleanParam(name: 'FORCE', value: params.FORCE_PREBUILD == true),
                                     string(name: 'TS_PLATFORM', value: platform),
                                     string(name: 'CBL_VERSION', value: env.CBL_PREBUILD_VERSION),
                                     string(name: 'CBL_BUILD', value: env.CBL_PREBUILD_BUILD)

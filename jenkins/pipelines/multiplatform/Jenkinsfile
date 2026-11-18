@@ -53,6 +53,7 @@ pipeline {
         choice(name: 'TS_DATASET_VERSION', choices: ['4.0', '3.2'], description: 'Test server dataset version, used by every test server. Any CBL 3.x entry needs 3.2; CBL 4.x can use either.')
         string(name: 'TS_TEST_FILTER', defaultValue: '', description: 'An optional filter for running a subset of tests')
         booleanParam(name: 'RUN_PREBUILD', defaultValue: true, description: 'Prebuild the test servers. Uncheck to skip prebuild entirely and reuse existing artifacts.')
+        booleanParam(name: 'FORCE_PREBUILD', defaultValue: false, description: 'Rebuild and re-upload the test server even if one already exists for this platform and CBL version/build (passes FORCE to prebuild-test-server). Ignored when RUN_PREBUILD is unchecked.')
     }
     options {
         ansiColor('xterm')
@@ -114,6 +115,7 @@ pipeline {
                         parallelBuilds["${platform}=${version}"] = {
                             build job: 'prebuild-test-server',
                             parameters: [
+                                booleanParam(name: 'FORCE', value: params.FORCE_PREBUILD == true),
                                 string(name: 'TS_PLATFORM', value: platform),
                                 string(name: 'CBL_VERSION', value: version),
                             ],

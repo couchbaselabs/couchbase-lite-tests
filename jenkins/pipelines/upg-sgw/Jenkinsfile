@@ -4,6 +4,7 @@ pipeline {
 // That's because we want to be able to trigger this job with different versions without having to modify the Jenkinsfile.
 // The default values in the UI will be used if no parameters are provided at build time.
 // But just for reference, these are the params that are used by the job :
+//         booleanParam(name: 'FORCE_PREBUILD', description: 'Rebuild and re-upload the test server even if one already exists for this platform and CBL version/build (passes FORCE to prebuild-test-server)')
 //         string(name: 'BRANCH', description: 'The branch of couchbase-lite-tests to run this pipeline and its tests from, eg : "main"')
 //         string(name: 'CBL_VERSION', description: 'Couchbase Lite Version to use, eg : "4"')
 //         string(name: 'SGW_VERSIONS', description: 'Sync Gateway Version to use, eg : "4.0.1 4.0.3 4.1.0"')
@@ -32,6 +33,7 @@ pipeline {
             steps {
                 build job: 'prebuild-test-server',
                 parameters: [
+                    booleanParam(name: 'FORCE', value: params.FORCE_PREBUILD == true),
                     string(name: 'TS_PLATFORM', value: 'swift_ios'),
                     string(name: 'CBL_VERSION', value: env.CBL_VERSION),
                 ],
