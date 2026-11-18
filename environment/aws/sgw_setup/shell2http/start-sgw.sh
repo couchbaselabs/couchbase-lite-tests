@@ -10,6 +10,11 @@ else
 fi
 CONFIG_FILE="${CONFIG_DIR}/${CONFIG_NAME}.json"
 
+# bootstrap-capella-pft names this variable as its audit info provider, as Capella's bootstrap does, and Sync Gateway
+# will not start unless it holds JSON. Capella sets it in the service's environment with these keys. Other configs
+# do not read it.
+export GLOBAL_AUDIT_INJECT_INFO="{\"capella_node_id\":\"$(uname -n)\",\"capella_app_service_id\":\"cbl-tests\",\"capella_tenant_id\":\"cbl-tests\"}"
+
 echo "Starting Sync Gateway with config: ${CONFIG_FILE}..."
 
 if pgrep -f "sync_gateway" >/dev/null; then
