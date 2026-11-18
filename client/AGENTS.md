@@ -57,6 +57,7 @@ client/
     │   ├── edgeserver.py         # EdgeServer REST client + EdgeServerConfig, its parsed config file
     │   ├── edgeservermanager.py  # EdgeServerManager — Edge Server state, via the shell2http sidecar
     │   ├── cluster.py            # CouchbaseCluster — SGW+CBS cluster grouping
+    │   ├── idleops.py            # Sync Gateway idle_kv_ops/idle_query_ops vs CBS commands and queries; quiet snapshots
     │   ├── error.py              # CblTestServerBadResponseError etc.
     │   ├── error_types.py
     │   ├── json_generator.py     # Test document generation
