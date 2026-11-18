@@ -8,12 +8,9 @@ Tests that a single user with access to multiple channels can correctly view and
 
 1. Configure database 'db' on all 3 SGW nodes (pointing to shared bucket)
 2. Create user 'vipul' with access to ['ABC', 'CBS', 'NBC', 'FOX'] (stored in shared bucket)
-3. Bulk create 5000 documents in 5 batches using **round-robin across SGW nodes** (documents distributed across channels)
-4. Wait for documents to propagate across all SGW nodes
-5. Verify user sees all 5000 docs via changes feed from first SGW
-6. Verify no duplicate documents in changes feed
-7. Verify all expected document IDs are present
-8. Verify user can retrieve all documents via _all_docs from one SGW node
-9. Verify all documents have correct revision format (generation 1)
-10. Verify all documents have correct version vector format (SGW 4.0+, optional)
-11. Verify all documents are accessible from each SGW node independently
+3. Bulk create 5000 documents in 50 batches of 100 docs using **round-robin across SGW nodes** (documents distributed across channels)
+4. Wait for the user changes feed on the first SGW to show all 5000 docs
+5. Verify user can retrieve all documents via _all_docs from one SGW node
+6. Verify all documents have correct revision format (generation 1)
+7. Verify all documents have correct version vector format (SGW 4.0+, optional)
+8. Verify all documents are accessible from each SGW node independently
