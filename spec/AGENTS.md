@@ -38,6 +38,7 @@ spec/
 │   │   └── 012-replication-xdcr.md
 │   │
 │   └── QE/                             # Test specs matching the test filename
+│       ├── test_db_config_concurrency.md
 │       ├── test_db_gone.md
 │       ├── test_delta_sync.md
 │       ├── test_high_availability.md
