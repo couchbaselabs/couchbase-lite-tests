@@ -5,6 +5,9 @@
 // and 4.x. Source:
 // https://docs.couchbase.com/sync-gateway/current/product-notes/compatibility.html
 //
+// Sync Gateway <-> Couchbase Server is checked by sgw_cbs_incompatibility() in
+// setup_test.py, where the Couchbase Server version is resolved.
+//
 // Load it from a Jenkinsfile inside a node/agent context, then call the method on
 // the returned object:
 //

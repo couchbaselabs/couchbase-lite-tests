@@ -45,6 +45,9 @@ class EdgeServerManager:
         self.__sidecar = Shell2HttpClient("Edge Server", info.hostname, error=CblEdgeServerBadResponseError)
         self.__config_file = info.config_path
         self.__clients: list[EdgeServer] = []
+        # Whether the host may differ from its provisioned state.  It starts out True,
+        # because a previous run may have been interrupted before cleaning up.
+        self.__changed = True
 
     def __str__(self) -> str:
         return self.__info.hostname
@@ -52,6 +55,20 @@ class EdgeServerManager:
     def __declares_users(self) -> bool:
         """Whether the running config declares users.  One that does not rejects any credentials."""
         return EdgeServerConfig.load(self.__config_file).declares_users
+
+    @property
+    def changed_since_reset(self) -> bool:
+        """
+        Whether anything may have changed the host since :func:`reset_to_initial_state`
+        last finished.  True until the first reset.
+
+        Every sidecar call but log collection counts, e.g. a restart, a new config or a
+        firewall rule.  So does handing out a client, whatever is done with it: a test
+        that takes one is expected to write to the Edge Server, by adding documents or
+        starting a replication, and requests are not tracked to tell.  A test that only
+        reads is unlikely to exist, and one that does pays for a reset it did not need.
+        """
+        return self.__changed
 
     @property
     def admin_user(self) -> str:
@@ -67,6 +84,14 @@ class EdgeServerManager:
         """
         A client that authenticates as the admin user, or sends no credentials if the running
         config declares no users.  Closed when the manager is.
+        """
+        self.__changed = True
+        return self.__admin_client()
+
+    def __admin_client(self) -> EdgeServer:
+        """
+        :func:`get_admin_client` for the manager's own reads, which change nothing and so
+        leave :attr:`changed_since_reset` alone.
         """
         headers = (
             get_basic_auth_headers(self.__info.admin_user, self.__info.admin_password)
@@ -90,12 +115,17 @@ class EdgeServerManager:
         path: str,
         payload: JSONDictionary | None = None,
         timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT,
+        changes_state: bool = True,
     ) -> str:
         """Call a shell2http endpoint on the Edge Server host, raising unless the script succeeded.
 
         :param timeout: Total HTTP timeout in seconds.  See :meth:`Shell2HttpClient.call`.
+        :param changes_state: False for an endpoint that only reads the host, such as log
+            collection, which leaves :attr:`changed_since_reset` alone
         :return: The response body, which every endpoint but this one ignores
         """
+        if changes_state:
+            self.__changed = True
         return await self.__sidecar.call(
             method,
             path,
@@ -133,7 +163,7 @@ class EdgeServerManager:
         if expected == 0:
             return
 
-        client = self.get_admin_client()
+        client = self.__admin_client()
 
         async def _poll() -> None:
             listed = await client.all_replication_status()
@@ -214,6 +244,7 @@ class EdgeServerManager:
                 f"Edge Server [{self.__info.hostname}] is running a config that declares no users, "
                 "so it would reject any user client"
             )
+        self.__changed = True
         client = EdgeServer(self.__info.hostname, self.__config_file, headers)
         try:
             yield client
@@ -223,6 +254,7 @@ class EdgeServerManager:
     @asynccontextmanager
     async def get_anonymous_client(self) -> AsyncIterator[EdgeServer]:
         """Yields a client that sends no credentials, closing it on exit."""
+        self.__changed = True
         client = EdgeServer(self.__info.hostname, config_file=self.__config_file)
         try:
             yield client
@@ -276,14 +308,16 @@ class EdgeServerManager:
             timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
             safe_host = self.__info.hostname.replace(".", "-").replace(":", "-")
             filename = f"es-collect-{safe_host}-{timestamp}.tar.gz"
-            response = await self._call_sidecar("post", "/collect-logs", JSONDictionary({"filename": filename}))
+            response = await self._call_sidecar(
+                "post", "/collect-logs", JSONDictionary({"filename": filename}), changes_state=False
+            )
             # tar reports a file that changed as it was read, which still leaves a usable
             # archive.  A body that is not the JSON the script emits is not worth losing it over.
             with suppress(json.JSONDecodeError, AttributeError):
                 if warnings := json.loads(response).get("warnings"):
                     cbl_warning(f"Edge Server [{self.__info.hostname}] archived its logs with warnings: {warnings}")
 
-            client = self.get_admin_client()
+            client = self.__admin_client()
             return await client.caddy.download(f"collect/{filename}", output_dir / filename)
 
     async def set_firewall_rules(self, allow: list[str] | None = None, deny: list[str] | None = None) -> None:
@@ -317,3 +351,4 @@ class EdgeServerManager:
             await self.kill_server()
             await self._call_sidecar("post", "/reset-all-dbs")
             await self.__start_process(self.__info.config_path)
+            self.__changed = False

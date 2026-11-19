@@ -1,0 +1,93 @@
+// Daily trigger: starts functional-e2e-sgw (jenkins/pipelines/functional/sgw) for the newest
+// build, prereleases included, of every non-EOL Sync Gateway train that Alembic's
+// latest_tested API does not already list as tested. The job picks the latest CBL C release
+// of each Sync Gateway's major version as the client.
+
+def SGW_PRODUCT = "sync-gateway"
+
+pipeline {
+    agent { label 'macos-host || linux-host' }
+    environment {
+        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+        timeout(time: 15, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    triggers {
+        cron('''TZ=Asia/Kolkata
+0 4 * * *''')
+    }
+    stages {
+        stage('Resolve and Trigger') {
+            steps {
+                script {
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
+                    def triggers = load 'jenkins/pipelines/shared/triggerRecord.groovy'
+                    def datasets = load 'jenkins/pipelines/shared/cblDatasetCompatibility.groovy'
+
+                    def trains = builds.fetchTrains(SGW_PRODUCT)
+                    if (!trains) { error "No SGW trains returned from ProGet get_trains" }
+                    echo "SGW trains to process: ${trains}"
+
+                    // Dedup on the SGW build only; the CBL client is not part of the key.
+                    def triggered = []
+                    def skipped = []
+                    def failed = []
+
+                    for (train in trains) {
+                        def sgw
+                        try {
+                            sgw = builds.resolveVersionBuild(proget, SGW_PRODUCT, train, 'SGW_VERSION', true)
+                        } catch (Exception e) {
+                            echo "WARN: Could not resolve SGW train ${train}: ${e}"
+                            failed << train
+                            continue
+                        }
+                        if (sgw == null) {
+                            // No published build yet (new train) — normal, not a failure.
+                            echo "SKIP: SGW train ${train} — no published build yet"
+                            skipped << "${train} (no build)"
+                            continue
+                        }
+                        def sgwFull = "${sgw.version}-${sgw.build}"
+
+                        if (triggers.alreadyTriggered(SGW_PRODUCT, sgw.version, sgw.build)) {
+                            echo "SKIP: SGW ${sgwFull} (already triggered)"
+                            skipped << sgwFull
+                            continue
+                        }
+
+                        // The client is the latest CBL C release of the SGW's major version,
+                        // so the dataset is the SGW's major version's too.
+                        def dataset = datasets.datasetFor(sgwFull)
+                        echo "Triggering 'functional-e2e-sgw' for SGW ${sgwFull} (dataset ${dataset})"
+                        build job: 'functional-e2e-sgw', parameters: [
+                            string(name: "SGW_VERSION", value: sgwFull),
+                            string(name: "CBL_VERSION", value: ''),
+                            string(name: "TS_DATASET_VERSION", value: dataset)
+                        ], wait: false
+
+                        triggered << sgwFull
+                        if (!triggers.record(SGW_PRODUCT, sgw.version, sgw.build)) {
+                            failed << "${sgwFull} (not recorded)"
+                        }
+                    }
+
+                    currentBuild.displayName = "SGW ${triggered ? triggered.join(', ') : 'none'}  (#${currentBuild.number})"
+                    echo "Triggered: ${triggered}"
+                    echo "Skipped:   ${skipped}"
+                    echo "Failed:    ${failed}"
+
+                    if (failed) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "WARNING: ${failed.size()} problem(s): ${failed}"
+                    }
+                }
+            }
+        }
+    }
+}

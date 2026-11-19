@@ -1,0 +1,12 @@
+{
+    "$schema": "../../../../../environment/aws/topology_setup/topology_schema.json",
+    "test_servers": [
+        {
+            "platform": "c_linux_x86_64",
+            "cbl_version": "{{version}}",
+            "location": "localhost",
+            "download": true
+        }
+    ],
+    "include": "../../cbl_topology_backend.json"
+}

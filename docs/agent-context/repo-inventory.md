@@ -14,7 +14,7 @@
 
 - `client/src/cbltest/`: request/response APIs, plugin fixtures, v1/v2 protocol support
 - `client/smoke_tests/`: smoke validation entry points
-- `tests/dev_e2e/`, `tests/QE/`: system test suites and `conftest.py` fixtures
+- `tests/functional/`, `tests/multiplatform/`, `tests/upgrade_sgw/`: test suites and `conftest.py` fixtures; long-running stress tests in `functional/stress/` and `multiplatform/stress/`
 - `environment/aws/`: Terraform + Python orchestrator (`start_backend.py`, `stop_backend.py`)
 - `environment/local/`: local test server + Sync Gateway runner (no Docker/AWS)
 - `jenkins/pipelines/`: shared and platform-specific setup/test pipeline code
@@ -33,8 +33,8 @@
 
 - Framework unit-ish tests: `uv run -- pytest --config client/tests/empty_config.json client/tests`
 - Smoke tests: `cd client/smoke_tests && uv run pytest -x -v --config config_in.json`
-- Dev E2E: `cd tests/dev_e2e && uv run pytest -x -v --config config.json`
-- QE: `cd tests/QE && uv run pytest -x -v --config config.json`
+- Functional: `cd tests/functional && uv run pytest -x -v --config config.json`
+- Stress: `cd tests/functional && uv run pytest -x -v --config config.json --stress` (or `tests/multiplatform`)
 
 ## Runtime Boundaries
 

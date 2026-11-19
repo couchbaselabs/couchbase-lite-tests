@@ -1,6 +1,6 @@
 # Test Datasets — `dataset/`
 
-Binary and JSON fixtures consumed by `tests/dev_e2e/`, `tests/QE/`, and `client/smoke_tests/` via the `dataset_path` fixture. Couchbase Server backup archives (`dataset/couchbase-server/*.zip`) and Sync Gateway data/config pairs (`dataset/sg/*-sg.json` + `*-sg-config.json`) are tracked via Git LFS.
+Binary and JSON fixtures consumed by `tests/functional/`, `tests/multiplatform/`, `tests/upgrade_sgw/`, and `client/smoke_tests/` via the `dataset_path` fixture. Couchbase Server backup archives (`dataset/couchbase-server/*.zip`) and Sync Gateway data/config pairs (`dataset/sg/*-sg.json` + `*-sg-config.json`) are tracked via Git LFS.
 
 ## `upgrade` dataset (`dataset/couchbase-server/upgrade.zip`)
 
@@ -27,7 +27,7 @@ cbbackupmgr restore -a <archive> -c <cluster> -r upgrade -u Administrator -p pas
   --filter-keys '^_sync:rev:' --replace-ttl expired --replace-ttl-with 0 --force-updates
 ```
 
-`_sync:rev:*` docs are old-revision backup bodies that SGW needs to compute a delta against a legacy ancestor revision (`tests/QE/test_replication_upgrade_delta_sync.py`). Their TTL is normally already expired at restore time, so the second pass must run immediately — once Couchbase Server's expiry pager tombstones an expired doc (can happen within seconds), the body is gone for good. `--force-updates` is required, or conflict resolution sees the doc as unchanged from pass one and skips the rewrite. **Don't** apply `--replace-ttl` to the first pass or to the whole bucket — any other doc's TTL should be left alone (or actually expire), not resurrected.
+`_sync:rev:*` docs are old-revision backup bodies that SGW needs to compute a delta against a legacy ancestor revision (`tests/functional/test_replication_upgrade_delta_sync.py`). Their TTL is normally already expired at restore time, so the second pass must run immediately — once Couchbase Server's expiry pager tombstones an expired doc (can happen within seconds), the body is gone for good. `--force-updates` is required, or conflict resolution sees the doc as unchanged from pass one and skips the rewrite. **Don't** apply `--replace-ttl` to the first pass or to the whole bucket — any other doc's TTL should be left alone (or actually expire), not resurrected.
 
 #### Step 2: delete `_sync:cfg*` and `_sync:dcp_ck*` docs
 

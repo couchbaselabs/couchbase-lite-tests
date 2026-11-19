@@ -84,7 +84,11 @@ def stub_sidecar(monkeypatch: pytest.MonkeyPatch, manager: EdgeServerManager) ->
     calls: list[SidecarCall] = []
 
     async def _call_sidecar(
-        method: str, path: str, payload: JSONSerializable | None = None, timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT
+        method: str,
+        path: str,
+        payload: JSONSerializable | None = None,
+        timeout: float = DEFAULT_SHELL2HTTP_TIMEOUT,
+        changes_state: bool = True,
     ) -> str:
         calls.append((method, path, None if payload is None else payload.to_json()))
         return ""
@@ -211,6 +215,56 @@ async def test_no_edge_servers_is_a_no_op() -> None:
     await reset_all_edge_servers([])
 
 
+def stub_shell2http(monkeypatch: pytest.MonkeyPatch, manager: EdgeServerManager) -> list[str]:
+    """
+    Record the paths a manager calls on its sidecar, below `_call_sidecar`, so that its
+    bookkeeping of what changed the host still runs.
+    """
+    paths: list[str] = []
+
+    async def call(method: str, path: str, **_: Any) -> str:
+        paths.append(path)
+        return ""
+
+    monkeypatch.setattr(getattr(manager, "_EdgeServerManager__sidecar"), "call", call)  # noqa: B009
+    return paths
+
+
+@pytest.mark.asyncio
+async def test_changed_since_reset_follows_sidecar_calls(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async with managers_for([write_config(tmp_path, "initial.json", 59840)]) as managers:
+        manager = managers[0]
+        stub_shell2http(monkeypatch, manager)
+        assert manager.changed_since_reset, "A host a previous run may have left dirty starts out changed"
+
+        await manager.reset_to_initial_state()
+        assert not manager.changed_since_reset
+
+        await manager._call_sidecar("post", "/collect-logs", changes_state=False)
+        assert not manager.changed_since_reset, "Reading the host must not count as changing it"
+
+        await manager.configure_dataset(config_file=write_config(tmp_path, "test.json", 60000))
+        assert manager.changed_since_reset
+
+
+@pytest.mark.asyncio
+async def test_reset_all_only_changed_skips_untouched_edge_servers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configs = [write_config(tmp_path, f"initial{index}.json", 59840 + index) for index in range(2)]
+    async with managers_for(configs) as managers:
+        paths = [stub_shell2http(monkeypatch, manager) for manager in managers]
+        await reset_all_edge_servers(managers)
+        await managers[1].set_firewall_rules(deny=["10.0.0.1"])
+        for host_paths in paths:
+            host_paths.clear()
+
+        await reset_all_edge_servers(managers, only_changed=True)
+
+        assert paths[0] == [], "An Edge Server nothing changed must not be restarted"
+        assert "/reset-all-dbs" in paths[1]
+
+
 class FakeResponse:
     """The little of an aiohttp response that `EdgeServer._send_request` reads."""
 
@@ -268,6 +322,21 @@ async def fake_session_manager(config_file: str) -> AsyncIterator[EdgeServerMana
             yield manager
         finally:
             await manager.close()
+
+
+@pytest.mark.asyncio
+async def test_changed_since_reset_follows_clients_handed_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    async with fake_session_manager(write_config(tmp_path, "initial.json", 59840)) as manager:
+        stub_shell2http(monkeypatch, manager)
+        await manager.reset_to_initial_state()
+        assert not manager.changed_since_reset, "The client a reset probes with must not count"
+
+        manager.get_admin_client()
+        assert manager.changed_since_reset, "A test may start a replication with it, which outlives the test"
+
+        await manager.reset_to_initial_state()
+        async with manager.get_anonymous_client():
+            assert manager.changed_since_reset
 
 
 @pytest.mark.asyncio

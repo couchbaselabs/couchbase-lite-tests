@@ -144,19 +144,27 @@ def _worse(a: str, b: str) -> str:
     return a if _OUTCOME_RANK[a] >= _OUTCOME_RANK[b] else b
 
 
+def parse_cbl_version(version: str) -> tuple[str, int | None]:
+    """Split a CBL library version into ``(x.y.z, build)``. Test servers report ``3.2.0-b0136`` or ``3.2.0-136``, or
+    a bare ``3.2.0`` for build 0 (C, iOS). The build is None when it is not a number.
+    """
+    base, _, build = version.partition("-")
+    try:
+        return base, int(build.lstrip("b")) if build else 0
+    except ValueError:
+        return base, None
+
+
 def format_cbl_version(version: str | None) -> str:
     """Return a CBL library version (e.g. ``3.2.0-b0136``) as ``"x.y.z-build"`` (``3.2.0-136``), like ``sgwVersion``.
-    ``"n/a"`` when no test server supplied a version; an unparseable build leaves the raw string.
+    ``"n/a"`` when no test server supplied a version; one with no build, or an unparseable one, stays the raw string.
     """
     if not version or version == "n/a":
         return "n/a"
-    components = version.split("-")
-    if len(components) < 2:
+    base, build = parse_cbl_version(version)
+    if build is None or "-" not in version:
         return version
-    try:
-        return f"{components[0]}-{int(components[1].lstrip('b'))}"
-    except ValueError:
-        return version
+    return f"{base}-{build}"
 
 
 def resolve_job_url() -> str:
@@ -258,8 +266,6 @@ class GreenboardUploader:
         self.__fail_count = 0
         self.__pass_count = 0
         self.__overall_fail = False
-        self.__has_sgw_marker = False
-        self.__has_es_marker = False
         self.__failures: list[dict[str, Any]] = []
         self.__tests: dict[str, str] = {}
 
@@ -272,13 +278,6 @@ class GreenboardUploader:
             if report.failed:
                 self.__overall_fail = True
             return
-
-        # Above the short-circuit: tests that still run after the latch must
-        # set this, or an SGW run gets filed under the CBL platform.
-        if item.get_closest_marker("sgw"):
-            self.__has_sgw_marker = True
-        if item.get_closest_marker("min_edge_servers"):
-            self.__has_es_marker = True
 
         if self.__overall_fail:
             return
@@ -310,18 +309,6 @@ class GreenboardUploader:
         else:
             return  # a passing setup/teardown says nothing: the call report decides
         self.__tests[report.nodeid] = _worse(outcome, self.__tests.get(report.nodeid, PASS))
-
-    def has_sgw_marker(self) -> bool:
-        """
-        Returns True if any test in the session has @pytest.mark.sgw marker
-        """
-        return self.__has_sgw_marker
-
-    def has_es_marker(self) -> bool:
-        """
-        Returns True if any test in the session has @pytest.mark.min_edge_servers
-        """
-        return self.__has_es_marker
 
     def upload(
         self,
@@ -432,18 +419,14 @@ class GreenboardUploader:
             parsed_version = es_version.version if es_version.version and es_version.version != "unknown" else "0.0.0"
             parsed_build = es_version.build_number
         else:
-            version_components = (version or "").split("-")
-
-            if len(version_components) > 0 and version_components[0]:
-                parsed_version = version_components[0]
-
-            if len(version_components) > 1:
-                try:
-                    # Handles build numbers like 'b1234' or just '1234'
-                    parsed_build = int(version_components[1].lstrip("b"))
-                except ValueError:
-                    # If the part after '-' is not a number, build remains 0
-                    cbl_warning(f"Could not parse build number from '{version}'")
+            base, build = parse_cbl_version(version or "")
+            if base:
+                parsed_version = base
+            if build is None:
+                # If the part after '-' is not a number, build remains 0
+                cbl_warning(f"Could not parse build number from '{version}'")
+            else:
+                parsed_build = build
 
         self._upload_document(
             RunResult(

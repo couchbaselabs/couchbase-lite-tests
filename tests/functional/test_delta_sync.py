@@ -1,0 +1,814 @@
+import asyncio
+import json
+from pathlib import Path
+
+import pytest
+from cbltest import CBLPyTest
+from cbltest.api.cbltestclass import CBLTestClass
+from cbltest.api.database_types import DocumentEntry
+from cbltest.api.error import CblSyncGatewayBadResponseError
+from cbltest.api.replicator import Replicator
+from cbltest.api.replicator_types import (
+    ReplicatorActivityLevel,
+    ReplicatorBasicAuthenticator,
+    ReplicatorCollectionEntry,
+    ReplicatorDocumentFlags,
+    ReplicatorType,
+    WaitForDocumentEventEntry,
+)
+from cbltest.api.syncgateway import DocumentUpdateEntry, SyncGateway, get_basic_auth_headers
+from cbltest.api.syncgatewaystats import StatNotPresentError
+from cbltest.api.test_functions import compare_local_and_remote
+from cbltest.api.testserver import CouchbaseLiteFeature
+
+
+async def _deltas_sent(sg: SyncGateway, db_name: str) -> int:
+    return (await sg.get_db_stats(db_name)).delta_sync.deltas_sent
+
+
+async def _deltas_sent_or_zero(sg: SyncGateway, db_name: str) -> int:
+    # SGW publishes no delta_sync stats for a database with delta sync disabled,
+    # and such a database cannot send deltas.
+    try:
+        return await _deltas_sent(sg, db_name)
+    except StatNotPresentError:
+        return 0
+
+
+@pytest.mark.min_test_servers(1)
+@pytest.mark.min_sync_gateways(1)
+class TestDeltaSync(CBLTestClass):
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_replication(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        await compare_local_and_remote(
+            db,
+            sync_gateway,
+            ReplicatorType.PULL,
+            "travel",
+            ["travel.hotels"],
+        )
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+        )
+
+        self.mark_test_step("Record the delta sync stats before update")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+        original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
+
+        self.mark_test_step("""
+            Update existing document in SGW:
+                * Modify hotel_400 with new name to test delta sync
+        """)
+        updates = [
+            DocumentUpdateEntry(
+                "hotel_400",
+                original_doc.revid,
+                original_doc.body | {"name": "Updated Hotel"},
+            )
+        ]
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
+
+        self.mark_test_step("Start the same replicator again to pull the update")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_400",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Verify SGW sent the update as a small delta")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+        read_bytes_after = stats.database.doc_reads_bytes_blip
+        delta_bytes = read_bytes_after - read_bytes_before
+        assert delta_bytes < 0.1 * original_doc_size, (
+            f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
+        )
+
+        self.mark_test_step("Verify the document was updated correctly in CBL")
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
+        assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
+        assert updated_cbl_doc.body.get("name") == "Updated Hotel", (
+            f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
+        )
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_nested_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        await compare_local_and_remote(
+            db,
+            sync_gateway,
+            ReplicatorType.PULL,
+            "travel",
+            ["travel.hotels"],
+        )
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+        )
+
+        self.mark_test_step("Record the delta sync stats before update")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+        original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update nested fields in existing document
+        """)
+        updates = [
+            DocumentUpdateEntry(
+                "hotel_400",
+                original_doc.revid,
+                original_doc.body | {"name": "SGW", "nested": {"name": "I am a nested field"}},
+            )
+        ]
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
+
+        self.mark_test_step("Start the same replicator again:")
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_400",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify the document was updated correctly in CBL")
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
+        assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
+        assert updated_cbl_doc.body.get("name") == "SGW", (
+            f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
+        )
+        nested_data = updated_cbl_doc.body.get("nested")
+        assert nested_data is not None and nested_data.get("name") == "I am a nested field", (
+            f"Expected updated nested field, got: {nested_data.get('name') if nested_data else None}"
+        )
+
+        self.mark_test_step("Verify SGW sent the update as a small delta")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+        read_bytes_after = stats.database.doc_reads_bytes_blip
+        delta_bytes = read_bytes_after - read_bytes_before
+        assert delta_bytes < 0.1 * original_doc_size, (
+            f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
+        )
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_utf8_strings(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Check that all docs are replicated correctly.")
+        await compare_local_and_remote(
+            db,
+            sync_gateway,
+            ReplicatorType.PULL,
+            "travel",
+            ["travel.hotels"],
+        )
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+        )
+
+        self.mark_test_step("Record the delta sync stats before update")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+        original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Add UTF-8 content (Chinese, Japanese characters, emoji-rich descriptions)
+        """)
+        utf8_body = "東京🚀🌏Привет世界مرحبا"
+        updates = [
+            DocumentUpdateEntry(
+                "hotel_400",
+                original_doc.revid,
+                original_doc.body | {"utf8": utf8_body},
+            )
+        ]
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_400",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify the document was updated correctly in CBL")
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
+        assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
+        assert updated_cbl_doc.body.get("utf8") == utf8_body, (
+            f"Expected updated UTF-8 content, got: {updated_cbl_doc.body.get('utf8')}"
+        )
+
+        self.mark_test_step("Verify SGW sent the update as a small delta")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+        read_bytes_after = stats.database.doc_reads_bytes_blip
+        delta_bytes = read_bytes_after - read_bytes_before
+        assert delta_bytes < 0.1 * original_doc_size, (
+            f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
+        )
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_enabled_disabled(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify docs are replicated correctly")
+        await compare_local_and_remote(
+            db,
+            sync_gateway,
+            ReplicatorType.PULL,
+            "travel",
+            ["travel.hotels"],
+        )
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])}"
+        )
+
+        self.mark_test_step("Record the delta sync stats before update")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent_before = stats.delta_sync.deltas_sent
+        read_bytes_before = stats.database.doc_reads_bytes_blip
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+        original_doc_size = len(json.dumps(original_doc.body).encode("utf-8"))
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Modify only the key `name`: `SGW`.
+        """)
+        updates = [DocumentUpdateEntry("hotel_400", original_doc.revid, original_doc.body | {"name": "SGW"})]
+        await sync_gateway.update_documents("travel", updates, "travel", "hotels")
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_400",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify the document was updated correctly in CBL")
+        updated_cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
+        assert updated_cbl_doc is not None, "Hotel_400 should exist in CBL"
+        assert updated_cbl_doc.body.get("name") == "SGW", (
+            f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
+        )
+
+        self.mark_test_step("Verify SGW sent the update as a small delta")
+        stats = await sync_gateway.get_db_stats("travel")
+        deltas_sent = stats.delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+        read_bytes_after = stats.database.doc_reads_bytes_blip
+        delta_bytes = read_bytes_after - read_bytes_before
+        assert delta_bytes < 0.1 * original_doc_size, (
+            f"Expected a delta under 10% of the doc size, got {delta_bytes} bytes (doc size: {original_doc_size})"
+        )
+
+        self.mark_test_step("Reset SG and load `posts` dataset with delta sync disabled")
+        await cloud.configure_dataset(dataset_path, "posts")
+
+        self.mark_test_step("Reset local database, and load `posts` dataset without delta sync.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="posts")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/posts`
+                * collections: `_default.posts`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("posts"),
+            collections=[ReplicatorCollectionEntry(["_default.posts"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify docs are replicated correctly")
+        await compare_local_and_remote(
+            db,
+            sync_gateway,
+            ReplicatorType.PULL,
+            "posts",
+            ["_default.posts"],
+        )
+
+        self.mark_test_step("Record the number of deltas SGW has sent")
+        deltas_sent_before = await _deltas_sent_or_zero(sync_gateway, "posts")
+
+        self.mark_test_step("Get the existing document")
+        original_doc = await sync_gateway.get_document("posts", "post_1", collection="posts")
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Modify the `name` field of the doc (small change).
+        """)
+        await sync_gateway.update_documents(
+            "posts",
+            [
+                DocumentUpdateEntry(
+                    "post_1",
+                    original_doc.revid,
+                    original_doc.body | {"channels": ["group1"], "name": "SGW"},
+                )
+            ],
+            collection="posts",
+        )
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default.posts",
+                    "post_1",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify the document was updated correctly in CBL")
+        updated_cbl_doc = await db.get_document(DocumentEntry("_default.posts", "post_1"))
+        assert updated_cbl_doc is not None, "post_1 should exist in CBL"
+        assert updated_cbl_doc.body.get("name") == "SGW", (
+            f"Expected updated name, got: {updated_cbl_doc.body.get('name')}"
+        )
+
+        self.mark_test_step("Verify SGW sent the full document, not a delta (delta sync is disabled).")
+        deltas_sent = await _deltas_sent_or_zero(sync_gateway, "posts") - deltas_sent_before
+        assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_within_expiry(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("""
+            Reset SG and load `short_expiry` dataset with delta sync enabled.
+                * has a `old_rev_expiry_seconds` of 10 seconds.
+                * has a rev_cache size of 1.
+        """)
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "short_expiry", ["delta_sync"])
+
+        self.mark_test_step("Verify SGW config has correct revision expiry settings")
+        db_config = await sync_gateway.get_database_config("short_expiry")
+
+        assert db_config.old_rev_expiry_seconds == 10, (
+            f"Expected old_rev_expiry_seconds to be 10, got {db_config.old_rev_expiry_seconds}"
+        )
+        delta_sync_config = db_config.delta_sync
+        assert delta_sync_config is not None
+        assert delta_sync_config.enabled is True, f"Expected delta sync to be enabled, got {delta_sync_config.enabled}"
+        assert delta_sync_config.rev_max_age_seconds == 10, (
+            f"Expected rev_max_age_seconds to be 10, got {delta_sync_config.rev_max_age_seconds}"
+        )
+
+        self.mark_test_step("Reset local database.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"])
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/short_expiry`
+                * collections: `_default._default`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("short_expiry"),
+            collections=[ReplicatorCollectionEntry(["_default._default"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "_default._default",
+                    "doc1",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Record the number of deltas SGW has sent.")
+        deltas_sent_before = await _deltas_sent(sync_gateway, "short_expiry")
+
+        self.mark_test_step("Get the current document state and revision before update.")
+        sgw_doc_before_update = await sync_gateway.get_document("short_expiry", "doc1")
+        assert sgw_doc_before_update.body.get("type") == "test", "Expected doc to have `type` as `test`"
+        old_revision = sgw_doc_before_update.revision
+        assert old_revision is not None, "Document should have a revision"
+
+        async with sync_gateway.get_user_client(get_basic_auth_headers("user1", "pass")) as sg_user:
+            self.mark_test_step("Verify old revision body is accessible before expiry through public API.")
+            old_rev_doc = await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert old_rev_doc is not None, "Should be able to fetch old revision before expiry"
+            assert old_rev_doc.body.get("type") == "test", "Old revision should have correct content"
+
+            self.mark_test_step("""
+                Update docs in SGW:
+                    * Modify content in document "doc1": `"name": "SGW"` (small change)
+            """)
+            await sync_gateway.update_documents(
+                "short_expiry",
+                [
+                    DocumentUpdateEntry(
+                        "doc1",
+                        old_revision,
+                        sgw_doc_before_update.body | {"name": "SGW"},
+                    )
+                ],
+            )
+
+            self.mark_test_step("Wait for 12 seconds to ensure delta rev expires.")
+            await asyncio.sleep(12)
+
+            self.mark_test_step("Verify old revision is not accessible through public API.")
+            with pytest.raises(CblSyncGatewayBadResponseError) as exc_info:
+                await sg_user.get_document("short_expiry", "doc1", revision=old_revision)
+            assert exc_info.value.code == 404, f"Expected 404 for the expired revision, got {exc_info.value.code}"
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("""
+            Verify:
+                * SGW sent the full document, not a delta, because the old revision expired
+                * CBL has the updated document
+        """)
+        deltas_sent = await _deltas_sent(sync_gateway, "short_expiry") - deltas_sent_before
+        assert deltas_sent == 0, f"Expected SGW to send the full body, got {deltas_sent} deltas"
+        cbl_doc = await db.get_document(DocumentEntry("_default._default", "doc1"))
+        assert cbl_doc is not None, "Document should exist in CBL"
+        assert cbl_doc.body.get("name") == "SGW", f"Expected updated name, got: {cbl_doc.body.get('name')}"
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_with_no_deltas(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Record the delta sync stats before update")
+        deltas_sent_before = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent
+
+        self.mark_test_step("Verify docs are replicated correctly.")
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+        )
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update the same hotel document with identical content (no real change)
+        """)
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+        await sync_gateway.update_documents(
+            "travel",
+            [DocumentUpdateEntry("hotel_400", original_doc.revid, original_doc.body)],
+            "travel",
+            "hotels",
+        )
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify SGW sent the update as a delta")
+        deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+
+        await cblpytest.test_servers[0].cleanup()
+
+    @pytest.mark.asyncio(loop_scope="session")
+    async def test_delta_sync_larger_than_doc(self, cblpytest: CBLPyTest, dataset_path: Path) -> None:
+        await self.skip_if_not_supports(cblpytest.test_servers[0], CouchbaseLiteFeature.DELTA_SYNC)
+
+        self.mark_test_step("Reset SG and load `travel` dataset with delta sync enabled.")
+        cloud = cblpytest.clusters[0]
+        sync_gateway = cloud.sync_gateways[0]
+        await cloud.configure_dataset(dataset_path, "travel", ["delta_sync"])
+
+        self.mark_test_step("Reset local database, and load `travel` dataset.")
+        dbs = await cblpytest.test_servers[0].create_and_reset_db(["db1"], dataset="travel")
+        db = dbs[0]
+
+        self.mark_test_step("""
+            Start a replicator:
+                * endpoint: `/travel`
+                * collections: `travel.hotels`
+                * type: pull
+                * continuous: false
+                * credentials: user1/pass
+        """)
+        replicator = Replicator(
+            db,
+            sync_gateway.replication_url("travel"),
+            collections=[ReplicatorCollectionEntry(["travel.hotels"])],
+            replicator_type=ReplicatorType.PULL,
+            authenticator=ReplicatorBasicAuthenticator("user1", "pass"),
+            pinned_server_cert=sync_gateway.tls_cert(),
+            enable_document_listener=True,
+        )
+        await replicator.start()
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify docs are replicated correctly")
+        lite_all_docs = await db.get_all_documents("travel.hotels")
+        assert len(lite_all_docs["travel.hotels"]) == 700, (
+            f"Incorrect number of initial documents replicated (expected 700; got {len(lite_all_docs['travel.hotels'])})"
+        )
+        original_doc = await sync_gateway.get_document("travel", "hotel_400", "travel", "hotels")
+
+        self.mark_test_step("Record the delta sync stats before update")
+        deltas_sent_before = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent
+
+        self.mark_test_step("""
+            Update docs in SGW:
+                * Update the same hotel document with much larger content (>2x original size)
+        """)
+        large_doc_body = "X" * 2_000_000
+        await sync_gateway.update_documents(
+            "travel",
+            [DocumentUpdateEntry("hotel_400", original_doc.revid, {"name": large_doc_body})],
+            "travel",
+            "hotels",
+        )
+
+        self.mark_test_step("Start the same replicator again.")
+        await replicator.start()
+        events = await replicator.wait_for_doc_events(
+            {
+                WaitForDocumentEventEntry(
+                    "travel.hotels",
+                    "hotel_400",
+                    ReplicatorType.PULL,
+                    ReplicatorDocumentFlags.NONE,
+                )
+            }
+        )
+        assert events, "Expected documents to be processed"
+
+        self.mark_test_step("Wait until the replicator stops.")
+        await replicator.wait_for(ReplicatorActivityLevel.STOPPED)
+
+        self.mark_test_step("Verify SGW sent the update as a delta")
+        deltas_sent = (await sync_gateway.get_db_stats("travel")).delta_sync.deltas_sent - deltas_sent_before
+        assert deltas_sent == 1, f"Expected SGW to send 1 delta, got {deltas_sent}"
+
+        self.mark_test_step("Verify document is replicated correctly.")
+        cbl_doc = await db.get_document(DocumentEntry("travel.hotels", "hotel_400"))
+        assert cbl_doc is not None, "Document should exist in CBL"
+        assert cbl_doc.body.get("name") == large_doc_body, "Expected doc to have same content"
+
+        await cblpytest.test_servers[0].cleanup()

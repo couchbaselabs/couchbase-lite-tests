@@ -13,6 +13,8 @@ from .jsonhelper import (
     _get_typed_nonnull,
 )
 
+_DEFAULT_ES_CONFIG: Final[Path] = Path("environment/aws/es_setup/config/config.json")
+
 
 class TestServerInfo:
     """The parsed Test Server information from the config file"""
@@ -160,22 +162,31 @@ class EdgeServerInfo:
     def config_path(self) -> str:
         return self.__config_path
 
-    def _get_repo_root(self) -> Path:
-        repo_root = next(
-            p
-            for p in (Path(__file__).resolve(), *Path(__file__).resolve().parents)
-            if "-lite-tests" in p.name or "-edge-server-pipeline" in p.name
+    @staticmethod
+    def _default_config_path() -> str:
+        """
+        The provisioned Edge Server config: ``environment/aws/es_setup/config/config.json`` in the checkout this
+        package runs from. Found by looking for that file, since the checkout's folder name varies (Jenkins names
+        its workspace after the job).
+        """
+        here = Path(__file__).resolve()
+        for directory in here.parents:
+            candidate = directory / _DEFAULT_ES_CONFIG
+            if candidate.is_file():
+                return str(candidate)
+        raise ValueError(
+            f"Edge Server entry has no '{EdgeServerInfo.__config_path_key}', and no {_DEFAULT_ES_CONFIG} was found "
+            f"above {here} to use instead"
         )
-        return repo_root
 
     def __init__(self, data: dict) -> None:
         self.__hostname: str = _assert_string_entry(data, self.__hostname_key)
         self.__admin_user = _get_str_or_default(data, self.__admin_user_key, "admin_user")
         self.__admin_password = _get_str_or_default(data, self.__admin_password_key, "password")
-        self.__config_path = _get_str_or_default(
-            data,
-            self.__config_path_key,
-            f"{self._get_repo_root()}/environment/aws/es_setup/config/config.json",
+        self.__config_path = (
+            _get_str_or_default(data, self.__config_path_key, "")
+            if self.__config_path_key in data
+            else self._default_config_path()
         )
 
 

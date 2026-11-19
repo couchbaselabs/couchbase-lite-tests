@@ -1,0 +1,102 @@
+// Daily trigger: starts functional-e2e-<platform> (jenkins/pipelines/functional/<platform>)
+// for the latest build of every non-EOL Couchbase Lite train of every platform that
+// Alembic's latest_tested API does not already list as tested. Each run uses the latest
+// Sync Gateway release.
+
+def PLATFORMS = ['c', 'android', 'java', 'ios', 'dotnet', 'javascript']
+
+def progetProductFor(String platform) {
+    def suffix = [dotnet: "net", javascript: "js"][platform] ?: platform
+    return "couchbase-lite-" + suffix
+}
+
+pipeline {
+    agent { label 'macos-host || linux-host' }
+    environment {
+        PATH = "/opt/homebrew/opt/python@3.10/bin:/opt/homebrew/bin:/usr/local/bin:${env.PATH}"
+    }
+    options {
+        ansiColor('xterm')
+        timestamps()
+        timeout(time: 30, unit: 'MINUTES')
+        disableConcurrentBuilds()
+    }
+    triggers {
+        cron('''TZ=Asia/Kolkata
+0 4 * * *''')
+    }
+    stages {
+        stage('Trigger Functional Tests') {
+            steps {
+                script {
+                    def proget = load 'jenkins/pipelines/shared/resolveProgetVersion.groovy'
+                    def builds = load 'jenkins/pipelines/shared/progetBuilds.groovy'
+                    def datasets = load 'jenkins/pipelines/shared/cblDatasetCompatibility.groovy'
+                    def triggers = load 'jenkins/pipelines/shared/triggerRecord.groovy'
+
+                    // platform -> "<version>-<build>" list triggered this run.
+                    def triggered = [:]
+                    // Anything that went wrong; one failure must not block the rest.
+                    def failed = []
+
+                    for (platform in PLATFORMS) {
+                        def product = progetProductFor(platform)
+                        def trains
+                        try {
+                            trains = builds.fetchTrains(product)
+                        } catch (Exception e) {
+                            echo "WARN: could not fetch trains for ${platform} (${product}): ${e.getMessage()}"
+                            failed << "${platform} (get_trains)"
+                            continue
+                        }
+
+                        for (train in trains) {
+                            try {
+                                def info = builds.resolveVersionBuild(proget, product, train, "CBL_VERSION", true)
+                                if (info == null) {
+                                    // No published build yet (new train) -- normal, not a failure.
+                                    echo "SKIP: ${platform} train ${train} -- no published build yet"
+                                    continue
+                                }
+                                def fullVersion = "${info.version}-${info.build}"
+                                if (triggers.alreadyTriggered(product, info.version, info.build)) {
+                                    echo "SKIP: ${platform} v${fullVersion} (already triggered)"
+                                    continue
+                                }
+
+                                def params = [
+                                    string(name: "CBL_VERSION", value: fullVersion),
+                                    string(name: "SGW_VERSION", value: '')
+                                ]
+                                // The JS pipeline has no dataset parameter.
+                                if (platform != 'javascript') {
+                                    params << string(name: "TS_DATASET_VERSION", value: datasets.datasetFor(fullVersion))
+                                }
+                                echo "Triggering 'functional-e2e-${platform}' for ${platform} v${fullVersion}"
+                                build job: "functional-e2e-${platform}", parameters: params, wait: false
+                                triggered[platform] = (triggered[platform] ?: []) + [fullVersion]
+
+                                if (!triggers.record(product, info.version, info.build)) {
+                                    failed << "${platform} ${fullVersion} (not recorded)"
+                                }
+                            } catch (Exception e) {
+                                echo "WARN: ${platform} train ${train} failed: ${e.getMessage()}"
+                                failed << "${platform} ${train}"
+                            }
+                        }
+                    }
+
+                    def title = triggered ?
+                        triggered.collect { p, v -> "${p}: ${v.join(', ')}" }.join('  |  ') :
+                        'none'
+                    currentBuild.displayName = "${title}  (#${currentBuild.number})"
+
+                    if (failed) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "WARNING: ${failed.size()} problem(s): ${failed}"
+                    }
+                }
+            }
+        }
+    }
+}
