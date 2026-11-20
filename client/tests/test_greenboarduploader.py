@@ -2288,10 +2288,10 @@ class TestSuiteStressAndTiming:
             90,
         )
 
-    def test_defaults_are_unknown(self) -> None:
+    def test_defaults_are_functional_and_unknown_timing(self) -> None:
         run = upload_in_process(make_uploader()).run
 
-        assert (run.suite, run.stress, run.started_at, run.duration_seconds) == ("n/a", False, None, None)
+        assert (run.suite, run.stress, run.started_at, run.duration_seconds) == ("functional", False, None, None)
 
     def test_junit_path_passes_the_fields(self, tmp_path: Path) -> None:
         xml = write_junit_cases(tmp_path / "j.xml", _PASS_CASE, tests=1, failures=0, errors=0)
@@ -2317,9 +2317,10 @@ class TestSuiteStressAndTiming:
         [
             (["tests/functional/test_a.py", "tests/functional/stress/test_b.py"], "couchbase-lite-c", "functional"),
             (["tests/multiplatform/test_a.py"], "couchbase-lite-c", "multiplatform"),
-            (["tests/functional/test_a.py", "tests/multiplatform/test_b.py"], "couchbase-lite-c", "n/a"),
-            (["client/smoke_tests/test_a.py"], "couchbase-lite-c", "n/a"),
-            ([], "couchbase-lite-c", "n/a"),
+            (["tests/functional/test_a.py", "tests/multiplatform/test_b.py"], "couchbase-lite-c", "functional"),
+            (["client/smoke_tests/test_a.py"], "couchbase-lite-c", "functional"),
+            ([], "couchbase-lite-c", "functional"),
+            ([], "edge-server", "functional"),
         ],
     )
     def test_suite_is_the_tests_folder(self, paths: list[str], platform: str, expected: str) -> None:
@@ -2327,11 +2328,11 @@ class TestSuiteStressAndTiming:
 
         assert greenboard_fixture.resolve_suite(items, Path("/repo"), platform) == expected
 
-    def test_item_outside_the_rootdir_is_na(self) -> None:
+    def test_item_outside_the_rootdir_is_functional(self) -> None:
         item = make_item()
         item.path = Path("/elsewhere/tests/functional/test_a.py")
 
-        assert greenboard_fixture.resolve_suite([item], Path("/repo"), "couchbase-lite-c") == "n/a"
+        assert greenboard_fixture.resolve_suite([item], Path("/repo"), "couchbase-lite-c") == "functional"
 
     def test_edge_server_run_of_only_test_server_tests_is_the_js_suite(self) -> None:
         items = [

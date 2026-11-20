@@ -10,7 +10,13 @@ import pytest
 import pytest_asyncio
 from cbltest import CBLPyTest
 from cbltest.api.syncgateway import CouchbaseVersion
-from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, parse_cbl_version, resolve_branch
+from cbltest.greenboarduploader import (
+    DEFAULT_SUITE,
+    EDGE_SERVER_PLATFORM,
+    GreenboardUploader,
+    parse_cbl_version,
+    resolve_branch,
+)
 from cbltest.logging import cbl_info, cbl_warning
 
 # Edge Server only runs on the 3.2 dataset and has no dataset version of its own to report.
@@ -134,19 +140,18 @@ _pending_key: Final[pytest.StashKey[_PendingRunResult]] = pytest.StashKey()
 
 
 def resolve_suite(items: Sequence[pytest.Item], rootpath: Path, platform: str) -> str:
-    """The suite of the run: the ``tests/<suite>`` folder every collected test is in, or ``"n/a"`` when they are
-    not all in one. An Edge Server run of ``functional`` whose every test also needs a test server is
-    ``EDGE_SERVER_JS_SUITE``."""
+    """The suite of the run: the one ``tests/<suite>`` folder the collected tests are in, else ``DEFAULT_SUITE``. An
+    Edge Server run of ``functional`` whose every test also needs a test server is ``EDGE_SERVER_JS_SUITE``."""
     suites = set()
     for item in items:
         parts = item.path.relative_to(rootpath).parts if item.path.is_relative_to(rootpath) else ()
-        suites.add(parts[1] if len(parts) > 2 and parts[0] == "tests" else "n/a")
-    if len(suites) != 1:
-        return "n/a"
-    suite = suites.pop()
+        if len(parts) > 2 and parts[0] == "tests":
+            suites.add(parts[1])
+    suite = suites.pop() if len(suites) == 1 else DEFAULT_SUITE
     if (
         suite == "functional"
         and platform == EDGE_SERVER_PLATFORM
+        and items
         and all(item.get_closest_marker("min_test_servers") for item in items)
     ):
         return EDGE_SERVER_JS_SUITE

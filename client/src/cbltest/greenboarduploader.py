@@ -18,6 +18,8 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 EDGE_SERVER_PLATFORM = "edge-server"
+# The suite of a run that names none; old docs, which have no suite, are functional runs too.
+DEFAULT_SUITE = "functional"
 
 
 def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
@@ -237,7 +239,7 @@ class RunResult(BaseModel):
     cbl_platform: str = Field("n/a", alias="cblPlatform")  # CBL platform of the test server, or "n/a"
     cbl_version: str = Field("n/a", alias="cblVersion")  # CBL library "x.y.z-build" from the test server, or "n/a"
     cbs_version: str = Field("n/a", alias="cbsVersion")  # "x.y.z-build", "rosmar" (no CBS) or "n/a" (none/unknown)
-    suite: str = "n/a"  # tests/ folder the run came from ("functional"), "functional-js" or "n/a"; missing on old docs
+    suite: str = DEFAULT_SUITE  # tests/ folder the run came from ("functional") or "functional-js"; missing on old docs
     stress: bool = False  # True if the run passed --stress (only the stress/ tests ran); missing on old docs
     started_at: float | None = Field(None, alias="startedAt")  # Unix time the pytest session started; None unknown
     duration_seconds: int | None = Field(None, alias="durationSeconds")  # session start to finish; None unknown
@@ -329,7 +331,7 @@ class GreenboardUploader:
         cbs_version: str = "n/a",
         dataset_version: str = "n/a",
         cbl_platform: str = "n/a",
-        suite: str = "n/a",
+        suite: str = DEFAULT_SUITE,
         stress: bool = False,
         started_at: float | None = None,
         duration_seconds: int | None = None,
@@ -365,7 +367,7 @@ class GreenboardUploader:
         :param dataset_version: The dataset version the test server used, or ``"n/a"`` when no test server was used.
         :param cbl_platform: The CBL platform of the test server (e.g. ``couchbase-lite-c``), or ``"n/a"`` when no test
             server was used. Unlike ``platform`` it is set even when the run is filed under another component.
-        :param suite: The suite the run's tests came from (``"functional"``, ``"functional-js"``), or ``"n/a"``.
+        :param suite: The suite the run's tests came from (``"functional"`` or ``"functional-js"``).
         :param stress: Whether the run passed ``--stress``, so only the stress tests ran.
         :param started_at: The Unix time the pytest session started, or None if unknown. The doc's ``uploaded`` and
             ``date`` are when the run finished.
@@ -483,7 +485,7 @@ class GreenboardUploader:
         cbs_version: str = "n/a",
         dataset_version: str = "n/a",
         cbl_platform: str = "n/a",
-        suite: str = "n/a",
+        suite: str = DEFAULT_SUITE,
         stress: bool = False,
         started_at: float | None = None,
         duration_seconds: int | None = None,
