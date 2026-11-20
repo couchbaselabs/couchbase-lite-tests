@@ -1,12 +1,14 @@
+import asyncio
 import json
 import re
 import socket
+import time
 from asyncio import Future, Semaphore, wait_for
 from contextlib import AsyncExitStack
 from logging import FileHandler, Formatter, getLogger
 from pathlib import Path
 from typing import cast
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import netifaces
 from aiohttp import web
@@ -52,6 +54,7 @@ class WebSocketRouter:
         self.__stopping = False
         self.__browser_cleanup = AsyncExitStack()
         self.__browser_log_path = Path("browser_log")
+        self.__connected_events: dict[str, asyncio.Event] = {url: asyncio.Event() for url in server_urls}
 
     async def _open_tdk_page(self, browser: Browser, url: str, device: str, query: str) -> None:
         self.__browser_log_path.mkdir(exist_ok=True)
@@ -85,17 +88,27 @@ class WebSocketRouter:
         self.__stopping = False
         await self.__runner.setup()
 
-        # Create a socket so that I can use an OS provided port
+        # Native WebSocket test servers (ws:// URLs, e.g. React Native) connect back to a
+        # fixed port given in their URL. Otherwise let the OS choose one.
+        bind_port = next(
+            (urlparse(u).port or 0 for u in self.__server_urls if urlparse(u).scheme == "ws"),
+            0,
+        )
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.bind(("", 0))
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind(("", bind_port))
         sock.listen(128)
         site = web.SockSite(self.__runner, sock)
         chosen_port = sock.getsockname()[1]
         await site.start()
+        cbl_info(f"WebSocket router listening on port {chosen_port}")
 
         try:
             browser: Browser | None = None
-            if CBLPyTestGlobal.auto_start_tdk_page:
+            # Only the JS test server needs a browser page; native WebSocket test servers launch themselves
+            needs_browser = any(urlparse(u).scheme != "ws" for u in self.__server_urls)
+            if CBLPyTestGlobal.auto_start_tdk_page and needs_browser:
                 playwright = await self.__browser_cleanup.enter_async_context(async_playwright())
                 browser = await playwright.chromium.launch()
                 self.__browser_cleanup.push_async_callback(browser.close)
@@ -109,15 +122,39 @@ class WebSocketRouter:
                     "device": f"ws{ws_index}",
                 }
                 query = urlencode(params)
-                timeout = 30
-                if browser is not None:
+                is_native_ws = urlparse(url).scheme == "ws"
+                timeout = 90 if is_native_ws else 30
+                if browser is not None and not is_native_ws:
                     await self._open_tdk_page(browser, url, params["device"], query)
 
-                await wait_for(self.__conn_sem.acquire(), timeout=timeout)
-                cbl_info(f"Connected to test server at {url}!")
+                t0 = time.monotonic()
+                try:
+                    await self._wait_for_connection(timeout)
+                except TimeoutError:
+                    cbl_error(f"No connection from {url} after {time.monotonic() - t0:.1f}s (limit {timeout}s)")
+                    raise
+                cbl_info(f"Connected to test server at {url} (took {time.monotonic() - t0:.1f}s)")
         except BaseException:
             await self.stop()
             raise
+
+    async def _wait_for_connection(self, timeout: float) -> None:
+        """Acquire the connection semaphore, logging a heartbeat every 10 s."""
+        deadline = time.monotonic() + timeout
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError
+            chunk = min(10.0, remaining)
+            try:
+                await wait_for(self.__conn_sem.acquire(), timeout=chunk)
+                return
+            except TimeoutError:
+                elapsed = timeout - (deadline - time.monotonic())
+                cbl_info(
+                    f"Still waiting for test server to connect ({elapsed:.0f}s elapsed, "
+                    f"{timeout - elapsed:.0f}s remaining)"
+                )
 
     async def stop(self) -> None:
         self.__stopping = True
@@ -144,6 +181,21 @@ class WebSocketRouter:
 
         self.__pending.clear()
 
+    async def ensure_connected(self, url: str, timeout: float = 120.0) -> None:
+        """Wait until a live WebSocket connection for *url* is available.
+
+        Returns immediately if already connected; blocks while a reconnect
+        is in progress.
+        """
+        event = self.__connected_events.get(url)
+        if event is None or event.is_set():
+            return
+        cbl_info(f"Waiting up to {timeout:.0f}s for test server to reconnect at {url}")
+        try:
+            await wait_for(event.wait(), timeout=timeout)
+        except TimeoutError:
+            raise ConnectionError(f"Device at {url} did not reconnect within {timeout:.0f} s") from None
+
     def get_websocket_for_write(self, url: str) -> web.WebSocketResponse:
         if not self.is_known_ws_url(url):
             raise IndexError(f"No WebSocket connection for the given URL ({url})")
@@ -157,6 +209,8 @@ class WebSocketRouter:
         ws = web.WebSocketResponse(protocols=request.headers.getall("Sec-WebSocket-Protocol", []))
         await ws.prepare(request)
 
+        current_url: str | None = None
+
         async for msg in ws:
             if self.__stopping:
                 break
@@ -166,13 +220,16 @@ class WebSocketRouter:
                 ts_id = data.get("ts_id")
                 if ts_id is not None and ts_id in self.__pending:
                     future = self.__pending.pop(ts_id)
-                    future.set_result(data)
+                    if not future.done():
+                        future.set_result(data)
                 else:
                     device = data.get("device")
                     if device is not None:
                         try:
                             url_index = int(device[2:])
-                            self.__connections[self.__server_urls[url_index]] = ws
+                            current_url = self.__server_urls[url_index]
+                            self.__connections[current_url] = ws
+                            self.__connected_events[current_url].set()
                             self.__conn_sem.release()
                         except (ValueError, IndexError):
                             cbl_error(f"Unknown or invalid device ID received: {device}")
@@ -180,15 +237,60 @@ class WebSocketRouter:
             elif msg.type == web.WSMsgType.ERROR:
                 cbl_error(f"WebSocket connection closed with exception {ws.exception()}")
 
+        # Only act if this ws is still the active connection for the URL.
+        # begin_reconnect() may already have dropped it, and a newer connection
+        # from the same test server may already have replaced it.
+        if current_url is not None and not self.__stopping and self.__connections.get(current_url) is ws:
+            cbl_warning(f"WebSocket connection from {current_url} dropped")
+
+            del self.__connections[current_url]
+            self.__connected_events[current_url].clear()
+
+            self._fail_pending_futures(current_url)
+
         return ws
+
+    def unregister(self, ts_id: int) -> None:
+        self.__pending.pop(ts_id, None)
+
+    def begin_reconnect(self, url: str) -> None:
+        """Drop the connection for *url* after a request to it timed out.
+
+        Called synchronously from send(), so the connected event is cleared before
+        send() raises, and the next request's ensure_connected() waits for the test
+        server to connect again instead of using the stale connection.  Native
+        WebSocket test servers reconnect on their own once the connection closes.
+        """
+        self.__connected_events[url].clear()
+
+        ws = self.__connections.pop(url, None)
+        cbl_warning(f"Request timeout on {url}; closing the connection so the test server reconnects")
+
+        self._fail_pending_futures(url)
+
+        if ws is not None and not ws.closed:
+            asyncio.ensure_future(self._close_quietly(ws))
 
     def register(self, ts_id: int) -> Future[dict]:
         future: Future[dict] = Future()
         self.__pending[ts_id] = future
         return future
 
-    def unregister(self, ts_id: int) -> None:
-        self.__pending.pop(ts_id, None)
+    def _fail_pending_futures(self, url: str) -> None:
+        pending_ids = list(self.__pending.keys())
+        if pending_ids:
+            cbl_warning(f"Failing {len(pending_ids)} in-flight request(s) for {url}")
+        for ts_id in pending_ids:
+            fut = self.__pending.pop(ts_id)
+            if not fut.done():
+                fut.set_exception(ConnectionError(f"WebSocket connection to {url} lost while waiting for response"))
+
+    @staticmethod
+    async def _close_quietly(ws: web.WebSocketResponse) -> None:
+        try:
+            await ws.close(code=1011, message=b"Request timed out, forcing reconnect")
+        except Exception:
+            pass
 
     def _lookup_ip(self, remote_url: str) -> str:
         if "localhost" in remote_url:
