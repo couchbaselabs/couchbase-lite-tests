@@ -18,6 +18,8 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.logging import cbl_info, cbl_warning
 
 EDGE_SERVER_PLATFORM = "edge-server"
+# The suite of a run that names none; old docs, which have no suite, are functional runs too.
+DEFAULT_SUITE = "functional"
 
 
 def count_from_junit_xml(xml_path: Path) -> tuple[int, int, int]:
@@ -237,6 +239,10 @@ class RunResult(BaseModel):
     cbl_platform: str = Field("n/a", alias="cblPlatform")  # CBL platform of the test server, or "n/a"
     cbl_version: str = Field("n/a", alias="cblVersion")  # CBL library "x.y.z-build" from the test server, or "n/a"
     cbs_version: str = Field("n/a", alias="cbsVersion")  # "x.y.z-build", "rosmar" (no CBS) or "n/a" (none/unknown)
+    suite: str = DEFAULT_SUITE  # tests/ folder the run came from ("functional") or "functional-js"; missing on old docs
+    stress: bool = False  # True if the run passed --stress (only the stress/ tests ran); missing on old docs
+    started_at: float | None = Field(None, alias="startedAt")  # Unix time the pytest session started; None unknown
+    duration_seconds: int | None = Field(None, alias="durationSeconds")  # session start to finish; None unknown
 
 
 class GreenboardUploader:
@@ -325,6 +331,10 @@ class GreenboardUploader:
         cbs_version: str = "n/a",
         dataset_version: str = "n/a",
         cbl_platform: str = "n/a",
+        suite: str = DEFAULT_SUITE,
+        stress: bool = False,
+        started_at: float | None = None,
+        duration_seconds: int | None = None,
         tests: dict[str, str] | None = None,
         failures: list[dict[str, Any]] | None = None,
         collected_ids: Sequence[str] | None = None,
@@ -357,6 +367,11 @@ class GreenboardUploader:
         :param dataset_version: The dataset version the test server used, or ``"n/a"`` when no test server was used.
         :param cbl_platform: The CBL platform of the test server (e.g. ``couchbase-lite-c``), or ``"n/a"`` when no test
             server was used. Unlike ``platform`` it is set even when the run is filed under another component.
+        :param suite: The suite the run's tests came from (``"functional"`` or ``"functional-js"``).
+        :param stress: Whether the run passed ``--stress``, so only the stress tests ran.
+        :param started_at: The Unix time the pytest session started, or None if unknown. The doc's ``uploaded`` and
+            ``date`` are when the run finished.
+        :param duration_seconds: The seconds from the session's start to its finish, or None if unknown.
         :param cbs_version: The Couchbase Server version string (``"x.y.z-build"``), ``"rosmar"`` or ``"n/a"``.
         :param tests: Every test's outcome keyed by node id. When ``None`` (default), uses the in-process outcomes built
             by :py:meth:`pytest_runtest_makereport`.
@@ -446,6 +461,10 @@ class GreenboardUploader:
                 datasetVersion=dataset_version,
                 cblPlatform=cbl_platform,
                 cblVersion=format_cbl_version(version),
+                suite=suite,
+                stress=stress,
+                startedAt=started_at,
+                durationSeconds=duration_seconds,
             ),
             all_tests,
             all_failures[:MAX_FAILURES],
@@ -466,6 +485,10 @@ class GreenboardUploader:
         cbs_version: str = "n/a",
         dataset_version: str = "n/a",
         cbl_platform: str = "n/a",
+        suite: str = DEFAULT_SUITE,
+        stress: bool = False,
+        started_at: float | None = None,
+        duration_seconds: int | None = None,
         collected_ids: Sequence[str] | None = None,
         finished_ids: Container[str] | None = None,
     ) -> None:
@@ -481,6 +504,10 @@ class GreenboardUploader:
         :param cbs_version: Passed through verbatim to :py:meth:`upload`.
         :param dataset_version: Passed through verbatim to :py:meth:`upload`.
         :param cbl_platform: Passed through verbatim to :py:meth:`upload`.
+        :param suite: Passed through verbatim to :py:meth:`upload`.
+        :param stress: Passed through verbatim to :py:meth:`upload`.
+        :param started_at: Passed through verbatim to :py:meth:`upload`.
+        :param duration_seconds: Passed through verbatim to :py:meth:`upload`.
         :param collected_ids: Passed through to :py:meth:`upload`, which only uses it on the no-XML fall-back.
         :param finished_ids: Same as ``collected_ids``.
 
@@ -522,6 +549,10 @@ class GreenboardUploader:
                 cbs_version=cbs_version,
                 dataset_version=dataset_version,
                 cbl_platform=cbl_platform,
+                suite=suite,
+                stress=stress,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
@@ -549,6 +580,10 @@ class GreenboardUploader:
             cbs_version=cbs_version,
             dataset_version=dataset_version,
             cbl_platform=cbl_platform,
+            suite=suite,
+            stress=stress,
+            started_at=started_at,
+            duration_seconds=duration_seconds,
             tests=tests,
             failures=failures,
         )
