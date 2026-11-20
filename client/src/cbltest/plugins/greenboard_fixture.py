@@ -1,4 +1,5 @@
 import asyncio
+import time
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,8 +13,12 @@ from cbltest.api.syncgateway import CouchbaseVersion
 from cbltest.greenboarduploader import EDGE_SERVER_PLATFORM, GreenboardUploader, parse_cbl_version, resolve_branch
 from cbltest.logging import cbl_info, cbl_warning
 
-# Edge Server only runs on the 3.x datasets and has no dataset version of its own to report.
-EDGE_SERVER_DATASET_VERSION: Final[str] = "3.x"
+# Edge Server only runs on the 3.2 dataset and has no dataset version of its own to report.
+EDGE_SERVER_DATASET_VERSION: Final[str] = "3.2"
+
+# The suite of an Edge Server run of tests/functional whose every test replicates with a CBL test server
+# (functional/es with JS_REPLICATION_TESTS_ONLY), kept apart from the full Edge Server runs.
+EDGE_SERVER_JS_SUITE: Final[str] = "functional-js"
 
 SYNC_GATEWAY_PLATFORM: Final[str] = "sync-gateway"
 PROGET_GET_VERSION_URL: Final[str] = "http://proget.build.couchbase.com:8080/api/get_version"
@@ -123,8 +128,29 @@ async def find_product_under_test(running: Sequence[RunningProduct]) -> RunningP
 
 
 _finished_key: Final[pytest.StashKey[FinishedItems]] = pytest.StashKey()
+_started_key: Final[pytest.StashKey[float]] = pytest.StashKey()
 _uploader_key: Final[pytest.StashKey[GreenboardUploader]] = pytest.StashKey()
 _pending_key: Final[pytest.StashKey[_PendingRunResult]] = pytest.StashKey()
+
+
+def resolve_suite(items: Sequence[pytest.Item], rootpath: Path, platform: str) -> str:
+    """The suite of the run: the ``tests/<suite>`` folder every collected test is in, or ``"n/a"`` when they are
+    not all in one. An Edge Server run of ``functional`` whose every test also needs a test server is
+    ``EDGE_SERVER_JS_SUITE``."""
+    suites = set()
+    for item in items:
+        parts = item.path.relative_to(rootpath).parts if item.path.is_relative_to(rootpath) else ()
+        suites.add(parts[1] if len(parts) > 2 and parts[0] == "tests" else "n/a")
+    if len(suites) != 1:
+        return "n/a"
+    suite = suites.pop()
+    if (
+        suite == "functional"
+        and platform == EDGE_SERVER_PLATFORM
+        and all(item.get_closest_marker("min_test_servers") for item in items)
+    ):
+        return EDGE_SERVER_JS_SUITE
+    return suite
 
 
 async def resolve_cbs_version(cblpytest: CBLPyTest) -> str:
@@ -268,6 +294,10 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
         finished_ids = session.config.stash[_finished_key].nodeids
         incomplete = len(finished_ids) < collected
         collected_ids = [item.nodeid for item in session.items]
+        suite = resolve_suite(session.items, session.config.rootpath, pending.test_platform)
+        stress = session.config.getoption("--stress", default=False)
+        started_at = session.config.stash.get(_started_key, None)
+        duration_seconds = round(time.time() - started_at) if started_at is not None else None
         if pending.xmlpath:
             uploader.upload_from_junit_file(
                 Path(pending.xmlpath),
@@ -281,6 +311,10 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 cbs_version=pending.cbs_version,
                 dataset_version=pending.dataset_version,
                 cbl_platform=pending.cbl_platform,
+                suite=suite,
+                stress=stress,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
@@ -298,11 +332,20 @@ def pytest_sessionfinish(session: pytest.Session) -> None:
                 cbs_version=pending.cbs_version,
                 dataset_version=pending.dataset_version,
                 cbl_platform=pending.cbl_platform,
+                suite=suite,
+                stress=stress,
+                started_at=started_at,
+                duration_seconds=duration_seconds,
                 collected_ids=collected_ids,
                 finished_ids=finished_ids,
             )
     finally:
         session.config.pluginmanager.unregister(uploader)
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Record when the session started, for the doc's ``startedAt`` and ``durationSeconds``."""
+    session.config.stash[_started_key] = time.time()
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

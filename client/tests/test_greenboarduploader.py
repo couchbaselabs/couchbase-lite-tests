@@ -978,7 +978,7 @@ class TestGreenboardFixture:
             platform="edge-server",
             os="n/a",
             jobUrl="local",
-            datasetVersion="3.x",
+            datasetVersion="3.2",
         )
 
     @pytest.mark.asyncio
@@ -2164,11 +2164,11 @@ class TestDatasetAndCblVersion:
         assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("n/a", "n/a", "n/a")
 
     @pytest.mark.asyncio
-    async def test_edge_server_run_alone_uses_3x_dataset(self) -> None:
+    async def test_edge_server_run_alone_uses_32_dataset(self) -> None:
         doc = await self._fixture_doc(edge_servers=[FakeEdgeServerManager(FakeEdgeServer("1.1.0(45;abc)"))])
 
         assert doc.platform == "edge-server"
-        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("3.x", "n/a", "n/a")
+        assert (doc.dataset_version, doc.cbl_version, doc.cbl_platform) == ("3.2", "n/a", "n/a")
 
     @pytest.mark.asyncio
     async def test_edge_server_run_with_test_server_carries_both(self) -> None:
@@ -2252,3 +2252,135 @@ class TestProductUnderTest:
 
     def test_unparseable_build_gives_none(self) -> None:
         assert greenboard_fixture.cbl_running_product("couchbase-lite-c", "4.2.0-bogus") is None
+
+
+def _suite_item(path: str, *, markers: list[str] | None = None, root: Path = Path("/repo")) -> MagicMock:
+    item = make_item(markers)
+    item.path = root / path
+    item.nodeid = path
+    return item
+
+
+class TestSuiteStressAndTiming:
+    """``suite``, ``stress``, ``startedAt`` and ``durationSeconds``: which suite and kind of run a doc came from, and
+    when it ran."""
+
+    def test_upload_writes_the_fields(self) -> None:
+        uploader = make_uploader()
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload(
+                "edge-server",
+                "n/a",
+                None,
+                None,
+                EdgeServerVersion("1.1.0(45;abc)"),
+                suite="functional",
+                stress=True,
+                started_at=1000.5,
+                duration_seconds=90,
+            )
+
+        doc = uploaded(mock_upload).run.model_dump(by_alias=True)
+        assert (doc["suite"], doc["stress"], doc["startedAt"], doc["durationSeconds"]) == (
+            "functional",
+            True,
+            1000.5,
+            90,
+        )
+
+    def test_defaults_are_unknown(self) -> None:
+        run = upload_in_process(make_uploader()).run
+
+        assert (run.suite, run.stress, run.started_at, run.duration_seconds) == ("n/a", False, None, None)
+
+    def test_junit_path_passes_the_fields(self, tmp_path: Path) -> None:
+        xml = write_junit_cases(tmp_path / "j.xml", _PASS_CASE, tests=1, failures=0, errors=0)
+        uploader = make_uploader()
+        with patch.object(uploader, "_upload_document") as mock_upload:
+            uploader.upload_from_junit_file(
+                xml,
+                "couchbase-lite-c",
+                "macOS",
+                "4.2.0-1",
+                None,
+                suite="functional",
+                stress=True,
+                started_at=1000.0,
+                duration_seconds=5,
+            )
+
+        run = uploaded(mock_upload).run
+        assert (run.suite, run.stress, run.started_at, run.duration_seconds) == ("functional", True, 1000.0, 5)
+
+    @pytest.mark.parametrize(
+        "paths, platform, expected",
+        [
+            (["tests/functional/test_a.py", "tests/functional/stress/test_b.py"], "couchbase-lite-c", "functional"),
+            (["tests/multiplatform/test_a.py"], "couchbase-lite-c", "multiplatform"),
+            (["tests/functional/test_a.py", "tests/multiplatform/test_b.py"], "couchbase-lite-c", "n/a"),
+            (["client/smoke_tests/test_a.py"], "couchbase-lite-c", "n/a"),
+            ([], "couchbase-lite-c", "n/a"),
+        ],
+    )
+    def test_suite_is_the_tests_folder(self, paths: list[str], platform: str, expected: str) -> None:
+        items = [_suite_item(path) for path in paths]
+
+        assert greenboard_fixture.resolve_suite(items, Path("/repo"), platform) == expected
+
+    def test_item_outside_the_rootdir_is_na(self) -> None:
+        item = make_item()
+        item.path = Path("/elsewhere/tests/functional/test_a.py")
+
+        assert greenboard_fixture.resolve_suite([item], Path("/repo"), "couchbase-lite-c") == "n/a"
+
+    def test_edge_server_run_of_only_test_server_tests_is_the_js_suite(self) -> None:
+        items = [
+            _suite_item("tests/functional/test_a.py", markers=["min_edge_servers", "min_test_servers"]),
+            _suite_item("tests/functional/test_b.py", markers=["min_edge_servers", "min_test_servers"]),
+        ]
+
+        assert greenboard_fixture.resolve_suite(items, Path("/repo"), "edge-server") == "functional-js"
+
+    def test_full_edge_server_run_is_functional(self) -> None:
+        items = [
+            _suite_item("tests/functional/test_a.py", markers=["min_edge_servers", "min_test_servers"]),
+            _suite_item("tests/functional/test_b.py", markers=["min_edge_servers"]),
+        ]
+
+        assert greenboard_fixture.resolve_suite(items, Path("/repo"), "edge-server") == "functional"
+
+    def test_cbl_run_whose_tests_all_need_a_test_server_is_functional(self) -> None:
+        items = [_suite_item("tests/functional/test_a.py", markers=["min_test_servers"])]
+
+        assert greenboard_fixture.resolve_suite(items, Path("/repo"), "couchbase-lite-c") == "functional"
+
+    @pytest.mark.asyncio
+    async def test_fixture_writes_suite_stress_and_timing(self) -> None:
+        cblpytest = _make_cblpytest(test_servers=[_make_server()])
+        config = _make_pytestconfig()
+        config.option.stress = True
+        session = _make_session(config)
+        greenboard_fixture.pytest_sessionstart(session)
+        started = config.stash[greenboard_fixture._started_key]
+        config.stash[greenboard_fixture._started_key] = started - 120
+        session.items = [_suite_item("tests/functional/stress/test_a.py", root=config.rootpath)]
+        with patch("cbltest.greenboarduploader.GreenboardUploader._upload_document") as mock_upload:
+            gen = _raw_greenboard(cblpytest, config)
+            await gen.__anext__()
+            uploader = next(p for p in config.pluginmanager.get_plugins() if isinstance(p, GreenboardUploader))
+            drive_hook(uploader, make_report("call", passed=True), make_item())
+            try:
+                await gen.__anext__()
+            except StopAsyncIteration:
+                pass
+            greenboard_fixture.pytest_sessionfinish(session)
+
+        run = uploaded(mock_upload).run
+        assert (run.suite, run.stress, run.started_at) == ("functional", True, started - 120)
+        assert run.duration_seconds is not None and 120 <= run.duration_seconds <= 125
+
+    @pytest.mark.asyncio
+    async def test_fixture_without_a_recorded_start_leaves_timing_unknown(self) -> None:
+        doc = await TestDatasetAndCblVersion()._fixture_doc(test_servers=[_make_server()])
+
+        assert (doc.stress, doc.started_at, doc.duration_seconds) == (False, None, None)
